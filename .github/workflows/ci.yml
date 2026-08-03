@@ -33,7 +33,17 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-          cache: pip
+
+      - name: Verificar árbol fuente
+        run: |
+          missing=0
+          for path in requirements-dev.txt run.py alembic.ini app tests migrations Dockerfile; do
+            if [[ ! -e "$path" ]]; then
+              echo "::error file=$path::La fuente canónica v0.45.5 aún no contiene $path en esta rama."
+              missing=1
+            fi
+          done
+          test "$missing" -eq 0
 
       - name: Instalar dependencias
         run: |
