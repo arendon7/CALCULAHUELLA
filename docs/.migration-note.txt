@@ -1,0 +1,1 @@
+La importación integral del árbol fuente v0.45.5 se construye mediante Git Data API y se verificará por SHA-256.
