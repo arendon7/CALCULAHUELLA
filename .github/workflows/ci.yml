@@ -1,0 +1,69 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - "feature/**"
+      - "release/**"
+      - "migration/**"
+    paths:
+      - "app/**"
+      - "tests/**"
+      - "scripts/**"
+      - "migrations/**"
+      - "run.py"
+      - "requirements*.txt"
+      - "Dockerfile"
+      - "*.sh"
+      - "*.command"
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      APP_ENV: local
+      SESSION_SECRET: ci-session-secret-only
+      DATABASE_URL: sqlite+pysqlite:///./instance/ci.sqlite3
+      SEED_DEMO: "true"
+      OPEN_BROWSER: "0"
+      CSRF_ENABLED: "false"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r requirements-dev.txt
+
+      - name: Compile Python
+        run: python -m compileall -q app scripts tests run.py
+
+      - name: Validate shell syntax
+        run: find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -n1 bash -n
+
+      - name: Run current release tests
+        run: |
+          mkdir -p instance
+          python -m pytest -q \
+            tests/test_v045_product_intelligence.py \
+            tests/test_v0451_user_experience.py \
+            tests/test_v0452_brand_navigation.py \
+            tests/test_v0453_guided_onboarding.py \
+            tests/test_v0454_first_inventory.py \
+            tests/test_v0455_guided_imports.py
+
+      - name: Build Docker image
+        run: docker build -t calcula-tu-huella:${{ github.sha }} .
