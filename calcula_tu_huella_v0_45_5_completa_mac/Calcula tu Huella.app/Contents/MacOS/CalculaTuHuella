@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+INSTALL_ROOT="${CTH_INSTALL_ROOT:-$HOME/Library/Application Support/CalculaTuHuella}"
+SCRIPT="$INSTALL_ROOT/current/ABRIR_CALCULA_TU_HUELLA.command"
+if [ ! -f "$SCRIPT" ]; then
+  /usr/bin/osascript -e 'display alert "Calcula tu Huella" message "La aplicación no está instalada. Abre INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command." as critical'
+  exit 1
+fi
+/usr/bin/osascript - "$SCRIPT" <<'APPLESCRIPT'
+on run argv
+  set scriptPath to item 1 of argv
+  tell application "Terminal"
+    activate
+    do script "/bin/bash " & quoted form of scriptPath & " --sin-pausa"
+  end tell
+end run
+APPLESCRIPT

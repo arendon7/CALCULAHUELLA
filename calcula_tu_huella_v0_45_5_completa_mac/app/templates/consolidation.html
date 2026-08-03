@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% block title %}Consolidación V1.0 · Calcula tu Huella{% endblock %}
+{% block page_label %}Producto / Consolidación y auditoría{% endblock %}
+{% block content %}
+<section class="page-heading consolidation-heading">
+  <div>
+    <span class="eyebrow">CONSOLIDACIÓN, AUDITORÍA Y ARQUITECTURA · V0.45</span>
+    <h1>Preparación controlada de V1.0</h1>
+    <p>Separa el núcleo climático, los módulos avanzados y la administración interna; controla deuda, puertas de salida, permisos y recorridos reales.</p>
+  </div>
+  <div class="page-actions">
+    <a class="button secondary" href="/modulos">Mapa del producto</a>
+    <a class="button primary" href="/consolidacion/exportar.xlsx">Exportar auditoría</a>
+  </div>
+</section>
+
+<section class="kpi-grid five consolidation-kpis">
+  <article class="kpi-card featured"><div class="kpi-icon green">V1</div><div><small>PREPARACIÓN CONTROLADA</small><strong>{{ summary.readiness_score }} %</strong><p>No equivale a certificación ni autorización de lanzamiento.</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">▦</div><div><small>MÓDULOS REGISTRADOS</small><strong>{{ summary.module_count }}</strong><p>Tres capas de producto.</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">!</div><div><small>HALLAZGOS ABIERTOS</small><strong>{{ summary.open_findings }}</strong><p>{{ summary.critical_open }} críticos.</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">◆</div><div><small>PUERTAS APROBADAS</small><strong>{{ summary.approved_gates }}/{{ summary.gate_count }}</strong><p>Condiciones mínimas de salida.</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">→</div><div><small>RECORRIDOS APROBADOS</small><strong>{{ summary.validated_journeys }}/{{ summary.journey_count }}</strong><p>Pruebas completas por rol.</p></div></article>
+</section>
+
+<section class="card consolidation-notice">
+  <strong>Regla de esta etapa</strong>
+  <p>No se agregan nuevos dominios funcionales. Cada cambio debe reducir deuda, mejorar confiabilidad metodológica, validar un recorrido o cerrar una condición de salida.</p>
+</section>
+
+<section class="card" id="arquitectura-dominios">
+  <div class="card-head">
+    <div><small>MODULARIZACIÓN V0.45</small><h3>Propiedad explícita de rutas y persistencia por dominios</h3></div>
+    <span class="counter">{{ domain_architecture.owned_route_count }} rutas extraídas</span>
+  </div>
+  <div class="architecture-metrics">
+    <div><small>Dominios web separados</small><strong>{{ domain_architecture.domain_count }}</strong></div>
+    <div><small>Líneas restantes en main.py</small><strong>{{ domain_architecture.main_lines }}</strong></div>
+    <div><small>Líneas en módulos extraídos</small><strong>{{ domain_architecture.extracted_module_lines }}</strong></div>
+    <div><small>Paridad de rutas</small><strong>{{ 'OK' if domain_architecture.route_parity_ok else 'REVISAR' }}</strong></div>
+  </div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Dominio</th><th>Módulo</th><th>Rutas</th><th>Líneas</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for domain in domain_architecture.domains %}
+        <tr>
+          <td><strong>{{ domain.name }}</strong></td>
+          <td><code>{{ domain.module }}</code></td>
+          <td>{{ domain.route_count }}</td>
+          <td>{{ domain.module_lines }}</td>
+          <td><span class="consolidation-status {{ 'status-aprobado' if domain.module_exists and domain.route_count else 'status-bloqueado' }}">{{ 'Separado' if domain.module_exists and domain.route_count else 'Revisar' }}</span></td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if domain_architecture.duplicate_paths %}
+  <p class="alert error">Rutas duplicadas: {{ domain_architecture.duplicate_paths|join(', ') }}</p>
+  {% endif %}
+  <div class="card-head architecture-subhead">
+    <div><small>PERSISTENCIA V0.45</small><h3>Modelos, repositorios y servicios por dominio</h3></div>
+    <span class="counter">{{ domain_architecture.persistence.model_class_count }} modelos</span>
+  </div>
+  <div class="architecture-metrics">
+    <div><small>Líneas restantes en database.py</small><strong>{{ domain_architecture.persistence.database_lines }}</strong></div>
+    <div><small>Módulos de modelos</small><strong>{{ domain_architecture.persistence.model_module_count }}</strong></div>
+    <div><small>Repositorios</small><strong>{{ domain_architecture.persistence.repository_count }}</strong></div>
+    <div><small>Servicios</small><strong>{{ domain_architecture.persistence.service_count }}</strong></div>
+    <div><small>Separación persistente</small><strong>{{ 'OK' if domain_architecture.persistence.split_ok else 'REVISAR' }}</strong></div>
+  </div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Módulo de modelos</th><th>Clases</th><th>Líneas</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for module in domain_architecture.persistence.model_modules %}
+        <tr><td><code>{{ module.module }}</code></td><td>{{ module.class_count }}</td><td>{{ module.lines }}</td><td>{{ 'Separado' if module.exists and module.class_count else 'Revisar' }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" id="capas">
+  <div class="card-head"><div><small>ARQUITECTURA DE PRODUCTO</small><h3>Tres capas con audiencias diferentes</h3></div></div>
+  <div class="product-layers">
+    {% for layer in summary.layers %}
+    <article class="product-layer layer-{{ loop.index }}">
+      <header><span>{{ loop.index }}</span><div><strong>{{ layer.name }}</strong><small>{{ layer.modules|length }} módulos</small></div></header>
+      <div class="layer-modules">
+        {% for module in layer.modules %}
+        <a href="{{ module.route }}"><b>{{ module.name }}</b><small>{{ module.audience }} · {{ module.version }}</small></a>
+        {% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card" id="puertas">
+  <div class="card-head"><div><small>GOBIERNO DE RELEASE</small><h3>Puertas obligatorias antes de V1.0</h3></div><span class="counter">{{ summary.approved_gates }} aprobadas</span></div>
+  <div class="responsive-table">
+    <table class="consolidation-table">
+      <thead><tr><th>Código</th><th>Categoría</th><th>Condición</th><th>Estado</th><th>Responsable</th><th>Evidencia</th><th>Control</th></tr></thead>
+      <tbody>
+      {% for gate in summary.gates %}
+        <tr>
+          <td><strong>{{ gate.code }}</strong></td><td>{{ gate.category }}</td><td>{{ gate.name }}</td>
+          <td><span class="consolidation-status status-{{ gate.status|lower|replace(' ','-')|replace('ó','o') }}">{{ gate.status }}</span></td>
+          <td>{{ gate.responsible }}</td><td>{{ gate.evidence or 'Sin evidencia' }}</td>
+          <td>
+            {% if user.can_manage_consolidation %}
+            <details class="row-details"><summary>Actualizar</summary>
+              <form class="mini-form consolidation-form" method="post" action="/consolidacion/puertas/{{ gate.id }}">
+                <label>Estado<select name="status">{% for option in ['Pendiente','Parcial','En revisión','Aprobado','Bloqueado'] %}<option {% if option==gate.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+                <label>Responsable<input name="responsible" value="{{ gate.responsible }}"></label>
+                <label>Evidencia<textarea name="evidence" rows="2">{{ gate.evidence }}</textarea></label>
+                <label>Notas<textarea name="notes" rows="2">{{ gate.notes }}</textarea></label>
+                <button class="button primary" type="submit">Guardar</button>
+              </form>
+            </details>
+            {% else %}<small>Solo lectura</small>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" id="hallazgos">
+  <div class="card-head"><div><small>BACKLOG DE CONSOLIDACIÓN</small><h3>Deuda técnica, metodológica y operativa</h3></div><span class="counter">{{ summary.open_findings }} abiertos</span></div>
+  <div class="responsive-table">
+    <table class="consolidation-table findings-table">
+      <thead><tr><th>Código</th><th>Área</th><th>Hallazgo</th><th>Prioridad</th><th>Estado</th><th>Responsable</th><th>Objetivo</th><th>Control</th></tr></thead>
+      <tbody>
+      {% for finding in summary.findings %}
+        <tr>
+          <td><strong>{{ finding.code }}</strong></td><td>{{ finding.area }}</td>
+          <td><b>{{ finding.title }}</b><small>{{ finding.detail }}</small></td>
+          <td><span class="priority priority-{{ finding.priority|lower|replace('í','i') }}">{{ finding.priority }}</span></td>
+          <td><span class="consolidation-status status-{{ finding.status|lower|replace(' ','-') }}">{{ finding.status }}</span></td>
+          <td>{{ finding.owner }}</td><td>{{ finding.target_version }}</td>
+          <td>
+            {% if user.can_manage_consolidation %}
+            <details class="row-details"><summary>Gestionar</summary>
+              <form class="mini-form consolidation-form" method="post" action="/consolidacion/hallazgos/{{ finding.id }}">
+                <label>Estado<select name="status">{% for option in ['Abierto','En curso','Bloqueado','Resuelto','Aceptado'] %}<option {% if option==finding.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+                <label>Responsable<input name="owner" value="{{ finding.owner }}"></label>
+                <label>Versión objetivo<input name="target_version" value="{{ finding.target_version }}"></label>
+                <label>Evidencia<textarea name="evidence" rows="3">{{ finding.evidence }}</textarea></label>
+                <button class="button primary" type="submit">Guardar</button>
+              </form>
+            </details>
+            {% else %}<small>Solo lectura</small>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" id="recorridos">
+  <div class="card-head"><div><small>PRUEBAS DE EXTREMO A EXTREMO</small><h3>Recorridos que deben funcionar sin conocer la arquitectura</h3></div></div>
+  <div class="journey-grid">
+    {% for journey in summary.journeys %}
+    <article class="journey-card">
+      <header><div><span>{{ journey.code }}</span><h4>{{ journey.name }}</h4><small>Rol: {{ journey.role }}</small></div><span class="consolidation-status status-{{ journey.validation.status|lower|replace(' ','-') if journey.validation else 'no-probado' }}">{{ journey.validation.status if journey.validation else 'No probado' }}</span></header>
+      <p>{{ journey.objective }}</p>
+      <ol>{% for step, route in journey.steps %}<li><a href="{{ route }}">{{ step }}</a><small>{{ route }}</small></li>{% endfor %}</ol>
+      {% if journey.validation and user.can_manage_consolidation %}
+      <form method="post" action="/consolidacion/recorridos/{{ journey.validation.id }}" class="journey-form">
+        <select name="status">{% for option in ['No probado','En prueba','Con bloqueos','Aprobado'] %}<option {% if option==journey.validation.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+        <input name="notes" value="{{ journey.validation.notes }}" placeholder="Resultado, bloqueo o evidencia">
+        <button class="button secondary" type="submit">Registrar</button>
+      </form>
+      {% elif journey.validation %}<small>{{ journey.validation.notes or 'Sin notas de validación.' }}</small>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="two-column consolidation-bottom">
+  <article class="card">
+    <div class="card-head"><div><small>AUDITORÍA ESTÁTICA</small><h3>Dimensión técnica actual</h3></div></div>
+    <div class="architecture-metrics">
+      <div><small>Archivos Python</small><strong>{{ summary.metrics.python_files }}</strong></div>
+      <div><small>Plantillas</small><strong>{{ summary.metrics.templates }}</strong></div>
+      <div><small>Rutas</small><strong>{{ summary.metrics.routes }}</strong></div>
+      <div><small>Pruebas</small><strong>{{ summary.metrics.tests }}</strong></div>
+      <div><small>Líneas Python</small><strong>{{ summary.metrics.total_lines }}</strong></div>
+    </div>
+    <h4>Archivos más grandes</h4>
+    <div class="largest-files">{% for item in summary.metrics.largest_files %}<div><code>{{ item.path }}</code><b>{{ item.lines }} líneas</b></div>{% endfor %}</div>
+  </article>
+  <article class="card permission-card">
+    <div class="card-head"><div><small>SEGREGACIÓN DE FUNCIONES</small><h3>Matriz centralizada de permisos</h3></div></div>
+    <div class="responsive-table permission-table"><table><thead><tr><th>Capacidad</th>{% for role in summary.roles %}<th>{{ role }}</th>{% endfor %}</tr></thead><tbody>{% for row in summary.permission_matrix %}<tr><td>{{ row.label }}</td>{% for role in summary.roles %}<td class="permission-cell {{ 'yes' if row.roles[role] else 'no' }}">{{ '✓' if row.roles[role] else '—' }}</td>{% endfor %}</tr>{% endfor %}</tbody></table></div>
+  </article>
+</section>
+{% endblock %}

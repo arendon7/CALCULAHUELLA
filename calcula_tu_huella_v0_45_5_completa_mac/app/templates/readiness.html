@@ -1,0 +1,10 @@
+{% extends "base.html" %}
+{% block title %}Alistamiento comercial · Calcula tu Huella{% endblock %}
+{% block page_label %}Alistamiento para comercialización{% endblock %}
+{% block content %}
+<section class="page-heading"><div><span class="eyebrow">PREPARACIÓN PARA SALIDA AL MERCADO</span><h1>Preparación del producto</h1><p>Controla las condiciones metodológicas, legales, comerciales, operativas y de seguridad necesarias antes del lanzamiento.</p></div><span class="status-badge {% if readiness_score >= 80 %}success{% elif readiness_score >= 50 %}warning{% else %}danger{% endif %}">{{ readiness_score }} %</span></section>
+<section class="progress-hero"><div><strong>{{ readiness_score }} %</strong><span>alistamiento ponderado</span></div><div class="progress"><span style="width:{{ readiness_score }}%"></span></div></section>
+{% for category, category_rows in categories.items() %}
+<section class="panel"><div class="panel-heading"><div><span class="eyebrow">{{ category }}</span><h2>{{ category_rows|length }} condiciones</h2></div></div><div class="settings-list">{% for row in category_rows %}<article><div><strong>{{ row.title }}</strong><span>{{ row.owner }}</span><small>{{ row.notes or 'Sin observaciones' }}{% if row.due_date %} · Fecha {{ row.due_date }}{% endif %}</small></div><form action="/alistamiento/{{ row.id }}/actualizar" method="post" class="inline-form readiness-form"><select name="status"><option {% if row.status=='Completado' %}selected{% endif %}>Completado</option><option {% if row.status=='En progreso' %}selected{% endif %}>En progreso</option><option {% if row.status=='Pendiente' %}selected{% endif %}>Pendiente</option><option {% if row.status=='Bloqueado' %}selected{% endif %}>Bloqueado</option></select><input name="owner" value="{{ row.owner }}"><input type="date" name="due_date" value="{{ row.due_date or '' }}"><input name="notes" value="{{ row.notes }}" placeholder="Nota"><button class="button secondary small">Guardar</button></form></article>{% endfor %}</div></section>
+{% endfor %}
+{% endblock %}

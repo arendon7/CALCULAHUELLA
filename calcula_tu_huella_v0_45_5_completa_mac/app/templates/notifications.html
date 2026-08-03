@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Notificaciones · Calcula tu Huella{% endblock %}
+{% block page_label %}Notificaciones{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">CENTRO PERSONAL</span><h1>Notificaciones y alertas</h1><p>Seguimiento de revisiones, aprobaciones, tareas y eventos relevantes de la plataforma.</p></div>
+  <form action="/notificaciones/leer-todas" method="post"><button class="button secondary" type="submit">Marcar todas como leídas</button></form>
+</section>
+<div class="two-column-grid notification-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">BANDEJA</span><h2>Actividad reciente</h2></div><span class="status-badge">{{ notifications|length }} registros</span></div>
+    {% if notifications %}
+    <div class="notification-list">
+      {% for item in notifications %}
+      <article class="notification-row {{ 'unread' if not item.read_at else '' }} priority-{{ item.priority|lower }}">
+        <div class="notification-dot"></div>
+        <div class="notification-copy">
+          <div class="notification-meta"><span>{{ item.category }}</span><small>{{ item.created_at.strftime('%d/%m/%Y %H:%M') }}</small></div>
+          <strong>{{ item.title }}</strong><p>{{ item.message }}</p>
+          <div class="notification-tags"><span>{{ item.priority }}</span><span>{{ item.status }}</span>{% if item.email_requested %}<span>Correo solicitado</span>{% endif %}</div>
+        </div>
+        <form action="/notificaciones/{{ item.id }}/leer" method="post"><button class="button secondary small" type="submit">{{ 'Abrir' if item.link else 'Leída' }}</button></form>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}<div class="empty-state"><strong>No tienes notificaciones.</strong><span>Las nuevas alertas aparecerán aquí.</span></div>{% endif %}
+  </section>
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">PREFERENCIAS</span><h2>Cómo deseas recibirlas</h2></div></div>
+    <form action="/notificaciones/preferencias" method="post" class="stacked-form">
+      <label class="check-line"><input type="checkbox" name="in_app_enabled" {% if preference.in_app_enabled %}checked{% endif %}> Mostrar en la plataforma</label>
+      <label class="check-line"><input type="checkbox" name="email_enabled" {% if preference.email_enabled %}checked{% endif %}> Enviar también por correo</label>
+      <label>Frecuencia<select name="digest_frequency"><option {% if preference.digest_frequency == 'Inmediato' %}selected{% endif %}>Inmediato</option><option {% if preference.digest_frequency == 'Diario' %}selected{% endif %}>Diario</option><option {% if preference.digest_frequency == 'Semanal' %}selected{% endif %}>Semanal</option></select></label>
+      <button class="button primary" type="submit">Guardar preferencias</button>
+    </form>
+    <div class="readiness-box"><strong>Modo local</strong><p>Los correos se guardan en <code>instance/mail_outbox</code>. En producción puedes configurar SMTP.</p></div>
+  </section>
+</div>
+{% endblock %}

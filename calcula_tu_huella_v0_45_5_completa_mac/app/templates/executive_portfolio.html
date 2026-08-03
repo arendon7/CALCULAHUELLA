@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Dirección ejecutiva · Calcula tu Huella{% endblock %}
+{% block page_label %}Dirección ejecutiva multiempresa{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">PORTAFOLIO CLIMÁTICO</span><h1>Vista consolidada de organizaciones</h1><p>Compara emisiones, avance, cumplimiento, riesgos y reducción potencial sin mezclar los datos de cada empresa.</p></div>
+  <span class="status-badge success">{{ cards|length }} organizaciones</span>
+</section>
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Emisiones consolidadas</small><strong>{{ portfolio_total|number_es(1) }}</strong><span>tCO₂e en inventarios vigentes</span></article>
+  <article class="metric-card"><small>Cumplimiento promedio</small><strong>{{ average_compliance }} %</strong><span>matriz metodológica</span></article>
+  <article class="metric-card"><small>Reducción identificada</small><strong>{{ total_reduction|number_es(1) }}</strong><span>tCO₂e potenciales</span></article>
+  <article class="metric-card"><small>Portafolio</small><strong>{{ cards|length }}</strong><span>contextos segregados</span></article>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">COMPARACIÓN</span><h2>Desempeño por organización</h2></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Organización</th><th>Inventario</th><th>Emisiones</th><th>Avance</th><th>Cumplimiento</th><th>Hallazgos</th><th>Reducción</th><th>Documentos</th></tr></thead>
+      <tbody>
+      {% for item in cards %}
+        <tr>
+          <td><strong>{{ item.organization.trade_name or item.organization.name }}</strong><small>{{ item.organization.sector }} · Rol {{ item.membership.role }}</small></td>
+          {% if item.inventory %}
+          <td>{{ item.inventory.name }}<small>{{ item.inventory.status }} · {{ item.inventory.version }}</small></td>
+          <td><strong>{{ item.emissions|number_es(1) }}</strong><small>tCO₂e</small></td>
+          <td><div class="progress"><span style="width:{{ item.inventory.progress }}%"></span></div><small>{{ item.inventory.progress }} %</small></td>
+          <td><span class="status-badge {% if item.compliance >= 80 %}success{% elif item.compliance >= 50 %}warning{% else %}danger{% endif %}">{{ item.compliance }} %</span></td>
+          <td>{{ item.open_observations }}</td>
+          <td>{{ item.reduction|number_es(1) }} tCO₂e</td>
+          <td>{{ item.documents }}</td>
+          {% else %}
+          <td colspan="7"><span class="status-badge neutral">Sin inventario</span></td>
+          {% endif %}
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+<section class="callout"><strong>Lectura ejecutiva:</strong> el tablero consolida indicadores, pero cada consulta y modificación continúa filtrada por membresía y organización activa.</section>
+{% endblock %}

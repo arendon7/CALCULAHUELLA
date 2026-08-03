@@ -1,0 +1,89 @@
+{% extends "base.html" %}
+{% block title %}Biblioteca Colombia · Calcula tu Huella{% endblock %}
+{% block page_label %}Biblioteca Colombia{% endblock %}
+{% block content %}
+<section class="page-heading colombia-head">
+  <div>
+    <span class="eyebrow">FACTORES Y MÉTODOS DOCUMENTADOS</span>
+    <h1>Biblioteca metodológica para Colombia</h1>
+    <p>Combustibles, aguas residuales, fertilización nitrogenada y balance de biogás con trazabilidad, restricciones y casos patrón.</p>
+  </div>
+  <div class="heading-actions"><a class="btn btn-outline" href="/metodologia/nucleo">Ver núcleo</a><a class="btn btn-primary" href="/metodologia/colombia/exportar.xlsx">Exportar Excel</a></div>
+</section>
+
+<div class="kpi-grid five colombia-kpis">
+  <article class="kpi-card featured"><div class="kpi-icon green">CO</div><div><small>Versión</small><strong>{{ summary.version }}</strong><span>Biblioteca sectorial</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon">▤</div><div><small>Fuentes</small><strong>{{ summary.counts.documents }}</strong><span>Documentos trazados</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon green">∑</div><div><small>Factores</small><strong>{{ summary.counts.factors }}</strong><span>Versiones documentadas</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon amber">P</div><div><small>Uso piloto</small><strong>{{ summary.counts.pilot }}</strong><span>Con restricciones</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon">✓</div><div><small>Casos patrón</small><strong>{{ summary.counts.reference_cases }}</strong><span>Casos de referencia</span></div></article>
+</div>
+
+{% if error %}<div class="flash flash-error">{{ error }}</div>{% endif %}
+{% if result %}
+<section class="card colombia-result">
+  <div><small>RESULTADO · {{ calculator|upper }}</small><h2>{{ "%.3f"|format(result.co2e_t) }} tCO₂e</h2><p>{{ result.formula if result.formula is defined else result.warning }}</p></div>
+  <div class="result-metrics">
+    {% if result.gas_kg is defined %}<span><small>Gas</small><strong>{{ "%.3f"|format(result.gas_kg) }} kg {{ result.gas }}</strong></span>{% endif %}
+    {% if result.emitted_ch4_kg is defined %}<span><small>CH₄ emitido</small><strong>{{ "%.3f"|format(result.emitted_ch4_kg) }} kg</strong></span>{% endif %}
+    {% if result.total_n2o_kg is defined %}<span><small>N₂O total</small><strong>{{ "%.3f"|format(result.total_n2o_kg) }} kg</strong></span>{% endif %}
+    {% if result.reporting_use is defined %}<span><small>Uso</small><strong>{{ result.reporting_use }}</strong></span>{% endif %}
+  </div>
+  {% if result.warning is defined %}<p class="method-warning">{{ result.warning }}</p>{% endif %}
+  {% if result.unassigned_m3 is defined and result.unassigned_m3|abs > 0.01 %}<p class="method-warning">Balance no conciliado: {{ "%.3f"|format(result.unassigned_m3) }} m³ sin asignar.</p>{% endif %}
+</section>
+{% endif %}
+
+<section class="calculator-grid">
+  <article class="card calculator-card" id="combustion">
+    <small>COMBUSTIBLES</small><h2>Combustión</h2><p>Convierte litros o galones y aplica el factor seleccionado. Los valores regulatorios y FECOC conservan su clasificación metodológica.</p>
+    <form method="post" action="/metodologia/colombia/calcular-combustion" class="stack-form">
+      <label>Factor<select name="factor_code">{% for code, item in summary.fuel_options.items() %}<option value="{{ code }}">{{ item.label }}</option>{% endfor %}</select></label>
+      <div class="form-grid"><label>Cantidad<input type="number" step="any" min="0" name="amount" value="100" required></label><label>Unidad<select name="amount_unit"><option value="L">L</option><option value="gal">gal US</option><option value="m3">m³ estándar</option></select></label></div>
+      <button class="btn btn-primary">Calcular</button>
+    </form>
+  </article>
+
+  <article class="card calculator-card" id="wastewater">
+    <small>AGUAS RESIDUALES</small><h2>Carga orgánica</h2><p>Aplica Bo × MCF y descuenta únicamente CH₄ recuperado o quemado con soporte.</p>
+    <form method="post" action="/metodologia/colombia/calcular-aguas" class="stack-form">
+      <div class="form-grid"><label>Carga orgánica (kg)<input type="number" step="any" min="0" name="organic_load_kg" value="1000" required></label><label>Base<select name="basis"><option value="COD">DQO / COD</option><option value="BOD">DBO / BOD</option></select></label></div>
+      <div class="form-grid"><label>MCF (0–1)<input type="number" step="0.01" min="0" max="1" name="mcf" value="0.8" required></label><label>CH₄ recuperado/quemado (kg)<input type="number" step="any" min="0" name="recovered_ch4_kg" value="0"></label></div>
+      <button class="btn btn-primary">Calcular</button>
+    </form>
+  </article>
+
+  <article class="card calculator-card" id="fertilizer">
+    <small>FERTILIZACIÓN</small><h2>N aplicado al suelo</h2><p>Estima N₂O directo e indirecto por volatilización y lixiviación. No calcula la fabricación del fertilizante.</p>
+    <form method="post" action="/metodologia/colombia/calcular-fertilizante" class="stack-form">
+      <div class="form-grid"><label>N aplicado (kg N)<input type="number" step="any" min="0" name="nitrogen_kg" value="1000" required></label><label>Clima<select name="climate"><option value="wet">Húmedo</option><option value="dry">Seco</option></select></label></div>
+      <label>Tipo de aporte<select name="input_type"><option value="synthetic">Sintético genérico</option><option value="urea">Urea</option><option value="ammonium">Base amoniacal</option><option value="nitrate">Base nitrato</option><option value="ammonium_nitrate">Nitrato de amonio</option><option value="other">Otros aportes de N</option></select></label>
+      <div class="check-grid"><label><input type="checkbox" name="include_volatilization" value="true" checked> Incluir volatilización</label><label><input type="checkbox" name="include_leaching" value="true" checked> Incluir lixiviación</label></div>
+      <button class="btn btn-primary">Calcular</button>
+    </form>
+  </article>
+
+  <article class="card calculator-card" id="biogas">
+    <small>BIOGÁS</small><h2>Balance operativo</h2><p>Concilia producción, uso, quema, venteo y fugas. La medición directa tiene prioridad.</p>
+    <form method="post" action="/metodologia/colombia/calcular-biogas" class="stack-form">
+      <div class="form-grid"><label>Producido (m³)<input type="number" step="any" min="0" name="produced_m3" value="1000" required></label><label>Utilizado (m³)<input type="number" step="any" min="0" name="used_m3" value="800"></label></div>
+      <div class="form-grid"><label>Quemado (m³)<input type="number" step="any" min="0" name="flared_m3" value="100"></label><label>Venteado (m³)<input type="number" step="any" min="0" name="vented_m3" value="50"></label></div>
+      <div class="form-grid"><label>Fracción CH₄ (0–1)<input type="number" step="0.01" min="0" max="1" name="methane_fraction" value="0.60"></label><label>Fuga (%)<input type="number" step="0.1" min="0" max="100" name="leakage_percent" value="2"></label></div>
+      <label>Densidad CH₄ (kg/m³)<input type="number" step="0.0001" min="0" name="methane_density_kg_m3" value="0.7168"></label>
+      <button class="btn btn-primary">Calcular</button>
+    </form>
+  </article>
+</section>
+
+<section class="card factor-library-card" id="factores">
+  <div class="card-head"><div><small>REGISTRO DOCUMENTAL</small><h2>Factores incorporados</h2></div><span>{{ summary.counts.factors }} versiones</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Factor</th><th>Gas</th><th>Valor</th><th>Uso</th><th>Revisión</th><th>Fuente</th><th>Restricción</th></tr></thead><tbody>
+    {% for item in summary.factors %}<tr><td><strong>{{ item.factor.name }}</strong><small>{{ item.version.version }} · {{ item.factor.activity_type }}</small></td><td>{{ item.gas.code }}</td><td>{{ item.version.value }}<small>{{ item.version.output_unit }}/{{ item.version.input_unit }}</small></td><td><span class="status-badge {% if item.documentation.reporting_use == 'Formal' %}success{% else %}warning{% endif %}">{{ item.documentation.reporting_use }}</span></td><td>{{ item.documentation.review_status }}<small>Calidad {{ item.documentation.quality_grade }}</small></td><td><strong>{{ item.source.code }}</strong><small>{{ item.documentation.page_reference }} {{ item.documentation.table_reference }}</small></td><td class="small-text">{{ item.documentation.restriction_notes }}</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<div class="colombia-bottom-grid">
+<section class="card"><div class="card-head"><div><small>FUENTES</small><h2>Documentos controlados</h2></div></div><div class="document-list">{% for item in summary.documents %}<article><div><strong>{{ item.code }}</strong><h3>{{ item.title }}</h3><p>{{ item.issuing_body }} · {{ item.status }}</p></div>{% if item.source_url %}<a href="{{ item.source_url }}" target="_blank" rel="noopener">Consultar</a>{% endif %}</article>{% endfor %}</div></section>
+<section class="card"><div class="card-head"><div><small>LÍMITES DE USO</small><h2>Advertencias obligatorias</h2></div></div><div class="limitation-list">{% for item in summary.limitations %}<p><span>!</span>{{ item }}</p>{% endfor %}</div></section>
+</div>
+{% endblock %}

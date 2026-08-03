@@ -1,0 +1,11 @@
+{% extends "public_base.html" %}
+{% block title %}Pago {{ payment.external_reference }} · Calcula tu Huella{% endblock %}
+{% block content %}
+<section class="payment-shell">
+  <div class="payment-summary"><span>ACTIVACIÓN DEL SERVICIO</span><h1>{{ proposal.company_name }}</h1><p>{{ proposal.title }}</p><div><small>Total</small><strong>$ {{ payment.amount|number_es(0) }} {{ payment.currency }}</strong></div><ul><li>Referencia: {{ payment.external_reference }}</li><li>Estado: {{ payment.status }}</li><li>Pasarela: {{ payment.gateway }}</li></ul></div>
+  <div class="payment-card">
+    {% if payment.status == 'Pagada' %}<div class="result-check">✓</div><h2>Pago confirmado</h2><p>La organización y el onboarding quedaron preparados. El equipo activará los accesos y confirmará el inicio.</p><div class="public-success">Esta es una confirmación demostrativa. No se procesó dinero real.</div><a class="button primary full" href="/">Volver al inicio</a>
+    {% else %}<span class="demo-badge">MODO DEMOSTRATIVO</span><h2>Confirmar pago</h2><p>Esta pantalla valida el flujo contractual y técnico. No captura tarjetas ni transfiere dinero.</p><form action="/pago/{{ payment.public_token }}/confirmar" method="post"><label>Nombre del pagador<input name="payer_name" value="{{ proposal.accepted_by or proposal.contact_name }}" required></label><label>Correo<input type="email" name="payer_email" value="{{ proposal.accepted_email or proposal.contact_email }}" required></label><label>Método<select name="method"><option>Transferencia demostrativa</option><option>Tarjeta demostrativa</option><option>Pago manual registrado</option></select></label><button class="button primary full" type="submit">Confirmar pago demostrativo</button></form><small>Para producción, conecta Wompi, Stripe u otra pasarela mediante el webhook firmado.</small>{% endif %}
+  </div>
+</section>
+{% endblock %}

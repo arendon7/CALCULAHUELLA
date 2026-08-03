@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Inventarios · Calcula tu Huella{% endblock %}
+{% block page_label %}Inventarios corporativos{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">Inventario / Periodos</p><h1>Inventarios</h1><p>Cada periodo conserva su metodología, límites, sedes, fuentes y versión.</p></div>{% if user.can_manage_inventory %}<a class="btn btn-primary" href="/inventarios/nuevo">＋ Crear inventario</a>{% endif %}</div>
+
+<section class="card architecture-note"><div><span>01</span><p><strong>La unidad principal es el proyecto de inventario.</strong><small>Una empresa puede tener varios años, distintas versiones y configuraciones metodológicas independientes.</small></p></div><a href="/modulos">Consultar arquitectura →</a></section>
+
+<div class="inventory-card-grid">
+{% for inventory in inventories %}
+  <article class="inventory-card card">
+    <div class="inventory-card-top"><span class="year-badge">{{ inventory.base_year }}</span><span class="status-chip {{ 'active' if inventory.status in ['Activo','Aprobado'] else 'pending' }}">{{ inventory.status }}</span></div>
+    <h2>{{ inventory.name }}</h2>
+    <p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</p>
+    <dl><div><dt>Metodología</dt><dd>{{ inventory.methodology }}</dd></div><div><dt>Consolidación</dt><dd>{{ inventory.consolidation_approach }}</dd></div><div><dt>Etapa actual</dt><dd>{{ inventory.current_stage }}</dd></div><div><dt>Sedes</dt><dd>{{ inventory.facility_links|selectattr('included')|list|length }}</dd></div></dl>
+    <div class="progress"><i style="width:{{ inventory.progress }}%"></i></div><small>{{ inventory.progress }}% de avance estructural</small>
+    <div class="card-actions"><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">Abrir</a>{% if user.can_manage_inventory %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">Configurar</a>{% endif %}</div>
+  </article>
+{% endfor %}
+</div>
+{% endblock %}

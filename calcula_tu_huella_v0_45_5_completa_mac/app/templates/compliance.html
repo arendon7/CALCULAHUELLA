@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Cumplimiento · Calcula tu Huella{% endblock %}
+{% block page_label %}Matriz de cumplimiento{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">CONTROL METODOLÓGICO</span><h1>Matriz de cumplimiento del inventario</h1><p>Relaciona requisitos, responsables, evidencia y estado para preparar revisión interna o verificación externa.</p></div>
+  <span class="status-badge {% if compliance_score >= 80 %}success{% elif compliance_score >= 50 %}warning{% else %}danger{% endif %}">{{ compliance_score }} %</span>
+</section>
+<section class="panel compact-panel">
+  <form method="get" class="inline-form">
+    <label>Inventario<select name="inventory_id">{% for item in inventories %}<option value="{{ item.id }}" {% if item.id == inventory.id %}selected{% endif %}>{{ item.name }} · {{ item.version }}</option>{% endfor %}</select></label>
+    <button class="button secondary" type="submit">Cambiar</button>
+  </form>
+</section>
+{% for framework, framework_rows in by_framework.items() %}
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">{{ framework }}</span><h2>{{ framework_rows|length }} controles</h2></div></div>
+  <div class="compliance-list">
+    {% for row in framework_rows %}
+    <article class="compliance-item">
+      <div class="compliance-copy">
+        <span class="status-badge {% if row.status == 'Cumple' %}success{% elif row.status == 'Parcial' %}warning{% elif row.status == 'No cumple' %}danger{% else %}neutral{% endif %}">{{ row.status }}</span>
+        <strong>{{ row.requirement.code }} · {{ row.requirement.title }}</strong>
+        <p>{{ row.requirement.description }}</p>
+        <small>Evidencia esperada: {{ row.requirement.evidence_expected }}</small>
+      </div>
+      {% if user.can_manage_compliance %}<form action="/cumplimiento/{{ row.id }}/actualizar" method="post" class="compact-form compliance-form">
+        <label>Estado<select name="status"><option {% if row.status=='Cumple' %}selected{% endif %}>Cumple</option><option {% if row.status=='Parcial' %}selected{% endif %}>Parcial</option><option {% if row.status=='Pendiente' %}selected{% endif %}>Pendiente</option><option {% if row.status=='No cumple' %}selected{% endif %}>No cumple</option><option {% if row.status=='No aplica' %}selected{% endif %}>No aplica</option></select></label>
+        <label>Responsable<input name="owner" value="{{ row.owner }}"></label>
+        <label>Evidencia<select name="evidence_id"><option value="">Sin vincular</option>{% for doc in documents %}<option value="{{ doc.id }}" {% if row.evidence_id == doc.id %}selected{% endif %}>{{ doc.name }}</option>{% endfor %}</select></label>
+        <label>Notas<textarea name="notes" rows="2">{{ row.notes }}</textarea></label>
+        <button class="button secondary small" type="submit">Guardar evaluación</button>
+      </form>{% else %}<div class="callout"><strong>Consulta de solo lectura.</strong><br>{{ row.owner }}{% if row.evidence %} · Evidencia: {{ row.evidence.name }}{% endif %}</div>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% endblock %}
