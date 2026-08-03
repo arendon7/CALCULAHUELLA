@@ -1,0 +1,52 @@
+name: Extraer fuente subida
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/extract-uploaded-source.yml
+      - calcula_tu_huella_v0_45_5_completa_mac.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: extract-v0-45-5-main
+  cancel-in-progress: false
+
+jobs:
+  extract:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar repositorio
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validar y extraer ZIP
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP='calcula_tu_huella_v0_45_5_completa_mac.zip'
+          test -f "$ZIP"
+          unzip -tq "$ZIP"
+          rm -rf /tmp/cth-source
+          mkdir -p /tmp/cth-source
+          unzip -q "$ZIP" -d /tmp/cth-source
+          mapfile -t roots < <(find /tmp/cth-source -mindepth 1 -maxdepth 1 -print | sort)
+          if [[ ${#roots[@]} -eq 1 && -d "${roots[0]}" ]]; then SOURCE="${roots[0]}"; else SOURCE='/tmp/cth-source'; fi
+          rsync -a --exclude='.git/' --exclude='.github/' --exclude='__pycache__/' --exclude='.pytest_cache/' --exclude='.DS_Store' "$SOURCE"/ ./
+          rm -f "$ZIP"
+          find . -type f \( -name '*.sh' -o -name '*.command' \) -exec chmod +x {} +
+
+      - name: Confirmar árbol fuente
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: extraer árbol fuente canónico v0.45.5'
+          git push origin HEAD:main
