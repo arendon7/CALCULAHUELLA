@@ -1,0 +1,72 @@
+name: Importar fuente canónica v0.45.5
+
+on:
+  push:
+    branches:
+      - migration/v0.45.5
+    paths:
+      - '.migration/parts/**'
+      - '.migration/source.sha256'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-v0-45-5
+  cancel-in-progress: false
+
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Descargar rama
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconstruir y verificar paquete
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -d .migration/parts
+          test -f .migration/source.sha256
+          cat $(find .migration/parts -maxdepth 1 -type f -name 'part-*' | sort) > /tmp/source_v0_45_5.zip
+          printf '%s  %s\n' "$(cat .migration/source.sha256)" /tmp/source_v0_45_5.zip | sha256sum --check --status
+          unzip -tq /tmp/source_v0_45_5.zip
+
+      - name: Extraer fuente canónica
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/calculahuella-source
+          mkdir -p /tmp/calculahuella-source
+          unzip -q /tmp/source_v0_45_5.zip -d /tmp/calculahuella-source
+
+          # El paquete contiene directamente el árbol del producto.
+          rsync -a \
+            --exclude='.git/' \
+            --exclude='.github/' \
+            --exclude='.gitignore' \
+            --exclude='.gitattributes' \
+            --exclude='render.yaml' \
+            --exclude='*.zip' \
+            --exclude='*.sha256' \
+            --exclude='__pycache__/' \
+            --exclude='.pytest_cache/' \
+            /tmp/calculahuella-source/ ./
+
+          rm -rf .migration
+          rm -f .github/workflows/import-source.yml
+          find . -type f \( -name '*.sh' -o -name '*.command' \) -exec chmod +x {} +
+
+      - name: Confirmar importación
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git diff --cached --quiet && exit 0
+          git commit -m 'feat: importar árbol fuente canónico v0.45.5'
+          git push origin HEAD:migration/v0.45.5
