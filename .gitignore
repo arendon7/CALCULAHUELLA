@@ -1,0 +1,52 @@
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+env/
+
+# Runtime data
+instance/
+*.sqlite
+*.sqlite3
+*.db
+uploads/
+evidencias/
+reportes/
+backups/
+logs/
+staging/
+*.log
+
+# Generated deliverables
+*.zip
+*.tar
+*.tar.gz
+*_manifest.txt
+*.sha256
+
+# IDE and operating system
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Local container volumes
+postgres_data/
+app_data/
+caddy_data/
+caddy_config/
