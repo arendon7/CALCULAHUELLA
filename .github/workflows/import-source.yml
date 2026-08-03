@@ -5,7 +5,6 @@ on:
     branches:
       - migration/v0.45.5
     paths:
-      - '.migration/parts/**'
       - '.migration/source.sha256'
   workflow_dispatch:
 
@@ -31,7 +30,7 @@ jobs:
           set -euo pipefail
           test -d .migration/parts
           test -f .migration/source.sha256
-          cat $(find .migration/parts -maxdepth 1 -type f -name 'part-*' | sort) > /tmp/source_v0_45_5.zip
+          find .migration/parts -type f -name 'part-*' | sort | xargs cat | base64 --decode > /tmp/source_v0_45_5.zip
           printf '%s  %s\n' "$(cat .migration/source.sha256)" /tmp/source_v0_45_5.zip | sha256sum --check --status
           unzip -tq /tmp/source_v0_45_5.zip
 
@@ -43,7 +42,6 @@ jobs:
           mkdir -p /tmp/calculahuella-source
           unzip -q /tmp/source_v0_45_5.zip -d /tmp/calculahuella-source
 
-          # El paquete contiene directamente el árbol del producto.
           rsync -a \
             --exclude='.git/' \
             --exclude='.github/' \
