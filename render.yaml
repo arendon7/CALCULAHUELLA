@@ -1,0 +1,38 @@
+services:
+  - type: web
+    name: calcula-tu-huella-demo
+    runtime: docker
+    plan: free
+    autoDeploy: true
+    healthCheckPath: /api/health
+    dockerCommand: >-
+      bash -lc 'export DATABASE_URL="${DATABASE_URL/postgresql:\/\//postgresql+psycopg:\/\/}"; exec ./start_prod.sh'
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: calcula-tu-huella-db
+          property: connectionString
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: SEED_DEMO
+        value: "true"
+      - key: SESSION_HTTPS_ONLY
+        value: "true"
+      - key: TRUSTED_HOSTS
+        value: "*.onrender.com,localhost,127.0.0.1"
+      - key: OPEN_BROWSER
+        value: "0"
+      - key: SCHEDULER_ENABLED
+        value: "false"
+      - key: DEPLOYMENT_STRICT
+        value: "false"
+      - key: STORAGE_BACKEND
+        value: local
+
+databases:
+  - name: calcula-tu-huella-db
+    plan: free
+    databaseName: calculatuhuella
+    user: calculatuhuella
