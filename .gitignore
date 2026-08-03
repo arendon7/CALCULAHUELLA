@@ -2,6 +2,7 @@
 .env
 .env.*
 !.env.example
+!.env.local.example
 *.pem
 *.key
 *.p12
@@ -32,6 +33,9 @@ logs/
 staging/
 *.log
 
+# Temporary repository migration
+.migration/
+
 # Generated deliverables
 *.zip
 *.tar
@@ -47,6 +51,8 @@ staging/
 
 # Local container volumes
 postgres_data/
+postgres_local_data/
 app_data/
+app_local_data/
 caddy_data/
 caddy_config/
