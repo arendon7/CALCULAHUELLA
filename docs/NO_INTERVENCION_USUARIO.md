@@ -1,0 +1,1 @@
+No se requiere ejecutar el migrador local; la importación se realizará desde el entorno conectado.
