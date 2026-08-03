@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Administración de plataforma · Calcula tu Huella{% endblock %}
+{% block page_label %}Administración de plataforma{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">GOBIERNO TÉCNICO</span><h1>Configuración y operación avanzada</h1><p>Administra almacenamiento, notificaciones, parámetros organizacionales y estado de la plataforma.</p></div>
+  <span class="status-badge {{ 'success' if storage_status.ok else 'warning' }}">{{ storage_status.backend|upper }} · {{ 'Operativo' if storage_status.ok else 'Revisar' }}</span>
+</section>
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Usuarios activos</small><strong>{{ users|selectattr('active')|list|length }}</strong><span>{{ users|length }} registrados</span></article>
+  <article class="metric-card"><small>Notificaciones</small><strong>{{ notification_stats.total }}</strong><span>{{ notification_stats.unread }} sin leer</span></article>
+  <article class="metric-card"><small>Cola de correo</small><strong>{{ notification_stats.pending }}</strong><span>{{ app_settings.email_backend|upper }}</span></article>
+  <article class="metric-card"><small>Almacenamiento</small><strong>{{ app_settings.storage_backend|upper }}</strong><span>{{ storage_status.detail }}</span></article>
+</section>
+<div class="two-column-grid operation-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">PARÁMETROS</span><h2>Configuración organizacional</h2></div></div>
+    {% if settings_rows %}<div class="settings-list">{% for row in settings_rows %}<article><div><strong>{{ row.key }}</strong><span>{{ row.description }}</span></div><code>{{ row.value }}</code></article>{% endfor %}</div>{% endif %}
+    <form action="/administracion-plataforma/configuracion" method="post" class="stacked-form admin-setting-form">
+      <label>Clave<input name="key" placeholder="ej. default_methodology" required></label>
+      <label>Valor<input name="value" required></label>
+      <label>Descripción<input name="description"></label>
+      <button class="button primary" type="submit">Guardar configuración</button>
+    </form>
+  </section>
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">NOTIFICACIONES</span><h2>Prueba y procesamiento</h2></div></div>
+    <form action="/administracion-plataforma/notificaciones/prueba" method="post" class="stacked-form">
+      <label>Rol destinatario<select name="role"><option>Administrador</option><option>Consultor</option><option>Cliente</option><option>Revisor</option><option>Verificador</option></select></label>
+      <label>Título<input name="title" value="Prueba de notificación" required></label>
+      <label>Mensaje<textarea name="message" rows="3" required>El centro de notificaciones está operativo.</textarea></label>
+      <button class="button secondary" type="submit">Crear notificación de prueba</button>
+    </form>
+    <form action="/administracion-plataforma/notificaciones/procesar" method="post" class="process-queue-form"><button class="button primary" type="submit">Procesar cola de correo</button></form>
+    <div class="check-list compact-checks">
+      <div class="check-row"><span class="check-icon {{ 'ok' if storage_status.ok else 'fail' }}">{{ '✓' if storage_status.ok else '!' }}</span><div><strong>Almacenamiento {{ storage_status.backend }}</strong><small>{{ storage_status.detail }}</small></div></div>
+      <div class="check-row"><span class="check-icon ok">✓</span><div><strong>Backend de correo</strong><small>{{ app_settings.email_backend }}{% if app_settings.email_backend == 'smtp' %} · {{ app_settings.smtp_host }}{% endif %}</small></div></div>
+      <div class="check-row"><span class="check-icon ok">✓</span><div><strong>Migraciones Alembic</strong><small>Ejecuta <code>alembic upgrade head</code> antes de iniciar producción.</small></div></div>
+    </div>
+  </section>
+</div>
+<section class="panel"><div class="panel-heading"><div><span class="eyebrow">USUARIOS</span><h2>Resumen de acceso</h2></div></div><div class="responsive-table"><table><thead><tr><th>Usuario</th><th>Correo</th><th>Rol</th><th>Estado</th></tr></thead><tbody>{% for item in users %}<tr><td>{{ item.name }}</td><td>{{ item.email }}</td><td>{{ item.role }}</td><td><span class="status-badge {{ 'success' if item.active else 'warning' }}">{{ 'Activo' if item.active else 'Inactivo' }}</span></td></tr>{% endfor %}</tbody></table></div></section>
+{% endblock %}

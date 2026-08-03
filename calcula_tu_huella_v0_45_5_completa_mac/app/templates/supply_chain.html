@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Cadena de valor · Calcula tu Huella{% endblock %}
+{% block page_label %}Información / Cadena de valor{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Alcance 3</p><h1>Cadena de valor y proveedores</h1><p>Solicita datos específicos, evalúa su calidad y consolida las emisiones de bienes y servicios adquiridos.</p></div><div class="head-actions"><span class="phase-label">Funcional · V0.9</span><a class="btn btn-secondary" href="/cadena-valor/plantilla.xlsx">Descargar Excel</a></div></div>
+
+<section class="card supply-hero">
+  <div><small>PROVEEDORES</small><h2>{{ suppliers|length }}</h2><p>{{ suppliers|selectattr('strategic')|list|length }} estratégicos.</p></div>
+  <div><small>SOLICITUDES</small><h2>{{ supply_summary.request_count }}</h2><p>{{ supply_summary.response_rate }}% de respuesta.</p></div>
+  <div><small>COBERTURA DE GASTO</small><h2>{{ supply_summary.spend_coverage }}%</h2><p>Información aprobada sobre compras consultadas.</p></div>
+  <div><small>EMISIONES APROBADAS</small><h2>{{ supply_summary.emissions|number_es }} tCO₂e</h2><p>Consolidadas en alcance 3.</p></div>
+</section>
+
+{% if campaigns %}
+<section class="scenario-tabs supply-tabs">
+  {% for item in campaigns %}<a class="scenario-tab {% if selected and item.id == selected.id %}active{% endif %}" href="/cadena-valor?campaign_id={{ item.id }}"><strong>{{ item.name }}</strong><small>{{ item.status }} · vence {{ item.due_date.strftime('%Y-%m-%d') }}</small></a>{% endfor %}
+</section>
+{% endif %}
+
+<div class="supply-layout">
+  <div class="supply-main">
+    {% if selected and selected_summary %}
+    <section class="card">
+      <div class="card-head"><div><small>CAMPAÑA ACTIVA</small><h3>{{ selected.name }}</h3><p>{{ selected.description }}</p></div><span class="status-chip progressing">{{ selected.status }}</span></div>
+      <div class="supply-campaign-metrics">
+        <div><small>Respuesta</small><strong>{{ selected_summary.response_rate }}%</strong></div>
+        <div><small>Aprobación</small><strong>{{ selected_summary.approval_rate }}%</strong></div>
+        <div><small>Cobertura gasto</small><strong>{{ selected_summary.spend_coverage }}%</strong></div>
+        <div><small>Emisiones</small><strong>{{ selected_summary.emissions|number_es }} tCO₂e</strong></div>
+      </div>
+      <div class="quality-strip">{% for level,count in selected_summary.quality_counts.items() %}<span class="quality-badge quality-{{ level|lower }}">{{ level }} · {{ count }}</span>{% endfor %}</div>
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><small>SOLICITUDES</small><h3>Seguimiento por proveedor</h3></div><span class="counter">{{ selected_summary.request_count }}</span></div>
+      <div class="table-wrap"><table><thead><tr><th>Proveedor</th><th>Producto/servicio</th><th>Compra</th><th>Estado</th><th>Calidad</th><th>tCO₂e</th><th>Acciones</th></tr></thead><tbody>
+      {% for item in selected_summary.requests %}
+      <tr>
+        <td><strong>{{ item.supplier.name }}</strong><small>{{ item.supplier.sector }} · {{ item.supplier.risk_level }}</small></td>
+        <td>{{ item.product_service }}<small>{{ item.quantity|number_es }} {{ item.unit }}</small></td>
+        <td>${{ (item.spend_cop/1000000)|number_es(1) }} M</td>
+        <td><span class="status-chip {% if item.status in ['Aprobada','Respondida'] %}active{% elif item.status == 'Devuelta' %}warning{% else %}progressing{% endif %}">{{ item.status }}</span><small>Vence {{ item.due_date.strftime('%Y-%m-%d') }}</small></td>
+        <td>{% if item.response %}<span class="quality-badge quality-{{ item.response.quality_level|lower }}">{{ item.response.quality_level }}</span><small>{{ item.response.review_status }}</small>{% else %}<span class="quality-badge quality-d">—</span>{% endif %}</td>
+        <td>{{ item.response.calculated_emissions_tco2e|number_es if item.response else '—' }}</td>
+        <td>
+          <details class="row-actions"><summary>Ver</summary><div class="row-popover">
+            <label>Enlace seguro<input readonly value="{{ portal_base }}/proveedor/responder/{{ item.access_token }}"></label>
+            {% if item.response %}
+            <p><strong>Método:</strong> {{ item.response.method }}</p><p><strong>Metodología:</strong> {{ item.response.methodology or 'No indicada' }}</p><p><strong>Límite:</strong> {{ item.response.boundary or 'No indicado' }}</p>
+            {% if item.response.evidence_stored_name %}<a class="btn btn-secondary btn-block" href="/cadena-valor/respuestas/{{ item.response.id }}/evidencia">Descargar evidencia</a>{% endif %}
+            {% if user.can_review or user.can_manage_supply_chain %}<form action="/cadena-valor/respuestas/{{ item.response.id }}/revisar" method="post" class="stack-form compact-form"><label>Decisión<select name="decision"><option>Aprobado</option><option>Devuelto</option></select></label><label>Comentario<textarea name="reviewer_comments">{{ item.response.reviewer_comments }}</textarea></label><button class="btn btn-primary btn-block">Registrar revisión</button></form>{% endif %}
+            {% else %}<form action="/cadena-valor/solicitudes/{{ item.id }}/renovar" method="post"><button class="btn btn-secondary btn-block">Renovar enlace</button></form>{% endif %}
+          </div></details>
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="7">La campaña aún no tiene solicitudes.</td></tr>{% endfor %}
+      </tbody></table></div>
+    </section>
+    {% else %}
+    <section class="card empty-state"><strong>No hay campañas.</strong><p>Crea una campaña para empezar a recopilar información de alcance 3.</p></section>
+    {% endif %}
+
+    <section class="card">
+      <div class="card-head"><div><small>DIRECTORIO</small><h3>Proveedores registrados</h3></div><span class="counter">{{ suppliers|length }}</span></div>
+      <div class="supplier-grid">{% for supplier in suppliers %}<article class="supplier-card"><div class="supplier-card-head"><span class="supplier-avatar">{{ supplier.name[:2]|upper }}</span><div><strong>{{ supplier.name }}</strong><small>{{ supplier.sector }} · {{ supplier.country }}</small></div>{% if supplier.strategic %}<span class="status-chip active">Estratégico</span>{% endif %}</div><div class="supplier-meta"><span>Compra anual <b>${{ (supplier.annual_spend_cop/1000000)|number_es(0) }} M</b></span><span>Riesgo <b>{{ supplier.risk_level }}</b></span><span>Contacto <b>{{ supplier.contact_name or 'Pendiente' }}</b></span></div></article>{% endfor %}</div>
+    </section>
+  </div>
+
+  <aside class="supply-side">
+    {% if user.can_manage_supply_chain and not inventory.locked %}
+    <section class="card"><div class="card-head"><div><small>NUEVA SOLICITUD</small><h3>Vincular proveedor</h3></div></div>
+      {% if selected %}<form action="/cadena-valor/solicitudes/nueva" method="post" class="stack-form"><input type="hidden" name="campaign_id" value="{{ selected.id }}"><label>Proveedor<select name="supplier_id" required>{% for supplier in suppliers %}<option value="{{ supplier.id }}">{{ supplier.name }}</option>{% endfor %}</select></label><label>Producto o servicio<input name="product_service" required></label><div class="form-grid two"><label>Cantidad<input name="quantity" type="number" step="any" min="0"></label><label>Unidad<input name="unit" value="unidad"></label></div><label>Gasto COP<input name="spend_cop" type="number" step="any" min="0"></label><label>Método solicitado<select name="requested_method"><option>Factor específico del proveedor</option><option>Huella total suministrada</option><option>Declaración ambiental de producto</option></select></label><label>Fecha límite<input name="due_date" type="date" value="{{ selected.due_date }}" required></label><label>Notas<textarea name="notes"></textarea></label><button class="btn btn-primary btn-block">Crear solicitud</button></form>{% else %}<p>Crea primero una campaña.</p>{% endif %}
+    </section>
+
+    <section class="card"><div class="card-head"><div><small>NUEVA CAMPAÑA</small><h3>Organizar levantamiento</h3></div></div><form action="/cadena-valor/campanas/nueva" method="post" class="stack-form"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><label>Nombre<input name="name" required placeholder="Proveedores estratégicos 2026"></label><label>Categoría<select name="category"><option>Bienes y servicios adquiridos</option><option>Bienes de capital</option><option>Transporte aguas arriba</option><option>Uso de productos vendidos</option></select></label><label>Fecha límite<input name="due_date" type="date" required></label><label>Metodología<input name="methodology" value="GHG Protocol Scope 3"></label><label>Descripción<textarea name="description"></textarea></label><button class="btn btn-primary btn-block">Crear campaña</button></form></section>
+
+    <section class="card"><div class="card-head"><div><small>NUEVO PROVEEDOR</small><h3>Ampliar directorio</h3></div></div><form action="/cadena-valor/proveedores/nuevo" method="post" class="stack-form"><label>Razón social<input name="name" required></label><label>NIT<input name="tax_id"></label><label>Sector<input name="sector"></label><label>País<input name="country" value="Colombia"></label><label>Contacto<input name="contact_name"></label><label>Correo<input name="contact_email" type="email"></label><label>Compra anual COP<input name="annual_spend_cop" type="number" min="0"></label><label>Riesgo<select name="risk_level"><option>Bajo</option><option selected>Medio</option><option>Alto</option></select></label><label class="check-row"><input type="checkbox" name="strategic"><span><strong>Proveedor estratégico</strong></span></label><button class="btn btn-primary btn-block">Guardar proveedor</button></form></section>
+    {% endif %}
+  </aside>
+</div>
+{% endblock %}

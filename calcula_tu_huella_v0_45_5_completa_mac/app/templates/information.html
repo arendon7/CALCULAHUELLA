@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% block title %}Datos y evidencias · Calcula tu Huella{% endblock %}
+{% block page_label %}Información / Recolección{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Información</p>
+    <h1>Datos y evidencias</h1>
+    <p>Registra la actividad por periodo, controla su calidad y conserva cada soporte.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-outline" href="/informacion/plantilla.xlsx">↓ Plantilla Excel</a>
+    <a class="btn btn-primary" href="/informacion/importar">Importar datos</a>
+  </div>
+</div>
+
+<div class="source-summary-grid data-summary-grid">
+  <article class="mini-card"><small>REGISTROS</small><strong>{{ records|length }}</strong><p>Datos de actividad</p></article>
+  <article class="mini-card"><small>EVIDENCIAS</small><strong>{{ documents|length }}</strong><p>Archivos protegidos</p></article>
+  <article class="mini-card"><small>CALIDAD A–B</small><strong>{{ quality_counts.A + quality_counts.B }}</strong><p>Datos confiables</p></article>
+  <article class="mini-card"><small>SOLICITUDES ABIERTAS</small><strong>{{ requests|rejectattr('status','equalto','Completado')|list|length }}</strong><p>Requieren gestión</p></article>
+</div>
+
+{% if not records %}
+<section class="card first-data-guide">
+  <div><small>PRIMERA CARGA</small><h2>Empieza con un dato fácil de comprobar</h2><p>Selecciona una fuente, registra el primer mes y asocia una factura, certificado o registro operativo. Después podrás importar el resto en Excel.</p></div>
+  <ol><li><span>1</span><strong>Elige una fuente</strong><small>La unidad sugerida se completa automáticamente.</small></li><li><span>2</span><strong>Registra el periodo</strong><small>El formulario inicia con el primer mes del inventario.</small></li><li><span>3</span><strong>Adjunta el soporte</strong><small>La evidencia puede cargarse antes o después del dato.</small></li></ol>
+</section>
+{% endif %}
+
+<section class="section-anchor" id="datos">
+  <div class="section-title-row">
+    <div><span class="section-number">1</span><div><small>DATOS DE ACTIVIDAD</small><h2>Registros por periodo</h2></div></div>
+    <span class="phase-label functional">Carga y validación activa</span>
+  </div>
+  <div class="information-layout wide-form-layout">
+    <section class="card">
+      <div class="card-head"><div><small>TRAZABILIDAD OPERATIVA</small><h3>Últimos registros</h3></div><span class="counter">{{ records|length }}</span></div>
+      {% if records %}
+      <div class="responsive-table"><table>
+        <thead><tr><th>Fuente y sede</th><th>Periodo</th><th>Dato</th><th>Origen</th><th>Calidad</th><th>Incertidumbre</th><th>Estado</th><th>Soporte</th></tr></thead>
+        <tbody>{% for item in records %}
+          <tr>
+            <td><a class="table-link" href="/fuentes/{{ item.source.id }}">{{ item.source.name }}</a><small class="table-sub">{{ item.source.facility.name if item.source.facility else 'Corporativo' }}</small></td>
+            <td>{{ item.period_start.strftime('%m/%Y') }}</td>
+            <td><strong>{{ item.value|number_es(2) }}</strong> {{ item.unit }}{% if item.is_estimated %}<span class="estimated-mark">Estimado</span>{% endif %}</td>
+            <td>{{ item.data_origin }}</td>
+            <td><span class="quality-badge quality-{{ item.quality_level|lower }}">{{ item.quality_level }}</span></td>
+            <td><strong>{{ item.uncertainty_percentage|number_es(1) }}%</strong><small class="table-sub">{{ item.uncertainty_basis or 'Sin base' }}</small></td>
+            <td><span class="status-chip {{ 'complete' if item.status == 'Aprobado' else 'progressing' if item.status in ['Cargado','En revisión'] else 'pending' }}">{{ item.status }}</span></td>
+            <td>{% if item.evidence %}<a class="icon-link" href="/evidencias/{{ item.evidence.id }}/descargar">↓ {{ item.evidence.name }}</a>{% else %}<span class="muted">Sin soporte</span>{% endif %}</td>
+          </tr>
+        {% endfor %}</tbody>
+      </table></div>
+      {% else %}<div class="inline-empty"><strong>No hay registros</strong><p>Usa el formulario para cargar el primer dato del inventario.</p></div>{% endif %}
+    </section>
+
+    {% if user.can_provide_data %}
+    <aside class="card sticky-form">
+      <div class="card-head"><div><small>NUEVO REGISTRO</small><h3>Cargar dato</h3></div></div>
+      {% if sources|selectattr('included')|list %}
+      <form method="post" action="/informacion/datos/nuevo" class="stack-form" data-activity-form>
+        <label>Fuente<select name="source_id" required data-activity-source>{% for source in sources if source.included %}<option value="{{ source.id }}" data-preferred-unit="{{ source.preferred_unit }}">{{ source.name }} · {{ source.facility.name if source.facility else 'Corporativo' }}</option>{% endfor %}</select><small data-source-unit-hint>Usaremos la unidad esperada de la fuente.</small></label>
+        <div class="form-grid two compact-fields"><label>Inicio<input name="period_start" type="date" value="{{ default_period_start }}" required></label><label>Final<input name="period_end" type="date" value="{{ default_period_end }}" required></label></div>
+        <div class="form-grid two compact-fields"><label>Valor<input name="value" type="number" step="any" min="0" required></label><label>Unidad<select name="unit" required data-activity-unit>{% for unit in allowed_units %}<option>{{ unit }}</option>{% endfor %}</select></label></div>
+        <label>Origen<select name="data_origin" required>{% for origin in data_origins %}<option>{{ origin }}</option>{% endfor %}</select></label>
+        <label>Evidencia asociada<select name="evidence_id"><option value="">Sin asociar todavía</option>{% for doc in documents %}<option value="{{ doc.id }}">{{ doc.name }}</option>{% endfor %}</select><small>{% if not documents %}<a href="#evidencias">Carga un soporte</a> y luego vuelve a este formulario.{% else %}Selecciona el soporte que respalda el valor.{% endif %}</small></label>
+        <label class="check-line"><input type="checkbox" name="is_estimated"> El valor es estimado</label>
+        <div class="form-grid two compact-fields"><label>Incertidumbre del dato (%)<input name="uncertainty_percentage" type="number" min="0" step="0.1" value="0"></label><label>Base de incertidumbre<input name="uncertainty_basis" placeholder="Medición, factura, estimación..."></label></div>
+        <label>Observaciones<textarea name="notes" placeholder="Supuestos, alcance del dato o aclaraciones"></textarea></label>
+        <button class="btn btn-primary btn-block">Guardar dato y recalcular</button>
+      </form>
+      {% else %}
+      <div class="guided-empty compact"><span>⌁</span><div><strong>Primero configura una fuente</strong><p>Necesitas al menos una fuente incluida para asociar el dato.</p><a class="btn btn-outline btn-small" href="/inventarios/{{ inventory.id }}/fuentes">Ir al mapa de fuentes</a></div></div>
+      {% endif %}
+    </aside>
+    {% endif %}
+  </div>
+</section>
+
+<section class="section-anchor" id="solicitudes">
+  <div class="section-title-row"><div><span class="section-number">2</span><div><small>FLUJO DE INFORMACIÓN</small><h2>Solicitudes al cliente</h2></div></div></div>
+  <div class="information-layout">
+    <section class="card">
+      <div class="request-list">{% for item in requests %}
+        <article>
+          <div class="request-status {{ item.status|lower|replace(' ','-') }}"></div>
+          <div><h3>{{ item.title }}</h3><p>{{ item.instructions }}</p><small>Fuente: {{ item.source_name or 'General' }} · Responsable: {{ item.requested_to }} · Vence {{ item.due_date.strftime('%d/%m/%Y') }}</small></div>
+          <form method="post" action="/informacion/solicitudes/{{ item.id }}/estado" class="compact-status-form">
+            <select name="status" aria-label="Estado de {{ item.title }}">{% for state in ['Pendiente','En preparación','Cargado','En revisión','Completado','Devuelto'] %}<option {% if item.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select>
+            <button class="tiny-button">Guardar</button>
+          </form>
+        </article>
+      {% else %}<div class="inline-empty"><strong>Sin solicitudes abiertas</strong></div>{% endfor %}</div>
+    </section>
+
+    {% if user.can_manage_sources %}<aside class="card sticky-form"><div class="card-head"><div><small>NUEVA SOLICITUD</small><h3>Pedir información</h3></div></div><form method="post" action="/informacion/solicitudes/nueva" class="stack-form">
+      <label>Título<input name="title" required placeholder="Ej. Facturas de electricidad"></label>
+      <label>Fuente<select name="source_id"><option value="">General</option>{% for source in sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
+      <label>Responsable<input name="requested_to" required placeholder="Área o persona"></label>
+      <label>Fecha límite<input name="due_date" type="date" required></label>
+      <label>Instrucciones<textarea name="instructions" placeholder="Dato, periodo y soporte requerido"></textarea></label>
+      <button class="btn btn-primary btn-block">Crear solicitud</button>
+    </form></aside>{% endif %}
+  </div>
+</section>
+
+<section class="section-anchor" id="evidencias">
+  <div class="section-title-row"><div><span class="section-number">3</span><div><small>REPOSITORIO DOCUMENTAL</small><h2>Evidencias</h2></div></div><span class="phase-label functional">Carga y descarga real</span></div>
+  <div class="information-layout wide-form-layout">
+    <section class="card">
+      <div class="responsive-table"><table>
+        <thead><tr><th>Documento</th><th>Fuente</th><th>Periodo</th><th>Tamaño</th><th>Integridad</th><th>Estado</th><th></th></tr></thead>
+        <tbody>{% for doc in documents %}<tr>
+          <td><strong class="document-name">▤ {{ doc.name }}</strong><small class="table-sub">{{ doc.document_type }} · {{ doc.uploaded_by }}</small></td>
+          <td>{{ doc.source_name }}</td><td>{{ doc.period_label or 'No indicado' }}</td><td>{{ doc.file_size|bytes }}</td>
+          <td><code class="hash-code">{{ doc.sha256[:10] }}…</code></td>
+          <td>{% if user.can_review %}<form method="post" action="/evidencias/{{ doc.id }}/estado" class="compact-status-form"><select name="status">{% for state in ['Cargado','En revisión','Aprobado','Devuelto'] %}<option {% if doc.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select><button class="tiny-button">Guardar</button></form>{% else %}<span class="status-chip {{ 'complete' if doc.status == 'Aprobado' else 'progressing' if doc.status == 'En revisión' else 'pending' }}">{{ doc.status }}</span>{% endif %}</td>
+          <td><a class="btn btn-outline btn-small" href="/evidencias/{{ doc.id }}/descargar">Descargar</a></td>
+        </tr>{% else %}<tr><td colspan="7">No hay evidencias cargadas.</td></tr>{% endfor %}</tbody>
+      </table></div>
+    </section>
+
+    {% if user.can_provide_data %}<aside class="card sticky-form"><div class="card-head"><div><small>NUEVA EVIDENCIA</small><h3>Subir soporte</h3></div></div><form method="post" action="/informacion/evidencias/nueva" enctype="multipart/form-data" class="stack-form">
+      <label>Archivo<input type="file" name="file" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" required><small>Máximo 10 MB.</small></label>
+      <label>Tipo<select name="document_type"><option>Factura</option><option>Registro operativo</option><option>Certificado</option><option>Imagen</option><option>Otro</option></select></label>
+      <label>Fuente<select name="source_id"><option value="">General</option>{% for source in sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
+      <label>Periodo<input name="period_label" placeholder="Ej. enero–marzo 2025"></label>
+      <label>Notas<textarea name="notes"></textarea></label>
+      <button class="btn btn-primary btn-block">Cargar evidencia</button>
+    </form></aside>{% endif %}
+  </div>
+</section>
+{% endblock %}

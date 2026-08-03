@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}Entorno demo · Calcula tu Huella{% endblock %}
+{% block page_label %}Portafolio / Entorno demo certificado{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">Demostración / Entorno multiempresa</p>
+    <h1>Greenatics y Andinas, diagnosticadas y listas para recorrer</h1>
+    <p>Datos sintéticos consistentes para probar perfil, diagnóstico, alcance, plan, inventarios, solicitudes, evidencias, cálculos, revisión y soporte.</p>
+  </div>
+  <div class="head-actions">
+    {% if demo_enabled %}
+    <form method="post" action="/entorno-demo/preparar"><button class="btn btn-outline" type="submit">Preparar o reparar demo</button></form>
+    <form method="post" action="/entorno-demo/certificar"><button class="btn btn-primary" type="submit">Certificar entorno demo</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<div class="calculation-notice notice-success">
+  <span>DEMO</span>
+  <p><strong>Ningún valor de esta sección corresponde a información oficial de Greenatics o Andinas.</strong><small>Los datos son sintéticos y existen exclusivamente para demostrar el flujo completo de la plataforma.</small></p>
+</div>
+
+<div class="kpi-grid five">
+  <div class="kpi-card featured"><div><small>EMPRESAS DEMO</small><strong>{{ summary.organization_count }}</strong></div></div>
+  <div class="kpi-card"><div><small>DATOS DE ACTIVIDAD</small><strong>{{ summary.totals.activity_records }}</strong></div></div>
+  <div class="kpi-card"><div><small>CÁLCULOS</small><strong>{{ summary.totals.calculations }}</strong></div></div>
+  <div class="kpi-card"><div><small>SOLICITUDES</small><strong>{{ summary.totals.requests }}</strong></div></div>
+  <div class="kpi-card"><div><small>MENSAJES</small><strong>{{ summary.totals.notifications }}</strong></div></div>
+</div>
+
+<div class="demo-company-grid">
+{% for company in summary.organizations %}
+  <section class="card demo-company-card">
+    <div class="card-head"><div><small>ORGANIZACIÓN DEMOSTRATIVA</small><h2>{{ company.trade_name }}</h2></div><span class="status-badge success">Lista</span></div>
+    <p>{{ company.sector }}</p>
+    <div class="demo-metrics">
+      <span><b>{{ company.facilities }}</b>Sedes</span>
+      <span><b>{{ company.inventories }}</b>Inventarios</span>
+      <span><b>{{ company.sources }}</b>Fuentes</span>
+      <span><b>{{ company.activity_records }}</b>Datos</span>
+      <span><b>{{ company.calculations }}</b>Cálculos</span>
+      <span><b>{{ company.evidence }}</b>Evidencias</span>
+      <span><b>{{ company.pending_requests }}</b>Pendientes</span>
+      <span><b>{{ company.open_observations }}</b>Hallazgos</span>
+      <span><b>{{ company.profile_completion }}%</b>Perfil</span>
+      <span><b>{{ company.implementation_plans }}</b>Plan</span>
+    </div>
+    <div class="demo-diagnostic-strip"><span>Complejidad <b>{{ company.complexity_level }}</b></span><span>Madurez <b>{{ company.maturity_level }}</b></span><span>Paquete <b>{{ {'ESENCIAL':'Huella Esencial','EMPRESARIAL':'Gestión de Carbono','CORPORATIVO':'Gestión Avanzada'}[company.recommended_package] if company.recommended_package else 'Pendiente' }}</b></span></div>
+    <div class="callout"><strong>{{ company.total_emissions|number_es(2) }} tCO₂e</strong> calculadas con datos de ejemplo y factores trazables disponibles en la biblioteca.</div>
+    <div class="button-row"><form method="post" action="/portafolio/cambiar/{{ company.id }}"><button class="btn btn-primary" type="submit">Abrir {{ company.trade_name }}</button></form><a class="btn btn-outline" href="/inteligencia-producto">Ver perfil y diagnóstico</a></div>
+  </section>
+{% endfor %}
+</div>
+
+<section class="card" id="certificaciones">
+  <div class="card-head"><div><small>CONTROL DE INTEGRIDAD</small><h2>Certificaciones del entorno demo</h2></div></div>
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Versión</th><th>Estado</th><th>Responsable</th><th>Hash</th><th></th></tr></thead><tbody>
+  {% for item in certifications %}
+    <tr><td>{{ item.row.created_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ item.row.application_version }}</td><td><span class="status-badge {{ 'success' if item.row.status == 'Certificado demo' else 'warning' }}">{{ item.row.status }}</span></td><td>{{ item.row.performed_by }}</td><td><code>{{ item.row.certificate_hash[:14] }}…</code></td><td><a class="btn btn-outline" href="/entorno-demo/certificados/{{ item.row.id }}/descargar">Descargar</a></td></tr>
+  {% else %}<tr><td colspan="6">Aún no se ha certificado el entorno demostrativo.</td></tr>{% endfor %}
+  </tbody></table></div>
+</section>
+{% endblock %}

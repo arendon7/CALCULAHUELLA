@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ source.name }} · Calcula tu Huella{% endblock %}
+{% block page_label %}Fuente / cálculo y trazabilidad{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">Fuentes / {{ source.category }} / {{ source.name }}</p><h1>{{ source.name }} <span class="status-chip {{ 'complete' if source.status == 'Completado' else 'progressing' if source.status == 'En progreso' else 'pending' }}">{{ source.status }}</span></h1><p>{{ source.facility.name if source.facility else 'Nivel corporativo' }} · {{ source.responsible }} · materialidad {{ source.materiality|lower }}</p></div><div class="head-actions"><a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/fuentes">Volver</a>{% if user.can_view_methodology %}<form method="post" action="/fuentes/{{ source.id }}/recalcular"><button class="btn btn-primary">↻ Recalcular</button></form>{% endif %}</div></div>
+
+<div class="calculation-notice notice-success"><span>TRAZABLE</span><p><strong>Dato, conversión, factor, gas, GWP y resultado ya están conectados.</strong><small>Los factores precargados son demostrativos; la trazabilidad del motor sí es funcional.</small></p></div>
+
+{% if user.can_manage_sources %}
+<details class="card source-config-panel">
+  <summary><div><small>CONFIGURACIÓN DE LA FUENTE</small><strong>Editar alcance, sede, responsable y unidad</strong></div><span>Configurar</span></summary>
+  <form method="post" action="/fuentes/{{ source.id }}/configurar" class="source-config-form">
+    <label>Nombre<input name="name" value="{{ source.name }}" required maxlength="100"></label>
+    <label>Alcance<select name="scope">{% for value in [1,2,3] %}<option value="{{ value }}" {% if source.scope == value %}selected{% endif %}>Alcance {{ value }}</option>{% endfor %}</select></label>
+    <label>Categoría<input name="category" value="{{ source.category }}" required maxlength="120"></label>
+    <label>Sede<select name="facility_id"><option value="">Nivel corporativo</option>{% for facility in facilities %}<option value="{{ facility.id }}" {% if source.facility_id == facility.id %}selected{% endif %}>{{ facility.name }}</option>{% endfor %}</select></label>
+    <label>Responsable<input name="responsible" value="{{ source.responsible }}" required maxlength="120"></label>
+    <label>Unidad esperada<select name="preferred_unit"><option value="">Por definir</option>{% for unit in allowed_units %}<option {% if source.preferred_unit == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}</select></label>
+    <label>Materialidad<select name="materiality">{% for value in ['Alta','Media','Baja'] %}<option {% if source.materiality == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+    <label>Frecuencia<select name="data_frequency">{% for value in ['Mensual','Trimestral','Anual','Por evento'] %}<option {% if source.data_frequency == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+    <label class="check-line source-inclusion"><input type="checkbox" name="included" {% if source.included %}checked{% endif %}> Incluir en el límite del inventario</label>
+    <label class="source-exclusion">Justificación de exclusión<input name="exclusion_reason" value="{{ source.exclusion_reason }}" placeholder="Obligatoria cuando la fuente queda excluida"></label>
+    <button class="btn btn-primary">Guardar configuración</button>
+  </form>
+</details>
+{% endif %}
+
+<div class="source-summary-grid">
+  <article class="mini-card"><small>AVANCE</small><strong>{{ source.progress }}%</strong><p>{{ source.data_frequency }}</p></article>
+  <article class="mini-card"><small>ACTIVIDAD ACUMULADA</small><strong>{{ total_activity|number_es(2) }}</strong><p>{{ calculation.activity_unit }}</p></article>
+  <article class="mini-card"><small>EMISIONES CALCULADAS</small><strong>{{ source.emissions|number_es(3) }}</strong><p>tCO₂e</p></article>
+  <article class="mini-card"><small>ESTADO DEL MOTOR</small><strong>{% if summary.errors %}{{ summary.errors }} errores{% elif summary.alerts %}{{ summary.alerts }} alertas{% else %}OK{% endif %}</strong><p>{{ summary.calculations|length }} componentes</p></article>
+</div>
+
+<div class="calculation-layout calculation-v04">
+  <div class="calculation-stack">
+    <section class="card calculation-card"><div class="card-head"><div><small>1. DATOS DE ACTIVIDAD</small><h3>Registros del periodo</h3></div><span class="counter">{{ records|length }}</span></div><div class="responsive-table"><table><thead><tr><th>Periodo</th><th>Dato</th><th>Calidad</th><th>Incertidumbre</th><th>Evidencia</th><th>CO₂e</th><th>Acción</th></tr></thead><tbody>
+    {% for item in records %}<tr>
+      <td>{{ item.period_start.strftime('%m/%Y') }}</td><td><strong>{{ item.value|number_es(3) }} {{ item.unit }}</strong>{% if item.is_estimated %}<span class="estimated-mark">Estimado</span>{% endif %}</td><td><span class="quality-badge quality-{{ item.quality_level|lower }}">{{ item.quality_level }}</span></td><td><strong>{{ item.uncertainty_percentage|number_es(1) }}%</strong><small class="table-sub">{{ item.uncertainty_basis or 'Sin base' }}</small></td><td>{% if item.evidence %}<a class="icon-link" href="/evidencias/{{ item.evidence.id }}/descargar">{{ item.evidence.name }}</a>{% else %}<span class="muted">Sin soporte</span>{% endif %}</td><td><strong>{{ (item.calculations|sum(attribute='co2e_kg') / 1000)|number_es(5) }} t</strong></td>
+      <td><details class="row-editor"><summary>Editar</summary><form method="post" action="/informacion/datos/{{ item.id }}/editar" class="inline-editor"><label>Valor<input name="value" type="number" step="any" min="0" value="{{ item.value }}" required></label><label>Unidad<select name="unit">{% for unit in allowed_units %}<option {% if item.unit == unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}</select></label><label>Origen<select name="data_origin">{% for origin in data_origins %}<option {% if item.data_origin == origin %}selected{% endif %}>{{ origin }}</option>{% endfor %}</select></label><label>Estado<select name="status">{% for state in ['Cargado','En revisión','Aprobado','Devuelto','Provisional'] %}<option {% if item.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select></label><label>Evidencia<select name="evidence_id"><option value="">Sin evidencia</option>{% for doc in documents %}<option value="{{ doc.id }}" {% if item.evidence_id == doc.id %}selected{% endif %}>{{ doc.name }}</option>{% endfor %}</select></label><label class="check-line"><input type="checkbox" name="is_estimated" {% if item.is_estimated %}checked{% endif %}> Estimado</label><label>Incertidumbre %<input name="uncertainty_percentage" type="number" min="0" step="0.1" value="{{ item.uncertainty_percentage }}"></label><label>Base incertidumbre<input name="uncertainty_basis" value="{{ item.uncertainty_basis }}"></label><label class="editor-notes">Notas<textarea name="notes">{{ item.notes }}</textarea></label><button class="btn btn-primary btn-small">Guardar y recalcular</button></form></details></td>
+    </tr>{% else %}<tr><td colspan="6">Esta fuente todavía no tiene datos.</td></tr>{% endfor %}
+    </tbody></table></div></section>
+
+    <section class="card calculation-card"><div class="card-head"><div><small>2. FACTORES ASIGNADOS</small><h3>Componentes activos</h3></div><span class="counter">{{ assignments|length }}</span></div>
+      <div class="factor-assignment-list">{% for assignment in assignments %}<article><div><strong>{{ assignment.factor_version.factor.name }}</strong><small>{{ assignment.factor_version.version }} · {{ assignment.factor_version.gas.formula or assignment.factor_version.gas.code }} · {{ assignment.factor_version.value|number_es(8) }} {{ assignment.factor_version.output_unit }}/{{ assignment.factor_version.input_unit }}</small></div><span class="status-chip complete">{{ assignment.factor_version.status }}</span>{% if user.can_view_methodology %}<form method="post" action="/fuentes/{{ source.id }}/factores/{{ assignment.id }}/retirar"><button class="tiny-button">Retirar</button></form>{% endif %}</article>{% else %}<div class="inline-empty"><strong>Sin factores asignados</strong><p>La fuente no producirá resultados hasta asignar una versión aprobada.</p></div>{% endfor %}</div>
+      {% if user.can_view_methodology and available_versions %}<form method="post" action="/fuentes/{{ source.id }}/factores/asignar" class="assign-factor-form"><label>Agregar factor<select name="factor_version_id">{% for version in available_versions %}<option value="{{ version.id }}">{{ version.factor.name }} · {{ version.gas.formula or version.gas.code }} · {{ version.value|number_es(8) }}/{{ version.input_unit }}</option>{% endfor %}</select></label><label>Nota<input name="notes" placeholder="Justificación de selección"></label><button class="btn btn-outline">Asignar y recalcular</button></form>{% endif %}
+    </section>
+
+    <section class="card calculation-card"><div class="card-head"><div><small>3. RESULTADO POR GAS</small><h3>Conversión a CO₂ equivalente</h3></div></div>
+      <div class="responsive-table"><table><thead><tr><th>Gas o componente</th><th>Masa del gas</th><th>GWP</th><th>CO₂e</th><th>Incertidumbre</th></tr></thead><tbody>{% for gas, values in summary.by_gas.items() %}<tr><td><strong>{{ gas }}</strong></td><td>{{ values.gas_kg|number_es(6) }} kg</td><td>{% set matches = summary.calculations|selectattr('gas_code','equalto',gas)|list %}{{ matches[0].gwp_value|number_es(3) if matches else '-' }}</td><td><strong>{{ (values.co2e_kg / 1000)|number_es(6) }} tCO₂e</strong></td><td>{% set matches = summary.calculations|selectattr('gas_code','equalto',gas)|list %}{{ matches[0].uncertainty_percentage|number_es(2) if matches else 0 }}%</td></tr>{% else %}<tr><td colspan="4">No hay cálculos disponibles.</td></tr>{% endfor %}</tbody></table></div>
+      <div class="result-total"><small>RESULTADO TOTAL REAL DEL MOTOR</small><strong>{{ (summary.total_co2e_kg / 1000)|number_es(6) }} tCO₂e</strong><p>Motor {{ summary.calculations[0].engine_version if summary.calculations else '0.4.0' }} · {{ inventory.gwp_version }}</p></div>
+    </section>
+
+    <section class="card calculation-card"><div class="card-head"><div><small>4. MEMORIA DE CÁLCULO</small><h3>Fórmulas congeladas</h3></div><span class="counter">{{ summary.calculations|length }}</span></div><div class="formula-history">{% for item in summary.calculations[:18] %}<article><div><strong>{{ item.activity_data.period_start.strftime('%m/%Y') }} · {{ item.gas_code }}</strong><span class="calc-state {{ 'state-error' if item.status == 'Error' else 'state-alert' if item.status == 'Con alerta' else 'state-ok' }}">{{ item.status }}</span></div><code>{{ item.formula_snapshot }}</code>{% if item.warning %}<p>{{ item.warning }}</p>{% endif %}</article>{% else %}<p class="muted">Sin memoria de cálculo.</p>{% endfor %}</div></section>
+  </div>
+
+  <aside class="card trace-card"><h3>Trazabilidad completa</h3>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Dato</strong><p>{{ records|length }} registros persistentes.</p></div></div>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Conversión</strong><p>{{ calculation.conversion }}</p></div></div>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Factor</strong><p>{{ assignments|length }} versiones activas.</p></div></div>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>GWP</strong><p>{{ inventory.gwp_version }}.</p></div></div>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Fórmula</strong><p>Cada cálculo conserva su instantánea.</p></div></div>
+    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Revisión y aprobación</strong><p>Flujo de revisión y aprobación disponible.</p></div></div>
+    {% if summary.warnings %}<div class="trace-warning"><strong>Alertas metodológicas</strong>{% for warning in summary.warnings %}<p>• {{ warning }}</p>{% endfor %}</div>{% endif %}
+  </aside>
+</div>
+{% endblock %}

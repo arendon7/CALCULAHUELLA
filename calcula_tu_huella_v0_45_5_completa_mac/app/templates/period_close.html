@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Cierre mensual · Calcula tu Huella{% endblock %}
+{% block page_label %}Cierre mensual{% endblock %}
+{% block content %}
+<section class="page-heading period-close-head">
+  <div>
+    <span class="eyebrow">CONCILIACIÓN Y CIERRE DEL PERIODO</span>
+    <h1>Cierre mensual del inventario</h1>
+    <p>Comprueba datos, evidencia, factores y cálculos antes de congelar cada mes con una huella SHA-256 reproducible.</p>
+  </div>
+  {% if summary.execution %}
+  <form method="get" class="period-selector">
+    <label>Periodo</label>
+    <select name="period" onchange="this.form.submit()">
+      {% for item in summary.periods %}<option value="{{ item.key }}" {% if item.key == summary.period_key %}selected{% endif %}>{{ item.label }}</option>{% endfor %}
+    </select>
+  </form>
+  {% endif %}
+</section>
+
+{% if not summary.execution %}
+<section class="card empty-state"><h2>El piloto todavía no está iniciado</h2><p>Inicia la ejecución del piloto para crear el inventario, sus fuentes y los periodos de cierre.</p><a class="btn btn-primary" href="/piloto-greenatics/ejecucion">Ir a ejecución del piloto</a></section>
+{% else %}
+{% set record = summary.record %}
+<section class="period-status-bar">
+  <div><small>PERIODO</small><strong>{{ summary.period_label }}</strong></div>
+  <div><small>ESTADO</small><span class="status-badge {% if record and record.status == 'Cerrado' %}success{% elif record and record.status == 'En revisión' %}warning{% else %}neutral{% endif %}">{{ record.status if record else 'Abierto' }}</span></div>
+  <div><small>COBERTURA DATOS</small><strong>{{ summary.metrics.data_coverage }} %</strong></div>
+  <div><small>COBERTURA EVIDENCIA</small><strong>{{ summary.metrics.evidence_coverage }} %</strong></div>
+  <div><small>EMISIONES</small><strong>{{ "%.3f"|format(summary.metrics.total_tco2e) }} tCO₂e</strong></div>
+</section>
+
+<div class="kpi-grid five period-kpis">
+  <article class="kpi-card featured"><div class="kpi-icon green">✓</div><div><small>Preparación</small><strong>{{ summary.metrics.quality_score }}/100</strong><span>Puntaje del periodo</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon">▦</div><div><small>Esperadas</small><strong>{{ summary.metrics.expected }}</strong><span>Fuentes aplicables</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon green">●</div><div><small>Listas</small><strong>{{ summary.metrics.ready }}</strong><span>Sin observaciones</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon amber">!</div><div><small>Advertencias</small><strong>{{ summary.metrics.warnings }}</strong><span>Requieren criterio</span></div></article>
+  <article class="kpi-card"><div class="kpi-icon red">×</div><div><small>Bloqueadas</small><strong>{{ summary.metrics.blocked }}</strong><span>Impiden el cierre</span></div></article>
+</div>
+
+{% if record and record.status == 'Cerrado' %}
+<section class="card integrity-card">
+  <div><small>HUELLA DE INTEGRIDAD DEL CIERRE</small><h2>{{ record.snapshot_hash }}</h2><p>El hash representa el inventario, métricas y estado de cada fuente al momento del cierre.</p></div>
+  <div class="integrity-meta"><span>Cerrado por <strong>{{ record.closed_by }}</strong></span><span>{{ record.closed_at.strftime('%Y-%m-%d %H:%M') if record.closed_at else '' }}</span></div>
+</section>
+{% endif %}
+
+<div class="period-layout">
+<section class="card period-table-card">
+  <div class="card-head"><div><small>CONCILIACIÓN POR FUENTE</small><h2>Lista de control del periodo</h2></div><span>{{ summary.rows|length }} fuentes</span></div>
+  <div class="table-wrap"><table class="period-table"><thead><tr><th>Fuente</th><th>Sede</th><th>A.</th><th>Datos</th><th>Evidencia</th><th>Calidad</th><th>Factor</th><th>tCO₂e</th><th>Estado</th></tr></thead><tbody>
+  {% for row in summary.rows %}
+  <tr>
+    <td><strong>{{ row.code }}</strong><small>{{ row.name }}</small>{% if row.blockers or row.warnings %}<details><summary>Ver observaciones</summary>{% for item in row.blockers %}<p class="text-danger">× {{ item }}</p>{% endfor %}{% for item in row.warnings %}<p class="text-warning">! {{ item }}</p>{% endfor %}</details>{% endif %}</td>
+    <td>{{ row.site }}<small>{{ row.materiality }}</small></td>
+    <td>{{ row.scope if row.scope else 'I' }}</td>
+    <td>{{ row.records }}</td><td>{{ row.evidence }}</td><td>{{ row.quality }}</td>
+    <td><span class="factor-label">{{ row.factor_status }}</span></td>
+    <td>{{ "%.3f"|format(row.emissions_tco2e) }}</td>
+    <td><span class="status-badge {% if row.status == 'Listo' %}success{% elif row.status == 'Bloqueado' %}danger{% else %}warning{% endif %}">{{ row.status }}</span></td>
+  </tr>
+  {% endfor %}
+  </tbody></table></div>
+</section>
+
+<aside class="period-side">
+  <section class="card blockers-card"><div class="card-head"><div><small>PUERTAS DE CIERRE</small><h2>Bloqueos</h2></div><span class="status-badge {% if summary.blockers %}danger{% else %}success{% endif %}">{{ summary.blockers|length }}</span></div>
+    {% if summary.blockers %}<div class="blocker-list">{% for item in summary.blockers[:12] %}<p><span>×</span>{{ item }}</p>{% endfor %}{% if summary.blockers|length > 12 %}<small>Y {{ summary.blockers|length - 12 }} bloqueo(s) adicional(es).</small>{% endif %}</div>{% else %}<div class="success-panel"><strong>Periodo técnicamente listo</strong><p>No existen bloqueos de datos, evidencia, factores ni cálculos.</p></div>{% endif %}
+  </section>
+
+  {% if can_submit and (not record or record.status in ['Abierto','Reabierto']) %}
+  <section class="card action-card"><small>PASO 1</small><h2>Enviar a revisión</h2><p>El envío exige cobertura de datos y evidencia. Los pendientes metodológicos permanecen visibles al revisor.</p><form method="post" action="/cierre-mensual/enviar"><input type="hidden" name="period" value="{{ summary.period_key }}"><textarea name="notes" rows="3" placeholder="Notas para el revisor"></textarea><button class="btn btn-primary btn-block">Enviar periodo</button></form></section>
+  {% endif %}
+
+  {% if can_close and record and record.status == 'En revisión' %}
+  <section class="card action-card"><small>PASO 2</small><h2>Cerrar y congelar</h2><p>Solo se habilita cuando no quedan bloqueos. Se guarda una instantánea y su hash.</p><form method="post" action="/cierre-mensual/cerrar"><input type="hidden" name="period" value="{{ summary.period_key }}"><textarea name="comments" rows="3" placeholder="Conclusión de revisión"></textarea><button class="btn btn-primary btn-block" {% if summary.blockers %}disabled{% endif %}>Cerrar periodo</button></form></section>
+  {% endif %}
+
+  {% if can_reopen and record and record.status == 'Cerrado' %}
+  <section class="card action-card danger-zone"><small>EXCEPCIÓN CONTROLADA</small><h2>Reabrir periodo</h2><p>La reapertura conserva el hash anterior y exige una justificación auditada.</p><form method="post" action="/cierre-mensual/reabrir"><input type="hidden" name="period" value="{{ summary.period_key }}"><textarea name="reason" rows="3" required minlength="10" placeholder="Motivo concreto de reapertura"></textarea><button class="btn btn-outline btn-block">Reabrir con trazabilidad</button></form></section>
+  {% endif %}
+</aside>
+</div>
+{% endif %}
+{% endblock %}

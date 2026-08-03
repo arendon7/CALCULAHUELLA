@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 115" role="img" aria-label="Calcula tu Huella">
+  <g transform="translate(5 6)">
+    <path d="M18 66C17 31 36 12 64 11" fill="none" stroke="#61ad58" stroke-width="7" stroke-linecap="round"/>
+    <circle cx="22" cy="27" r="6" fill="#61ad58"/><circle cx="35" cy="15" r="8" fill="#61ad58"/><circle cx="52" cy="8" r="10" fill="#4f9f4d"/><circle cx="72" cy="8" r="12" fill="#328c54"/>
+    <path d="M18 70C24 93 41 103 61 101C81 99 91 83 90 62" fill="none" stroke="#2d78b9" stroke-width="7" stroke-linecap="round"/>
+    <path d="M22 76L43 51L65 62L86 33" fill="none" stroke="#2e7d5b" stroke-width="5" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="22" cy="76" r="7" fill="#fff" stroke="#194d7b" stroke-width="5"/><circle cx="43" cy="51" r="6" fill="#fff" stroke="#2e7d5b" stroke-width="5"/><circle cx="65" cy="62" r="6" fill="#fff" stroke="#2e7d5b" stroke-width="5"/><circle cx="86" cy="33" r="7" fill="#fff" stroke="#2d78b9" stroke-width="5"/>
+  </g>
+  <text x="117" y="52" font-family="Inter,Arial,sans-serif" font-size="43" font-weight="700" fill="#0f2d4d">Calcula</text>
+  <text x="117" y="93" font-family="Inter,Arial,sans-serif" font-size="43" font-weight="700"><tspan fill="#63b35e">tu</tspan><tspan fill="#0f2d4d"> Huella</tspan></text>
+  <text x="120" y="111" font-family="Inter,Arial,sans-serif" font-size="9.5" letter-spacing="2.3" fill="#657887">PLATAFORMA PROFESIONAL DE HUELLA DE CARBONO</text>
+</svg>

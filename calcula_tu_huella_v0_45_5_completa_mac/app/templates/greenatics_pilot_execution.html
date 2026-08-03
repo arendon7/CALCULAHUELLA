@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% block title %}Ejecución piloto Greenatics · Calcula tu Huella{% endblock %}
+{% block page_label %}Piloto Greenatics / Ejecución controlada{% endblock %}
+{% block content %}
+<div class="page-head pilot-execution-head">
+  <div>
+    <p class="breadcrumb">Piloto controlado / Greenatics</p>
+    <h1>Ejecución controlada del piloto</h1>
+    <p>Ejecuta el inventario por sede, fuente y mes; controla evidencias, calidad, factores, incidencias y contraste independiente fuente a fuente.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-outline" href="/piloto-greenatics">Volver a la matriz</a>
+    {% if summary.execution %}<a class="btn btn-primary" href="/piloto-greenatics/ejecucion/plantilla.xlsx">Descargar plantilla de ejecución</a>{% endif %}
+  </div>
+</div>
+
+{% if not summary.execution %}
+<section class="pilot-start-card card">
+  <div>
+    <span class="eyebrow">INICIO CONTROLADO</span>
+    <h2>Crear el inventario operativo del piloto</h2>
+    <p>La plataforma generará las sedes, fuentes, responsables y solicitudes definidas en la matriz Greenatics. El proceso es idempotente: no crea un segundo piloto si ya existe.</p>
+    <ul class="clean-list">
+      <li>Inventario anual 2026 bajo control operacional.</li>
+      <li>Fuentes de Yarumal, Támesis y operación corporativa.</li>
+      <li>Solicitudes de información por responsable.</li>
+      <li>Asignación automática de factores documentados cuando exista coincidencia aprobada.</li>
+    </ul>
+  </div>
+  <form method="post" action="/piloto-greenatics/ejecucion/iniciar" class="pilot-start-form">
+    <label>Fecha objetivo del piloto<input type="date" name="target_date"></label>
+    <button class="btn btn-primary">Iniciar piloto controlado</button>
+    <small>No modifica inventarios cerrados ni elimina información previa.</small>
+  </form>
+</section>
+{% else %}
+<section class="pilot-status-grid">
+  <article class="pilot-readiness-card">
+    <div class="pilot-score" style="--pilot-score: {{ summary.metrics.readiness }}%"><strong>{{ summary.metrics.readiness }}%</strong><span>preparación</span></div>
+    <div><span class="eyebrow">ESTADO GENERAL</span><h2>{{ summary.execution.status }}</h2><p>Meta: {{ summary.execution.target_date.strftime('%d/%m/%Y') if summary.execution.target_date else 'Sin fecha' }}</p></div>
+  </article>
+  <article class="pilot-kpi"><span>FUENTES</span><strong>{{ summary.metrics.source_count }}</strong><small>{{ summary.metrics.data_complete }} completas</small></article>
+  <article class="pilot-kpi"><span>FACTORES</span><strong>{{ summary.metrics.factor_covered }}</strong><small>{{ summary.metrics.factor_score }}% de cobertura</small></article>
+  <article class="pilot-kpi"><span>EVIDENCIAS</span><strong>{{ summary.metrics.evidence_covered }}</strong><small>{{ summary.metrics.evidence_score }}% de fuentes</small></article>
+  <article class="pilot-kpi"><span>CONTRASTE</span><strong>{{ summary.metrics.comparison_coverage }}%</strong><small>{{ summary.metrics.comparison_conforming }} fuentes conformes</small></article>
+  <article class="pilot-kpi"><span>INCIDENCIAS</span><strong>{{ summary.metrics.open_issues }}</strong><small>{{ summary.metrics.critical_issues }} altas o críticas</small></article>
+  <article class="pilot-kpi"><span>RESULTADO</span><strong>{{ summary.metrics.platform_total|number_es(3) }}</strong><small>tCO₂e calculadas</small></article>
+</section>
+
+<section class="pilot-next-actions card">
+  <div class="card-head"><div><small>PRÓXIMAS DECISIONES</small><h3>Ruta recomendada</h3></div><span class="status-badge {% if summary.blockers %}warning{% else %}success{% endif %}">{{ summary.blockers|length }} bloqueadores</span></div>
+  <div class="pilot-action-grid">
+    {% for action in summary.next_actions %}<a href="{{ action.href }}" class="pilot-action-card"><span>{{ loop.index }}</span><div><strong>{{ action.title }}</strong><small>{{ action.detail }}</small></div><b>→</b></a>{% endfor %}
+  </div>
+  {% if summary.blockers %}<div class="pilot-blockers"><strong>Bloqueadores actuales</strong><ul>{% for blocker in summary.blockers %}<li>{{ blocker }}</li>{% endfor %}</ul></div>{% endif %}
+</section>
+
+<section class="card pilot-site-control">
+  <div class="card-head"><div><small>CONTROL POR SEDE</small><h3>Yarumal, Támesis y operación corporativa</h3><p>La preparación se mide por datos, evidencias, factores y contraste; no solo por un total anual.</p></div></div>
+  <div class="pilot-site-metric-grid">
+    {% for site, metric in summary.site_metrics.items() %}
+    <article><span>{{ site }}</span><strong>{{ metric.emissions|number_es(3) }} tCO₂e</strong><div><small>Datos {{ metric.data_coverage }}%</small><small>Evidencia {{ metric.evidence_coverage }}%</small><small>Factores {{ metric.factor_coverage }}%</small><small>Contraste {{ metric.comparison_coverage }}%</small></div></article>
+    {% endfor %}
+  </div>
+  <details class="pilot-context"><summary>Contexto operativo conocido · no aplicado automáticamente</summary><div class="responsive-table"><table><thead><tr><th>Sede</th><th>Indicador</th><th>Valor</th><th>Estado</th><th>Uso</th></tr></thead><tbody>{% for item in summary.operational_context %}<tr><td>{{ item.site }}</td><td>{{ item.indicator }}</td><td>{{ item.value|number_es(2) }} {{ item.unit }}</td><td>{{ item.status }}</td><td>{{ item.use }}</td></tr>{% endfor %}</tbody></table></div></details>
+</section>
+
+<section class="card" id="datos">
+  <div class="card-head"><div><small>CAPTURA MASIVA</small><h3>Datos mensuales del piloto</h3><p>Descarga la plantilla, diligencia valores y vuelve a cargarla. Las filas válidas se crean o actualizan sin duplicar periodos.</p></div></div>
+  <div class="pilot-import-row">
+    <div class="pilot-import-instructions"><span>1</span><p><strong>Descarga la plantilla</strong><small>Incluye 12 meses por cada fuente vinculada.</small></p></div>
+    <div class="pilot-import-instructions"><span>2</span><p><strong>Diligencia sin cambiar encabezados</strong><small>Usa fechas ISO, valor numérico, unidad y calidad A–D.</small></p></div>
+    <form method="post" action="/piloto-greenatics/ejecucion/importar" enctype="multipart/form-data" class="pilot-upload-form">
+      <label>3 · Importar archivo<input type="file" name="file" accept=".xlsx" required></label>
+      <button class="btn btn-primary">Validar e importar</button>
+    </form>
+  </div>
+  {% if import_errors %}<div class="pilot-import-errors"><strong>Filas rechazadas</strong><ul>{% for error in import_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+
+  {% for site, links in summary.by_site.items() %}
+  <h3 class="pilot-site-title">{{ site }}</h3>
+  <div class="responsive-table"><table><thead><tr><th>Código / fuente</th><th>Frecuencia</th><th>Cobertura</th><th>Evidencias</th><th>Factor</th><th>Resultado</th><th>Acción</th></tr></thead><tbody>
+  {% for control in summary.source_controls if control.link.requirement.site == site %}
+    {% set link = control.link %}
+    <tr>
+      <td><strong>{{ link.requirement.code }}</strong><small class="table-sub">{{ link.requirement.source_name }} · A{{ link.requirement.scope }} · {{ link.requirement.activity_unit }}</small></td>
+      <td>{{ link.requirement.frequency }}<small class="table-sub">{{ control.actual_records }}/{{ control.expected_records }} periodos</small></td>
+      <td><div class="mini-progress"><i style="width: {{ control.coverage }}%"></i></div><small>{{ control.coverage }}%</small></td>
+      <td><span class="status-badge {% if control.evidence_count %}success{% else %}danger{% endif %}">{{ control.evidence_count }} soporte(s)</span>{% if control.estimated_records %}<small class="table-sub">{{ control.estimated_records }} estimado(s)</small>{% endif %}</td>
+      <td><span class="status-badge {% if link.source and link.source.factor_assignments %}success{% else %}danger{% endif %}">{{ 'Asignado' if link.source and link.source.factor_assignments else 'Pendiente' }}</span></td>
+      <td>{{ link.source.emissions|number_es(4) if link.source else '0,0000' }} tCO₂e</td>
+      <td>{% if link.source %}<a class="tiny-button" href="/fuentes/{{ link.source.id }}">Abrir fuente</a>{% endif %}</td>
+    </tr>
+  {% endfor %}
+  </tbody></table></div>
+  {% endfor %}
+</section>
+
+<section class="card" id="cobertura">
+  <div class="card-head"><div><small>COBERTURA MENSUAL</small><h3>Control de periodos por sede</h3><p>Cuenta únicamente fuentes con frecuencia mensual; las fuentes anuales y trimestrales se controlan en la tabla detallada.</p></div></div>
+  <div class="responsive-table"><table class="pilot-month-matrix"><thead><tr><th>Mes</th>{% for site in summary.by_site %}<th>{{ site }}</th>{% endfor %}</tr></thead><tbody>
+  {% for month in summary.monthly_coverage %}<tr><td><strong>{{ month.label }}</strong></td>{% for site in summary.by_site %}{% set cell = month.sites[site] %}<td><span class="status-badge {% if cell.coverage == 100 %}success{% elif cell.coverage > 0 %}warning{% else %}danger{% endif %}">{{ cell.present }}/{{ cell.expected }}</span><small class="table-sub">{{ cell.coverage }}%</small></td>{% endfor %}</tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="pilot-two-column">
+  <article class="card" id="contraste">
+    <div class="card-head"><div><small>VALIDACIÓN INDEPENDIENTE</small><h3>Contraste por fuente</h3></div><span class="status-badge {% if summary.execution.comparison_status == 'Conforme' %}success{% elif summary.execution.comparison_status in ['Parcial','Revisar'] %}warning{% endif %}">{{ summary.execution.comparison_status }}</span></div>
+    <div class="comparison-values">
+      <div><span>Plataforma comparada</span><strong>{{ summary.metrics.compared_platform_total|number_es(4) }}</strong><small>tCO₂e</small></div>
+      <div><span>Memoria independiente</span><strong>{{ summary.metrics.independent_total|number_es(4) if summary.metrics.independent_total is not none else '—' }}</strong><small>tCO₂e</small></div>
+      <div><span>Cobertura / variación</span><strong>{{ summary.metrics.comparison_coverage }}%</strong><small>{{ summary.metrics.variance|number_es(2) if summary.metrics.variance is not none else '—' }}% variación</small></div>
+    </div>
+    <form method="post" action="/piloto-greenatics/ejecucion/contraste/importar" enctype="multipart/form-data" class="pilot-upload-form">
+      <label>Importar la misma plantilla con la hoja «Contraste por fuente» diligenciada<input type="file" name="file" accept=".xlsx" required></label>
+      <button class="btn btn-primary">Importar contraste</button>
+    </form>
+    {% if comparison_import_errors %}<div class="pilot-import-errors"><strong>Filas rechazadas</strong><ul>{% for error in comparison_import_errors %}<li>{{ error }}</li>{% endfor %}</ul></div>{% endif %}
+    <details><summary>Registrar total anual heredado</summary><form method="post" action="/piloto-greenatics/ejecucion/contraste" class="stack-form"><label>Total independiente en tCO₂e<input type="number" step="0.000001" min="0" name="independent_total_tco2e" value="{{ summary.execution.independent_total_tco2e if summary.execution.independent_total_tco2e is not none else '' }}" required></label><label>Explicación<textarea name="comparison_notes" rows="3">{{ summary.execution.comparison_notes }}</textarea></label><button class="btn btn-outline">Guardar total</button></form><small>Este total no reemplaza el contraste por fuente requerido para aprobar el piloto.</small></details>
+  </article>
+
+  <article class="card" id="cierre">
+    <div class="card-head"><div><small>PUERTA DE SALIDA</small><h3>Aprobación del piloto</h3></div></div>
+    <p>Solo puede aprobarse cuando las fuentes estén completas, los factores estén cubiertos, las incidencias críticas estén cerradas y el contraste sea conforme.</p>
+    <div class="pilot-approval-status {% if summary.blockers %}blocked{% else %}ready{% endif %}">
+      <strong>{{ 'Bloqueado' if summary.blockers else 'Listo para aprobación' }}</strong>
+      <small>{{ summary.blockers|length }} condición(es) pendiente(s)</small>
+    </div>
+    {% if user.can_approve or user.can_manage_methodology_governance %}
+    <form method="post" action="/piloto-greenatics/ejecucion/aprobar"><button class="btn btn-primary" {% if summary.blockers %}disabled{% endif %}>Aprobar piloto</button></form>
+    {% endif %}
+    {% if summary.inventory %}<a class="btn btn-outline full-width" href="/inventarios/{{ summary.inventory.id }}">Abrir inventario completo</a>{% endif %}
+  </article>
+</section>
+
+<section class="card pilot-source-reconciliation">
+  <div class="card-head"><div><small>MEMORIA DE CONTRASTE</small><h3>Diferencias fuente a fuente</h3><p>La conformidad exige variación máxima de 2% por fuente o una explicación revisada.</p></div></div>
+  <div class="responsive-table"><table><thead><tr><th>Fuente</th><th>Plataforma</th><th>Independiente</th><th>Variación</th><th>Estado</th><th>Revisión</th></tr></thead><tbody>
+  {% for comparison in summary.comparisons %}<tr>
+    <td><strong>{{ comparison.requirement.code }}</strong><small class="table-sub">{{ comparison.requirement.site }} · {{ comparison.requirement.source_name }}</small></td>
+    <td>{{ comparison.platform_tco2e|number_es(5) }} tCO₂e</td>
+    <td>{{ comparison.independent_tco2e|number_es(5) if comparison.independent_tco2e is not none else '—' }}</td>
+    <td>{{ comparison.variance_percent|number_es(2) if comparison.variance_percent is not none else '—' }}%</td>
+    <td><span class="status-badge {% if comparison.status == 'Conforme' %}success{% elif comparison.status == 'Revisar' %}danger{% else %}warning{% endif %}">{{ comparison.status }}</span></td>
+    <td>{% if user.can_manage_inventory or user.can_review or user.can_approve %}<form method="post" action="/piloto-greenatics/ejecucion/contraste/fuentes/{{ comparison.id }}" class="factor-review-form"><input type="number" step="0.000001" min="0" name="independent_tco2e" value="{{ comparison.independent_tco2e if comparison.independent_tco2e is not none else '' }}" placeholder="tCO₂e" required><input name="notes" value="{{ comparison.notes }}" placeholder="Explicación"><button class="tiny-button">Guardar</button></form>{% else %}{{ comparison.notes or 'Sin revisión' }}{% endif %}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="card" id="incidencias">
+  <div class="card-head"><div><small>LECCIONES Y HALLAZGOS</small><h3>Incidencias del piloto</h3></div><span class="counter">{{ summary.issues|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Código</th><th>Hallazgo</th><th>Severidad</th><th>Responsable</th><th>Estado y resolución</th></tr></thead><tbody>
+  {% for issue in summary.issues %}<tr>
+    <td><strong>{{ issue.code }}</strong><small class="table-sub">{{ issue.category }}</small></td>
+    <td><strong>{{ issue.title }}</strong><small class="table-sub">{{ issue.description }}</small></td>
+    <td><span class="status-badge {% if issue.severity in ['Alta','Crítica'] %}danger{% elif issue.severity == 'Media' %}warning{% else %}success{% endif %}">{{ issue.severity }}</span></td>
+    <td>{{ issue.owner }}<small class="table-sub">{{ issue.due_date.strftime('%d/%m/%Y') if issue.due_date else 'Sin fecha' }}</small></td>
+    <td>{% if user.can_manage_inventory or user.can_review or user.can_manage_methodology_governance %}<form method="post" action="/piloto-greenatics/ejecucion/incidencias/{{ issue.id }}" class="factor-review-form"><select name="status">{% for state in ['Abierto','En curso','Resuelto','Cerrado'] %}<option {% if issue.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select><input name="owner" value="{{ issue.owner }}" aria-label="Responsable"><input name="resolution" value="{{ issue.resolution }}" placeholder="Resolución" aria-label="Resolución"><button class="tiny-button">Guardar</button></form>{% else %}<span class="status-badge">{{ issue.status }}</span>{% endif %}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+
+  {% if user.can_manage_inventory or user.can_review or user.can_manage_methodology_governance %}
+  <details class="pilot-new-issue"><summary>Registrar una incidencia adicional</summary><form method="post" action="/piloto-greenatics/ejecucion/incidencias" class="form-grid"><label>Categoría<input name="category" value="Datos"></label><label>Severidad<select name="severity"><option>Baja</option><option selected>Media</option><option>Alta</option><option>Crítica</option></select></label><label class="span-2">Título<input name="title" required></label><label class="span-2">Descripción<textarea name="description" rows="3"></textarea></label><label>Responsable<input name="owner" value="Equipo piloto"></label><label>Vencimiento<input type="date" name="due_date"></label><div class="span-2"><button class="btn btn-primary">Crear incidencia</button></div></form></details>
+  {% endif %}
+</section>
+{% endif %}
+{% endblock %}

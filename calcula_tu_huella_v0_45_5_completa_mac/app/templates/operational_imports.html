@@ -1,0 +1,252 @@
+{% extends "base.html" %}
+{% block title %}Cargas operativas · Calcula tu Huella{% endblock %}
+{% block page_label %}Cargas operativas{% endblock %}
+{% block content %}
+<section class="page-heading operational-head">
+  <div>
+    <span class="eyebrow">INTEGRACIÓN DE DATOS</span>
+    <h1>Importa, valida y corrige tus datos</h1>
+    <p><strong>Cargas operativas configurables.</strong> Carga archivos CSV o Excel, relaciona sus columnas y corrige los hallazgos antes de incorporar información al inventario.</p>
+  </div>
+  <div class="head-actions">
+    <form method="get" action="/cargas-operativas" class="period-selector compact-selector">
+      <label>INVENTARIO</label>
+      <select name="inventory_id" onchange="this.form.submit()">
+        {% for inventory in summary.inventories %}
+        <option value="{{ inventory.id }}" {% if inventory.id == summary.inventory.id %}selected{% endif %}>{{ inventory.name }} · {{ inventory.start_date.year }}</option>
+        {% endfor %}
+      </select>
+    </form>
+    <a class="btn btn-outline" href="/cargas-operativas/plantilla.xlsx?inventory_id={{ summary.inventory.id }}">Plantilla estándar</a>
+  </div>
+</section>
+
+<section class="kpi-grid five operational-kpis">
+  <article class="kpi-card featured"><div class="kpi-icon green">⇄</div><div><small>PERFILES</small><strong>{{ summary.metrics.profiles }}</strong><p>mapeos reutilizables</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon blue">▤</div><div><small>LOTES</small><strong>{{ summary.metrics.batches }}</strong><p>archivos validados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">#</div><div><small>FILAS</small><strong>{{ summary.metrics.rows }}</strong><p>registros procesados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon lime">✓</div><div><small>APLICADAS</small><strong>{{ summary.metrics.applied }}</strong><p>datos incorporados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">!</div><div><small>HALLAZGOS</small><strong>{{ summary.metrics.open_findings }}</strong><p>abiertos</p></div></article>
+</section>
+
+{% if can_manage %}
+<section class="card operational-upload-card">
+  <div class="card-head"><div><small>PASO 1</small><h2>Seleccionar y previsualizar archivo</h2></div><span class="status-chip progressing">CSV · XLSX</span></div>
+  <div class="operational-upload-grid">
+    <div class="upload-explainer">
+      <strong>No necesitas adaptar tu archivo a una plantilla fija.</strong>
+      <p>La plataforma lee los encabezados y permite indicar qué columna representa la fuente, el periodo, el valor, la unidad y la evidencia.</p>
+      <ul class="compact-list">
+        <li>La previsualización no modifica datos.</li>
+        <li>Los lotes con errores no pueden aplicarse.</li>
+        <li>Las actualizaciones y omisiones quedan auditadas.</li>
+      </ul>
+    </div>
+    <form action="/cargas-operativas/previsualizar" method="post" enctype="multipart/form-data" class="stack-form upload-form-box">
+      <input type="hidden" name="inventory_id" value="{{ summary.inventory.id }}">
+      <label>Perfil existente
+        <select name="profile_id">
+          <option value="">Detectar columnas automáticamente</option>
+          {% for profile in summary.profiles %}<option value="{{ profile.id }}">{{ profile.name }}</option>{% endfor %}
+        </select>
+      </label>
+      <label>Archivo operativo
+        <input type="file" name="file" accept=".csv,.xlsx" required>
+      </label>
+      <button class="btn btn-primary" type="submit">Previsualizar y mapear</button>
+    </form>
+  </div>
+</section>
+{% endif %}
+
+{% if staging %}
+<section class="card mapping-workspace" id="mapeo">
+  <div class="card-head mapping-head">
+    <div><small>PASO 2 · {{ staging.inspection.source_format }}</small><h2>Mapear columnas de {{ staging.filename }}</h2><p>{{ staging.inspection.rows|length }} filas detectadas · encabezado en fila {{ staging.inspection.header_row }}</p></div>
+    <span class="status-chip progressing">Sin aplicar</span>
+  </div>
+
+  <form method="get" action="/cargas-operativas" class="read-settings-form">
+    <input type="hidden" name="stage" value="{{ staging.token }}">
+    <input type="hidden" name="inventory_id" value="{{ summary.inventory.id }}">
+    {% if staging.profile %}<input type="hidden" name="profile_id" value="{{ staging.profile.id }}">{% endif %}
+    <div>
+      <small>CONFIGURACIÓN DE LECTURA</small>
+      <p>Ajusta estos campos cuando el archivo tenga títulos antes de los encabezados o use un separador particular.</p>
+    </div>
+    {% if staging.inspection.sheets %}
+    <label>Hoja
+      <select name="sheet_name">
+        {% for sheet in staging.inspection.sheets %}<option value="{{ sheet }}" {% if sheet == staging.inspection.sheet_name %}selected{% endif %}>{{ sheet }}</option>{% endfor %}
+      </select>
+    </label>
+    {% else %}<input type="hidden" name="sheet_name" value="">{% endif %}
+    <label>Fila de encabezados<input type="number" name="header_row" min="1" max="100" value="{{ staging.inspection.header_row }}"></label>
+    {% if staging.inspection.source_format == 'CSV' %}
+    <label>Separador
+      <select name="delimiter">
+        <option value="auto" {% if staging.inspection.delimiter not in [',',';','\t','|'] %}selected{% endif %}>Detectar automáticamente</option>
+        <option value="," {% if staging.inspection.delimiter == ',' %}selected{% endif %}>Coma (,)</option>
+        <option value=";" {% if staging.inspection.delimiter == ';' %}selected{% endif %}>Punto y coma (;)</option>
+        <option value="tab" {% if staging.inspection.delimiter == '\t' %}selected{% endif %}>Tabulación</option>
+        <option value="|" {% if staging.inspection.delimiter == '|' %}selected{% endif %}>Barra vertical (|)</option>
+      </select>
+    </label>
+    {% else %}<input type="hidden" name="delimiter" value="auto">{% endif %}
+    <button class="btn btn-outline" type="submit">Actualizar lectura</button>
+  </form>
+
+  <form method="post" action="/cargas-operativas/validar" class="mapping-form" data-operational-mapping>
+    <input type="hidden" name="stage_token" value="{{ staging.token }}">
+    <input type="hidden" name="inventory_id" value="{{ summary.inventory.id }}">
+    <input type="hidden" name="source_sheet" value="{{ staging.inspection.sheet_name }}">
+    <input type="hidden" name="delimiter" value="{{ 'tab' if staging.inspection.delimiter == '\t' else staging.inspection.delimiter }}">
+    <input type="hidden" name="header_row" value="{{ staging.inspection.header_row }}">
+    {% if staging.profile %}<input type="hidden" name="profile_id" value="{{ staging.profile.id }}">{% endif %}
+
+    <div class="mapping-grid">
+      {% for field in mapping_fields %}
+      <label class="mapping-field {% if field in ['source','period_start','value'] %}required-map{% endif %}">
+        <span>{{ summary.field_labels[field] }}{% if field in ['source','period_start','value'] %}<b>*</b>{% endif %}</span>
+        <select name="map_{{ field }}">
+          <option value="">No mapear / usar valor predeterminado</option>
+          {% for header in staging.inspection.headers %}
+          <option value="{{ header }}" {% if staging.mapping.get(field) == header %}selected{% endif %}>{{ header }}</option>
+          {% endfor %}
+        </select>
+      </label>
+      {% endfor %}
+    </div>
+
+    <div class="mapping-defaults">
+      <div><small>VALORES PREDETERMINADOS</small><h3>Completar cuando el archivo no trae una columna</h3></div>
+      <div class="form-grid three">
+        <label>Fuente fija opcional
+          <select name="default_source_id">
+            <option value="">Ninguna</option>
+            {% for source in summary.inventory.sources %}
+            <option value="{{ source.id }}" {% if staging.defaults.get('source_id')|string == source.id|string %}selected{% endif %}>#{{ source.id }} · {{ source.facility.name if source.facility else 'Sin sede' }} · {{ source.name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Unidad predeterminada<input name="default_unit" value="{{ staging.defaults.get('unit','') }}" placeholder="Ej. kWh, L, kg"></label>
+        <label>Origen predeterminado
+          <select name="default_origin">{% for origin in origins %}<option value="{{ origin }}" {% if staging.defaults.get('origin','Registro operativo') == origin %}selected{% endif %}>{{ origin }}</option>{% endfor %}</select>
+        </label>
+      </div>
+      <div class="form-grid three">
+        <label>Política de duplicados
+          <select name="duplicate_policy">
+            <option value="reject" {% if staging.defaults.get('duplicate_policy','reject') == 'reject' %}selected{% endif %}>Rechazar y exigir corrección</option>
+            <option value="skip" {% if staging.defaults.get('duplicate_policy') == 'skip' %}selected{% endif %}>Omitir el registro existente</option>
+            <option value="update" {% if staging.defaults.get('duplicate_policy') == 'update' %}selected{% endif %}>Actualizar el registro existente</option>
+          </select>
+        </label>
+        <label class="check-line"><input type="checkbox" name="default_estimated" value="true" {% if staging.defaults.get('estimated') %}checked{% endif %}> Marcar como estimados los datos sin columna propia</label>
+        <label class="check-line"><input type="checkbox" name="save_profile" value="true"> Guardar este mapeo como perfil</label>
+      </div>
+      <label>Nombre del perfil<input name="profile_name" value="{{ staging.profile.name if staging.profile else '' }}" placeholder="Ej. Facturación eléctrica mensual"></label>
+    </div>
+
+    <div class="preview-block">
+      <div class="card-head"><div><small>PREVISUALIZACIÓN</small><h3>Primeras filas del archivo</h3></div><span>{{ staging.inspection.preview|length }} filas</span></div>
+      <div class="responsive-table"><table class="preview-table"><thead><tr><th>Fila</th>{% for header in staging.inspection.headers %}<th>{{ header }}</th>{% endfor %}</tr></thead><tbody>
+        {% for row in staging.inspection.preview %}<tr><td>{{ row.row_number }}</td>{% for header in staging.inspection.headers %}<td>{{ row.payload.get(header,'') }}</td>{% endfor %}</tr>{% endfor %}
+      </tbody></table></div>
+    </div>
+
+    <div class="mapping-actions">
+      <a class="btn btn-outline" href="/cargas-operativas?inventory_id={{ summary.inventory.id }}">Cancelar</a>
+      <div class="mapping-readiness" data-mapping-readiness aria-live="polite"></div><button class="btn btn-primary" type="submit" data-mapping-submit>Validar lote completo</button>
+    </div>
+  </form>
+</section>
+{% endif %}
+
+<div class="operational-layout">
+  <section class="card table-card">
+    <div class="card-head"><div><small>HISTORIAL</small><h2>Lotes operativos</h2></div><span class="counter">{{ summary.batches|length }}</span></div>
+    <div class="responsive-table"><table><thead><tr><th>Código</th><th>Archivo / perfil</th><th>Estado</th><th>Filas</th><th>Errores</th><th>Calidad</th><th></th></tr></thead><tbody>
+      {% for batch in summary.batches %}
+      <tr>
+        <td><strong>{{ batch.code }}</strong><small>{{ batch.uploaded_at.strftime('%Y-%m-%d %H:%M') if batch.uploaded_at else '' }}</small></td>
+        <td>{{ batch.filename }}<small>{{ batch.import_profile.name if batch.import_profile else batch.source_format }}</small></td>
+        <td><span class="status-chip {% if batch.status == 'Aplicado' %}complete{% elif batch.error_rows %}danger{% else %}progressing{% endif %}">{{ batch.status }}</span></td>
+        <td>{{ batch.total_rows }}<small>{{ batch.applied_rows }} aplicadas</small></td>
+        <td>{{ batch.error_rows }}<small>{{ batch.warning_rows }} advertencias</small></td>
+        <td><strong>{{ batch.quality_score }} %</strong></td>
+        <td><a class="btn btn-outline" href="/cargas-operativas?inventory_id={{ summary.inventory.id }}&batch_id={{ batch.id }}">Revisar</a></td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="empty-cell">Todavía no existen lotes operativos.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <aside class="card profile-card">
+    <div class="card-head"><div><small>CONFIGURACIÓN</small><h2>Perfiles activos</h2></div><span class="counter">{{ summary.profiles|length }}</span></div>
+    <div class="profile-list">
+      {% for profile in summary.profiles %}
+      <article><div><strong>{{ profile.name }}</strong><small>{{ profile.source_format }}{% if profile.sheet_name %} · {{ profile.sheet_name }}{% endif %}</small></div>{% if can_manage %}<form method="post" action="/cargas-operativas/perfiles/{{ profile.id }}/estado"><button class="mini-action" title="Desactivar perfil">×</button></form>{% endif %}</article>
+      {% else %}<p class="muted">Guarda un mapeo para reutilizarlo en cargas periódicas.</p>{% endfor %}
+    </div>
+  </aside>
+</div>
+
+{% if summary.selected %}
+<section class="card batch-detail-card" id="detalle-lote">
+  <div class="card-head">
+    <div><small>DETALLE DEL LOTE</small><h2>{{ summary.selected.code }} · {{ summary.selected.filename }}</h2><p>{{ summary.selected.source_format }}{% if summary.selected.source_sheet %} · {{ summary.selected.source_sheet }}{% endif %}</p></div>
+    <div class="head-actions">
+      <a class="btn btn-outline" href="/cargas-operativas/lotes/{{ summary.selected.id }}/errores.csv">Descargar hallazgos</a>
+      {% if can_manage and summary.selected.status != 'Aplicado' %}<form method="post" action="/cargas-operativas/lotes/{{ summary.selected.id }}/aplicar"><button class="btn btn-primary" {% if summary.selected.error_rows %}disabled title="Corrige los errores antes de aplicar"{% endif %}>Aplicar lote</button></form>{% endif %}
+    </div>
+  </div>
+  <div class="batch-status-strip">
+    <div><small>ESTADO</small><strong>{{ summary.selected.status }}</strong></div>
+    <div><small>VÁLIDAS</small><strong>{{ summary.selected.valid_rows }}</strong></div>
+    <div><small>ADVERTENCIAS</small><strong>{{ summary.selected.warning_rows }}</strong></div>
+    <div><small>ERRORES</small><strong>{{ summary.selected.error_rows }}</strong></div>
+    <div><small>APLICADAS</small><strong>{{ summary.selected.applied_rows }}</strong></div>
+  </div>
+  {% if summary.selected.error_rows %}
+  <div class="correction-banner"><div><strong>El lote todavía no puede aplicarse.</strong><p>Abre las filas marcadas, corrige los campos y revalida. No necesitas modificar ni cargar nuevamente el archivo.</p></div><span>{{ summary.selected.error_rows }} por corregir</span></div>
+  {% elif summary.selected.status != 'Aplicado' %}
+  <div class="correction-banner ready"><div><strong>El lote está listo para aplicarse.</strong><p>Revisa las advertencias y confirma cuando la información sea correcta.</p></div><span>Validación completa</span></div>
+  {% endif %}
+  <div class="responsive-table"><table class="batch-rows-table"><thead><tr><th>Fila</th><th>Fuente</th><th>Periodo</th><th>Valor</th><th>Calidad</th><th>Estado</th><th>Validación</th><th></th></tr></thead><tbody>
+    {% for row in summary.selected.rows %}
+    <tr id="fila-{{ row.id }}" class="{% if row.status == 'Error' %}row-has-error{% elif row.status == 'Advertencia' or row.status == 'Omitir' %}row-has-warning{% endif %}">
+      <td>{{ row.row_number }}</td>
+      <td><strong>{{ row.source.name if row.source else row.requirement_code or 'Sin vincular' }}</strong><small>{{ row.source.facility.name if row.source and row.source.facility else '' }}</small></td>
+      <td>{{ row.period_start or '—' }}<small>{{ row.period_end or '—' }}</small></td>
+      <td>{{ row.value if row.value is not none else '—' }} {{ row.unit }}<small>{{ row.data_origin }}{% if row.is_estimated %} · estimado{% endif %}</small></td>
+      <td><span class="quality-badge q{{ row.quality_level|lower }}">{{ row.quality_level }}</span></td>
+      <td><span class="status-chip {% if row.status == 'Aplicado' or row.status == 'Válido' %}complete{% elif row.status == 'Error' %}danger{% else %}progressing{% endif %}">{{ row.status }}</span></td>
+      <td class="small-text">
+        {% if row.validation_items %}<ul class="row-findings">{% for item in row.validation_items %}<li class="{{ item.severity|lower }}"><b>{{ item.rule }}</b> {{ item.message }}</li>{% endfor %}</ul>{% else %}<span class="muted">Sin hallazgos</span>{% endif %}
+      </td>
+      <td>{% if can_manage and summary.selected.status != 'Aplicado' %}<button class="btn btn-outline btn-compact" type="button" data-row-editor-toggle="editor-{{ row.id }}">{% if row.status == 'Error' %}Corregir{% else %}Editar{% endif %}</button>{% endif %}</td>
+    </tr>
+    {% if can_manage and summary.selected.status != 'Aplicado' %}
+    <tr class="row-editor-line" id="editor-{{ row.id }}" hidden><td colspan="8">
+      <form method="post" action="/cargas-operativas/lotes/{{ summary.selected.id }}/filas/{{ row.id }}/corregir" class="row-correction-form">
+        <div class="row-correction-head"><div><small>CORRECCIÓN GUIADA</small><h3>Fila {{ row.row_number }}</h3></div><button type="button" class="mini-close" data-row-editor-close="editor-{{ row.id }}" aria-label="Cerrar editor">×</button></div>
+        <div class="row-correction-grid">
+          <label>Fuente<select name="source_id" required><option value="">Seleccionar</option>{% for source in summary.inventory.sources %}<option value="{{ source.id }}" data-preferred-unit="{{ source.preferred_unit }}" {% if row.source_id == source.id %}selected{% endif %}>{{ source.facility.name if source.facility else 'Sin sede' }} · {{ source.name }}</option>{% endfor %}</select></label>
+          <label>Fecha inicial<input type="date" name="period_start" value="{{ row.period_start or '' }}" required></label>
+          <label>Fecha final<input type="date" name="period_end" value="{{ row.period_end or '' }}" required></label>
+          <label>Valor<input name="value" inputmode="decimal" value="{{ row.value if row.value is not none else '' }}" required></label>
+          <label>Unidad<input name="unit" value="{{ row.unit }}" required></label>
+          <label>Origen<select name="origin">{% for origin in origins %}<option value="{{ origin }}" {% if row.data_origin == origin %}selected{% endif %}>{{ origin }}</option>{% endfor %}</select></label>
+          <label class="wide-field">Referencia de evidencia<input name="evidence" value="{{ row.evidence_reference }}" placeholder="Factura, certificado, archivo o enlace"></label>
+          <label class="wide-field">Notas<input name="notes" value="{{ row.correction_notes }}" placeholder="Justificación o detalle de la corrección"></label>
+          <label class="check-line compact-check"><input type="checkbox" name="estimated" value="true" {% if row.is_estimated %}checked{% endif %}> Dato estimado</label>
+        </div>
+        <div class="row-correction-actions"><button type="button" class="btn btn-outline" data-row-editor-close="editor-{{ row.id }}">Cancelar</button><button class="btn btn-primary" type="submit">Guardar y revalidar fila</button></div>
+      </form>
+    </td></tr>
+    {% endif %}
+    {% endfor %}
+  </tbody></table></div>
+</section>
+{% endif %}
+{% endblock %}

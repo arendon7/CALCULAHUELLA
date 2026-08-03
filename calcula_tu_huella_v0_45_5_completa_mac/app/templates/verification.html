@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Portal del verificador · Calcula tu Huella{% endblock %}
+{% block page_label %}Verificación independiente{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">Expediente / {{ inventory.name }}</p><h1>Portal del verificador</h1><p>Consulta de solo lectura, hallazgos independientes y paquete reproducible de aseguramiento.</p></div><span class="phase-label">Funcional · V0.8</span></div>
+<div class="verification-banner"><span>◇</span><div><strong>Espacio independiente de revisión</strong><small>Los hallazgos de este portal no alteran datos, factores ni cálculos. Toda interacción queda en auditoría.</small></div></div>
+
+<section class="card verifier-hero">
+  <div><small>EMISIONES</small><h2>{{ inventory.sources|selectattr('included')|sum(attribute='emissions')|number_es }} tCO₂e</h2><p>{{ inventory.methodology_version }}</p></div>
+  <div><small>FUENTES</small><h2>{{ inventory.sources|selectattr('included')|list|length }}</h2><p>{{ calculations_count }} cálculos trazables.</p></div>
+  <div><small>EVIDENCIAS</small><h2>{{ evidence_with_files }}/{{ inventory.documents|length }}</h2><p>Archivos físicamente disponibles.</p></div>
+  <div><small>HALLAZGOS ABIERTOS</small><h2>{{ finding_counts.open }}</h2><p>{{ finding_counts.major }} mayores o críticos.</p></div>
+</section>
+
+<div class="verification-layout">
+  <div class="verification-main">
+    <section class="card">
+      <div class="card-head"><div><small>PUERTAS DE CALIDAD</small><h3>Estado previo al aseguramiento</h3></div><span class="status-chip {% if can_approve %}active{% else %}warning{% endif %}">{{ 'Listo' if can_approve else 'Con bloqueos' }}</span></div>
+      <div class="gate-grid">{% for gate in gates %}<article class="gate-card"><span class="status-dot {% if gate.status == 'Aprobado' %}ok{% else %}pending{% endif %}"></span><div><strong>{{ gate.name }}</strong><small>{{ gate.detail }}</small></div></article>{% endfor %}</div>
+      {% if blockers %}<div class="method-note"><strong>Bloqueos:</strong> {{ blockers|join(' · ') }}</div>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><small>HALLAZGOS EXTERNOS</small><h3>Expediente de verificación</h3></div><span class="counter">{{ findings|length }}</span></div>
+      {% if findings %}<div class="finding-list">{% for finding in findings %}<article class="finding-card severity-{{ finding.severity|lower }}"><div class="finding-head"><div><small>{{ finding.finding_type|upper }} · {{ finding.source.name if finding.source else 'INVENTARIO' }}</small><h3>{{ finding.title }}</h3></div><span class="status-chip {% if finding.status == 'Cerrado' %}active{% else %}progressing{% endif %}">{{ finding.status }}</span></div><p>{{ finding.description }}</p><dl><div><dt>Severidad</dt><dd>{{ finding.severity }}</dd></div><div><dt>Verificador</dt><dd>{{ finding.verifier_email }}</dd></div><div><dt>Fecha</dt><dd>{{ finding.created_at.strftime('%Y-%m-%d') }}</dd></div></dl>
+      {% if finding.management_response %}<div class="response-box"><strong>Respuesta de gestión</strong><p>{{ finding.management_response }}</p><small>{{ finding.response_by }}</small></div>{% endif %}
+      {% if finding.conclusion %}<div class="conclusion-box"><strong>Conclusión del verificador</strong><p>{{ finding.conclusion }}</p></div>{% endif %}
+      <div class="finding-actions">
+        {% if finding.status != 'Cerrado' and (user.can_manage_inventory or user.can_provide_data or user.can_review) %}<details><summary>Responder</summary><form action="/verificacion/hallazgos/{{ finding.id }}/responder" method="post" class="stack-form compact-form"><label>Respuesta<textarea name="management_response" required>{{ finding.management_response }}</textarea></label><button class="btn btn-primary btn-block">Enviar respuesta</button></form></details>{% endif %}
+        {% if user.can_external_audit and finding.status != 'Cerrado' %}<details><summary>Decidir</summary><form action="/verificacion/hallazgos/{{ finding.id }}/cerrar" method="post" class="stack-form compact-form"><label>Conclusión<textarea name="conclusion" required></textarea></label><label>Decisión<select name="decision"><option>Cerrar</option><option>Reabrir</option></select></label><button class="btn btn-primary btn-block">Registrar decisión</button></form></details>{% endif %}
+      </div></article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>No hay hallazgos externos.</strong><p>El verificador puede documentar solicitudes, observaciones o no conformidades.</p></div>{% endif %}
+    </section>
+
+    <section class="card">
+      <div class="card-head"><div><small>TRAZABILIDAD DISPONIBLE</small><h3>Fuentes y cobertura</h3></div></div>
+      <div class="table-wrap"><table><thead><tr><th>Fuente</th><th>Alcance</th><th>Progreso</th><th>Emisiones</th><th>Datos</th><th>Evidencias</th></tr></thead><tbody>{% for source in inventory.sources if source.included %}<tr><td><a href="/fuentes/{{ source.id }}"><strong>{{ source.name }}</strong></a><small>{{ source.category }}</small></td><td>A{{ source.scope }}</td><td>{{ source.progress }}%</td><td>{{ source.emissions|number_es }} tCO₂e</td><td>{{ source.activity_records|length }}</td><td>{{ source.evidence_documents|length }}</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+  </div>
+
+  <aside class="verification-side">
+    {% if user.can_external_audit %}<section class="card"><div class="card-head"><div><small>NUEVO HALLAZGO</small><h3>Registrar evidencia</h3></div></div><form action="/verificacion/hallazgos/nuevo" method="post" class="stack-form"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><label>Título<input name="title" required></label><label>Tipo<select name="finding_type"><option>Observación</option><option>Solicitud de información</option><option>No conformidad</option><option>Oportunidad de mejora</option></select></label><label>Severidad<select name="severity"><option>Informativa</option><option selected>Menor</option><option>Mayor</option><option>Crítica</option></select></label><label>Fuente<select name="source_id"><option value="">Inventario general</option>{% for source in inventory.sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label><label>Descripción<textarea name="description" required></textarea></label><button class="btn btn-primary btn-block">Crear hallazgo</button></form></section>{% endif %}
+    <section class="card"><div class="card-head"><div><small>PAQUETE DE ASEGURAMIENTO</small><h3>Exportación reproducible</h3></div></div><p>Genera un ZIP con manifiesto, datos, cálculos, factores, índices, hallazgos e informes disponibles.</p><form action="/verificacion/paquete" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><button class="btn btn-primary btn-block">Generar paquete</button></form>{% set packages = reports|selectattr('report_type','equalto','Paquete de verificación')|list %}{% if packages %}<hr class="section-divider"><strong>Paquetes anteriores</strong>{% for item in packages[:3] %}<a class="download-row" href="/reportes/{{ item.id }}/descargar"><span>ZIP</span><div><strong>{{ item.file_name }}</strong><small>{{ item.generated_at.strftime('%Y-%m-%d %H:%M') }} · {{ item.file_size|bytes }}</small></div></a>{% endfor %}{% endif %}</section>
+    <section class="card"><div class="card-head"><div><small>DOCUMENTOS</small><h3>Informes emitidos</h3></div></div>{% for report in reports if report.report_type != 'Paquete de verificación' %}<a class="download-row" href="/reportes/{{ report.id }}/descargar"><span>{{ 'PDF' if report.file_name.endswith('.pdf') else 'XLS' }}</span><div><strong>{{ report.report_type }}</strong><small>{{ report.status }} · v{{ report.version }}</small></div></a>{% else %}<p>No existen informes generados.</p>{% endfor %}</section>
+  </aside>
+</div>
+{% endblock %}

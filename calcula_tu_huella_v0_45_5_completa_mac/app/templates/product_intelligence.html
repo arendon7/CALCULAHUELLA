@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% block title %}Perfil y diagnóstico · Calcula tu Huella{% endblock %}
+{% block page_label %}Producto / Perfil y diagnóstico{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><p class="breadcrumb">Organización / Perfil y alcance</p><h1>Perfil, diagnóstico y ruta de implementación</h1><p>Configura la profundidad del servicio según la operación, la madurez de datos, el objetivo y la presión de reporte de {{ organization.trade_name or organization.name }}.</p></div>
+  <span class="release-chip">Alcance configurable</span>
+</div>
+
+<div class="calculation-notice notice-info">
+  <span>REGLA</span>
+  <p><strong>El motor recomienda; el equipo técnico aprueba.</strong><small>La recomendación no reemplaza la definición metodológica, la materialidad, la selección de factores ni la verificación independiente.</small></p>
+</div>
+
+<div class="intelligence-kpis">
+  <article class="kpi-card featured"><div><small>PERFIL</small><strong>{{ profile.row.profile_completion if profile else 0 }}%</strong><span>{{ profile.row.status if profile else 'Sin configurar' }}</span></div></article>
+  <article class="kpi-card"><div><small>COMPLEJIDAD</small><strong>{{ latest_assessment.row.complexity_level if latest_assessment else '—' }}</strong><span>{{ latest_assessment.row.total_score if latest_assessment else 0 }} puntos</span></div></article>
+  <article class="kpi-card"><div><small>MADUREZ</small><strong>{{ latest_assessment.row.maturity_level if latest_assessment else '—' }}</strong><span>{{ latest_assessment.row.data_maturity_score if latest_assessment else 0 }}% datos</span></div></article>
+  <article class="kpi-card"><div><small>PAQUETE</small><strong>{{ latest_assessment.package_label if latest_assessment else 'Por definir' }}</strong><span>{{ latest_assessment.row.estimated_duration_months if latest_assessment else 0 }} meses estimados</span></div></article>
+  <article class="kpi-card"><div><small>PLANES</small><strong>{{ plans|length }}</strong><span>rutas generadas</span></div></article>
+</div>
+
+<section class="card" id="perfil">
+  <div class="card-head"><div><small>1 · PERFIL INTEGRAL</small><h2>Cómo opera la empresa</h2><p>Documenta el contexto que determina fuentes, datos, responsables y profundidad del inventario.</p></div><span class="status-badge {{ 'success' if profile and profile.row.profile_completion >= 80 else 'warning' }}">{{ profile.row.status if profile else 'Pendiente' }}</span></div>
+  <form method="post" action="/inteligencia-producto/perfil" class="form-grid two intelligence-profile-form">
+    <label>Tamaño de empresa<select name="company_size"><option {% if profile and profile.row.company_size == 'Micro' %}selected{% endif %}>Micro</option><option {% if profile and profile.row.company_size == 'Pequeña' %}selected{% endif %}>Pequeña</option><option {% if profile and profile.row.company_size == 'Mediana' %}selected{% endif %}>Mediana</option><option {% if profile and profile.row.company_size == 'Grande' %}selected{% endif %}>Grande</option></select></label>
+    <label>Subsector o especialidad<input name="sector_subsector" value="{{ profile.row.sector_subsector if profile else organization.sector }}"></label>
+    <label class="span-2">Modelo de negocio<textarea name="business_model" rows="2" placeholder="Qué vende, a quién y cómo genera valor">{{ profile.row.business_model if profile else '' }}</textarea></label>
+    <label class="span-2">Descripción operativa<textarea name="operating_description" rows="3" placeholder="Procesos, entradas, salidas, tecnologías y límites operativos">{{ profile.row.operating_description if profile else '' }}</textarea></label>
+    <label>Países donde opera<input name="countries" value="{{ profile.countries if profile else organization.country }}" placeholder="Colombia, Ecuador"></label>
+    <label>Número de países<input name="countries_count" type="number" min="1" value="{{ profile.row.countries_count if profile else 1 }}"></label>
+    <label>Tipos de sede<input name="facility_types" value="{{ profile.facility_types if profile else '' }}" placeholder="Planta, oficina, centro logístico"></label>
+    <label>Procesos principales<input name="core_processes" value="{{ profile.core_processes if profile else '' }}" placeholder="Producción, compostaje, transporte"></label>
+    <label>Fuentes de energía<input name="energy_sources" value="{{ profile.energy_sources if profile else '' }}" placeholder="Red, diésel, gas, solar"></label>
+    <label>Materiales clave<input name="key_materials" value="{{ profile.key_materials if profile else '' }}" placeholder="Urea, empaques, acero, biomasa"></label>
+    <label class="span-2">Flota y movilidad<textarea name="fleet_profile" rows="2" placeholder="Vehículos, maquinaria, combustibles, transporte contratado">{{ profile.row.fleet_profile if profile else '' }}</textarea></label>
+    <label>Refrigerantes y climatización<textarea name="refrigerants_profile" rows="2">{{ profile.row.refrigerants_profile if profile else '' }}</textarea></label>
+    <label>Residuos<textarea name="waste_profile" rows="2">{{ profile.row.waste_profile if profile else '' }}</textarea></label>
+    <label>Aguas residuales<textarea name="wastewater_profile" rows="2">{{ profile.row.wastewater_profile if profile else '' }}</textarea></label>
+    <label>Agricultura y uso de suelo<textarea name="agriculture_land_use_profile" rows="2">{{ profile.row.agriculture_land_use_profile if profile else '' }}</textarea></label>
+    <label class="span-2">Cadena de suministro<textarea name="supplier_profile" rows="2" placeholder="Proveedores críticos, logística, compras y datos disponibles">{{ profile.row.supplier_profile if profile else '' }}</textarea></label>
+    <label>Motivadores de reporte<input name="reporting_drivers" value="{{ profile.reporting_drivers if profile else '' }}" placeholder="Clientes, PGIRS, ESG, licitaciones"></label>
+    <label>Metas climáticas<input name="climate_goals" value="{{ profile.climate_goals if profile else '' }}" placeholder="Reducir 20%, carbono neutral, eficiencia"></label>
+    <label>Sistemas de datos<input name="current_data_systems" value="{{ profile.current_data_systems if profile else '' }}" placeholder="ERP, Excel, SharePoint, facturación"></label>
+    <label>Historial del inventario<select name="inventory_history"><option {% if not profile or profile.row.inventory_history == 'Sin inventario anterior' %}selected{% endif %}>Sin inventario anterior</option><option {% if profile and profile.row.inventory_history == 'Inventario preliminar' %}selected{% endif %}>Inventario preliminar</option><option {% if profile and profile.row.inventory_history == 'Inventario anual anterior' %}selected{% endif %}>Inventario anual anterior</option><option {% if profile and profile.row.inventory_history == 'Serie histórica' %}selected{% endif %}>Serie histórica</option></select></label>
+    <label>Disponibilidad de datos<select name="data_availability">{% for option in ['Baja','Parcial','Media','Alta','Completa'] %}<option {% if profile and profile.row.data_availability == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+    <label>Disponibilidad de evidencias<select name="evidence_readiness">{% for option in ['Baja','Parcial','Media','Alta','Completa'] %}<option {% if profile and profile.row.evidence_readiness == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+    <label>Frecuencia de gestión<select name="reporting_frequency">{% for option in ['Anual','Trimestral','Mensual'] %}<option {% if profile and profile.row.reporting_frequency == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+    <label>Aseguramiento esperado<select name="assurance_ambition">{% for option in ['Sin verificación externa','Revisión interna independiente','Preparación para verificación limitada','Preparación para verificación razonable'] %}<option {% if profile and profile.row.assurance_ambition == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+    <label>Responsable del inventario<input name="inventory_owner" value="{{ profile.row.inventory_owner if profile else '' }}"></label>
+    <label>Patrocinador directivo<input name="executive_sponsor" value="{{ profile.row.executive_sponsor if profile else '' }}"></label>
+    <input type="hidden" name="source" value="Configuración interna V0.45">
+    <div class="span-2 form-actions"><button class="btn btn-primary">Guardar perfil integral</button></div>
+  </form>
+</section>
+
+<section class="card" id="diagnostico">
+  <div class="card-head"><div><small>2 · DIAGNÓSTICO Y RECOMENDACIÓN</small><h2>Profundidad adecuada para esta empresa</h2><p>Calcula una recomendación explicable y conserva cada versión para revisión y aprobación.</p></div></div>
+  <form method="post" action="/inteligencia-producto/evaluar" class="diagnostic-run-form">
+    <label>Alcance esperado<select name="desired_scopes"><option>Alcances 1 y 2</option><option>Alcances 1, 2 y 3 priorizado</option><option>Alcances 1, 2 y 3 avanzado</option></select></label>
+    <label>Objetivo<select name="objective"><option>Conocer la huella corporativa</option><option>Requisito de clientes y estrategia de reducción</option><option>Licitación o cadena de suministro</option><option>Preparación para verificación</option><option>Reporte regulatorio o sostenibilidad</option><option>Información para dirección o financiadores</option></select></label>
+    <label>Prioridad<select name="urgency"><option>Normal</option><option>Alta</option></select></label>
+    <label>Plazo<input type="number" min="1" max="36" name="deadline_months" value="12"><small>meses</small></label>
+    <button class="btn btn-primary" type="submit">Ejecutar diagnóstico</button>
+  </form>
+
+  {% if latest_assessment %}
+  <div class="assessment-hero">
+    <div><small>RECOMENDACIÓN ACTUAL</small><h3>{{ latest_assessment.package_label }}</h3><p>{{ latest_assessment.package_description }}</p></div>
+    <div class="assessment-score"><strong>{{ latest_assessment.row.total_score }}</strong><span>{{ latest_assessment.row.complexity_level }}</span></div>
+    <div class="assessment-score"><strong>{{ latest_assessment.row.data_maturity_score }}%</strong><span>Madurez de datos</span></div>
+    <div class="assessment-score"><strong>{{ latest_assessment.row.verification_readiness_score }}%</strong><span>Preparación para verificación</span></div>
+  </div>
+  <div class="assessment-columns">
+    <article><h3>Alcance recomendado</h3>{% for item in latest_assessment.recommended_scopes %}<span class="status-badge success">{{ item }}</span>{% endfor %}<h4>Fuentes probables</h4><ul>{% for item in latest_assessment.probable_sources %}<li>{{ item }}</li>{% endfor %}</ul></article>
+    <article><h3>Hallazgos</h3><ul>{% for item in latest_assessment.findings %}<li>{{ item }}</li>{% endfor %}</ul>{% if latest_assessment.risk_flags %}<h4>Riesgos</h4><ul class="risk-list">{% for item in latest_assessment.risk_flags %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}</article>
+    <article><h3>Módulos aplicables</h3><div class="module-chip-list">{% for item in latest_assessment.applicable_modules %}<span>{{ item }}</span>{% endfor %}</div><h4>Alcance 3 prioritario</h4><ul>{% for item in latest_assessment.priority_scope3_categories %}<li>{{ item }}</li>{% else %}<li>No priorizado en esta etapa.</li>{% endfor %}</ul></article>
+  </div>
+  <div class="assessment-actions">
+    {% if latest_assessment.row.status != 'Aprobado' %}<form method="post" action="/inteligencia-producto/evaluaciones/{{ latest_assessment.row.id }}/aprobar"><label>Observación de aprobación<input name="notes" placeholder="Criterio, ajuste o condición"></label><button class="btn btn-outline">Aprobar diagnóstico</button></form>{% else %}<span class="status-badge success">Aprobado por {{ latest_assessment.row.approved_by }}</span>{% endif %}
+    <form method="post" action="/inteligencia-producto/evaluaciones/{{ latest_assessment.row.id }}/plan"><label>Responsable del plan<input name="owner" value="{{ profile.row.inventory_owner if profile and profile.row.inventory_owner else 'Equipo del inventario' }}"></label><label>Inicio<input type="date" name="start_date"></label><button class="btn btn-primary">Generar plan de implementación</button></form>
+  </div>
+  {% else %}<div class="empty-state"><strong>Aún no existe un diagnóstico</strong><p>Completa el perfil y ejecuta la evaluación para obtener una ruta explicable.</p></div>{% endif %}
+</section>
+
+<section class="card" id="plan">
+  <div class="card-head"><div><small>3 · PLAN POR ETAPAS</small><h2>Implementación controlada</h2><p>Cada fase tiene propietario, fecha, entregables y una ventana de la plataforma asociada.</p></div><span class="counter">{{ plans|length }}</span></div>
+  {% for plan in plans %}
+  <article class="implementation-plan-card">
+    <div class="plan-summary"><div><small>{{ plan.row.code }}</small><h3>{{ plan.package_label }}</h3><p>{{ plan.row.scope_summary }}</p></div><div><span class="status-badge {{ 'success' if plan.row.status == 'Aprobado' else 'warning' }}">{{ plan.row.status }}</span><strong>{{ plan.row.duration_months }} meses</strong><small>hasta {{ plan.row.target_completion.strftime('%d/%m/%Y') if plan.row.target_completion else 'por definir' }}</small></div></div>
+    <div class="implementation-timeline">{% for item in plan["items"] %}<div class="timeline-item"><span>{{ loop.index }}</span><div><small>{{ item.row.phase_name }} · {{ item.row.due_date.strftime('%d/%m/%Y') if item.row.due_date else 'sin fecha' }}</small><h4>{{ item.row.title }}</h4><p>{{ item.row.description }}</p><div>{% for deliverable in item.deliverables %}<em>{{ deliverable }}</em>{% endfor %}</div>{% if item.row.module_route %}<a href="{{ item.row.module_route }}">Abrir módulo →</a>{% endif %}</div></div>{% endfor %}</div>
+  </article>
+  {% else %}<div class="empty-state"><strong>No hay planes generados</strong><p>Aprueba o revisa un diagnóstico y crea la ruta de implementación.</p></div>{% endfor %}
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>HISTORIAL</small><h2>Versiones del diagnóstico</h2></div><span class="counter">{{ assessments|length }}</span></div>
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Código</th><th>Complejidad</th><th>Madurez</th><th>Paquete</th><th>Estado</th><th>Responsable</th></tr></thead><tbody>{% for assessment in assessments %}<tr><td>{{ assessment.row.assessed_at.strftime('%d/%m/%Y %H:%M') }}</td><td><code>{{ assessment.row.assessment_code }}</code></td><td>{{ assessment.row.complexity_level }} · {{ assessment.row.total_score }}</td><td>{{ assessment.row.maturity_level }}</td><td>{{ assessment.package_label }}</td><td><span class="status-badge {{ 'success' if assessment.row.status == 'Aprobado' else 'warning' }}">{{ assessment.row.status }}</span></td><td>{{ assessment.row.assessed_by }}</td></tr>{% else %}<tr><td colspan="7">Sin evaluaciones.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}
