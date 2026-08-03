@@ -1,0 +1,1 @@
+La importación usa árboles Git por carpeta para consolidar cientos de archivos en un solo commit verificable.
