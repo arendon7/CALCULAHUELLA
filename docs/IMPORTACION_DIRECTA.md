@@ -1,0 +1,1 @@
+La importación integral será realizada directamente desde el paquete validado v0.45.5 mediante objetos Git, sin intervención local del usuario.
