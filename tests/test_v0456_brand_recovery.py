@@ -87,6 +87,15 @@ def test_rejects_non_matching_dimensions(tmp_path):
 
 def test_recovery_script_does_not_contain_image_transformation_operations():
     source = MODULE_PATH.read_text(encoding="utf-8")
-    forbidden = ("resize(", "thumbnail(", "crop(", "convert(", "ImageEnhance", "recolor")
-    assert not any(token in source for token in forbidden)
+    forbidden_operations = (
+        "from PIL",
+        "import PIL",
+        ".resize(",
+        ".thumbnail(",
+        ".crop(",
+        ".convert(",
+        "ImageEnhance",
+        "ImageOps",
+    )
+    assert not any(token in source for token in forbidden_operations)
     assert '"transformation": "none"' in source
