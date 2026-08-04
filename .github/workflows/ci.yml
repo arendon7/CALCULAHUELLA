@@ -89,7 +89,8 @@ jobs:
             tests/test_v0456_guided_experience.py \
             tests/test_v0456_brand_recovery.py \
             tests/test_v0456_brand_activation.py \
-            tests/test_v0456_brand_historical_audit.py
+            tests/test_v0456_brand_historical_audit.py \
+            tests/test_v0456_data_flow_experience.py
 
       - name: Construir imagen Docker
         run: docker build -t calcula-tu-huella:${{ github.sha }} .
