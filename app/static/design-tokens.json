@@ -1,0 +1,27 @@
+{
+  "brand": "Calcula tu Huella",
+  "version": "Frontend Kit v1",
+  "colors": {
+    "forest": "#0B3B2E",
+    "forest_2": "#12533F",
+    "sage": "#A7C1A0",
+    "cream": "#F7F5EF",
+    "slate": "#1F2933",
+    "teal": "#2D6F73",
+    "earth": "#CA9A6C",
+    "white": "#FFFFFF",
+    "line": "#DCE3DE",
+    "soft_green": "#EDF4EE",
+    "danger": "#C94F4F"
+  },
+  "typography": {
+    "headings": "Inter, Arial, sans-serif",
+    "body": "Inter, Arial, sans-serif"
+  },
+  "layout": {
+    "max_width": "1280px",
+    "radius_large": "28px",
+    "radius_medium": "18px",
+    "shadow": "0 18px 50px rgba(11,59,46,.10)"
+  }
+}
