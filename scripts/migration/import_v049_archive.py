@@ -53,7 +53,9 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def load_verifier():
-    spec = importlib.util.spec_from_file_location("verify_v049_archive", VERIFIER_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "verify_v049_archive", VERIFIER_PATH
+    )
     if not spec or not spec.loader:
         raise ImportErrorV049("No pudo cargarse el verificador V0.49")
     module = importlib.util.module_from_spec(spec)
@@ -78,12 +80,40 @@ def extract_safely(archive_path: Path, destination: Path) -> Path:
             if path.is_absolute() or ".." in path.parts:
                 raise ImportErrorV049(f"Ruta insegura: {item.filename}")
             if is_symlink(item):
-                raise ImportErrorV049(f"No se permiten enlaces simbólicos: {item.filename}")
+                raise ImportErrorV049(
+                    f"No se permiten enlaces simbólicos: {item.filename}"
+                )
             target = (destination / Path(*path.parts)).resolve()
             if root not in target.parents and target != root:
                 raise ImportErrorV049(f"Ruta fuera del staging: {item.filename}")
         archive.extractall(destination)
     return destination
+
+
+def locate_package_root(extracted: Path) -> tuple[Path, str | None]:
+    """Localiza MAC/ y WINDOWS/ directamente o bajo una carpeta superior."""
+
+    if (extracted / "MAC").is_dir() and (extracted / "WINDOWS").is_dir():
+        return extracted, None
+
+    entries = [
+        entry
+        for entry in extracted.iterdir()
+        if entry.name != "__MACOSX" and not entry.name.startswith("._")
+    ]
+    directories = [entry for entry in entries if entry.is_dir()]
+    files = [entry for entry in entries if entry.is_file()]
+    if files or len(directories) != 1:
+        raise ImportErrorV049(
+            "No se localizaron MAC/ y WINDOWS/ en la raíz ni dentro de una única carpeta superior"
+        )
+
+    wrapper = directories[0]
+    if not (wrapper / "MAC").is_dir() or not (wrapper / "WINDOWS").is_dir():
+        raise ImportErrorV049(
+            f"La carpeta envolvente {wrapper.name}/ no contiene MAC/ y WINDOWS/"
+        )
+    return wrapper, wrapper.name
 
 
 def backup_preserved(repo: Path, backup: Path) -> None:
@@ -160,7 +190,9 @@ def build_windows_overlay(
     destination.mkdir(parents=True, exist_ok=True)
 
     entries: list[dict[str, Any]] = []
-    for source in sorted(path for path in windows_root.rglob("*") if path.is_file()):
+    for source in sorted(
+        path for path in windows_root.rglob("*") if path.is_file()
+    ):
         relative = source.relative_to(windows_root)
         windows_data = source.read_bytes()
         mac_file = mac_root / relative
@@ -169,12 +201,14 @@ def build_windows_overlay(
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         target.write_bytes(windows_data)
-        entries.append({
-            "path": relative.as_posix(),
-            "sha256": sha256_bytes(windows_data),
-            "bytes": len(windows_data),
-            "windows_only": not mac_file.exists(),
-        })
+        entries.append(
+            {
+                "path": relative.as_posix(),
+                "sha256": sha256_bytes(windows_data),
+                "bytes": len(windows_data),
+                "windows_only": not mac_file.exists(),
+            }
+        )
 
     manifest = {
         "release": "0.49.0",
@@ -207,10 +241,14 @@ def build_windows_overlay(
 def post_import_checks(repo: Path) -> dict[str, Any]:
     config = (repo / "app" / "config.py").read_text(encoding="utf-8")
     if "0.49.0" not in config:
-        raise ImportErrorV049("La fuente importada no conserva la versión 0.49.0")
+        raise ImportErrorV049(
+            "La fuente importada no conserva la versión 0.49.0"
+        )
     templates = sorted((repo / "app" / "templates").glob("*.html"))
     if len(templates) != 65:
-        raise ImportErrorV049(f"Se esperaban 65 plantillas; se encontraron {len(templates)}")
+        raise ImportErrorV049(
+            f"Se esperaban 65 plantillas; se encontraron {len(templates)}"
+        )
     for filename in (
         "logo-oficial.png",
         "logo-oficial-blanco.png",
@@ -219,11 +257,17 @@ def post_import_checks(repo: Path) -> dict[str, Any]:
     ):
         matches = list(repo.glob(f"**/img/brand/{filename}"))
         if not matches:
-            raise ImportErrorV049(f"Falta el activo oficial después de importar: {filename}")
-    migrations = list((repo / "migrations" / "versions").glob("*0030*.py"))
+            raise ImportErrorV049(
+                f"Falta el activo oficial después de importar: {filename}"
+            )
+    migrations = list(
+        (repo / "migrations" / "versions").glob("*0030*.py")
+    )
     if not migrations:
         raise ImportErrorV049("Falta la migración Alembic 20260804_0030")
-    if not (repo / "platform" / "windows" / "OVERLAY_MANIFEST.json").is_file():
+    if not (
+        repo / "platform" / "windows" / "OVERLAY_MANIFEST.json"
+    ).is_file():
         raise ImportErrorV049("No se generó el overlay Windows")
     return {
         "version": "0.49.0",
@@ -244,7 +288,10 @@ def main() -> int:
     archive = args.archive.expanduser().resolve()
     repo = args.repo.expanduser().resolve()
     if not archive.is_file() or not (repo / ".git").exists():
-        print("ERROR V0.49: se requiere un ZIP existente y una copia Git", file=sys.stderr)
+        print(
+            "ERROR V0.49: se requiere un ZIP existente y una copia Git",
+            file=sys.stderr,
+        )
         return 1
 
     verifier = load_verifier()
@@ -252,7 +299,8 @@ def main() -> int:
         verification = verifier.validate_archive(archive)
         with tempfile.TemporaryDirectory(prefix="cth-v049-import-") as temporary:
             temp_root = Path(temporary)
-            package = extract_safely(archive, temp_root / "package")
+            extracted = extract_safely(archive, temp_root / "package")
+            package, package_wrapper = locate_package_root(extracted)
             mac_root = package / "MAC"
             windows_root = package / "WINDOWS"
             backup = temp_root / "preserved"
@@ -261,11 +309,16 @@ def main() -> int:
             copy_runtime(mac_root, repo)
             restore_preserved(repo, backup)
             release_docs = write_release_docs(package, repo)
-            windows_overlay = build_windows_overlay(mac_root, windows_root, repo)
+            windows_overlay = build_windows_overlay(
+                mac_root, windows_root, repo
+            )
 
         result = {
             "verification": verification,
-            "import": post_import_checks(repo),
+            "import": {
+                **post_import_checks(repo),
+                "package_wrapper": package_wrapper,
+            },
             "release_docs": release_docs,
             "windows_overlay": windows_overlay,
         }
