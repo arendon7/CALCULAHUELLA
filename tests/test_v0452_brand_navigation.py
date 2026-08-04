@@ -93,6 +93,33 @@ def test_frontend_kit_shared_components_are_loaded_and_accessible():
     assert "var(--cth-teal)" in components
 
 
+def test_internal_shell_preserves_context_and_accessible_mobile_navigation():
+    base = read("base.html")
+    token_css = (STATIC / "css" / "cth-tokens.css").read_text(encoding="utf-8")
+    shell_css = (STATIC / "css" / "cth-shell.css").read_text(encoding="utf-8")
+    shell_js = (STATIC / "js" / "cth-shell.js").read_text(encoding="utf-8")
+
+    assert '@import "./cth-shell.css";' in token_css
+    assert "js/cth-shell.js" in base
+    assert 'data-shell' in base
+    assert 'aria-current="page"' in base
+    assert 'class="topbar-organization"' in base
+    assert 'aria-label="Navegación de la plataforma"' in base
+    assert 'aria-hidden="true" tabindex="-1"' in base
+    assert 'id="contenido-aplicacion" tabindex="-1"' in base
+
+    assert "body.sidebar-open" in shell_css
+    assert "@media (max-width: 980px)" in shell_css
+    assert '.nav-item[aria-current="page"]' in shell_css
+    assert ".topbar-organization" in shell_css
+
+    assert "MutationObserver" in shell_js
+    assert "sidebar-open" in shell_js
+    assert "previouslyFocused" in shell_js
+    assert "matchMedia('(min-width: 981px)')" in shell_js
+    assert "aria-hidden" in shell_js
+
+
 def test_release_is_v0455_until_visual_master_is_installed():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
     assert 'version: str = "0.45.5"' in config
