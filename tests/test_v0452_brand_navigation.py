@@ -54,6 +54,31 @@ def test_brand_contract_blocks_approximations_and_legacy_copy():
     assert "Mide. Comprende. Reduce." not in templates
 
 
+def test_frontend_kit_tokens_are_canonical_and_loaded():
+    tokens = json.loads((STATIC / "design-tokens.json").read_text(encoding="utf-8"))
+    assert tokens["brand"] == "Calcula tu Huella"
+    assert tokens["version"] == "Frontend Kit v1"
+    assert tokens["colors"] == {
+        "forest": "#0B3B2E",
+        "forest_2": "#12533F",
+        "sage": "#A7C1A0",
+        "cream": "#F7F5EF",
+        "slate": "#1F2933",
+        "teal": "#2D6F73",
+        "earth": "#CA9A6C",
+        "white": "#FFFFFF",
+        "line": "#DCE3DE",
+        "soft_green": "#EDF4EE",
+        "danger": "#C94F4F",
+    }
+    token_css = (STATIC / "css" / "cth-tokens.css").read_text(encoding="utf-8")
+    assert "--cth-forest: #0B3B2E" in token_css
+    assert "--cth-teal: #2D6F73" in token_css
+    assert "--navy: var(--cth-forest)" in token_css
+    for name in ("base.html", "public_base.html", "login.html"):
+        assert "css/cth-tokens.css" in read(name)
+
+
 def test_release_is_v0455_until_visual_master_is_installed():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
     assert 'version: str = "0.45.5"' in config
