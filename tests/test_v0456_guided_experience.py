@@ -54,3 +54,24 @@ def test_inventory_wizard_connects_steps_and_accessible_progress():
     assert "aria-valuenow" in guided_js
     assert "aria-valuetext" in guided_js
     assert "aria-expanded" in guided_js
+
+
+def test_dashboard_prioritizes_guided_work_and_accessible_metrics():
+    dashboard = read_template("dashboard.html")
+    token_css = (STATIC / "css" / "cth-tokens.css").read_text(encoding="utf-8")
+    dashboard_css = (STATIC / "css" / "cth-dashboard.css").read_text(encoding="utf-8")
+
+    assert '@import "./cth-dashboard.css";' in token_css
+    assert 'aria-labelledby="guided-workspace-title"' in dashboard
+    assert 'aria-label="Etapas del flujo principal"' in dashboard
+    assert 'aria-label="Acciones recomendadas"' in dashboard
+    assert 'aria-label="Indicadores principales del inventario"' in dashboard
+    assert 'aria-label="Progreso del flujo principal"' in dashboard
+    assert 'aria-label="Fuentes completas"' in dashboard
+    assert 'aria-label="Distribución por alcance:' in dashboard
+
+    assert ".guided-workspace" in dashboard_css
+    assert ".workspace-steps" in dashboard_css
+    assert ".workspace-actions" in dashboard_css
+    assert ".dashboard-grid" in dashboard_css
+    assert "@media (max-width: 680px)" in dashboard_css
