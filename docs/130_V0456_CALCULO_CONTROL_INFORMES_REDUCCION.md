@@ -208,6 +208,8 @@ La ejecución de CI asociada a esta fase terminó en verde:
 - prueba del recorrido de resultados;
 - construcción Docker.
 
+Validación repetida tras la actualización documental: sin cambios funcionales pendientes.
+
 ## Estado de versión
 
 Esta integración no eleva por sí sola la versión a 0.45.6. El cierre formal sigue bloqueado hasta recuperar, instalar y verificar los cuatro activos exactos de la Marca Maestra v1.
