@@ -1,42 +1,41 @@
-# Bandeja de importación V0.49.0
+# Bandeja de importación canónica
 
-Esta carpeta recibe temporalmente el paquete dual exacto:
+Esta carpeta recibe temporalmente el ZIP definido en:
 
 ```text
-calcula_tu_huella_v0_49_0_dual_mac_windows.zip
+migration/current-release.json
 ```
 
-SHA-256 obligatorio:
+Entrega actual:
 
 ```text
-b83066b35490bfed325ee2d74cf38cfeb14c216c0a63632c19140a777f763c06
+calcula_tu_huella_v0_52_0_onboarding_guiado_dual_mac_windows.zip
+SHA-256: 4186571c49741e86e899e9c6554e3cb78b40c2b657c5807d775d557540c85a01
 ```
 
 ## Estado
 
-El manifiesto, la validación y el checksum están recuperados en la Biblioteca del proyecto. El ZIP binario no está montado en el entorno activo ni presente todavía en esta carpeta. Por tanto, la importación no se declara ejecutada.
+El checksum, el manifiesto y la validación V0.52 están recuperados y registrados. El ZIP binario no está montado todavía en el entorno activo ni presente en esta carpeta; por eso la importación no se declara ejecutada.
 
-## Procedimiento web
+## Funcionamiento
 
-1. Abrir esta carpeta en la rama `migration/v0.49.0-canonical`.
-2. Seleccionar **Add file → Upload files**.
-3. Cargar el ZIP con el nombre exacto.
-4. Confirmar el commit sobre la misma rama.
+Cuando aparece un ZIP en esta carpeta, `.github/workflows/import-current-release.yml`:
 
-GitHub Actions ejecutará `.github/workflows/import-v049.yml` y:
+1. lee el nombre y SHA-256 desde `current-release.json`;
+2. rechaza nombres o hashes diferentes;
+3. exige las distribuciones `MAC/` y `WINDOWS/`;
+4. verifica que el núcleo compartido sea idéntico;
+5. rechaza bases, secretos, evidencias, certificados, logs y cachés;
+6. usa `MAC/` como runtime canónico;
+7. conserva diferencias Windows en `platform/windows/overlay/`;
+8. aplica Alembic desde una base vacía;
+9. comprueba versión, rutas, modelos y plantillas;
+10. ejecuta pruebas focalizadas y Docker;
+11. elimina el ZIP antes del commit automático;
+12. publica el resultado mediante CI, GitHub Pages y Codespaces.
 
-- verificará el SHA-256 exacto;
-- comprobará las distribuciones `MAC/` y `WINDOWS/`;
-- verificará que el núcleo compartido sea idéntico;
-- exigirá versión 0.49.0, landing, selección dato–factor, logos e imágenes modulares;
-- rechazará bases, secretos, evidencias, certificados, logs y cachés;
-- usará `MAC/` como runtime canónico por ser la distribución ejecutada en validación;
-- conservará las diferencias de Windows en `platform/windows/overlay/`;
-- aplicará Alembic desde una base vacía hasta `20260804_0030`;
-- comprobará 287 rutas, 110 modelos y 65 plantillas;
-- ejecutará pruebas V0.46–V0.49 y seguridad;
-- construirá Docker;
-- eliminará el ZIP del repositorio;
-- confirmará el árbol V0.49.0 ya descomprimido.
+El ZIP es un insumo transitorio. Nunca permanece versionado después de una importación aprobada.
 
-El ZIP es un insumo transitorio y no permanecerá versionado después de la importación.
+## Versiones futuras
+
+No se crea una carpeta ni un workflow nuevo. Se actualiza `current-release.json` y se usa esta misma bandeja.
