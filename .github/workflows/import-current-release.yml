@@ -86,20 +86,27 @@ jobs:
           python -m alembic upgrade head
           python - <<'PY'
           import json
+          from sqlalchemy import inspect
           from app.config import settings
-          from app.database import Base
+          from app.database import Base, engine
           from app.main import app, templates
 
           contract = json.load(open('migration/current-release.json', encoding='utf-8'))
           expected = contract['runtime_contract']
           names = sorted(templates.env.list_templates())
+          physical_tables = inspect(engine).get_table_names()
           for name in names:
               templates.env.get_template(name)
           assert settings.version == contract['release'], (settings.version, contract['release'])
           assert len(app.routes) == expected['routes'], len(app.routes)
           assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
+          assert len(physical_tables) == expected['physical_tables_after_migration'], physical_tables
           assert len(names) == expected['jinja_templates'], len(names)
-          print(f"Release {settings.version}: {len(app.routes)} rutas · {len(Base.metadata.tables)} modelos · {len(names)} plantillas")
+          print(
+              f"Release {settings.version}: {len(app.routes)} rutas · "
+              f"{len(Base.metadata.tables)} modelos · {len(physical_tables)} tablas · "
+              f"{len(names)} plantillas"
+          )
           PY
           current="$(python -m alembic current 2>/dev/null | tr -d '\r')"
           head="$(python - <<'PY'
@@ -114,20 +121,30 @@ jobs:
         if: steps.release.outputs.found == 'true'
         run: |
           python - <<'PY'
-          from pathlib import Path
+          import json
           import subprocess
           import sys
+          from pathlib import Path
 
-          patterns = (
-              'test_v052*.py', 'test_v051*.py', 'test_v050*.py',
-              'test_v049*.py', 'test_v048*.py', 'test_v047*.py',
-              'test_v046*.py', 'test_security*.py'
-          )
-          selected = sorted({path for pattern in patterns for path in Path('tests').glob(pattern)})
+          release = json.load(open('migration/current-release.json', encoding='utf-8'))['release']
+          minor = int(release.split('.')[1])
+          version_patterns = [
+              f'test_v{value:03d}*.py'
+              for value in range(max(0, minor - 6), minor + 1)
+          ]
+          patterns = (*version_patterns, 'test_security*.py')
+          selected = sorted({
+              path
+              for pattern in patterns
+              for path in Path('tests').glob(pattern)
+          })
           if not selected:
-              raise SystemExit('No se localizaron pruebas focalizadas de la entrega')
+              raise SystemExit(f'No se localizaron pruebas focalizadas para V{release}')
           for path in selected:
-              subprocess.run([sys.executable, '-m', 'pytest', '-q', str(path)], check=True)
+              subprocess.run(
+                  [sys.executable, '-m', 'pytest', '-q', str(path)],
+                  check=True,
+              )
           PY
           python -m pytest -q migration/tests
           docker build -t calcula-tu-huella:canonical-import .
