@@ -67,6 +67,22 @@ Layout:
 
 La hoja se importa desde `cth-tokens.css`, de modo que todas las superficies conectadas reciben el sistema sin duplicar enlaces ni modificar cada vista. Sus selectores están deliberadamente limitados a clases y controles existentes; no cambia rutas, estructura HTML ni contratos Jinja.
 
+## Shell interno y navegación
+
+`app/static/css/cth-shell.css` y `app/static/js/cth-shell.js` mejoran el shell existente sin reemplazarlo:
+
+- cada grupo de navegación tiene un nombre accesible;
+- el módulo actual declara `aria-current="page"` y recibe una señal visual lateral;
+- el espacio actual muestra rol y foco de trabajo;
+- el encabezado conserva el nombre de la organización en móvil;
+- el menú lateral bloquea el desplazamiento de fondo mientras está abierto;
+- el fondo modal actualiza `aria-hidden` y su orden de foco;
+- el foco entra al módulo activo al abrir y regresa al control al cerrar;
+- el menú se cierra al volver a una resolución de escritorio;
+- Escape y los enlaces mantienen el comportamiento histórico de cierre.
+
+La mejora evita duplicar la lógica funcional de navegación: el controlador complementario observa el estado del sidebar existente y sincroniza accesibilidad y presentación.
+
 ## Superficies conectadas
 
 - `base.html`;
@@ -126,8 +142,9 @@ Las pruebas verifican:
 
 - valores exactos de los tokens;
 - carga de `cth-tokens.css` en superficies base;
-- importación de la capa compartida de componentes;
+- importación de las capas compartidas de componentes y shell;
 - presencia de estilos para foco, tablas y movimiento reducido;
+- estado activo semántico, contexto móvil y control complementario del sidebar;
 - tema de navegador `#0B3B2E`;
 - descriptor y claim oficiales;
 - prohibición de redibujos y placeholders;
