@@ -5,11 +5,28 @@
   "descriptor": "Plataforma digital de gestión de huella de carbono",
   "claim": "Convierte tus datos en decisiones climáticas",
   "approved_master": {
-    "status": "pending_exact_binary_recovery",
-    "source": "Frontend Kit v1 / static/img/brand/",
+    "status": "recoverable_exact_primary_from_embedded_html",
+    "source": "Frontend Kit v1 y experiencias autocontenidas del 3 de agosto de 2026",
     "geometry": "C circular envolvente, barras ascendentes y hoja integrada",
     "redraw_allowed": false,
-    "placeholder_allowed": false
+    "placeholder_allowed": false,
+    "expected_primary": {
+      "filename": "logo-oficial.png",
+      "width": 470,
+      "height": 195,
+      "encoding": "PNG data URI base64",
+      "transformation": "none"
+    },
+    "verified_source_names": [
+      "v0_44_experiencia.html",
+      "experiencia_interna.html",
+      "index.html autocontenido de Marca Maestra v1"
+    ],
+    "pending_independent_assets": [
+      "logo-oficial-blanco.png",
+      "favicon-64.png",
+      "favicon-256.png"
+    ]
   },
   "compatibility_assets": {
     "brand-primary.svg": {
