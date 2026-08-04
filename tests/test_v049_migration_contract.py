@@ -37,7 +37,10 @@ def shared_files():
     files = {
         "app/main.py": "app = object()\n",
         "app/config.py": 'class Settings:\n    version: str = "0.49.0"\n',
-        "app/models.py": "class ActivityFactorSelection: pass\nactivity_factor_selections = True\n",
+        "app/models.py": (
+            "class ActivityFactorSelection: pass\n"
+            "activity_factor_selections = True\n"
+        ),
         "alembic.ini": "[alembic]\n",
         "run.py": "print('ok')\n",
         "requirements.txt": "fastapi\n",
@@ -48,7 +51,6 @@ def shared_files():
             "revision = '20260804_0030'\n"
         ),
         "tests/test_v049.py": "def test_ok(): assert True\n",
-        "scripts/common.py": "VALUE = 1\n",
     }
     landing = (
         "Potenciado por Greenatics · Huella Esencial · Gestión de Carbono · "
@@ -80,35 +82,69 @@ def package_documents():
             "ActivityFactorSelection\nactivity_factor_selections\n"
             "20260804_0030\n115 pruebas aprobadas\n"
         ),
-        "V049_LANDING_Y_CONVERSACION_FACTORES.md": "Landing y conversación técnica\n",
+        "V049_LANDING_Y_CONVERSACION_FACTORES.md": (
+            "Landing y conversación técnica\n"
+        ),
         "PROMPTS_LANDING_V049.md": "Prompts landing\n",
     }
 
 
-def write_dual_archive(path: Path, *, mutate_windows=None, extra=None, include_windows=True):
+def write_dual_archive(
+    path: Path,
+    *,
+    mutate_windows=None,
+    extra=None,
+    include_windows=True,
+    wrapper=None,
+):
     mutate_windows = mutate_windows or {}
     extra = extra or {}
     core = shared_files()
+    prefix = f"{wrapper}/" if wrapper else ""
     with zipfile.ZipFile(path, "w") as archive:
         for name, content in package_documents().items():
-            archive.writestr(name, content)
+            archive.writestr(prefix + name, content)
         for relative, content in core.items():
-            archive.writestr(f"MAC/{relative}", content)
-        archive.writestr("MAC/ABRIR_CALCULA_TU_HUELLA.command", "#!/bin/bash\n")
+            archive.writestr(f"{prefix}MAC/{relative}", content)
+        archive.writestr(
+            f"{prefix}MAC/scripts/platform_lifecycle.txt",
+            "mac lifecycle\n",
+        )
+        archive.writestr(
+            f"{prefix}MAC/ABRIR_CALCULA_TU_HUELLA.command",
+            "#!/bin/bash\n",
+        )
         if include_windows:
             for relative, content in core.items():
                 archive.writestr(
-                    f"WINDOWS/{relative}",
+                    f"{prefix}WINDOWS/{relative}",
                     mutate_windows.get(relative, content),
                 )
-            archive.writestr("WINDOWS/ABRIR_CALCULA_TU_HUELLA.bat", "@echo off\r\n")
+            archive.writestr(
+                f"{prefix}WINDOWS/scripts/platform_lifecycle.txt",
+                "windows lifecycle\n",
+            )
+            archive.writestr(
+                f"{prefix}WINDOWS/ABRIR_CALCULA_TU_HUELLA.bat",
+                "@echo off\r\n",
+            )
         for relative, content in extra.items():
-            archive.writestr(relative, content)
+            archive.writestr(prefix + relative, content)
+
+
+def normalized_names(archive: Path):
+    with zipfile.ZipFile(archive) as z:
+        names = [item.filename for item in z.infolist() if not item.is_dir()]
+    first_parts = {Path(name).parts[0] for name in names}
+    if len(first_parts) == 1:
+        first = next(iter(first_parts))
+        if first not in {"MAC", "WINDOWS"}:
+            names = [Path(*Path(name).parts[1:]).as_posix() for name in names]
+    return names
 
 
 def contract_for(archive: Path):
-    with zipfile.ZipFile(archive) as z:
-        names = [item.filename for item in z.infolist() if not item.is_dir()]
+    names = normalized_names(archive)
     mac_count = sum(name.startswith("MAC/") for name in names)
     windows_count = sum(name.startswith("WINDOWS/") for name in names)
     return {
@@ -140,18 +176,49 @@ def test_accepts_exact_dual_package(tmp_path, monkeypatch):
 
     assert report["status"] == "verified_exact_dual_archive"
     assert report["release"] == "0.49.0"
+    assert report["package_wrapper"] is None
     assert report["mac"]["templates"] == 65
     assert report["windows"]["templates"] == 65
     assert report["shared_core"]["shared_files"] > 70
-    assert report["windows_overlay_files"] == 1
+    assert report["windows_overlay_files"] == 2
     assert report["safe_to_stage"] is True
+
+
+def test_accepts_single_package_wrapper(tmp_path, monkeypatch):
+    archive = tmp_path / "wrapped.zip"
+    write_dual_archive(
+        archive,
+        wrapper="calcula_tu_huella_v0_49_0_dual_mac_windows",
+    )
+    monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(archive))
+
+    report = verifier.validate_archive(archive)
+
+    assert report["package_wrapper"] == (
+        "calcula_tu_huella_v0_49_0_dual_mac_windows"
+    )
+    assert report["safe_to_stage"] is True
+
+
+def test_platform_scripts_may_differ_without_core_drift(tmp_path, monkeypatch):
+    archive = tmp_path / "platform-scripts.zip"
+    write_dual_archive(archive)
+    monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(archive))
+
+    report = verifier.validate_archive(archive)
+
+    overlay_paths = {item["path"] for item in report["windows_overlay"]}
+    assert "scripts/platform_lifecycle.txt" in overlay_paths
+    assert "ABRIR_CALCULA_TU_HUELLA.bat" in overlay_paths
 
 
 def test_rejects_changed_shared_core(tmp_path, monkeypatch):
     archive = tmp_path / "drift.zip"
     write_dual_archive(
         archive,
-        mutate_windows={"app/main.py": "app = object()\nWINDOWS_DRIFT = True\n"},
+        mutate_windows={
+            "app/main.py": "app = object()\nWINDOWS_DRIFT = True\n"
+        },
     )
     monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(archive))
 
@@ -166,13 +233,19 @@ def test_rejects_missing_windows_distribution(tmp_path, monkeypatch):
     contract["distributions"]["WINDOWS"]["physical_files"] = 0
     monkeypatch.setattr(verifier, "load_contract", lambda: contract)
 
-    with pytest.raises(verifier.VerificationError, match="Falta la distribución WINDOWS"):
+    with pytest.raises(
+        verifier.VerificationError,
+        match="Falta la distribución WINDOWS",
+    ):
         verifier.validate_archive(archive)
 
 
 def test_rejects_database_inside_package(tmp_path, monkeypatch):
     archive = tmp_path / "with-db.zip"
-    write_dual_archive(archive, extra={"MAC/instance/demo.sqlite3": b"database"})
+    write_dual_archive(
+        archive,
+        extra={"MAC/instance/demo.sqlite3": b"database"},
+    )
     monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(archive))
 
     with pytest.raises(verifier.VerificationError, match="Contenido prohibido"):
