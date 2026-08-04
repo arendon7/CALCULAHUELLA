@@ -6,6 +6,7 @@
   <meta name="theme-color" content="#0F2D4D">
   <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/brand-v0456.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
 </head>
 <body class="login-page">
@@ -24,6 +25,7 @@
     <div class="login-card">
       <a class="login-back-link" href="/">← Volver al sitio</a>
       <img src="{{ url_for('static', path='img/brand-primary.svg') }}" class="login-card-logo" alt="Calcula tu Huella">
+      <p class="login-mobile-claim">Convierte tus datos en decisiones climáticas.</p>
       <div class="release-chip">Acceso seguro a tu organización</div>
       <h2>Bienvenido</h2>
       <p>{% if app_settings.seed_demo %}Accede al entorno demostrativo para recorrer el flujo completo de la plataforma.{% else %}Ingresa con las credenciales asignadas por el administrador de tu organización.{% endif %}</p>
