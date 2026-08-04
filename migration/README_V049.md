@@ -77,7 +77,7 @@ También se exigen al menos ocho imágenes modulares, incluidas:
 ```text
 01_dashboard_climatico.png
 02_calidad_de_datos.png
-08_metodologia_y_alcANCES.png
+08_metodologia_y_alcances.png
 ```
 
 Los SVG históricos no son sustitutos válidos de la Marca Maestra.
