@@ -44,9 +44,11 @@ def test_manifest_assets_match_strict_verifier_contract():
     assert assets["favicon_256"]["path"] == "app/static/img/brand/favicon-256.png"
 
     verifier = VERIFIER_PATH.read_text(encoding="utf-8")
-    assert 'approved.get("status") != "installed_exact_master"' in verifier
     importer_source = IMPORTER_PATH.read_text(encoding="utf-8")
+    assert 'INSTALLED_STATUS = "installed_exact_master"' in verifier
     assert '"status": "installed_exact_master"' in importer_source
+    for key in ("logo_primary", "logo_reversed", "favicon_64", "favicon_256"):
+        assert f'"{key}"' in verifier
 
 
 def test_template_plan_replaces_all_active_legacy_references(tmp_path, monkeypatch):
