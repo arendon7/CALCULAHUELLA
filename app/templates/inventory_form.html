@@ -5,25 +5,25 @@
 <div class="page-head">
   <div>
     <p class="breadcrumb">Inventarios / {{ 'Configuración' if inventory else 'Nuevo inventario' }}</p>
-    <h1>{{ 'Configurar inventario' if inventory else 'Crea tu primer inventario' }}</h1>
+    <h1 id="inventory-wizard-title">{{ 'Configurar inventario' if inventory else 'Crea tu primer inventario' }}</h1>
     <p>{{ 'Actualiza las decisiones del periodo sin perder trazabilidad.' if inventory else 'Define el periodo, elige un punto de partida y deja lista la estructura para cargar información.' }}</p>
   </div>
   <a class="btn btn-outline" href="{{ '/inventarios/' ~ inventory.id if inventory else '/inventarios' }}">Cancelar</a>
 </div>
 
-<form class="inventory-wizard" data-inventory-wizard method="post" action="{{ '/inventarios/' ~ inventory.id ~ '/editar' if inventory else '/inventarios/nuevo' }}">
+<form class="inventory-wizard" data-inventory-wizard aria-labelledby="inventory-wizard-title" method="post" action="{{ '/inventarios/' ~ inventory.id ~ '/editar' if inventory else '/inventarios/nuevo' }}">
   <aside class="inventory-wizard-nav card" aria-label="Etapas de configuración">
-    <button type="button" data-inventory-indicator><span>1</span><div><strong>Periodo y propósito</strong><small>Qué se medirá y cuándo</small></div></button>
-    <button type="button" data-inventory-indicator><span>2</span><div><strong>{{ 'Fuentes actuales' if inventory else 'Punto de partida' }}</strong><small>{{ 'Revisa el mapa existente' if inventory else 'Fuentes recomendadas' }}</small></div></button>
-    <button type="button" data-inventory-indicator><span>3</span><div><strong>Metodología</strong><small>Estándar, GWP y materialidad</small></div></button>
-    <button type="button" data-inventory-indicator><span>4</span><div><strong>Límites y gobierno</strong><small>Sedes, consolidación y control</small></div></button>
-    <div class="inventory-wizard-progress"><i data-inventory-progress></i></div>
-    <p><strong data-inventory-counter>Paso 1 de 4</strong><span data-inventory-title>Periodo y propósito</span></p>
+    <button type="button" data-inventory-indicator aria-controls="inventory-step-1"><span aria-hidden="true">1</span><div><strong>Periodo y propósito</strong><small>Qué se medirá y cuándo</small></div></button>
+    <button type="button" data-inventory-indicator aria-controls="inventory-step-2"><span aria-hidden="true">2</span><div><strong>{{ 'Fuentes actuales' if inventory else 'Punto de partida' }}</strong><small>{{ 'Revisa el mapa existente' if inventory else 'Fuentes recomendadas' }}</small></div></button>
+    <button type="button" data-inventory-indicator aria-controls="inventory-step-3"><span aria-hidden="true">3</span><div><strong>Metodología</strong><small>Estándar, GWP y materialidad</small></div></button>
+    <button type="button" data-inventory-indicator aria-controls="inventory-step-4"><span aria-hidden="true">4</span><div><strong>Límites y gobierno</strong><small>Sedes, consolidación y control</small></div></button>
+    <div class="inventory-wizard-progress" data-inventory-progress-container role="progressbar" aria-label="Progreso de configuración del inventario" aria-valuemin="1" aria-valuemax="4" aria-valuenow="1" aria-valuetext="Paso 1 de 4"><i data-inventory-progress></i></div>
+    <p aria-live="polite"><strong data-inventory-counter>Paso 1 de 4</strong><span data-inventory-title>Periodo y propósito</span></p>
   </aside>
 
   <div class="inventory-wizard-content">
-    <section class="card form-section inventory-wizard-step" data-inventory-step>
-      <div class="section-title"><span>1</span><div><h2>Periodo y propósito</h2><p>Identifica el inventario con un nombre claro y un objetivo útil para la organización.</p></div></div>
+    <section class="card form-section inventory-wizard-step" id="inventory-step-1" data-inventory-step tabindex="-1" aria-labelledby="inventory-step-title-1">
+      <div class="section-title"><span aria-hidden="true">1</span><div><h2 id="inventory-step-title-1">Periodo y propósito</h2><p>Identifica el inventario con un nombre claro y un objetivo útil para la organización.</p></div></div>
       <div class="form-grid two">
         <label>Nombre del inventario<input name="name" value="{{ inventory.name if inventory else 'Inventario corporativo ' ~ default_year }}" required maxlength="120"></label>
         <label>Año base<input name="base_year" type="number" min="1990" max="2100" value="{{ inventory.base_year if inventory else default_year }}" required></label>
@@ -31,11 +31,11 @@
         <label>Fecha final<input name="end_date" type="date" value="{{ inventory.end_date.isoformat() if inventory else default_end }}" required></label>
         <label class="span-2">Objetivo<textarea name="objective" required maxlength="220">{{ inventory.objective if inventory else 'Cuantificar las emisiones corporativas, establecer una línea base y priorizar oportunidades de reducción.' }}</textarea><small>Describe para qué se usarán los resultados: gestión interna, reporte, meta, cliente o verificación.</small></label>
       </div>
-      <div class="inventory-step-tip"><span>01</span><p><strong>Empieza con un periodo manejable.</strong> Un año calendario facilita la conciliación con facturas, registros y cierres administrativos.</p></div>
+      <div class="inventory-step-tip"><span aria-hidden="true">01</span><p><strong>Empieza con un periodo manejable.</strong> Un año calendario facilita la conciliación con facturas, registros y cierres administrativos.</p></div>
     </section>
 
-    <section class="card form-section inventory-wizard-step" data-inventory-step hidden>
-      <div class="section-title"><span>2</span><div><h2>{{ 'Fuentes actuales' if inventory else 'Elige un punto de partida' }}</h2><p>{{ 'La configuración del inventario puede continuar sin alterar sus fuentes.' if inventory else 'El paquete crea una base editable; no asigna factores ni calcula automáticamente.' }}</p></div></div>
+    <section class="card form-section inventory-wizard-step" id="inventory-step-2" data-inventory-step tabindex="-1" aria-labelledby="inventory-step-title-2" hidden>
+      <div class="section-title"><span aria-hidden="true">2</span><div><h2 id="inventory-step-title-2">{{ 'Fuentes actuales' if inventory else 'Elige un punto de partida' }}</h2><p>{{ 'La configuración del inventario puede continuar sin alterar sus fuentes.' if inventory else 'El paquete crea una base editable; no asigna factores ni calcula automáticamente.' }}</p></div></div>
       {% if inventory %}
         <input type="hidden" name="starter_pack" value="custom">
         <input type="hidden" name="source_responsible" value="Responsable ambiental">
@@ -63,22 +63,22 @@
         </fieldset>
         <label class="source-owner-field">Responsable inicial de las fuentes<input name="source_responsible" value="Responsable ambiental" required maxlength="120"><small>Después podrás ajustar sede, responsable, frecuencia, unidad y materialidad en cada fuente.</small></label>
       {% endif %}
-      <div class="inventory-step-tip"><span>02</span><p><strong>El paquete no toma decisiones metodológicas por ti.</strong> Solo reduce la digitación y deja una lista inicial para confirmar.</p></div>
+      <div class="inventory-step-tip"><span aria-hidden="true">02</span><p><strong>El paquete no toma decisiones metodológicas por ti.</strong> Solo reduce la digitación y deja una lista inicial para confirmar.</p></div>
     </section>
 
-    <section class="card form-section inventory-wizard-step" data-inventory-step hidden>
-      <div class="section-title"><span>3</span><div><h2>Metodología</h2><p>Documenta el marco de cálculo y los criterios que quedarán congelados en cada versión del informe.</p></div></div>
+    <section class="card form-section inventory-wizard-step" id="inventory-step-3" data-inventory-step tabindex="-1" aria-labelledby="inventory-step-title-3" hidden>
+      <div class="section-title"><span aria-hidden="true">3</span><div><h2 id="inventory-step-title-3">Metodología</h2><p>Documenta el marco de cálculo y los criterios que quedarán congelados en cada versión del informe.</p></div></div>
       <div class="form-grid two">
         <label>Marco metodológico<select name="methodology"><option {% if not inventory or 'GHG Protocol + ISO' in inventory.methodology %}selected{% endif %}>GHG Protocol + ISO 14064-1</option><option {% if inventory and inventory.methodology == 'GHG Protocol Corporate Standard' %}selected{% endif %}>GHG Protocol Corporate Standard</option><option {% if inventory and inventory.methodology == 'ISO 14064-1' %}selected{% endif %}>ISO 14064-1</option><option {% if inventory and inventory.methodology == 'Metodología interna aprobada' %}selected{% endif %}>Metodología interna aprobada</option></select></label>
         <label>Versión metodológica<input name="methodology_version" value="{{ inventory.methodology_version if inventory else 'GHG Protocol Corporate Standard · ISO 14064-1:2018' }}" maxlength="120"></label>
         <label>Potenciales de calentamiento<select name="gwp_version"><option {% if not inventory or 'AR6' in inventory.gwp_version %}selected{% endif %}>IPCC AR6 · 100 años</option><option {% if inventory and 'AR5' in inventory.gwp_version %}selected{% endif %}>IPCC AR5 · 100 años</option><option {% if inventory and 'AR4' in inventory.gwp_version %}selected{% endif %}>IPCC AR4 · 100 años</option></select></label>
         <label>Umbral interno de materialidad (%)<input name="materiality_threshold" type="number" step="0.1" min="0" max="100" value="{{ inventory.materiality_threshold if inventory else 5 }}"></label>
       </div>
-      <div class="inventory-step-tip"><span>03</span><p><strong>La materialidad no excluye automáticamente una fuente.</strong> Sirve para priorizar y documentar decisiones durante la revisión.</p></div>
+      <div class="inventory-step-tip"><span aria-hidden="true">03</span><p><strong>La materialidad no excluye automáticamente una fuente.</strong> Sirve para priorizar y documentar decisiones durante la revisión.</p></div>
     </section>
 
-    <section class="card form-section inventory-wizard-step" data-inventory-step hidden>
-      <div class="section-title"><span>4</span><div><h2>Límites y gobierno</h2><p>Selecciona las operaciones incluidas y deja documentadas las decisiones de control.</p></div></div>
+    <section class="card form-section inventory-wizard-step" id="inventory-step-4" data-inventory-step tabindex="-1" aria-labelledby="inventory-step-title-4" hidden>
+      <div class="section-title"><span aria-hidden="true">4</span><div><h2 id="inventory-step-title-4">Límites y gobierno</h2><p>Selecciona las operaciones incluidas y deja documentadas las decisiones de control.</p></div></div>
       <label>Enfoque de consolidación<select name="consolidation_approach"><option {% if not inventory or inventory.consolidation_approach == 'Control operacional' %}selected{% endif %}>Control operacional</option><option {% if inventory and inventory.consolidation_approach == 'Control financiero' %}selected{% endif %}>Control financiero</option><option {% if inventory and inventory.consolidation_approach == 'Participación accionaria' %}selected{% endif %}>Participación accionaria</option></select></label>
       <div class="facility-selector guided-facilities">
         {% for facility in facilities %}
