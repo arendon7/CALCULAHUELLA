@@ -1,0 +1,151 @@
+name: Importar entrega canónica actual
+
+on:
+  push:
+    branches:
+      - integration/canonical
+    paths:
+      - "migration/inbox/*.zip"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: canonical-release-import
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: integration/canonical
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Resolver archivo esperado
+        id: release
+        run: |
+          filename="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['archive']['filename'])
+          PY
+          )"
+          path="migration/inbox/$filename"
+          echo "filename=$filename" >> "$GITHUB_OUTPUT"
+          echo "path=$path" >> "$GITHUB_OUTPUT"
+          if [[ -f "$path" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No se encontró $path; no se modifica el árbol."
+          fi
+
+      - name: Verificar e importar
+        if: steps.release.outputs.found == 'true'
+        run: |
+          python scripts/migration/verify_current_release.py "${{ steps.release.outputs.path }}" \
+            --json-output migration/CURRENT_RELEASE_VERIFICATION.json
+          python scripts/migration/import_current_release.py "${{ steps.release.outputs.path }}" \
+            --report migration/CURRENT_RELEASE_IMPORT.json
+          rm -f "${{ steps.release.outputs.path }}"
+
+      - name: Instalar dependencias importadas
+        if: steps.release.outputs.found == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          if [[ -f requirements-dev.txt ]]; then
+            python -m pip install -r requirements-dev.txt
+          else
+            python -m pip install -r requirements.txt
+            python -m pip install pytest
+          fi
+
+      - name: Validar runtime importado
+        if: steps.release.outputs.found == 'true'
+        env:
+          APP_ENV: test
+          SESSION_SECRET: canonical-import-validation
+          DATABASE_URL: sqlite+pysqlite:///./instance/canonical-import.sqlite3
+          SEED_DEMO: "true"
+          OPEN_BROWSER: "0"
+          CSRF_ENABLED: "false"
+          SCHEDULER_ENABLED: "false"
+          DEPLOYMENT_STRICT: "false"
+        run: |
+          python -m compileall -q app scripts tests migration/tests run.py
+          find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
+          mkdir -p instance
+          rm -f instance/canonical-import.sqlite3
+          python -m alembic upgrade head
+          python - <<'PY'
+          import json
+          from app.config import settings
+          from app.database import Base
+          from app.main import app, templates
+
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected = contract['runtime_contract']
+          names = sorted(templates.env.list_templates())
+          for name in names:
+              templates.env.get_template(name)
+          assert settings.version == contract['release'], (settings.version, contract['release'])
+          assert len(app.routes) == expected['routes'], len(app.routes)
+          assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
+          assert len(names) == expected['jinja_templates'], len(names)
+          print(f"Release {settings.version}: {len(app.routes)} rutas · {len(Base.metadata.tables)} modelos · {len(names)} plantillas")
+          PY
+          current="$(python -m alembic current 2>/dev/null | tr -d '\r')"
+          head="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['runtime_contract']['alembic_head'])
+          PY
+          )"
+          echo "$current" | grep -q "$head"
+          test -f platform/windows/OVERLAY_MANIFEST.json
+
+      - name: Ejecutar pruebas focalizadas
+        if: steps.release.outputs.found == 'true'
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          patterns = (
+              'test_v052*.py', 'test_v051*.py', 'test_v050*.py',
+              'test_v049*.py', 'test_v048*.py', 'test_v047*.py',
+              'test_v046*.py', 'test_security*.py'
+          )
+          selected = sorted({path for pattern in patterns for path in Path('tests').glob(pattern)})
+          if not selected:
+              raise SystemExit('No se localizaron pruebas focalizadas de la entrega')
+          for path in selected:
+              subprocess.run([sys.executable, '-m', 'pytest', '-q', str(path)], check=True)
+          PY
+          python -m pytest -q migration/tests
+          docker build -t calcula-tu-huella:canonical-import .
+
+      - name: Confirmar árbol importado
+        if: steps.release.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "La importación no produjo cambios."
+            exit 0
+          fi
+          version="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['release'])
+          PY
+          )"
+          git commit -m "feat: importar fuente canónica V${version}"
+          git push origin HEAD:integration/canonical
