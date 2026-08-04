@@ -57,6 +57,7 @@ jobs:
           node --check app/static/js/app.js
           node --check app/static/js/cth-shell.js
           node --check app/static/js/cth-guided.js
+          node --check app/static/js/cth-outcomes.js
 
       - name: Validar contrato de marca
         run: python scripts/brand/verify_master_assets.py
@@ -90,7 +91,8 @@ jobs:
             tests/test_v0456_brand_recovery.py \
             tests/test_v0456_brand_activation.py \
             tests/test_v0456_brand_historical_audit.py \
-            tests/test_v0456_data_flow_experience.py
+            tests/test_v0456_data_flow_experience.py \
+            tests/test_v0456_outcome_experience.py
 
       - name: Construir imagen Docker
         run: docker build -t calcula-tu-huella:${{ github.sha }} .
