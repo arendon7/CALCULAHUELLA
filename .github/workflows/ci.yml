@@ -55,16 +55,16 @@ jobs:
           python -m compileall -q app scripts tests run.py
           find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
 
-      - name: Validar contrato de migración V0.48
-        run: python -m pytest -q tests/test_v048_migration_contract.py
+      - name: Validar contrato de migración V0.49
+        run: python -m pytest -q tests/test_v049_migration_contract.py
 
-      - name: Migrar base limpia
+      - name: Migrar base limpia provisional
         run: |
           mkdir -p instance
           rm -f instance/ci.sqlite3
           python -m alembic upgrade head
 
-      - name: Compilar plantillas Jinja
+      - name: Compilar plantillas Jinja provisionales
         run: |
           python - <<'PY'
           from app.main import templates
@@ -74,7 +74,7 @@ jobs:
           print(f"Plantillas compiladas: {len(names)}")
           PY
 
-      - name: Ejecutar regresión v0.45.x
+      - name: Ejecutar regresión provisional v0.45.x
         run: |
           python -m pytest -q \
             tests/test_v045_product_intelligence.py \
@@ -84,5 +84,5 @@ jobs:
             tests/test_v0454_first_inventory.py \
             tests/test_v0455_guided_imports.py
 
-      - name: Construir imagen Docker
+      - name: Construir imagen Docker provisional
         run: docker build -t calcula-tu-huella:${{ github.sha }} .
