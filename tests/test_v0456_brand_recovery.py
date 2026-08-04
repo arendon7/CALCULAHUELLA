@@ -1,15 +1,18 @@
 import base64
 import importlib.util
+import sys
 from pathlib import Path
 
 import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 MODULE_PATH = ROOT / "scripts" / "brand" / "extract_embedded_master.py"
+MODULE_NAME = "extract_embedded_master"
 
-spec = importlib.util.spec_from_file_location("extract_embedded_master", MODULE_PATH)
+spec = importlib.util.spec_from_file_location(MODULE_NAME, MODULE_PATH)
 assert spec and spec.loader
 recovery = importlib.util.module_from_spec(spec)
+sys.modules[MODULE_NAME] = recovery
 spec.loader.exec_module(recovery)
 
 # PNG transparent 1 × 1, usado únicamente como fixture técnico de prueba.
