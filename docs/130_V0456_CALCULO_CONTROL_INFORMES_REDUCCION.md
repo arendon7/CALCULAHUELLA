@@ -22,13 +22,7 @@ Superficie:
 /calculos
 ```
 
-Se mantienen:
-
-- recálculo del inventario;
-- resultados por fuente;
-- alertas y errores del motor;
-- acceso a trazabilidad por fuente;
-- explicación de las reglas activas.
+Se mantienen el recálculo, los resultados por fuente, las alertas y errores del motor, el acceso a trazabilidad y la explicación de las reglas activas.
 
 ### 2. Control
 
@@ -40,15 +34,7 @@ Superficie:
 /control
 ```
 
-Se mantienen:
-
-- puertas de calidad;
-- observaciones y respuestas;
-- recomendación independiente;
-- aprobación final;
-- cierre inmutable;
-- reapertura mediante nueva versión;
-- historial formal y auditoría.
+Se mantienen las puertas de calidad, observaciones, respuestas, recomendación independiente, aprobación final, cierre inmutable, reapertura mediante nueva versión, historial formal y auditoría.
 
 ### 3. Informes
 
@@ -60,15 +46,7 @@ Superficie:
 /reportes
 ```
 
-Se mantienen:
-
-- informe ejecutivo;
-- informe técnico;
-- memoria de cálculo;
-- generación de PDF y Excel;
-- descarga;
-- aprobación del artefacto;
-- hash y tamaño del archivo.
+Se mantienen el informe ejecutivo, informe técnico, memoria de cálculo, generación PDF/Excel, descarga, aprobación, hash y tamaño del archivo.
 
 ### 4. Reducción
 
@@ -80,14 +58,7 @@ Superficie:
 /reduccion
 ```
 
-Se mantienen:
-
-- creación y actualización de acciones;
-- metas absolutas o de intensidad;
-- sincronización con el inventario;
-- seguimiento de avance;
-- reducción real y esperada;
-- economía de cada medida.
+Se mantienen la creación y actualización de acciones, metas absolutas o de intensidad, sincronización con el inventario, seguimiento, reducción real y esperada y economía de cada medida.
 
 ### 5. Escenarios
 
@@ -99,77 +70,25 @@ Superficie:
 /escenarios
 ```
 
-Se mantienen:
-
-- configuración de escenarios;
-- inclusión de medidas;
-- porcentaje de adopción;
-- año de implementación;
-- tasa de descuento;
-- curva de costo marginal;
-- emisiones proyectadas;
-- creación de nuevos portafolios.
+Se mantienen la configuración, inclusión de medidas, porcentaje de adopción, año de implementación, tasa de descuento, curva de costo marginal, emisiones proyectadas y creación de portafolios.
 
 ## Mejoras de experiencia
 
-### Navegación de resultados
+`app/static/js/cth-outcomes.js` incorpora:
 
-`app/static/js/cth-outcomes.js` inserta una navegación de cinco etapas con:
+- navegación de cinco etapas con `aria-current="step"`;
+- propósito y siguiente acción por etapa;
+- eliminación de la navegación de captura al entrar en `/calculos`;
+- barras de progreso accesibles;
+- trayectorias y curvas marginales enfocables;
+- búsqueda local en resultados, documentos, medidas, acciones y observaciones;
+- normalización que ignora mayúsculas y tildes.
 
-- orden visible;
-- `aria-current="step"`;
-- textos de propósito;
-- acción recomendada hacia la siguiente etapa;
-- eliminación de la navegación de captura al entrar en `/calculos`, evitando duplicidad.
-
-### Lectura de progreso
-
-Las barras existentes reciben progresivamente:
-
-- `role="progressbar"`;
-- valores mínimo, máximo y actual;
-- nombre accesible basado en la tarjeta o medida;
-- navegación mediante teclado.
-
-Las curvas marginales y trayectorias se convierten en grupos enfocados con una descripción derivada de su contenido visible.
-
-### Búsqueda local
-
-Sin modificar el backend se habilita búsqueda en:
-
-- resultados por fuente;
-- documentos generados;
-- medidas del escenario;
-- acciones de reducción;
-- observaciones de control.
-
-La normalización ignora mayúsculas y tildes. El filtro solo afecta la visualización y nunca elimina datos.
-
-### Jerarquía visual
-
-`app/static/css/cth-outcomes.css` incorpora:
-
-- recorrido horizontal responsive;
-- contexto de la etapa;
-- énfasis consistente de indicadores;
-- numeración de entregables;
-- herramientas de búsqueda;
-- estados vacíos;
-- foco visible en medidas, observaciones y trayectorias.
+`app/static/css/cth-outcomes.css` añade recorrido horizontal responsive, contexto de etapa, jerarquía de indicadores, numeración de entregables, herramientas de búsqueda, estados vacíos y foco visible.
 
 ## Contratos preservados
 
-No se modifican:
-
-- modelos SQLAlchemy;
-- migraciones;
-- cálculo de emisiones;
-- conversiones;
-- factores ni GWP;
-- generación de documentos;
-- permisos y segregación de funciones;
-- estados de inventario;
-- rutas y formularios existentes.
+No se modifican modelos, migraciones, motor de cálculo, conversiones, factores, GWP, generación documental, permisos, segregación de funciones, estados, rutas ni formularios existentes.
 
 ## Archivos
 
@@ -182,25 +101,12 @@ tests/test_v0456_outcome_experience.py
 .github/workflows/ci.yml
 ```
 
-## Criterio de aceptación
-
-- navegación visible en las cinco rutas;
-- una sola navegación principal en `/calculos`;
-- acciones operativas intactas;
-- filtros locales sin cambios de datos;
-- progreso y trayectorias accesibles;
-- sintaxis JavaScript válida;
-- plantillas Jinja compiladas;
-- regresión y Docker aprobados.
-
 ## Validación ejecutada
 
-La ejecución de CI asociada a esta fase terminó en verde:
+CI terminó en verde para:
 
-- árbol fuente;
-- dependencias;
-- Python y shell;
-- JavaScript, incluido `cth-outcomes.js`;
+- árbol y dependencias;
+- Python, shell y JavaScript;
 - contrato de marca;
 - migraciones Alembic;
 - 64 plantillas Jinja;
@@ -208,8 +114,6 @@ La ejecución de CI asociada a esta fase terminó en verde:
 - prueba del recorrido de resultados;
 - construcción Docker.
 
-Validación repetida tras la actualización documental: sin cambios funcionales pendientes.
-
 ## Estado de versión
 
-Esta integración no eleva por sí sola la versión a 0.45.6. El cierre formal sigue bloqueado hasta recuperar, instalar y verificar los cuatro activos exactos de la Marca Maestra v1.
+El bloque funcional está cerrado. La versión permanece en 0.45.5 porque el cierre formal de v0.45.6 sigue condicionado a recuperar, instalar y verificar los cuatro activos exactos de la Marca Maestra v1.
