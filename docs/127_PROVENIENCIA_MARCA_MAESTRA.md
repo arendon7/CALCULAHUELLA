@@ -24,19 +24,56 @@ static/img/brand/
   favicon-256.png
 ```
 
-La guía de integración del Frontend Kit identifica `static/img/brand/` como la ubicación de los activos oficiales exactos. Las demos históricas referencian directamente esos nombres y las versiones autocontenidas conservan el logo como PNG embebido.
+La guía de integración identifica `static/img/brand/` como la ubicación de los activos oficiales exactos. El demo interno utiliza expresamente `logo-oficial-blanco.png` sobre la barra lateral oscura; el sitio público utiliza `logo-oficial.png` en navegación y footer, además de los dos favicons.
+
+## Copias autocontenidas recuperadas
+
+Tres artefactos históricos conservan el logo principal como un PNG embebido mediante `data:image/png;base64`:
+
+```text
+v0_44_experiencia.html
+experiencia_interna.html
+index.html autocontenido de Marca Maestra v1
+```
+
+Las copias identificadas declaran un PNG de **470 × 195 px** y muestran la misma secuencia de bytes en los fragmentos cotejados. La recuperación definitiva debe decodificar cada archivo completo, comprobar el cierre `IEND` y exigir un único SHA-256 común.
 
 ## Política de recuperación
 
 1. Priorizar los bytes del paquete maestro o del Frontend Kit histórico.
-2. Aceptar el PNG embebido únicamente cuando su flujo de bytes pueda recuperarse completo y verificarse.
-3. Registrar SHA-256, bytes, dimensiones, profundidad y transparencia.
+2. Recuperar el logo principal desde HTML autocontenido únicamente si existen dos o más copias completas e idénticas.
+3. Registrar SHA-256, bytes, dimensiones, profundidad, tipo de color y archivos fuente.
 4. Comparar las copias disponibles y rechazar cualquier divergencia.
-5. No derivar la variante blanca ni los favicons a partir de una descripción.
-6. No declarar cerrada la v0.45.6 mientras falte alguno de los cuatro activos exactos.
+5. No redimensionar, recortar, recolorear, vectorizar ni optimizar el PNG recuperado.
+6. No derivar la variante blanca ni los favicons a partir del logo principal.
+7. Mantener los SVG actuales como compatibilidad legacy hasta sustituir cada referencia por un binario oficial.
+8. No declarar cerrada la v0.45.6 mientras falte alguno de los cuatro activos exactos.
 
-## Importador verificable
+## Herramientas verificables
+
+### Paquete completo
 
 `scripts/brand/import_master_package.py` recibe el ZIP o la carpeta histórica, localiza los cuatro archivos exactos, valida PNG, transparencia y tamaños de favicon, calcula sus huellas y solo después permite instalarlos con `--apply`.
 
-El importador no transforma las imágenes.
+### HTML autocontenido
+
+`scripts/brand/extract_embedded_master.py` recibe dos o más HTML históricos, localiza las imágenes PNG con texto alternativo “Calcula tu Huella”, valida firma, `IHDR`, cierre `IEND`, dimensiones de 470 × 195 y coincidencia SHA-256. Al usar `--apply` escribe exclusivamente:
+
+```text
+app/static/img/brand/logo-oficial.png
+app/static/img/brand/logo-oficial.provenance.json
+```
+
+No modifica plantillas ni genera los otros tres activos.
+
+Comando normalizado:
+
+```bash
+make brand-recover-primary BRAND_HTML_SOURCES="v0_44_experiencia.html experiencia_interna.html"
+```
+
+La instalación completa continúa exigiendo:
+
+```bash
+make brand-require-master
+```
