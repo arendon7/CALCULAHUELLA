@@ -16,9 +16,9 @@ SEARCH_ROOTS=(
   "$ROOT"
 )
 
-KNOWN_PACKAGES=(
-  "calcula_tu_huella_front_consolidado_v0_37.zip"
-  "calcula_tu_huella_marca_maestra_v1.zip"
+KNOWN_PACKAGE_PATTERNS=(
+  "calcula_tu_huella_front_consolidado_v0_37*.zip"
+  "calcula_tu_huella_marca_maestra_v1*.zip"
 )
 
 REQUIRED_ASSETS=(
@@ -39,12 +39,12 @@ REPORT="$ROOT/instance/brand-recovery-mac.json"
 printf '\nCalcula tu Huella · Recuperación segura de Marca Maestra\n'
 printf 'Repositorio: %s\n\n' "$ROOT"
 
-find_named_file() {
-  local name="$1"
+find_named_pattern() {
+  local pattern="$1"
   local root
   for root in "${SEARCH_ROOTS[@]}"; do
     [[ -d "$root" ]] || continue
-    find "$root" -maxdepth 6 -type f -name "$name" -print 2>/dev/null | head -n 1
+    find "$root" -maxdepth 6 -type f -name "$pattern" -print 2>/dev/null | head -n 1
   done | head -n 1
 }
 
@@ -61,14 +61,14 @@ find_complete_asset_folder() {
         printf '%s\n' "$candidate"
         return 0
       fi
-    done < <(find "$root" -maxdepth 7 -type d -path '*/static/img/brand' -print 2>/dev/null)
+    done < <(find "$root" -maxdepth 7 -type d -path '*/img/brand' -print 2>/dev/null)
   done
   return 1
 }
 
 PACKAGE=""
-for name in "${KNOWN_PACKAGES[@]}"; do
-  PACKAGE="$(find_named_file "$name" || true)"
+for pattern in "${KNOWN_PACKAGE_PATTERNS[@]}"; do
+  PACKAGE="$(find_named_pattern "$pattern" || true)"
   [[ -n "$PACKAGE" ]] && break
 done
 
@@ -89,7 +89,7 @@ fi
 
 HTML_SOURCES=()
 for name in "${HTML_NAMES[@]}"; do
-  candidate="$(find_named_file "$name" || true)"
+  candidate="$(find_named_pattern "$name" || true)"
   [[ -n "$candidate" ]] && HTML_SOURCES+=("$candidate")
 done
 
@@ -104,8 +104,8 @@ if [[ "${#HTML_SOURCES[@]}" -ge 2 ]]; then
 fi
 
 printf 'No se encontró una fuente completa y verificable.\n'
-printf 'Nombres prioritarios buscados:\n'
-printf '  - %s\n' "${KNOWN_PACKAGES[@]}"
+printf 'Patrones prioritarios buscados:\n'
+printf '  - %s\n' "${KNOWN_PACKAGE_PATTERNS[@]}"
 printf '\nNo se modificó ningún archivo del repositorio.\n'
 printf 'No se utilizaron los SVG legacy ni los tableros de docs/visual como fuente del logo.\n'
 exit 2
