@@ -54,6 +54,19 @@ Layout:
 3. identificar y retirar gradualmente las variables anteriores;
 4. evitar que nuevas vistas introduzcan colores no gobernados.
 
+## Capa compartida de componentes
+
+`app/static/css/cth-components.css` normaliza progresivamente:
+
+- botones primarios, secundarios, estados activos y deshabilitados;
+- campos, selectores, áreas de texto, foco y validación inválida;
+- tarjetas, KPIs, tablas y contenedores de trazabilidad;
+- chips de estado, alertas y mensajes;
+- tablas desplazables en móvil;
+- reducción de movimiento cuando el sistema operativo lo solicita.
+
+La hoja se importa desde `cth-tokens.css`, de modo que todas las superficies conectadas reciben el sistema sin duplicar enlaces ni modificar cada vista. Sus selectores están deliberadamente limitados a clases y controles existentes; no cambia rutas, estructura HTML ni contratos Jinja.
+
 ## Superficies conectadas
 
 - `base.html`;
@@ -84,6 +97,8 @@ static/img/brand/
 
 También existen demostraciones autocontenidas con el PNG oficial embebido en base64. Estos archivos prueban la existencia y uso del activo, pero no autorizan redibujarlo ni sustituirlo por una aproximación.
 
+La procedencia y política de recuperación están registradas en `docs/127_PROVENIENCIA_MARCA_MAESTRA.md`. El importador `scripts/brand/import_master_package.py` valida el paquete histórico sin transformar sus imágenes.
+
 Hasta materializar los binarios exactos en el repositorio:
 
 - los SVG actuales permanecen únicamente por compatibilidad;
@@ -111,6 +126,8 @@ Las pruebas verifican:
 
 - valores exactos de los tokens;
 - carga de `cth-tokens.css` en superficies base;
+- importación de la capa compartida de componentes;
+- presencia de estilos para foco, tablas y movimiento reducido;
 - tema de navegador `#0B3B2E`;
 - descriptor y claim oficiales;
 - prohibición de redibujos y placeholders;
