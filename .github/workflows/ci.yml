@@ -54,6 +54,9 @@ jobs:
         run: |
           python -m compileall -q app scripts tests run.py
           find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
+          node --check app/static/js/app.js
+          node --check app/static/js/cth-shell.js
+          node --check app/static/js/cth-guided.js
 
       - name: Validar contrato de marca
         run: python scripts/brand/verify_master_assets.py
@@ -82,7 +85,8 @@ jobs:
             tests/test_v0452_brand_navigation.py \
             tests/test_v0453_guided_onboarding.py \
             tests/test_v0454_first_inventory.py \
-            tests/test_v0455_guided_imports.py
+            tests/test_v0455_guided_imports.py \
+            tests/test_v0456_guided_experience.py
 
       - name: Construir imagen Docker
         run: docker build -t calcula-tu-huella:${{ github.sha }} .
