@@ -2,13 +2,13 @@
 
 ## Opción principal: GitHub Codespaces
 
-Codespaces ejecuta la aplicación FastAPI completa, incluida autenticación, base demo, formularios, cálculos, informes y APIs. GitHub Pages no puede ejecutar este backend; únicamente serviría una maqueta estática.
+Codespaces ejecuta la aplicación FastAPI completa: landing pública, autenticación, base demo, formularios, selección dato–factor, cálculos, informes, reducción y APIs. GitHub Pages no puede ejecutar este backend; únicamente serviría contenido estático.
 
 ### Abrir
 
 1. Entrar al repositorio en GitHub.
-2. Seleccionar la rama `migration/v0.48.0-canonical`.
-3. Pulsar **Code → Codespaces → Create codespace on migration/v0.48.0-canonical**.
+2. Seleccionar la rama `migration/v0.49.0-canonical`.
+3. Pulsar **Code → Codespaces → Create codespace on migration/v0.49.0-canonical**.
 4. Esperar a que finalicen `postCreateCommand` y `postStartCommand`.
 5. GitHub abrirá el puerto **8765** en una nueva pestaña.
 
@@ -61,4 +61,10 @@ Codespaces es una vista previa efímera. Utiliza SQLite, almacenamiento local y 
 
 ## Estado durante la migración
 
-Antes de que Actions importe el ZIP V0.48.0, Codespaces ejecutará temporalmente la base de `develop`. Después del commit automático de importación, debe reconstruirse o recrearse el Codespace para ver la V0.48.0 exacta con sus logos e imágenes oficiales.
+Antes de que Actions importe el ZIP V0.49.0, Codespaces ejecutará temporalmente la base de `develop`. Después del commit automático de importación, debe reconstruirse o recrearse el Codespace para ver la V0.49.0 exacta con:
+
+- landing pública completa;
+- logos, favicons e imágenes oficiales;
+- selección específica de factores por dato;
+- portafolio de reducción dirigido;
+- overlay de distribución Windows preservado.
