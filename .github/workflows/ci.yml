@@ -159,8 +159,8 @@ jobs:
           curl -fsS -o /dev/null http://127.0.0.1:8765/login
           python scripts/preview/build_static_preview.py \
             --output _site \
-            --commit "$GITHUB_SHA" \
-            --branch "$GITHUB_REF_NAME"
+            --commit "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --branch "${{ github.head_ref || github.ref_name }}"
           test -f _site/index.html
           test -f _site/login/index.html
           test -f _site/preview-status.json
@@ -168,7 +168,7 @@ jobs:
       - name: Guardar snapshot de la revisión
         uses: actions/upload-artifact@v4
         with:
-          name: preview-${{ github.sha }}
+          name: preview-${{ github.event.pull_request.head.sha || github.sha }}
           path: _site
           if-no-files-found: error
           retention-days: 30
