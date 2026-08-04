@@ -15,6 +15,7 @@
       "width": 470,
       "height": 195,
       "encoding": "PNG data URI base64",
+      "minimum_independent_sources": 2,
       "transformation": "none"
     },
     "verified_source_names": [
