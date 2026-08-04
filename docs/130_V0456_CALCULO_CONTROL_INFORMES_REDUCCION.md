@@ -193,6 +193,21 @@ tests/test_v0456_outcome_experience.py
 - plantillas Jinja compiladas;
 - regresión y Docker aprobados.
 
+## Validación ejecutada
+
+La ejecución de CI asociada a esta fase terminó en verde:
+
+- árbol fuente;
+- dependencias;
+- Python y shell;
+- JavaScript, incluido `cth-outcomes.js`;
+- contrato de marca;
+- migraciones Alembic;
+- 64 plantillas Jinja;
+- regresiones v0.45.x;
+- prueba del recorrido de resultados;
+- construcción Docker.
+
 ## Estado de versión
 
 Esta integración no eleva por sí sola la versión a 0.45.6. El cierre formal sigue bloqueado hasta recuperar, instalar y verificar los cuatro activos exactos de la Marca Maestra v1.
