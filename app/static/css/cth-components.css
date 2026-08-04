@@ -1,0 +1,186 @@
+/* Calcula tu Huella · Frontend Kit v1 · Componentes compartidos
+ * Esta capa no contiene activos ni geometría de logo.
+ */
+
+:where(.btn, .button) {
+  display: inline-flex;
+  min-height: 42px;
+  align-items: center;
+  justify-content: center;
+  gap: .55rem;
+  padding: .65rem 1rem;
+  border: 1px solid var(--cth-line);
+  border-radius: 12px;
+  font-weight: 750;
+  line-height: 1.15;
+  cursor: pointer;
+  transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease, border-color .16s ease;
+}
+
+:where(.btn, .button):hover {
+  transform: translateY(-1px);
+}
+
+:where(.btn, .button):active {
+  transform: translateY(0);
+}
+
+:where(.btn-primary, .button.primary) {
+  color: var(--cth-white);
+  border-color: var(--cth-forest);
+  background: linear-gradient(135deg, var(--cth-forest), var(--cth-forest-2));
+  box-shadow: 0 10px 24px rgba(11, 59, 46, .16);
+}
+
+:where(.btn-primary, .button.primary):hover {
+  box-shadow: 0 13px 30px rgba(11, 59, 46, .22);
+}
+
+:where(.btn-outline, .button.secondary) {
+  color: var(--cth-forest);
+  border-color: color-mix(in srgb, var(--cth-forest) 25%, var(--cth-line));
+  background: color-mix(in srgb, var(--cth-white) 94%, var(--cth-soft-green));
+}
+
+:where(.btn, .button)[disabled],
+:where(.btn, .button)[aria-disabled="true"] {
+  opacity: .55;
+  pointer-events: none;
+  box-shadow: none;
+}
+
+:where(input, select, textarea) {
+  color: var(--cth-slate);
+  border-color: var(--cth-line);
+  border-radius: 11px;
+  background: var(--cth-white);
+}
+
+:where(input, select, textarea):hover {
+  border-color: color-mix(in srgb, var(--cth-forest-2) 32%, var(--cth-line));
+}
+
+:where(input, select, textarea):focus {
+  border-color: var(--cth-teal);
+  outline: 3px solid color-mix(in srgb, var(--cth-teal) 16%, transparent);
+  outline-offset: 1px;
+}
+
+:where(input, select, textarea)[aria-invalid="true"] {
+  border-color: var(--cth-danger);
+  outline-color: color-mix(in srgb, var(--cth-danger) 18%, transparent);
+}
+
+:where(.card, .kpi-card, .mini-card, .table-card, .trace-card) {
+  border-color: var(--cth-line);
+  border-radius: var(--cth-radius-medium);
+  box-shadow: 0 8px 28px rgba(11, 59, 46, .055);
+}
+
+:where(.card, .kpi-card, .mini-card, .table-card, .trace-card):focus-within {
+  border-color: color-mix(in srgb, var(--cth-teal) 42%, var(--cth-line));
+}
+
+:where(.status-chip, .tag, .counter, .release-chip) {
+  border-radius: 999px;
+  font-weight: 750;
+}
+
+.status-chip.active,
+.status-chip.complete,
+.status-chip.validated,
+.status-chip.approved {
+  color: var(--cth-forest);
+  border-color: color-mix(in srgb, var(--cth-forest-2) 24%, var(--cth-line));
+  background: var(--cth-soft-green);
+}
+
+.status-chip.progressing,
+.status-chip.review,
+.status-chip.in-review {
+  color: var(--cth-teal);
+  border-color: color-mix(in srgb, var(--cth-teal) 24%, var(--cth-line));
+  background: color-mix(in srgb, var(--cth-teal) 8%, var(--cth-white));
+}
+
+.status-chip.pending,
+.status-chip.incomplete,
+.status-chip.estimated {
+  color: #65726B;
+  border-color: var(--cth-line);
+  background: color-mix(in srgb, var(--cth-line) 35%, var(--cth-white));
+}
+
+:where(.alert, .flash, .locked-banner) {
+  border-radius: 14px;
+  border: 1px solid var(--cth-line);
+}
+
+:where(.alert-error, .flash-error) {
+  color: #842f2f;
+  border-color: color-mix(in srgb, var(--cth-danger) 32%, var(--cth-line));
+  background: color-mix(in srgb, var(--cth-danger) 8%, var(--cth-white));
+}
+
+:where(.alert-success, .flash-success) {
+  color: var(--cth-forest);
+  border-color: color-mix(in srgb, var(--cth-forest-2) 28%, var(--cth-line));
+  background: var(--cth-soft-green);
+}
+
+.responsive-table {
+  border: 1px solid var(--cth-line);
+  border-radius: 14px;
+  background: var(--cth-white);
+  scrollbar-color: var(--cth-sage) var(--cth-soft-green);
+}
+
+.responsive-table table {
+  min-width: 680px;
+}
+
+.responsive-table thead th {
+  color: #65726B;
+  background: color-mix(in srgb, var(--cth-soft-green) 68%, var(--cth-white));
+}
+
+.responsive-table tbody tr:hover {
+  background: color-mix(in srgb, var(--cth-soft-green) 48%, var(--cth-white));
+}
+
+.page-head h1,
+.public-section-head h2 {
+  text-wrap: balance;
+}
+
+.page-head p,
+.public-section-head p,
+.card p {
+  text-wrap: pretty;
+}
+
+@media (max-width: 760px) {
+  :where(.btn, .button) {
+    min-height: 44px;
+  }
+
+  .head-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .head-actions :where(.btn, .button, select) {
+    flex: 1 1 160px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
