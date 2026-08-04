@@ -36,18 +36,31 @@ experiencia_interna.html
 index.html autocontenido de Marca Maestra v1
 ```
 
-Las copias identificadas declaran un PNG de **470 × 195 px** y muestran la misma secuencia de bytes en los fragmentos cotejados. La recuperación definitiva debe decodificar cada archivo completo, comprobar el cierre `IEND` y exigir un único SHA-256 común.
+Las copias identificadas declaran un PNG de **470 × 195 px** y muestran la misma secuencia de bytes en los fragmentos cotejados. La recuperación definitiva debe decodificar cada archivo completo, comprobar el cierre `IEND` y exigir un único SHA-256 común presente en al menos dos archivos históricos independientes.
+
+## Activos descartados como canon
+
+Los siguientes SVG pertenecen a la identidad anterior de huella y gráfica; permanecen temporalmente por compatibilidad, pero no pueden declararse Marca Maestra:
+
+```text
+brand-primary.svg
+brand-reversed.svg
+brand-symbol.svg
+```
+
+`brand-primary.svg` contiene además el descriptor antiguo “Plataforma profesional de huella de carbono”. Las láminas v0.45 que muestran esa misma geometría tampoco autorizan su reutilización como logo final.
 
 ## Política de recuperación
 
 1. Priorizar los bytes del paquete maestro o del Frontend Kit histórico.
-2. Recuperar el logo principal desde HTML autocontenido únicamente si existen dos o más copias completas e idénticas.
-3. Registrar SHA-256, bytes, dimensiones, profundidad, tipo de color y archivos fuente.
-4. Comparar las copias disponibles y rechazar cualquier divergencia.
-5. No redimensionar, recortar, recolorear, vectorizar ni optimizar el PNG recuperado.
-6. No derivar la variante blanca ni los favicons a partir del logo principal.
-7. Mantener los SVG actuales como compatibilidad legacy hasta sustituir cada referencia por un binario oficial.
-8. No declarar cerrada la v0.45.6 mientras falte alguno de los cuatro activos exactos.
+2. Recuperar el logo principal desde HTML autocontenido únicamente si existen dos o más archivos completos, distintos e idénticos en SHA-256.
+3. No considerar dos apariciones dentro de un mismo HTML como dos fuentes independientes.
+4. Registrar SHA-256, bytes, dimensiones, profundidad, tipo de color y archivos fuente.
+5. Comparar las copias disponibles y rechazar cualquier divergencia.
+6. No redimensionar, recortar, recolorear, vectorizar ni optimizar el PNG recuperado.
+7. No derivar la variante blanca ni los favicons a partir del logo principal.
+8. Mantener los SVG actuales como compatibilidad legacy hasta sustituir cada referencia por un binario oficial.
+9. No declarar cerrada la v0.45.6 mientras falte alguno de los cuatro activos exactos.
 
 ## Herramientas verificables
 
@@ -57,7 +70,7 @@ Las copias identificadas declaran un PNG de **470 × 195 px** y muestran la mism
 
 ### HTML autocontenido
 
-`scripts/brand/extract_embedded_master.py` recibe dos o más HTML históricos, localiza las imágenes PNG con texto alternativo “Calcula tu Huella”, valida firma, `IHDR`, cierre `IEND`, dimensiones de 470 × 195 y coincidencia SHA-256. Al usar `--apply` escribe exclusivamente:
+`scripts/brand/extract_embedded_master.py` recibe dos o más HTML históricos independientes, localiza las imágenes PNG con texto alternativo “Calcula tu Huella”, valida firma, `IHDR`, cierre `IEND`, dimensiones de 470 × 195 y coincidencia SHA-256. Al usar `--apply` escribe exclusivamente:
 
 ```text
 app/static/img/brand/logo-oficial.png
