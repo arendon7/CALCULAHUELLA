@@ -3,7 +3,8 @@
 
 La validación es de solo lectura. Exige el SHA-256 publicado, las distribuciones
 MAC y WINDOWS, paridad del núcleo compartido, activos visuales exactos y ausencia
-de datos locales o secretos.
+de datos locales o secretos. Acepta que el ZIP contenga directamente la entrega
+o que esté envuelta en una única carpeta superior.
 """
 
 from __future__ import annotations
@@ -47,11 +48,13 @@ FORBIDDEN_EXACT = {
     "credentials.json",
     "secrets.json",
 }
+
+# El núcleo funcional debe ser idéntico. Los scripts de instalación y ciclo de
+# vida son deliberadamente distintos por plataforma y se conservan en overlay.
 SHARED_CORE_PREFIXES = (
     "app/",
     "migrations/",
     "tests/",
-    "scripts/",
 )
 SHARED_CORE_FILES = {
     "alembic.ini",
@@ -88,7 +91,10 @@ def normalize_member(name: str) -> str:
     path = PurePosixPath(name)
     if path.is_absolute() or ".." in path.parts:
         raise VerificationError(f"Ruta insegura dentro del ZIP: {name}")
-    return path.as_posix().lstrip("./")
+    normalized = path.as_posix().lstrip("./")
+    if not normalized:
+        raise VerificationError("El ZIP contiene una ruta vacía")
+    return normalized
 
 
 def safe_members(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
@@ -100,7 +106,49 @@ def safe_members(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
         if normalized in members:
             raise VerificationError(f"Ruta duplicada dentro del ZIP: {normalized}")
         members[normalized] = item
+    if not members:
+        raise VerificationError("El ZIP no contiene archivos")
     return members
+
+
+def normalize_package_layout(
+    members: dict[str, zipfile.ZipInfo],
+) -> tuple[dict[str, zipfile.ZipInfo], str | None]:
+    """Retira una única carpeta envolvente cuando contiene toda la entrega."""
+
+    names = sorted(members)
+    if any(name.startswith("MAC/") for name in names) and any(
+        name.startswith("WINDOWS/") for name in names
+    ):
+        return members, None
+
+    top_levels = {PurePosixPath(name).parts[0] for name in names}
+    if len(top_levels) != 1:
+        raise VerificationError(
+            "No se localizaron MAC/ y WINDOWS/ en la raíz ni dentro de una única carpeta superior"
+        )
+
+    wrapper = next(iter(top_levels))
+    prefix = wrapper + "/"
+    stripped: dict[str, zipfile.ZipInfo] = {}
+    for name, item in members.items():
+        if not name.startswith(prefix):
+            raise VerificationError("La carpeta envolvente no contiene todos los archivos")
+        relative = name[len(prefix) :]
+        if not relative:
+            continue
+        if relative in stripped:
+            raise VerificationError(f"Ruta duplicada después de retirar {wrapper}/: {relative}")
+        stripped[relative] = item
+
+    stripped_names = sorted(stripped)
+    if not any(name.startswith("MAC/") for name in stripped_names) or not any(
+        name.startswith("WINDOWS/") for name in stripped_names
+    ):
+        raise VerificationError(
+            f"La carpeta envolvente {wrapper}/ no contiene las distribuciones MAC/ y WINDOWS/"
+        )
+    return stripped, wrapper
 
 
 def ensure_no_forbidden(names: list[str]) -> None:
@@ -114,16 +162,14 @@ def ensure_no_forbidden(names: list[str]) -> None:
             violations.append(name)
             continue
         lowered = f"/{name.casefold()}/"
-        if any(segment in lowered for segment in ("/evidencias/", "/backups/", "/certificados/")):
+        if any(
+            segment in lowered
+            for segment in ("/evidencias/", "/backups/", "/certificados/")
+        ):
             violations.append(name)
     if violations:
         sample = "\n  - ".join(violations[:25])
         raise VerificationError(f"Contenido prohibido detectado:\n  - {sample}")
-
-
-def find_exact_or_suffix(names: list[str], suffix: str) -> list[str]:
-    suffix = suffix.lstrip("/")
-    return [name for name in names if name == suffix or name.endswith("/" + suffix)]
 
 
 def read_member_text(
@@ -139,17 +185,12 @@ def read_member_text(
         raise VerificationError(f"El archivo no es UTF-8: {name}") from exc
 
 
-def distribution_names(all_names: list[str], root: str) -> list[str]:
-    prefix = root.rstrip("/") + "/"
-    return [name[len(prefix):] for name in all_names if name.startswith(prefix)]
-
-
 def distribution_member_map(
     members: dict[str, zipfile.ZipInfo], root: str
 ) -> dict[str, zipfile.ZipInfo]:
     prefix = root.rstrip("/") + "/"
     return {
-        name[len(prefix):]: item
+        name[len(prefix) :]: item
         for name, item in members.items()
         if name.startswith(prefix)
     }
@@ -178,7 +219,9 @@ def require_distribution_structure(
         raise VerificationError(f"{distribution}: app/config.py no declara 0.49.0")
 
     template_names = sorted(
-        name for name in mapping if name.startswith("app/templates/") and name.endswith(".html")
+        name
+        for name in mapping
+        if name.startswith("app/templates/") and name.endswith(".html")
     )
     expected_templates = int(contract["runtime"]["jinja_templates"])
     if len(template_names) != expected_templates:
@@ -187,14 +230,18 @@ def require_distribution_structure(
         )
 
     for asset in contract["required_brand_assets"]:
-        candidates = [name for name in mapping if name.endswith("/img/brand/" + asset)]
+        candidates = [
+            name for name in mapping if name.endswith("/img/brand/" + asset)
+        ]
         if len(candidates) != 1:
             raise VerificationError(
                 f"{distribution}: se esperaba un único activo {asset}; encontrados {len(candidates)}"
             )
 
     module_pngs = sorted(
-        name for name in mapping if "/img/modules/" in ("/" + name) and name.endswith(".png")
+        name
+        for name in mapping
+        if "/img/modules/" in ("/" + name) and name.endswith(".png")
     )
     if len(module_pngs) < int(contract["minimum_module_pngs"]):
         raise VerificationError(
@@ -206,21 +253,19 @@ def require_distribution_structure(
             raise VerificationError(f"{distribution}: falta la imagen modular {asset}")
 
     migration_tokens = [
-        name for name in mapping
-        if name.startswith("migrations/versions/") and "0030" in PurePosixPath(name).name
+        name
+        for name in mapping
+        if name.startswith("migrations/versions/")
+        and "0030" in PurePosixPath(name).name
     ]
     if not migration_tokens:
         raise VerificationError(
             f"{distribution}: no se encontró la migración Alembic 20260804_0030"
         )
 
-    landing_candidates = [
-        name for name in mapping
-        if name.startswith("app/templates/") and name.endswith(".html")
-    ]
     landing_text = "\n".join(
         archive.read(mapping[name]).decode("utf-8", errors="ignore")
-        for name in landing_candidates
+        for name in template_names
     )
     required_landing_tokens = (
         "Potenciado por Greenatics",
@@ -237,12 +282,13 @@ def require_distribution_structure(
         for name in mapping
         if name.startswith("app/") and name.endswith(".py")
     )
+    all_paths = "\n".join(mapping)
     for token in (
         "ActivityFactorSelection",
         "activity_factor_selections",
         "20260804_0030",
     ):
-        if token not in python_text and token not in "\n".join(mapping):
+        if token not in python_text and token not in all_paths:
             raise VerificationError(f"{distribution}: falta la capacidad técnica {token}")
 
     return {
@@ -291,7 +337,9 @@ def compare_shared_core(
     return {
         "shared_files": len(mac_hashes),
         "shared_core_sha256": sha256_bytes(
-            "\n".join(f"{name}:{mac_hashes[name]}" for name in sorted(mac_hashes)).encode("utf-8")
+            "\n".join(
+                f"{name}:{mac_hashes[name]}" for name in sorted(mac_hashes)
+            ).encode("utf-8")
         ),
     }
 
@@ -307,12 +355,14 @@ def windows_overlay_entries(
         mac_item = mac.get(name)
         if mac_item is not None and archive.read(mac_item) == data:
             continue
-        overlay.append({
-            "path": name,
-            "sha256": sha256_bytes(data),
-            "bytes": len(data),
-            "windows_only": mac_item is None,
-        })
+        overlay.append(
+            {
+                "path": name,
+                "sha256": sha256_bytes(data),
+                "bytes": len(data),
+                "windows_only": mac_item is None,
+            }
+        )
     return overlay
 
 
@@ -331,7 +381,8 @@ def validate_archive(path: Path) -> dict[str, Any]:
         raise VerificationError("El archivo no es un ZIP válido") from exc
 
     with archive:
-        members = safe_members(archive)
+        raw_members = safe_members(archive)
+        members, package_wrapper = normalize_package_layout(raw_members)
         names = sorted(members)
         ensure_no_forbidden(names)
 
@@ -369,22 +420,22 @@ def validate_archive(path: Path) -> dict[str, Any]:
 
         mac = distribution_member_map(members, "MAC")
         windows = distribution_member_map(members, "WINDOWS")
-        mac_report = require_distribution_structure(
-            archive, "MAC", mac, contract
-        )
+        mac_report = require_distribution_structure(archive, "MAC", mac, contract)
         windows_report = require_distribution_structure(
             archive, "WINDOWS", windows, contract
         )
 
-        if mac_report["physical_files"] != int(contract["distributions"]["MAC"]["physical_files"]):
+        expected_mac = int(contract["distributions"]["MAC"]["physical_files"])
+        expected_windows = int(
+            contract["distributions"]["WINDOWS"]["physical_files"]
+        )
+        if mac_report["physical_files"] != expected_mac:
             raise VerificationError(
-                f"MAC: archivos físicos esperados {contract['distributions']['MAC']['physical_files']}; "
-                f"encontrados {mac_report['physical_files']}"
+                f"MAC: archivos físicos esperados {expected_mac}; encontrados {mac_report['physical_files']}"
             )
-        if windows_report["physical_files"] != int(contract["distributions"]["WINDOWS"]["physical_files"]):
+        if windows_report["physical_files"] != expected_windows:
             raise VerificationError(
-                f"WINDOWS: archivos físicos esperados {contract['distributions']['WINDOWS']['physical_files']}; "
-                f"encontrados {windows_report['physical_files']}"
+                f"WINDOWS: archivos físicos esperados {expected_windows}; encontrados {windows_report['physical_files']}"
             )
 
         shared = compare_shared_core(archive, mac, windows)
@@ -395,6 +446,7 @@ def validate_archive(path: Path) -> dict[str, Any]:
             "archive": path.name,
             "sha256": actual_hash,
             "release": contract["release"],
+            "package_wrapper": package_wrapper,
             "root_files": len([name for name in names if "/" not in name]),
             "mac": mac_report,
             "windows": windows_report,
