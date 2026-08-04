@@ -19,6 +19,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      pages_ready: ${{ steps.pages_status.outputs.ready }}
     env:
       APP_ENV: test
       SESSION_SECRET: pages-preview-session-secret
@@ -81,13 +83,38 @@ jobs:
           test -f _site/login/index.html
           test -f _site/preview-status.json
 
-      - uses: actions/configure-pages@v5
+      - name: Guardar snapshot descargable
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcula-tu-huella-preview-${{ github.sha }}
+          path: _site
+          if-no-files-found: error
+          retention-days: 30
 
-      - uses: actions/upload-pages-artifact@v3
+      - name: Configurar GitHub Pages
+        id: configure_pages
+        continue-on-error: true
+        uses: actions/configure-pages@v5
+
+      - name: Registrar disponibilidad de Pages
+        id: pages_status
+        run: |
+          if [[ "${{ steps.configure_pages.outcome }}" == "success" ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages está habilitado."
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "GitHub Pages aún no está habilitado; el snapshot quedó disponible como artefacto."
+          fi
+
+      - name: Empaquetar artefacto de Pages
+        if: steps.pages_status.outputs.ready == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: _site
 
   deploy:
+    if: needs.build.outputs.pages_ready == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
