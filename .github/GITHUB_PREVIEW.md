@@ -1,17 +1,37 @@
 # Vista previa web desde GitHub
 
-[![Abrir en GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/arendon7/CALCULAHUELLA?ref=migration%2Fv0.49.0-canonical&quickstart=1)
+## Vista pública automática · GitHub Pages
 
-## Opción principal: GitHub Codespaces
+Cada push a `integration/canonical` ejecuta `.github/workflows/pages-preview.yml` y publica un snapshot de:
 
-Codespaces ejecuta la aplicación FastAPI completa: landing pública, autenticación, base demo, formularios, selección dato–factor, cálculos, informes, reducción y APIs. GitHub Pages no puede ejecutar este backend; únicamente serviría contenido estático.
+- landing pública;
+- identidad visual y recursos estáticos;
+- responsive;
+- pantalla de acceso;
+- versión, rama y commit visibles en `preview-status.json`.
+
+Dirección prevista:
+
+```text
+https://arendon7.github.io/CALCULAHUELLA/
+```
+
+La primera publicación requiere que GitHub Pages esté habilitado con **Source: GitHub Actions** en la configuración del repositorio. Después, cada commit aprobado se publica automáticamente.
+
+La vista Pages es deliberadamente estática. Los formularios y la sesión aparecen deshabilitados para no simular operaciones que requieren backend.
+
+## Aplicación completa · GitHub Codespaces
+
+[![Abrir en GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/arendon7/CALCULAHUELLA?ref=integration%2Fcanonical&quickstart=1)
+
+Codespaces ejecuta FastAPI, autenticación, base demo, formularios, cálculos, informes, reducción, onboarding y APIs.
 
 ### Abrir
 
-1. Utilizar el botón **Abrir en GitHub Codespaces** incluido arriba; o entrar al repositorio y seleccionar la rama `migration/v0.49.0-canonical`.
-2. Pulsar **Code → Codespaces → Create codespace on migration/v0.49.0-canonical** cuando se use el procedimiento manual.
-3. Esperar a que finalicen `postCreateCommand` y `postStartCommand`.
-4. GitHub abrirá el puerto **8765** en una nueva pestaña.
+1. Utilizar el botón **Abrir en GitHub Codespaces**; o seleccionar la rama `integration/canonical`.
+2. Pulsar **Code → Codespaces → Create codespace on integration/canonical**.
+3. Esperar a que terminen `postCreateCommand` y `postStartCommand`.
+4. GitHub abrirá el puerto **8765**.
 
 Credenciales demo:
 
@@ -20,52 +40,35 @@ consultor@calculatuhuella.local
 Demo2026!
 ```
 
-También están disponibles los perfiles administrador, cliente, revisor y verificador definidos por la semilla demo.
-
-### Estado del puerto
-
-El puerto se mantiene **Private** por defecto. Esto permite compartir la vista únicamente con usuarios autorizados al Codespace.
-
-Para una demostración temporal pública:
-
-1. Abrir la pestaña **Ports** de Codespaces.
-2. Ubicar el puerto `8765`.
-3. Abrir el menú contextual.
-4. Cambiar **Port Visibility** a **Public**.
-5. Copiar la URL HTTPS generada.
-
-No debe utilizarse la visibilidad pública con datos reales, secretos o evidencias cargadas.
+El puerto se mantiene **Private** por defecto. Para una demostración temporal puede cambiarse a **Public** desde la pestaña **Ports**. No debe hacerse con datos reales, secretos o evidencias cargadas.
 
 ### Diagnóstico
 
-El servidor escribe:
+```bash
+bash .devcontainer/start.sh
+curl -fsS http://127.0.0.1:8765/api/health
+```
+
+Log:
 
 ```text
 instance/codespaces.log
 ```
 
-Para reiniciarlo:
+## Flujo de publicación
 
-```bash
-bash .devcontainer/start.sh
+```text
+ChatGPT modifica integration/canonical
+            ↓
+GitHub registra cada commit
+            ↓
+CI valida código, migraciones y pruebas
+            ↓
+Pages publica landing/login automáticamente
+            ↓
+Codespaces permite probar la aplicación completa
 ```
 
-Para comprobar salud:
+## Versión actual
 
-```bash
-curl -fsS http://127.0.0.1:8765/api/health
-```
-
-## Diferencia con producción
-
-Codespaces es una vista previa efímera. Utiliza SQLite, almacenamiento local y usuarios demo. Una producción estricta requiere PostgreSQL, HTTPS administrado, secretos seguros, almacenamiento externo, monitoreo y restauración comprobada.
-
-## Estado durante la migración
-
-Antes de que Actions importe el ZIP V0.49.0, Codespaces ejecutará temporalmente la base de `develop`. Después del commit automático de importación, debe reconstruirse o recrearse el Codespace para ver la V0.49.0 exacta con:
-
-- landing pública completa;
-- logos, favicons e imágenes oficiales;
-- selección específica de factores por dato;
-- portafolio de reducción dirigido;
-- overlay de distribución Windows preservado.
+`migration/current-release.json` registra V0.52.0 como la última entrega completa documentada. Mientras el ZIP binario no esté montado e importado, la rama puede seguir ejecutando transitoriamente el runtime anterior; el estado se expone en `preview-status.json` para no confundir versión documentada con versión realmente desplegada.
