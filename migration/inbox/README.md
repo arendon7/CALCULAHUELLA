@@ -12,6 +12,10 @@ SHA-256 obligatorio:
 b83066b35490bfed325ee2d74cf38cfeb14c216c0a63632c19140a777f763c06
 ```
 
+## Estado
+
+El manifiesto, la validación y el checksum están recuperados en la Biblioteca del proyecto. El ZIP binario no está montado en el entorno activo ni presente todavía en esta carpeta. Por tanto, la importación no se declara ejecutada.
+
 ## Procedimiento web
 
 1. Abrir esta carpeta en la rama `migration/v0.49.0-canonical`.
