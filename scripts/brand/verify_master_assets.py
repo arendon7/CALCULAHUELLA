@@ -21,6 +21,13 @@ TEMPLATES = ROOT / "app" / "templates"
 APPROVED_DESCRIPTOR = "Plataforma digital de gestión de huella de carbono"
 APPROVED_CLAIM = "Convierte tus datos en decisiones climáticas"
 LEGACY_NAMES = ("brand-primary.svg", "brand-reversed.svg", "brand-symbol.svg")
+RECOVERABLE_STATUS = "recoverable_exact_primary_from_embedded_html"
+INSTALLED_STATUS = "installed_exact_master"
+PENDING_INDEPENDENT_ASSETS = {
+    "logo-oficial-blanco.png",
+    "favicon-64.png",
+    "favicon-256.png",
+}
 
 
 class BrandValidationError(RuntimeError):
@@ -55,6 +62,33 @@ def load_manifest() -> dict[str, Any]:
     return data
 
 
+def validate_recoverable_state(approved: dict[str, Any]) -> None:
+    expected = approved.get("expected_primary")
+    if not isinstance(expected, dict):
+        raise BrandValidationError("Falta approved_master.expected_primary")
+    required_expected = {
+        "filename": "logo-oficial.png",
+        "width": 470,
+        "height": 195,
+        "encoding": "PNG data URI base64",
+        "minimum_independent_sources": 2,
+        "transformation": "none",
+    }
+    for field, value in required_expected.items():
+        if expected.get(field) != value:
+            raise BrandValidationError(
+                f"expected_primary.{field} debe ser {value!r}, no {expected.get(field)!r}"
+            )
+
+    sources = approved.get("verified_source_names")
+    if not isinstance(sources, list) or len(set(map(str, sources))) < 2:
+        raise BrandValidationError("Se requieren al menos dos fuentes históricas independientes")
+
+    pending = approved.get("pending_independent_assets")
+    if not isinstance(pending, list) or set(map(str, pending)) != PENDING_INDEPENDENT_ASSETS:
+        raise BrandValidationError("La lista de activos independientes pendientes es inconsistente")
+
+
 def validate_contract(manifest: dict[str, Any]) -> None:
     if manifest.get("brand") != "Calcula tu Huella":
         raise BrandValidationError("Nombre de marca inconsistente")
@@ -73,12 +107,18 @@ def validate_contract(manifest: dict[str, Any]) -> None:
     if "canonical_assets" in manifest:
         raise BrandValidationError("No se permiten activos falsamente declarados como canónicos")
 
+    status = approved.get("status")
+    if status == RECOVERABLE_STATUS:
+        validate_recoverable_state(approved)
+    elif status != INSTALLED_STATUS:
+        raise BrandValidationError(f"Estado de Marca Maestra no reconocido: {status!r}")
+
 
 def validate_installed_assets(manifest: dict[str, Any]) -> None:
     approved = manifest["approved_master"]
-    if approved.get("status") != "installed_exact_master":
+    if approved.get("status") != INSTALLED_STATUS:
         raise BrandValidationError(
-            "El logo maestro exacto aún no está instalado. Estado esperado: installed_exact_master"
+            f"El logo maestro exacto aún no está instalado. Estado esperado: {INSTALLED_STATUS}"
         )
 
     assets = approved.get("assets")
@@ -143,7 +183,7 @@ def main() -> int:
             print("Marca Maestra exacta: VALIDADA")
         else:
             print(f"Contrato de marca: VALIDADO · estado del maestro: {status}")
-            if status == "installed_exact_master":
+            if status == INSTALLED_STATUS:
                 validate_installed_assets(manifest)
                 print("Activos maestros instalados: VALIDADOS")
         return 0
