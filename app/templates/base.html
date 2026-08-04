@@ -10,31 +10,31 @@
   <link rel="stylesheet" href="{{ url_for('static', path='css/cth-tokens.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
 </head>
-<body class="app-shell">
+<body class="app-shell" data-shell>
   <a class="skip-link" href="#contenido-aplicacion">Saltar al contenido</a>
-  <aside class="sidebar" id="sidebar">
-    <a class="brand" href="/dashboard"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
+  <aside class="sidebar" id="sidebar" aria-label="Navegación de la plataforma">
+    <a class="brand" href="/dashboard" aria-label="Calcula tu Huella, ir al tablero"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
 
-    <div class="workspace-identity">
+    <div class="workspace-identity" aria-label="Perfil y foco del espacio actual">
       <small>ESPACIO ACTUAL</small>
       <strong>{{ role_profile.name }}</strong>
       <span>{{ role_profile.focus }}</span>
     </div>
 
     {% for section in navigation.core %}
-    <nav class="nav-group{% if not loop.first %} compact-nav{% endif %}">
+    <nav class="nav-group{% if not loop.first %} compact-nav{% endif %}" aria-label="{{ section["label"] }}">
       <p class="nav-label">{{ section["label"] }}</p>
-      {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"><span>{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+      {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"{% if active == item["active"] %} aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
     </nav>
     {% endfor %}
 
     {% if navigation.mode == 'complete' and navigation.advanced %}
     <details class="nav-disclosure" open>
-      <summary>Herramientas avanzadas <span>⌄</span></summary>
+      <summary>Herramientas avanzadas <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.advanced %}
-      <nav class="nav-group compact-nav">
+      <nav class="nav-group compact-nav" aria-label="{{ section["label"] }}">
         <p class="nav-label">{{ section["label"] }}</p>
-        {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"><span>{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+        {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"{% if active == item["active"] %} aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
     </details>
@@ -42,11 +42,11 @@
 
     {% if navigation.mode == 'complete' and navigation.internal %}
     <details class="nav-disclosure internal-disclosure">
-      <summary>Administración interna <span>⌄</span></summary>
+      <summary>Administración interna <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.internal %}
-      <nav class="nav-group compact-nav">
+      <nav class="nav-group compact-nav" aria-label="{{ section["label"] }}">
         <p class="nav-label">{{ section["label"] }}</p>
-        {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"><span>{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+        {% for item in section["items"] %}<a class="nav-item {% if active == item["active"] %}active{% endif %}" href="{{ item["href"] }}"{% if active == item["active"] %} aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
     </details>
@@ -56,7 +56,7 @@
     <form action="/preferencias/vista" method="post" class="view-mode-form">
       <input type="hidden" name="mode" value="{{ 'complete' if navigation.mode == 'essential' else 'essential' }}">
       <input type="hidden" name="return_url" value="{{ request.url.path }}">
-      <button type="submit"><span>{{ '＋' if navigation.mode == 'essential' else '−' }}</span>{{ 'Mostrar vista completa' if navigation.mode == 'essential' else 'Volver a vista esencial' }}</button>
+      <button type="submit"><span aria-hidden="true">{{ '＋' if navigation.mode == 'essential' else '−' }}</span>{{ 'Mostrar vista completa' if navigation.mode == 'essential' else 'Volver a vista esencial' }}</button>
       <small>{{ 'Incluye módulos avanzados e internos.' if navigation.mode == 'essential' else 'Prioriza solo el flujo principal.' }}</small>
     </form>
     {% endif %}
@@ -66,28 +66,31 @@
       <svg viewBox="0 0 220 90" aria-hidden="true"><path d="M0 75 C35 40, 65 85, 105 48 S170 20 220 52" fill="none" stroke="#A7C1A0" stroke-width="2"/><path d="M150 70V18M150 18l-16 18M150 18l18 16M188 70V31M188 31l-12 13M188 31l13 12" stroke="#12533F" fill="none"/><path d="M38 74v-22h34v22M48 52V37h15v15" stroke="#2D6F73" fill="none"/></svg>
     </div>
     <div class="user-box">
-      <div class="avatar">{{ user.initials }}</div>
+      <div class="avatar" aria-hidden="true">{{ user.initials }}</div>
       <div><strong>{{ user.name }}</strong><small>{{ user.role }}</small></div>
-      <form action="/logout" method="post"><button title="Cerrar sesión">↗</button></form>
+      <form action="/logout" method="post"><button type="submit" aria-label="Cerrar sesión" title="Cerrar sesión">↗</button></form>
     </div>
   </aside>
-  <button class="sidebar-backdrop" id="sidebarBackdrop" aria-label="Cerrar menú"></button>
+  <button class="sidebar-backdrop" id="sidebarBackdrop" type="button" aria-label="Cerrar menú" aria-hidden="true" tabindex="-1"></button>
 
   <main class="main-area">
     <header class="topbar">
-      <button class="icon-button mobile-only" id="menuButton" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú">☰</button>
-      <div class="topbar-title">{% block page_label %}Calcula tu Huella{% endblock %}</div>
+      <button class="icon-button mobile-only" id="menuButton" type="button" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú"><span aria-hidden="true">☰</span><span class="icon-button-label">Menú</span></button>
+      <div class="topbar-context">
+        <div class="topbar-title">{% block page_label %}Calcula tu Huella{% endblock %}</div>
+        <span class="topbar-organization">{{ org.name }}</span>
+      </div>
       <div class="topbar-actions">
         <a class="version-pill" href="/inteligencia-producto">Perfil y alcance</a>
-        <a class="icon-button" href="/recorrido-inventario" title="Ayuda y recorrido">?</a>
-        <a class="icon-button notification" href="/notificaciones" title="Notificaciones">♢{% if unread_notifications %}<b>{{ unread_notifications }}</b>{% endif %}</a>
+        <a class="icon-button" href="/recorrido-inventario" aria-label="Abrir ayuda y recorrido" title="Ayuda y recorrido"><span aria-hidden="true">?</span></a>
+        <a class="icon-button notification" href="/notificaciones" aria-label="Abrir notificaciones" title="Notificaciones"><span aria-hidden="true">♢</span>{% if unread_notifications %}<b aria-label="{{ unread_notifications }} notificaciones sin leer">{{ unread_notifications }}</b>{% endif %}</a>
         <a class="org-name" href="/portafolio" title="Cambiar organización">{{ org.name }}</a>
       </div>
     </header>
-    <div class="page-content" id="contenido-aplicacion">
-      {% if flash %}<div class="flash flash-{{ flash.level }}">{{ flash.message }}</div>{% endif %}
+    <div class="page-content" id="contenido-aplicacion" tabindex="-1">
+      {% if flash %}<div class="flash flash-{{ flash.level }}" role="status">{{ flash.message }}</div>{% endif %}
       {% if inventory is defined and inventory.locked %}
-      <div class="locked-banner"><span>🔒</span><div><strong>Inventario cerrado e inmutable</strong><small>Los datos, evidencias, factores y cálculos de la versión {{ inventory.version }} están bloqueados. Para corregirlos debe crearse una nueva versión desde Control.</small></div></div>
+      <div class="locked-banner" role="status"><span aria-hidden="true">🔒</span><div><strong>Inventario cerrado e inmutable</strong><small>Los datos, evidencias, factores y cálculos de la versión {{ inventory.version }} están bloqueados. Para corregirlos debe crearse una nueva versión desde Control.</small></div></div>
       {% endif %}
       {% block content %}{% endblock %}
     </div>
