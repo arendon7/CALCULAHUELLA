@@ -4,8 +4,10 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>{% block title %}Calcula tu Huella{% endblock %}</title>
+  <meta name="theme-color" content="#0B3B2E">
   <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/cth-tokens.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
 </head>
 <body class="app-shell">
@@ -61,7 +63,7 @@
 
     <div class="sidebar-motto">
       <strong>Convierte tus datos en <em>decisiones climáticas.</em></strong>
-      <svg viewBox="0 0 220 90" aria-hidden="true"><path d="M0 75 C35 40, 65 85, 105 48 S170 20 220 52" fill="none" stroke="#79b77a" stroke-width="2"/><path d="M150 70V18M150 18l-16 18M150 18l18 16M188 70V31M188 31l-12 13M188 31l13 12" stroke="#2f895d" fill="none"/><path d="M38 74v-22h34v22M48 52V37h15v15" stroke="#2d78b9" fill="none"/></svg>
+      <svg viewBox="0 0 220 90" aria-hidden="true"><path d="M0 75 C35 40, 65 85, 105 48 S170 20 220 52" fill="none" stroke="#A7C1A0" stroke-width="2"/><path d="M150 70V18M150 18l-16 18M150 18l18 16M188 70V31M188 31l-12 13M188 31l13 12" stroke="#12533F" fill="none"/><path d="M38 74v-22h34v22M48 52V37h15v15" stroke="#2D6F73" fill="none"/></svg>
     </div>
     <div class="user-box">
       <div class="avatar">{{ user.initials }}</div>
