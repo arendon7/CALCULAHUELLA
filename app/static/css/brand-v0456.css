@@ -1,0 +1,14 @@
+.login-mobile-claim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .login-mobile-claim {
+    display: block;
+    margin: -16px 0 24px;
+    color: var(--green);
+    font-size: 13px;
+    font-weight: 800;
+    line-height: 1.45;
+  }
+}
