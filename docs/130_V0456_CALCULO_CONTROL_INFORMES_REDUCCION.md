@@ -4,73 +4,31 @@
 
 Transformar el resultado técnico del inventario en un recorrido comprensible de decisión, sin modificar datos, factores, fórmulas, permisos, estados ni endpoints.
 
-El flujo consolidado es:
-
 ```text
 Cálculo → Control → Informes → Reducción → Escenarios
 ```
 
 ## Etapas
 
-### 1. Cálculo
+### Cálculo — `/calculos`
 
-Objetivo: confirmar que los datos, conversiones, factores y GWP producen resultados trazables.
+Confirma que datos, conversiones, factores y GWP produzcan resultados trazables. Se mantienen recálculo, resultados por fuente, alertas, errores, acceso a trazabilidad y reglas activas.
 
-Superficie:
+### Control — `/control`
 
-```text
-/calculos
-```
+Convierte el resultado técnico en una versión revisable, aprobable y cerrable. Se mantienen puertas de calidad, observaciones, respuestas, recomendación independiente, aprobación, cierre inmutable, nueva versión e historial de auditoría.
 
-Se mantienen el recálculo, los resultados por fuente, las alertas y errores del motor, el acceso a trazabilidad y la explicación de las reglas activas.
+### Informes — `/reportes`
 
-### 2. Control
+Selecciona el entregable y conserva versiones, estado e integridad. Se mantienen informe ejecutivo, informe técnico, memoria de cálculo, generación PDF/Excel, descarga, aprobación, hash y tamaño.
 
-Objetivo: convertir el resultado técnico en una versión revisable, aprobable y cerrable.
+### Reducción — `/reduccion`
 
-Superficie:
+Prioriza medidas por impacto, inversión, ahorro, viabilidad, riesgo, responsable y fecha. Se mantienen acciones, metas, sincronización, seguimiento, reducción real/esperada y economía de cada medida.
 
-```text
-/control
-```
+### Escenarios — `/escenarios`
 
-Se mantienen las puertas de calidad, observaciones, respuestas, recomendación independiente, aprobación final, cierre inmutable, reapertura mediante nueva versión, historial formal y auditoría.
-
-### 3. Informes
-
-Objetivo: seleccionar el entregable adecuado y conservar versiones, estado e integridad.
-
-Superficie:
-
-```text
-/reportes
-```
-
-Se mantienen el informe ejecutivo, informe técnico, memoria de cálculo, generación PDF/Excel, descarga, aprobación, hash y tamaño del archivo.
-
-### 4. Reducción
-
-Objetivo: priorizar medidas por impacto, inversión, ahorro, viabilidad, riesgo, responsable y fecha.
-
-Superficie:
-
-```text
-/reduccion
-```
-
-Se mantienen la creación y actualización de acciones, metas absolutas o de intensidad, sincronización con el inventario, seguimiento, reducción real y esperada y economía de cada medida.
-
-### 5. Escenarios
-
-Objetivo: comparar portafolios, adopción, cronograma, costo marginal y trayectoria.
-
-Superficie:
-
-```text
-/escenarios
-```
-
-Se mantienen la configuración, inclusión de medidas, porcentaje de adopción, año de implementación, tasa de descuento, curva de costo marginal, emisiones proyectadas y creación de portafolios.
+Compara portafolios, adopción, cronograma, costo marginal y trayectoria. Se mantienen configuración, medidas, adopción, año, tasa de descuento, curva marginal, emisiones proyectadas y creación de portafolios.
 
 ## Mejoras de experiencia
 
@@ -78,17 +36,17 @@ Se mantienen la configuración, inclusión de medidas, porcentaje de adopción, 
 
 - navegación de cinco etapas con `aria-current="step"`;
 - propósito y siguiente acción por etapa;
-- eliminación de la navegación de captura al entrar en `/calculos`;
+- sustitución de la navegación de captura al entrar en `/calculos`;
 - barras de progreso accesibles;
 - trayectorias y curvas marginales enfocables;
 - búsqueda local en resultados, documentos, medidas, acciones y observaciones;
 - normalización que ignora mayúsculas y tildes.
 
-`app/static/css/cth-outcomes.css` añade recorrido horizontal responsive, contexto de etapa, jerarquía de indicadores, numeración de entregables, herramientas de búsqueda, estados vacíos y foco visible.
+`app/static/css/cth-outcomes.css` añade recorrido responsive, contexto de etapa, jerarquía de indicadores, numeración de entregables, herramientas de búsqueda, estados vacíos y foco visible.
 
 ## Contratos preservados
 
-No se modifican modelos, migraciones, motor de cálculo, conversiones, factores, GWP, generación documental, permisos, segregación de funciones, estados, rutas ni formularios existentes.
+No se modifican modelos, migraciones, motor, conversiones, factores, GWP, generación documental, permisos, segregación de funciones, estados, rutas ni formularios.
 
 ## Archivos
 
@@ -101,19 +59,10 @@ tests/test_v0456_outcome_experience.py
 .github/workflows/ci.yml
 ```
 
-## Validación ejecutada
+## Validación
 
-CI terminó en verde para:
+CI terminó en verde para árbol, dependencias, Python, shell, JavaScript, contrato de marca, migraciones, 64 plantillas Jinja, regresiones v0.45.x, prueba del recorrido y Docker.
 
-- árbol y dependencias;
-- Python, shell y JavaScript;
-- contrato de marca;
-- migraciones Alembic;
-- 64 plantillas Jinja;
-- regresiones v0.45.x;
-- prueba del recorrido de resultados;
-- construcción Docker.
+## Estado
 
-## Estado de versión
-
-El bloque funcional está cerrado. La versión permanece en 0.45.5 porque el cierre formal de v0.45.6 sigue condicionado a recuperar, instalar y verificar los cuatro activos exactos de la Marca Maestra v1.
+El bloque funcional está cerrado. La versión permanece en 0.45.5 porque el cierre formal de v0.45.6 sigue condicionado a recuperar e instalar los cuatro activos exactos de la Marca Maestra v1.
