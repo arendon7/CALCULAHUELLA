@@ -1,0 +1,51 @@
+{
+  "release": "0.48.0",
+  "archive": {
+    "filename": "calcula_tu_huella_v0_48_0_portafolio_reduccion_mac.zip",
+    "sha256": "921a97f8cf6a74c60161c9e96afcaed13c713afebdf09dedc8309c77a961b5d3"
+  },
+  "source_tree": {
+    "logical_sha256": "91410e981bf93e2c036cf544cc190dc57c39f5c464e1793cea314b4b7d210eef",
+    "functional_files": 406,
+    "routes": 284,
+    "orm_models": 109,
+    "jinja_templates": 65,
+    "test_files": 31,
+    "focused_tests_passed": 103,
+    "security_controls_passed": 7
+  },
+  "database": {
+    "alembic_head": "20260803_0029",
+    "schema_changes_from_v047": false
+  },
+  "required_brand_assets": [
+    "logo-oficial.png",
+    "logo-oficial-blanco.png",
+    "favicon-64.png",
+    "favicon-256.png"
+  ],
+  "required_module_assets": [
+    "01_dashboard_climatico.png",
+    "02_calidad_de_datos.png",
+    "08_metodologia_y_alcances.png"
+  ],
+  "minimum_module_pngs": 8,
+  "forbidden_content": [
+    "database files",
+    "secrets",
+    "real evidence",
+    "generated reports",
+    "logs",
+    "caches",
+    "Git metadata"
+  ],
+  "compatibility": {
+    "emission_factors_changed": false,
+    "unit_conversions_changed": false,
+    "gwp_changed": false,
+    "inventory_formulas_changed": false,
+    "orm_models_changed": false,
+    "migrations_changed": false,
+    "historical_user_data_changed": false
+  }
+}
