@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: setup dev test demo reset-demo docker-up docker-down inventory
+.PHONY: setup dev test demo reset-demo docker-up docker-down inventory brand-check brand-require-master
 
 setup:
 	./scripts/dev/setup.sh
@@ -25,3 +25,9 @@ docker-down:
 
 inventory:
 	.venv/bin/python scripts/migration/build_source_inventory.py . --output instance/source_inventory.csv
+
+brand-check:
+	python3 scripts/brand/verify_master_assets.py
+
+brand-require-master:
+	python3 scripts/brand/verify_master_assets.py --require-master
