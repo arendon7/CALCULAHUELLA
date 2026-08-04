@@ -235,7 +235,7 @@ def test_rejects_missing_windows_distribution(tmp_path, monkeypatch):
 
     with pytest.raises(
         verifier.VerificationError,
-        match="Falta la distribución WINDOWS",
+        match="MAC/ y WINDOWS/",
     ):
         verifier.validate_archive(archive)
 
