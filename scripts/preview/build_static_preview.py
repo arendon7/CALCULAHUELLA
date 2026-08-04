@@ -9,10 +9,12 @@ mantiene GitHub Codespaces.
 from __future__ import annotations
 
 import argparse
+import html as html_module
 import json
 import os
 import re
 import shutil
+import sys
 import urllib.request
 from pathlib import Path
 
@@ -28,21 +30,46 @@ def fetch(url: str) -> str:
         return response.read().decode("utf-8")
 
 
-def inject_banner(html: str, *, depth: int) -> str:
+def inject_banner(
+    html: str,
+    *,
+    depth: int,
+    runtime_version: str,
+    target_release: str | None,
+    release_status: str | None,
+) -> str:
     relative = "../" * depth
+    runtime_label = html_module.escape(runtime_version)
+    target_label = html_module.escape(target_release or "sin definir")
+    status_label = html_module.escape(release_status or "sin contrato")
     banner = f"""
 <div role="status" style="position:sticky;top:0;z-index:99999;padding:10px 16px;background:#0B3B2E;color:#fff;font:600 14px/1.4 Inter,Arial,sans-serif;text-align:center">
-  Vista previa pública estática · formularios y sesión deshabilitados ·
+  Vista previa estática · runtime V{runtime_label} · objetivo V{target_label}
+  ({status_label}) · formularios y sesión deshabilitados ·
   <a href="{CODESPACES_URL}" style="color:#fff;text-decoration:underline">abrir aplicación completa en Codespaces</a>
 </div>
 """
     if re.search(r"<body[^>]*>", html, flags=re.I):
-        html = re.sub(r"(<body[^>]*>)", r"\1" + banner, html, count=1, flags=re.I)
+        html = re.sub(
+            r"(<body[^>]*>)",
+            r"\1" + banner,
+            html,
+            count=1,
+            flags=re.I,
+        )
     else:
         html = banner + html
-    html = html.replace('action="/login"', 'action="#" onsubmit="return false"')
-    html = html.replace('action="/logout"', 'action="#" onsubmit="return false"')
-    html = re.sub(r'action="/[^"]*"', 'action="#" onsubmit="return false"', html)
+    html = html.replace(
+        'action="/login"', 'action="#" onsubmit="return false"'
+    )
+    html = html.replace(
+        'action="/logout"', 'action="#" onsubmit="return false"'
+    )
+    html = re.sub(
+        r'action="/[^"]*"',
+        'action="#" onsubmit="return false"',
+        html,
+    )
     html = html.replace('href="/static/', f'href="{relative}static/')
     html = html.replace('src="/static/', f'src="{relative}static/')
     html = html.replace("url('/static/", f"url('{relative}static/")
@@ -51,39 +78,73 @@ def inject_banner(html: str, *, depth: int) -> str:
     return html
 
 
+def runtime_version() -> str:
+    sys.path.insert(0, str(ROOT))
+    from app.config import settings
+
+    return str(settings.version)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--base-url", default="http://127.0.0.1:8765")
     parser.add_argument("--output", type=Path, default=ROOT / "_site")
     parser.add_argument("--commit", default=os.getenv("GITHUB_SHA", "local"))
-    parser.add_argument("--branch", default=os.getenv("GITHUB_REF_NAME", "integration/canonical"))
+    parser.add_argument(
+        "--branch",
+        default=os.getenv("GITHUB_REF_NAME", "integration/canonical"),
+    )
     args = parser.parse_args()
+
+    release_path = ROOT / "migration" / "current-release.json"
+    release = (
+        json.loads(release_path.read_text(encoding="utf-8"))
+        if release_path.exists()
+        else {}
+    )
+    running_version = runtime_version()
+    target_release = release.get("release")
+    release_status = release.get("status")
 
     output = args.output.resolve()
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
-    landing = inject_banner(fetch(args.base_url.rstrip("/") + "/"), depth=0)
-    login = inject_banner(fetch(args.base_url.rstrip("/") + "/login"), depth=1)
+    landing = inject_banner(
+        fetch(args.base_url.rstrip("/") + "/"),
+        depth=0,
+        runtime_version=running_version,
+        target_release=target_release,
+        release_status=release_status,
+    )
+    login = inject_banner(
+        fetch(args.base_url.rstrip("/") + "/login"),
+        depth=1,
+        runtime_version=running_version,
+        target_release=target_release,
+        release_status=release_status,
+    )
 
     (output / "index.html").write_text(landing, encoding="utf-8")
     (output / "login").mkdir()
-    (output / "login" / "index.html").write_text(login, encoding="utf-8")
+    (output / "login" / "index.html").write_text(
+        login, encoding="utf-8"
+    )
 
     static_source = ROOT / "app" / "static"
     if not static_source.is_dir():
         raise SystemExit("Falta app/static")
     shutil.copytree(static_source, output / "static")
 
-    release_path = ROOT / "migration" / "current-release.json"
-    release = json.loads(release_path.read_text(encoding="utf-8")) if release_path.exists() else {}
     status = {
         "project": "Calcula tu Huella",
         "branch": args.branch,
         "commit": args.commit,
-        "runtime_snapshot": release.get("release"),
-        "release_status": release.get("status"),
+        "runtime_version": running_version,
+        "target_release": target_release,
+        "matches_target": running_version == target_release,
+        "release_status": release_status,
         "full_preview": CODESPACES_URL,
     }
     (output / "preview-status.json").write_text(
