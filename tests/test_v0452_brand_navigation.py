@@ -75,8 +75,10 @@ def test_frontend_kit_tokens_are_canonical_and_loaded():
     assert "--cth-forest: #0B3B2E" in token_css
     assert "--cth-teal: #2D6F73" in token_css
     assert "--navy: var(--cth-forest)" in token_css
-    for name in ("base.html", "public_base.html", "login.html"):
-        assert "css/cth-tokens.css" in read(name)
+    for name in ("base.html", "public_base.html", "login.html", "supplier_portal.html"):
+        template = read(name)
+        assert "css/cth-tokens.css" in template
+        assert '<meta name="theme-color" content="#0B3B2E">' in template
 
 
 def test_release_is_v0455_until_visual_master_is_installed():
