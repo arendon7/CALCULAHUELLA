@@ -14,28 +14,28 @@
   </div>
 </div>
 
-<section class="onboarding-command card">
+<section class="onboarding-command card" aria-labelledby="onboarding-command-title">
   <div class="onboarding-command-copy">
     <span class="eyebrow">{{ onboarding.state|upper }}</span>
-    <h2>{{ onboarding.headline }}</h2>
+    <h2 id="onboarding-command-title">{{ onboarding.headline }}</h2>
     <p>{{ onboarding.message }}</p>
     {% if onboarding.next_step %}
     <div class="onboarding-next-action">
-      <span>{{ onboarding.next_step.number }}</span>
+      <span aria-hidden="true">{{ onboarding.next_step.number }}</span>
       <div><small>SIGUIENTE ACTIVIDAD</small><strong>{{ onboarding.next_step.row.title }}</strong><p>{{ onboarding.next_step.outcome }}</p></div>
-      <a href="{{ onboarding.next_step.href }}">Abrir →</a>
+      <a href="{{ onboarding.next_step.href }}" aria-label="Abrir siguiente actividad: {{ onboarding.next_step.row.title }}">Abrir →</a>
     </div>
     {% else %}
     <div class="onboarding-next-action completed">
-      <span>✓</span>
+      <span aria-hidden="true">✓</span>
       <div><small>IMPLEMENTACIÓN COMPLETA</small><strong>Tu espacio está listo para operar</strong><p>Continúa con el recorrido del inventario y controla el avance por etapas.</p></div>
       <a href="/recorrido-inventario">Continuar →</a>
     </div>
     {% endif %}
   </div>
   <div class="onboarding-score-card">
-    <div class="onboarding-score-ring" style="--onboarding-progress:{{ onboarding.score }}%"><strong>{{ onboarding.score }}%</strong><small>completado</small></div>
-    <div class="onboarding-score-stats">
+    <div class="onboarding-score-ring" style="--onboarding-progress:{{ onboarding.score }}%" role="progressbar" aria-label="Progreso de la puesta en marcha" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ onboarding.score }}"><strong>{{ onboarding.score }}%</strong><small>completado</small></div>
+    <div class="onboarding-score-stats" aria-label="Resumen de actividades">
       <span><b>{{ onboarding.completed }}</b> listas</span>
       <span><b>{{ onboarding.remaining }}</b> pendientes</span>
       <span><b>{{ onboarding.blocked }}</b> bloqueadas</span>
@@ -44,20 +44,20 @@
 </section>
 
 <section class="onboarding-outcomes" aria-label="Resultados de la puesta en marcha">
-  <article><span>1</span><div><strong>Alcance aprobado</strong><p>Entidad, sedes, periodo y metodología claramente definidos.</p></div></article>
-  <article><span>2</span><div><strong>Equipo responsable</strong><p>Permisos y responsabilidades asignados para cada dato y decisión.</p></div></article>
-  <article><span>3</span><div><strong>Primer ciclo probado</strong><p>Dato, cálculo e informe inicial validados antes de escalar.</p></div></article>
+  <article><span aria-hidden="true">1</span><div><strong>Alcance aprobado</strong><p>Entidad, sedes, periodo y metodología claramente definidos.</p></div></article>
+  <article><span aria-hidden="true">2</span><div><strong>Equipo responsable</strong><p>Permisos y responsabilidades asignados para cada dato y decisión.</p></div></article>
+  <article><span aria-hidden="true">3</span><div><strong>Primer ciclo probado</strong><p>Dato, cálculo e informe inicial validados antes de escalar.</p></div></article>
 </section>
 
-<section class="onboarding-roadmap">
+<section class="onboarding-roadmap" aria-labelledby="onboarding-roadmap-title">
   <div class="section-heading compact">
-    <div><span class="eyebrow">RUTA DE IMPLEMENTACIÓN</span><h2>Seis actividades, un resultado operativo</h2><p>Abre cada actividad para consultar su propósito, resultado esperado y gestión administrativa.</p></div>
+    <div><span class="eyebrow">RUTA DE IMPLEMENTACIÓN</span><h2 id="onboarding-roadmap-title">Seis actividades, un resultado operativo</h2><p>Abre cada actividad para consultar su propósito, resultado esperado y gestión administrativa.</p></div>
     <span class="status-badge {{ 'success' if onboarding.ready else 'warning' }}">{{ onboarding.completed }}/{{ onboarding.total }} completas</span>
   </div>
   <div class="onboarding-stage-list">
     {% for step in onboarding.steps %}
-    <article class="onboarding-stage card {% if step.done %}done{% elif step.blocked %}blocked{% elif step.current %}current{% endif %}">
-      <div class="onboarding-stage-marker">{{ '✓' if step.done else step.number }}</div>
+    <article class="onboarding-stage card {% if step.done %}done{% elif step.blocked %}blocked{% elif step.current %}current{% endif %}"{% if step.current %} aria-current="step"{% endif %}>
+      <div class="onboarding-stage-marker" aria-hidden="true">{{ '✓' if step.done else step.number }}</div>
       <div class="onboarding-stage-main">
         <div class="onboarding-stage-head">
           <div><small>{{ step.row.category|upper }} · {{ step.row.code }}</small><h3>{{ step.row.title }}</h3></div>
