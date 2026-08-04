@@ -112,8 +112,12 @@ def extract_candidates(path: Path) -> list[tuple[Candidate, bytes]]:
 def select_exact_copy(
     sources: list[Path], expected_width: int, expected_height: int
 ) -> tuple[Candidate, bytes, list[Candidate]]:
+    unique_sources = list(dict.fromkeys(path.resolve() for path in sources))
+    if len(unique_sources) < 2:
+        raise EmbeddedLogoError("Se requieren al menos dos HTML históricos independientes")
+
     recovered: list[tuple[Candidate, bytes]] = []
-    for source in sources:
+    for source in unique_sources:
         if not source.is_file():
             raise EmbeddedLogoError(f"No existe la fuente: {source}")
         candidates = extract_candidates(source)
@@ -140,6 +144,10 @@ def select_exact_copy(
         )
         raise EmbeddedLogoError(f"Las copias del logo no son idénticas: {details}")
 
+    independent_sources = {candidate.source for candidate, _ in matching}
+    if len(independent_sources) < 2:
+        raise EmbeddedLogoError("El mismo PNG debe existir en dos archivos independientes")
+
     representative, data = matching[0]
     return representative, data, [candidate for candidate, _ in matching]
 
@@ -162,6 +170,7 @@ def main() -> int:
         report = {
             "selected": asdict(representative),
             "verified_copies": [asdict(candidate) for candidate in candidates],
+            "verified_independent_sources": sorted({candidate.source for candidate in candidates}),
             "transformation": "none",
             "output": str(args.output),
         }
