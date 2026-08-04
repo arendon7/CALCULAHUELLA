@@ -17,6 +17,11 @@ if sys.version_info < (3, 11):
 print(f"Python validado: {sys.version.split()[0]}")
 PY
 
+# GitHub Contents API y algunas descargas ZIP no conservan el bit ejecutable.
+# Se normalizan únicamente los lanzadores propios del repositorio.
+find "$PROJECT_ROOT" -maxdepth 1 -type f -name '*.command' -exec chmod u+x {} +
+find "$PROJECT_ROOT/scripts" -type f \( -name '*.sh' -o -name '*.command' \) -exec chmod u+x {} +
+
 if [[ ! -d .venv ]]; then
   "$PYTHON_BIN" -m venv .venv
 fi
@@ -51,3 +56,4 @@ set +a
 echo
 echo "Instalación local completada."
 echo "Inicia la aplicación con: ./scripts/dev/run.sh"
+echo "Recuperación de marca disponible: ./RECUPERAR_MARCA_MAESTRA_MAC.command"
