@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +29,18 @@ def test_public_experience_has_mobile_navigation_and_official_claim():
     assert "decisiones climáticas" in home
     assert "Plataforma digital de gestión de huella de carbono" in home
     assert "public-results-grid" in home
+
+
+def test_brand_contract_blocks_approximations_and_legacy_copy():
+    manifest = json.loads((STATIC / "img" / "brand-manifest.json").read_text(encoding="utf-8"))
+    assert manifest["descriptor"] == "Plataforma digital de gestión de huella de carbono"
+    assert manifest["claim"] == "Convierte tus datos en decisiones climáticas"
+    assert manifest["approved_master"]["redraw_allowed"] is False
+    assert manifest["approved_master"]["placeholder_allowed"] is False
+    assert "canonical_assets" not in manifest
+    templates = "\n".join(path.read_text(encoding="utf-8") for path in TEMPLATES.glob("*.html"))
+    assert "PLATAFORMA PROFESIONAL DE HUELLA DE CARBONO" not in templates
+    assert "Mide. Comprende. Reduce." not in templates
 
 
 def test_release_is_v0455_until_visual_master_is_installed():
