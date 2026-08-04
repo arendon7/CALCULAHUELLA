@@ -1,0 +1,392 @@
+/* Calcula tu Huella · Frontend Kit v1 · Flujo de datos y calidad.
+ * Capa de presentación: no modifica rutas, datos ni contratos Jinja.
+ */
+
+.data-flow-nav {
+  margin: 0 0 20px;
+  padding: 10px;
+  overflow-x: auto;
+  border: 1px solid var(--cth-line);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--cth-white) 94%, var(--cth-soft-green));
+  box-shadow: 0 8px 28px rgba(11, 59, 46, .05);
+  scrollbar-width: thin;
+  scrollbar-color: var(--cth-sage) transparent;
+}
+
+.data-flow-list {
+  display: grid;
+  min-width: 760px;
+  grid-template-columns: repeat(5, minmax(138px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.data-flow-step {
+  min-width: 0;
+}
+
+.data-flow-step a {
+  display: grid;
+  min-height: 72px;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  color: var(--cth-slate);
+  border: 1px solid transparent;
+  border-radius: 13px;
+  text-decoration: none;
+  transition: background-color .16s ease, border-color .16s ease, transform .16s ease;
+}
+
+.data-flow-step a:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--cth-sage) 62%, var(--cth-line));
+  background: var(--cth-white);
+}
+
+.data-flow-step-number {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  color: var(--cth-forest);
+  border: 1px solid color-mix(in srgb, var(--cth-forest-2) 22%, var(--cth-line));
+  border-radius: 50%;
+  background: var(--cth-soft-green);
+  font-size: .82rem;
+  font-weight: 850;
+}
+
+.data-flow-step strong,
+.data-flow-step small {
+  display: block;
+  min-width: 0;
+}
+
+.data-flow-step strong {
+  font-size: .88rem;
+  line-height: 1.2;
+}
+
+.data-flow-step small {
+  margin-top: 3px;
+  color: #65726B;
+  font-size: .72rem;
+  line-height: 1.25;
+}
+
+.data-flow-step.active a {
+  color: var(--cth-white);
+  border-color: var(--cth-forest);
+  background: linear-gradient(135deg, var(--cth-forest), var(--cth-forest-2));
+  box-shadow: 0 10px 25px rgba(11, 59, 46, .16);
+}
+
+.data-flow-step.active .data-flow-step-number {
+  color: var(--cth-forest);
+  border-color: var(--cth-white);
+  background: var(--cth-white);
+}
+
+.data-flow-step.active small {
+  color: color-mix(in srgb, var(--cth-white) 76%, var(--cth-sage));
+}
+
+.table-toolbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 10px;
+  border: 1px solid var(--cth-line);
+  border-radius: 13px;
+  background: color-mix(in srgb, var(--cth-soft-green) 52%, var(--cth-white));
+}
+
+.table-search-label {
+  display: flex;
+  min-width: 220px;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  color: #65726B;
+  font-size: .8rem;
+  font-weight: 750;
+}
+
+.table-search-label::before {
+  content: "⌕";
+  color: var(--cth-teal);
+  font-size: 1.15rem;
+}
+
+.table-search-label input {
+  width: 100%;
+  min-height: 38px;
+  padding: .55rem .7rem;
+  border-radius: 10px;
+}
+
+.table-filter-count {
+  flex: 0 0 auto;
+  color: #65726B;
+  font-size: .76rem;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.table-filter-empty {
+  margin: 10px 0 0;
+  padding: 14px;
+  color: #65726B;
+  border: 1px dashed var(--cth-line);
+  border-radius: 12px;
+  text-align: center;
+}
+
+.file-intake-control {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border: 1px dashed color-mix(in srgb, var(--cth-teal) 45%, var(--cth-line));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cth-soft-green) 45%, var(--cth-white));
+}
+
+.file-intake-control:focus-within {
+  border-style: solid;
+  border-color: var(--cth-teal);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--cth-teal) 13%, transparent);
+}
+
+.file-intake-control input[type="file"] {
+  width: 100%;
+  padding: 7px;
+  border: 1px solid var(--cth-line);
+  background: var(--cth-white);
+}
+
+.file-intake-control input[type="file"]::file-selector-button {
+  margin-right: 10px;
+  padding: .55rem .75rem;
+  color: var(--cth-forest);
+  border: 0;
+  border-radius: 9px;
+  background: var(--cth-soft-green);
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.file-intake-status {
+  display: block;
+  min-height: 1.2em;
+  color: #65726B;
+  font-size: .76rem;
+  line-height: 1.35;
+}
+
+.file-intake-status.ready {
+  color: var(--cth-forest-2);
+  font-weight: 750;
+}
+
+.file-intake-status.warning {
+  color: #8A5A23;
+  font-weight: 750;
+}
+
+body.data-flow-page .page-head,
+body.data-flow-page .page-heading {
+  margin-bottom: 14px;
+}
+
+body.data-flow-page .source-summary-grid,
+body.data-flow-page .kpi-grid {
+  margin-top: 16px;
+}
+
+body.data-flow-page .responsive-table {
+  overflow: auto;
+  outline: none;
+}
+
+body.data-flow-page .responsive-table:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--cth-teal) 22%, transparent);
+  outline-offset: 2px;
+}
+
+body.data-flow-page .responsive-table table {
+  border-collapse: separate;
+  border-spacing: 0;
+}
+
+body.data-flow-page .responsive-table tbody tr:not([hidden]) {
+  transition: background-color .12s ease;
+}
+
+.operational-upload-card,
+.mapping-workspace,
+.validation-errors,
+.batch-detail-card {
+  overflow: hidden;
+}
+
+.operational-upload-grid,
+.import-layout {
+  align-items: stretch;
+}
+
+.upload-explainer,
+.import-guide {
+  position: relative;
+}
+
+.upload-explainer::before,
+.import-guide::before {
+  content: "";
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 4px;
+  border-radius: 999px;
+  background: linear-gradient(var(--cth-forest-2), var(--cth-sage));
+}
+
+.upload-explainer {
+  padding-left: 18px;
+}
+
+.mapping-workspace {
+  border-color: color-mix(in srgb, var(--cth-teal) 30%, var(--cth-line));
+}
+
+.mapping-grid {
+  align-items: end;
+}
+
+.mapping-field.required-map > span::after {
+  content: " Requerido";
+  margin-left: 6px;
+  color: var(--cth-danger);
+  font-size: .68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.mapping-field.required-map > span b {
+  display: none;
+}
+
+.mapping-readiness {
+  padding: 8px 10px;
+  color: #7A4E1D;
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--cth-earth) 18%, var(--cth-white));
+  font-size: .78rem;
+  font-weight: 750;
+}
+
+.mapping-readiness.ready {
+  color: var(--cth-forest);
+  background: var(--cth-soft-green);
+}
+
+.batch-status-strip {
+  border: 1px solid var(--cth-line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--cth-soft-green) 35%, var(--cth-white));
+}
+
+.batch-status-strip > div {
+  min-width: 0;
+}
+
+.correction-banner {
+  border-left: 4px solid var(--cth-danger);
+}
+
+.correction-banner.ready {
+  border-left-color: var(--cth-forest-2);
+}
+
+.row-has-error > td:first-child {
+  box-shadow: inset 4px 0 0 var(--cth-danger);
+}
+
+.row-has-warning > td:first-child {
+  box-shadow: inset 4px 0 0 var(--cth-earth);
+}
+
+.row-editor-line > td {
+  padding: 0 !important;
+  background: color-mix(in srgb, var(--cth-soft-green) 55%, var(--cth-white));
+}
+
+.row-correction-form {
+  border: 0;
+  border-radius: 0;
+}
+
+.validation-errors {
+  border-color: color-mix(in srgb, var(--cth-danger) 35%, var(--cth-line));
+}
+
+.validation-errors .card-head {
+  background: color-mix(in srgb, var(--cth-danger) 6%, var(--cth-white));
+}
+
+@media (max-width: 920px) {
+  .data-flow-nav {
+    margin-inline: -2px;
+  }
+
+  .table-toolbox {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .table-search-label {
+    min-width: 0;
+  }
+
+  .table-filter-count {
+    padding-left: 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  .data-flow-nav {
+    padding: 7px;
+    border-radius: 14px;
+  }
+
+  .data-flow-list {
+    min-width: 660px;
+    grid-template-columns: repeat(5, 124px);
+  }
+
+  .data-flow-step a {
+    min-height: 66px;
+    grid-template-columns: 28px minmax(0, 1fr);
+    padding: 8px;
+  }
+
+  .data-flow-step-number {
+    width: 28px;
+    height: 28px;
+  }
+
+  .data-flow-step small {
+    font-size: .68rem;
+  }
+
+  .file-intake-control {
+    padding: 10px;
+  }
+}
