@@ -55,6 +55,9 @@ jobs:
           python -m compileall -q app scripts tests run.py
           find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
 
+      - name: Validar contrato de marca
+        run: python scripts/brand/verify_master_assets.py
+
       - name: Migrar base limpia
         run: |
           mkdir -p instance
