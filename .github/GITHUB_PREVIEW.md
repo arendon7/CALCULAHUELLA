@@ -1,16 +1,17 @@
 # Vista previa web desde GitHub
 
+[![Abrir en GitHub Codespaces](https://github.com/codespaces/badge.svg)](https://codespaces.new/arendon7/CALCULAHUELLA?ref=migration%2Fv0.49.0-canonical&quickstart=1)
+
 ## Opción principal: GitHub Codespaces
 
 Codespaces ejecuta la aplicación FastAPI completa: landing pública, autenticación, base demo, formularios, selección dato–factor, cálculos, informes, reducción y APIs. GitHub Pages no puede ejecutar este backend; únicamente serviría contenido estático.
 
 ### Abrir
 
-1. Entrar al repositorio en GitHub.
-2. Seleccionar la rama `migration/v0.49.0-canonical`.
-3. Pulsar **Code → Codespaces → Create codespace on migration/v0.49.0-canonical**.
-4. Esperar a que finalicen `postCreateCommand` y `postStartCommand`.
-5. GitHub abrirá el puerto **8765** en una nueva pestaña.
+1. Utilizar el botón **Abrir en GitHub Codespaces** incluido arriba; o entrar al repositorio y seleccionar la rama `migration/v0.49.0-canonical`.
+2. Pulsar **Code → Codespaces → Create codespace on migration/v0.49.0-canonical** cuando se use el procedimiento manual.
+3. Esperar a que finalicen `postCreateCommand` y `postStartCommand`.
+4. GitHub abrirá el puerto **8765** en una nueva pestaña.
 
 Credenciales demo:
 
