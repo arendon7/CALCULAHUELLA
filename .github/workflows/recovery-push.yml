@@ -1,0 +1,28 @@
+name: Recovery package on branch push
+
+on:
+  push:
+    branches: [recovery-local-v0-45-5]
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build clean local ZIP
+        run: |
+          set -euo pipefail
+          rm -rf .git
+          zip -rq calcula_tu_huella_v0_45_5_recuperada.zip . \
+            -x '.github/workflows/recovery-local-package.yml' \
+               '.github/workflows/recovery-push.yml' \
+               '__pycache__/*' '*.pyc' '.pytest_cache/*' '.DS_Store'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: calcula-tu-huella-v0-45-5-recuperada
+          path: calcula_tu_huella_v0_45_5_recuperada.zip
+          if-no-files-found: error
+          retention-days: 1
