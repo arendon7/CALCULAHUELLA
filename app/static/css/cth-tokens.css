@@ -1,0 +1,60 @@
+/*
+ * Calcula tu Huella · Frontend Kit v1
+ * Capa de compatibilidad entre los tokens oficiales y la interfaz v0.45.5.
+ * No contiene geometría ni reinterpretaciones del logo.
+ */
+:root {
+  --cth-forest: #0B3B2E;
+  --cth-forest-2: #12533F;
+  --cth-sage: #A7C1A0;
+  --cth-cream: #F7F5EF;
+  --cth-slate: #1F2933;
+  --cth-teal: #2D6F73;
+  --cth-earth: #CA9A6C;
+  --cth-white: #FFFFFF;
+  --cth-line: #DCE3DE;
+  --cth-soft-green: #EDF4EE;
+  --cth-danger: #C94F4F;
+  --cth-max-width: 1280px;
+  --cth-radius-large: 28px;
+  --cth-radius-medium: 18px;
+  --cth-shadow: 0 18px 50px rgba(11, 59, 46, .10);
+
+  /* Aliases temporales para la capa v0.45.5. */
+  --navy: var(--cth-forest);
+  --navy2: var(--cth-forest-2);
+  --green: var(--cth-forest-2);
+  --green2: var(--cth-sage);
+  --lime: var(--cth-sage);
+  --blue: var(--cth-teal);
+  --light: var(--cth-cream);
+  --soft: var(--cth-soft-green);
+  --line: var(--cth-line);
+  --text: var(--cth-slate);
+  --muted: #65726B;
+  --white: var(--cth-white);
+  --orange: var(--cth-earth);
+  --red: var(--cth-danger);
+  --shadow: var(--cth-shadow);
+}
+
+html,
+body {
+  font-family: Inter, Arial, sans-serif;
+}
+
+body,
+.public-body,
+.login-page {
+  color: var(--cth-slate);
+}
+
+:focus-visible {
+  outline: 3px solid color-mix(in srgb, var(--cth-teal) 58%, white);
+  outline-offset: 3px;
+}
+
+::selection {
+  color: var(--cth-white);
+  background: var(--cth-forest-2);
+}
