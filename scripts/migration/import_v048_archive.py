@@ -12,7 +12,6 @@ from __future__ import annotations
 import argparse
 import importlib.util
 import json
-import os
 import shutil
 import stat
 import sys
@@ -98,7 +97,7 @@ def clear_managed_tree(repo: Path) -> None:
 
 def copy_source(source: Path, repo: Path) -> None:
     for entry in source.iterdir():
-        if entry.name in {"__MACOSX", ".git"}:
+        if entry.name in PRESERVE_TOP_LEVEL or entry.name == "__MACOSX":
             continue
         destination = repo / entry.name
         if destination.exists():
