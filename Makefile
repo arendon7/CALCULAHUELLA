@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: setup dev test demo reset-demo docker-up docker-down inventory brand-check brand-recover-primary brand-validate-package brand-install-master brand-require-master
+.PHONY: setup dev test demo reset-demo docker-up docker-down inventory brand-check brand-audit-history brand-recover-primary brand-validate-package brand-install-master brand-require-master
 
 setup:
 	./scripts/dev/setup.sh
@@ -28,6 +28,11 @@ inventory:
 
 brand-check:
 	python3 scripts/brand/verify_master_assets.py
+
+brand-audit-history:
+	@test -n "$(BRAND_HISTORY_SOURCES)" || (echo "Define BRAND_HISTORY_SOURCES con archivos, carpetas o ZIP históricos" && exit 1)
+	mkdir -p instance
+	python3 scripts/brand/audit_historical_sources.py $(BRAND_HISTORY_SOURCES) --output instance/brand-history-audit.json
 
 brand-recover-primary:
 	@test -n "$(BRAND_HTML_SOURCES)" || (echo "Define BRAND_HTML_SOURCES con dos o más HTML autocontenidos históricos" && exit 1)
