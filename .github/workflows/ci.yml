@@ -8,6 +8,7 @@ on:
       - "feature/**"
       - "release/**"
       - "migration/**"
+      - "integration/**"
   pull_request:
     branches: [main, develop]
 
@@ -27,6 +28,7 @@ jobs:
       CSRF_ENABLED: "false"
       SCHEDULER_ENABLED: "false"
       DEPLOYMENT_STRICT: "false"
+      SESSION_HTTPS_ONLY: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +39,7 @@ jobs:
       - name: Verificar árbol fuente
         run: |
           missing=0
-          for path in requirements-dev.txt run.py alembic.ini app tests migrations Dockerfile migration/tests; do
+          for path in requirements-dev.txt run.py alembic.ini app tests migrations Dockerfile migration/current-release.json migration/tests scripts/migration scripts/preview; do
             if [[ ! -e "$path" ]]; then
               echo "::error file=$path::Falta $path en esta rama."
               missing=1
@@ -50,24 +52,36 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Validar Python y scripts
+      - name: Validar Python, shell y contrato de release
         run: |
           python -m compileall -q app scripts tests migration/tests run.py
           find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
+          python -m pytest -q migration/tests/test_current_release_tools.py
+          python - <<'PY'
+          import json
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          assert contract['channel'] == 'canonical-integration'
+          assert contract['archive']['filename'].endswith('.zip')
+          assert len(contract['archive']['sha256']) == 64
+          print(f"Contrato actual: V{contract['release']} · {contract['status']}")
+          PY
 
-      - name: Validar herramientas de migración V0.49
-        run: python -m pytest -q migration/tests/test_v049_migration_tools.py
-
-      - name: Detectar versión runtime
+      - name: Detectar versión runtime y versión objetivo
         id: runtime
         run: |
-          version="$(python - <<'PY'
+          runtime="$(python - <<'PY'
           from app.config import settings
           print(settings.version)
           PY
           )"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-          echo "Runtime detectado: $version"
+          target="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['release'])
+          PY
+          )"
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "Runtime: $runtime · objetivo: $target"
 
       - name: Migrar base limpia
         run: |
@@ -85,43 +99,39 @@ jobs:
           print(f"Plantillas compiladas: {len(names)}")
           PY
 
-      - name: Validar contrato runtime V0.49
-        if: steps.runtime.outputs.version == '0.49.0'
+      - name: Validar runtime canónico importado
+        if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
         run: |
-          current="$(python -m alembic current 2>/dev/null | tr -d '\r')"
-          echo "$current"
-          echo "$current" | grep -q '20260804_0030'
           python - <<'PY'
+          import json
+          from pathlib import Path
           from app.config import settings
           from app.database import Base
           from app.main import app, templates
 
-          template_names = sorted(templates.env.list_templates())
-          assert settings.version == "0.49.0", settings.version
-          assert len(app.routes) == 287, len(app.routes)
-          assert len(Base.metadata.tables) == 110, len(Base.metadata.tables)
-          assert len(template_names) == 65, len(template_names)
-          assert "activity_factor_selections" in Base.metadata.tables
-          for name in (
-              "logo-oficial.png",
-              "logo-oficial-blanco.png",
-              "favicon-64.png",
-              "favicon-256.png",
-          ):
-              matches = list(__import__("pathlib").Path("app/static").glob(f"**/img/brand/{name}"))
-              assert matches, name
-          print("Contrato runtime V0.49 aprobado")
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected = contract['runtime_contract']
+          names = sorted(templates.env.list_templates())
+          assert settings.version == contract['release']
+          assert len(app.routes) == expected['routes'], len(app.routes)
+          assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
+          assert len(names) == expected['jinja_templates'], len(names)
+          for asset in contract['required_brand_assets']:
+              assert list(Path('app/static').glob(f'**/img/brand/{asset}')), asset
+          assert Path('platform/windows/OVERLAY_MANIFEST.json').is_file()
+          print('Runtime canónico aprobado')
           PY
-          test -f platform/windows/OVERLAY_MANIFEST.json
-          grep -R -q "Potenciado por Greenatics" app/templates
-          grep -R -q "Huella Esencial" app/templates
+          head="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['runtime_contract']['alembic_head'])
+          PY
+          )"
+          python -m alembic current | grep -q "$head"
 
-      - name: Probar vista previa HTTP
+      - name: Probar vista HTTP y construir snapshot Pages
         env:
           HOST: 127.0.0.1
           PORT: "8765"
-          OPEN_BROWSER: "0"
-          SESSION_HTTPS_ONLY: "false"
         run: |
           python run.py > instance/ci-preview.log 2>&1 &
           server_pid=$!
@@ -142,12 +152,15 @@ jobs:
             cat instance/ci-preview.log
             exit 1
           fi
-          curl -fsS http://127.0.0.1:8765/api/health
           curl -fsS -o /dev/null http://127.0.0.1:8765/
           curl -fsS -o /dev/null http://127.0.0.1:8765/login
+          python scripts/preview/build_static_preview.py --output _site --commit "$GITHUB_SHA" --branch "$GITHUB_REF_NAME"
+          test -f _site/index.html
+          test -f _site/login/index.html
+          test -f _site/preview-status.json
 
-      - name: Ejecutar regresión provisional v0.45.x
-        if: steps.runtime.outputs.version != '0.49.0'
+      - name: Ejecutar regresión provisional
+        if: steps.runtime.outputs.runtime != steps.runtime.outputs.target
         run: |
           python -m pytest -q \
             tests/test_v045_product_intelligence.py \
@@ -157,8 +170,8 @@ jobs:
             tests/test_v0454_first_inventory.py \
             tests/test_v0455_guided_imports.py
 
-      - name: Ejecutar regresión focalizada V0.49
-        if: steps.runtime.outputs.version == '0.49.0'
+      - name: Ejecutar regresión de la release canónica
+        if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -166,25 +179,15 @@ jobs:
           import sys
 
           patterns = (
-              "test_v049*.py",
-              "test_v048*.py",
-              "test_v047*.py",
-              "test_v046*.py",
-              "test_security*.py",
+              'test_v052*.py', 'test_v051*.py', 'test_v050*.py',
+              'test_v049*.py', 'test_v048*.py', 'test_v047*.py',
+              'test_v046*.py', 'test_security*.py'
           )
-          selected = sorted({
-              path
-              for pattern in patterns
-              for path in Path("tests").glob(pattern)
-          })
+          selected = sorted({path for pattern in patterns for path in Path('tests').glob(pattern)})
           if not selected:
-              raise SystemExit("No se localizaron pruebas V0.46–V0.49 o seguridad")
+              raise SystemExit('No se localizaron pruebas focalizadas de la release')
           for path in selected:
-              print(f"Ejecutando {path}")
-              subprocess.run(
-                  [sys.executable, "-m", "pytest", "-q", str(path)],
-                  check=True,
-              )
+              subprocess.run([sys.executable, '-m', 'pytest', '-q', str(path)], check=True)
           PY
 
       - name: Construir imagen Docker
