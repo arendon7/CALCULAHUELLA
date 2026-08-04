@@ -81,6 +81,18 @@ def test_frontend_kit_tokens_are_canonical_and_loaded():
         assert '<meta name="theme-color" content="#0B3B2E">' in template
 
 
+def test_frontend_kit_shared_components_are_loaded_and_accessible():
+    token_css = (STATIC / "css" / "cth-tokens.css").read_text(encoding="utf-8")
+    components = (STATIC / "css" / "cth-components.css").read_text(encoding="utf-8")
+    assert '@import "./cth-components.css";' in token_css
+    assert ":where(.btn, .button)" in components
+    assert ":where(input, select, textarea):focus" in components
+    assert ".responsive-table" in components
+    assert "prefers-reduced-motion: reduce" in components
+    assert "var(--cth-forest)" in components
+    assert "var(--cth-teal)" in components
+
+
 def test_release_is_v0455_until_visual_master_is_installed():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
     assert 'version: str = "0.45.5"' in config
