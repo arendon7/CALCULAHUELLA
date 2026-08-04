@@ -1,0 +1,129 @@
+name: Importar fuente canónica V0.48.0
+
+on:
+  push:
+    branches:
+      - migration/v0.48.0-canonical
+    paths:
+      - migration/inbox/calcula_tu_huella_v0_48_0_portafolio_reduccion_mac.zip
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: import-v048-canonical
+  cancel-in-progress: false
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: migration/v0.48.0-canonical
+          fetch-depth: 0
+
+      - name: Localizar archivo exacto
+        id: archive
+        shell: bash
+        run: |
+          path="migration/inbox/calcula_tu_huella_v0_48_0_portafolio_reduccion_mac.zip"
+          if [[ -f "$path" ]]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "path=$path" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No hay un ZIP pendiente; la ejecución termina sin cambios."
+          fi
+
+      - uses: actions/setup-python@v5
+        if: steps.archive.outputs.found == 'true'
+        with:
+          python-version: "3.12"
+
+      - name: Verificar e importar V0.48.0
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          python scripts/migration/verify_v048_archive.py "${{ steps.archive.outputs.path }}" \
+            --json-output migration/V048_VERIFICATION_REPORT.json
+          python scripts/migration/import_v048_archive.py "${{ steps.archive.outputs.path }}" \
+            --report migration/V048_IMPORT_REPORT.json
+          rm -f "${{ steps.archive.outputs.path }}"
+
+      - name: Instalar dependencias de la fuente importada
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          python -m pip install --upgrade pip
+          if [[ -f requirements-dev.txt ]]; then
+            python -m pip install -r requirements-dev.txt
+          else
+            python -m pip install -r requirements.txt
+            python -m pip install pytest
+          fi
+
+      - name: Validar fuente importada
+        if: steps.archive.outputs.found == 'true'
+        env:
+          APP_ENV: test
+          SESSION_SECRET: migration-validation-secret
+          DATABASE_URL: sqlite+pysqlite:///./instance/v048-import.sqlite3
+          SEED_DEMO: "true"
+          OPEN_BROWSER: "0"
+          CSRF_ENABLED: "false"
+          SCHEDULER_ENABLED: "false"
+          DEPLOYMENT_STRICT: "false"
+        run: |
+          python -m compileall -q app scripts tests run.py
+          find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
+          mkdir -p instance
+          rm -f instance/v048-import.sqlite3
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.config import settings
+          from app.main import app, templates
+          from app.database import Base
+
+          names = sorted(templates.env.list_templates())
+          for name in names:
+              templates.env.get_template(name)
+          routes = len(app.routes)
+          models = len(Base.metadata.tables)
+          assert settings.version == "0.48.0", settings.version
+          assert len(names) == 65, len(names)
+          assert routes == 284, routes
+          assert models == 109, models
+          print(f"V0.48 validada: {routes} rutas · {models} modelos · {len(names)} plantillas")
+          PY
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess
+          import sys
+
+          selected = sorted({
+              *Path("tests").glob("test_v048*.py"),
+              *Path("tests").glob("test_v047*.py"),
+              *Path("tests").glob("test_v046*.py"),
+              *Path("tests").glob("test_security*.py"),
+          })
+          if not selected:
+              raise SystemExit("No se localizaron pruebas focalizadas V0.46–V0.48")
+          for path in selected:
+              print(f"Ejecutando {path}")
+              subprocess.run([sys.executable, "-m", "pytest", "-q", str(path)], check=True)
+          PY
+          docker build -t calcula-tu-huella:v0.48.0-import .
+
+      - name: Confirmar árbol importado
+        if: steps.archive.outputs.found == 'true'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "La importación no produjo cambios."
+            exit 0
+          fi
+          git commit -m "feat: importar fuente canónica exacta V0.48.0"
+          git push origin HEAD:migration/v0.48.0-canonical
