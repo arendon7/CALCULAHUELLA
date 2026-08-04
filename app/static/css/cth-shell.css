@@ -1,0 +1,240 @@
+/* Calcula tu Huella · Frontend Kit v1 · Shell interno
+ * Mejoras de orientación, navegación y responsive sin cambiar rutas ni permisos.
+ */
+
+.workspace-identity {
+  margin: 18px 0 4px;
+  padding: 14px;
+  border: 1px solid var(--cth-line);
+  border-radius: 14px;
+  background: linear-gradient(145deg, var(--cth-white), var(--cth-soft-green));
+}
+
+.workspace-identity small,
+.workspace-identity strong,
+.workspace-identity span {
+  display: block;
+}
+
+.workspace-identity small {
+  margin-bottom: 5px;
+  color: #65726B;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: .12em;
+}
+
+.workspace-identity strong {
+  color: var(--cth-forest);
+  font-size: 13px;
+}
+
+.workspace-identity span {
+  margin-top: 4px;
+  color: #65726B;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.nav-item {
+  position: relative;
+  min-height: 42px;
+  border: 1px solid transparent;
+}
+
+.nav-item::before {
+  content: "";
+  position: absolute;
+  inset: 8px auto 8px 0;
+  width: 3px;
+  border-radius: 999px;
+  background: transparent;
+}
+
+.nav-item:hover {
+  border-color: color-mix(in srgb, var(--cth-forest-2) 12%, transparent);
+}
+
+.nav-item.active,
+.nav-item[aria-current="page"] {
+  color: var(--cth-forest);
+  border-color: color-mix(in srgb, var(--cth-forest-2) 18%, var(--cth-line));
+  background: linear-gradient(90deg, var(--cth-soft-green), color-mix(in srgb, var(--cth-soft-green) 35%, var(--cth-white)));
+}
+
+.nav-item.active::before,
+.nav-item[aria-current="page"]::before {
+  background: var(--cth-forest-2);
+}
+
+.nav-disclosure > summary {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  color: #53665D;
+  font-size: 12px;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.nav-disclosure > summary:hover {
+  color: var(--cth-forest);
+  background: var(--cth-soft-green);
+}
+
+.nav-disclosure > summary::marker {
+  content: "";
+}
+
+.topbar {
+  min-height: 72px;
+  height: auto;
+  gap: 14px;
+}
+
+.topbar-context {
+  min-width: 0;
+  display: grid;
+  gap: 2px;
+}
+
+.topbar-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.topbar-organization {
+  display: none;
+  color: #65726B;
+  font-size: 11px;
+  font-weight: 650;
+}
+
+.topbar-actions a {
+  white-space: nowrap;
+}
+
+.icon-button {
+  flex: 0 0 auto;
+}
+
+.icon-button-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 19;
+  border: 0;
+  background: rgba(10, 35, 29, .48);
+  backdrop-filter: blur(2px);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity .18s ease, visibility .18s ease;
+}
+
+@media (max-width: 980px) {
+  body.sidebar-open {
+    overflow: hidden;
+  }
+
+  .sidebar {
+    width: min(320px, calc(100vw - 48px));
+    transform: translateX(-105%);
+    transition: transform .2s ease;
+    box-shadow: 22px 0 55px rgba(11, 59, 46, .18);
+  }
+
+  .sidebar.open {
+    transform: translateX(0);
+  }
+
+  body.sidebar-open .sidebar-backdrop {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+  }
+
+  .main-area {
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .topbar {
+    padding: 11px 18px;
+  }
+
+  .topbar-context {
+    flex: 1 1 auto;
+  }
+
+  .topbar-organization {
+    display: block;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .topbar-actions {
+    gap: 8px;
+  }
+
+  .topbar-actions .version-pill,
+  .topbar-actions .org-name {
+    display: none;
+  }
+
+  .page-content {
+    padding: 24px 18px 42px;
+  }
+}
+
+@media (max-width: 560px) {
+  .topbar {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+
+  .topbar-title {
+    font-size: 15px;
+  }
+
+  .topbar-actions .icon-button:first-of-type {
+    display: none;
+  }
+
+  .page-content {
+    padding-inline: 12px;
+  }
+
+  .page-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .page-head h1 {
+    font-size: clamp(25px, 8vw, 31px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar-backdrop {
+    transition: none;
+  }
+}
