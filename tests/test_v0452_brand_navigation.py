@@ -31,6 +31,17 @@ def test_public_experience_has_mobile_navigation_and_official_claim():
     assert "public-results-grid" in home
 
 
+def test_login_keeps_official_claim_visible_on_mobile():
+    login = read("login.html")
+    brand_css = (STATIC / "css" / "brand-v0456.css").read_text(encoding="utf-8")
+    assert "css/brand-v0456.css" in login
+    assert 'class="login-mobile-claim"' in login
+    assert "Convierte tus datos en decisiones climáticas." in login
+    assert "@media (max-width: 900px)" in brand_css
+    assert ".login-mobile-claim" in brand_css
+    assert "display: block" in brand_css
+
+
 def test_brand_contract_blocks_approximations_and_legacy_copy():
     manifest = json.loads((STATIC / "img" / "brand-manifest.json").read_text(encoding="utf-8"))
     assert manifest["descriptor"] == "Plataforma digital de gestión de huella de carbono"
