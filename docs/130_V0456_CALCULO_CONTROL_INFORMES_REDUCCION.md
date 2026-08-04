@@ -10,26 +10,17 @@ Cálculo → Control → Informes → Reducción → Escenarios
 
 ## Etapas
 
-### Cálculo — `/calculos`
-Confirma que datos, conversiones, factores y GWP produzcan resultados trazables. Conserva recálculo, resultados por fuente, alertas, errores, trazabilidad y reglas activas.
-
-### Control — `/control`
-Convierte el resultado en una versión revisable, aprobable y cerrable. Conserva puertas de calidad, observaciones, recomendación independiente, aprobación, cierre inmutable y auditoría.
-
-### Informes — `/reportes`
-Selecciona entregables y conserva versiones, estado e integridad. Conserva informes ejecutivo/técnico, memoria de cálculo, generación, descarga, aprobación y hashes.
-
-### Reducción — `/reduccion`
-Prioriza medidas por impacto, inversión, ahorro, viabilidad, riesgo, responsable y fecha. Conserva acciones, metas, sincronización y seguimiento.
-
-### Escenarios — `/escenarios`
-Compara portafolios, adopción, cronograma, costo marginal y trayectoria. Conserva configuración, medidas, tasa de descuento, curva marginal y emisiones proyectadas.
+- **Cálculo — `/calculos`:** confirma resultados trazables y conserva recálculo, alertas, errores y acceso por fuente.
+- **Control — `/control`:** conserva puertas de calidad, observaciones, recomendación, aprobación, cierre y auditoría.
+- **Informes — `/reportes`:** conserva entregables ejecutivo/técnico, memoria, generación, descarga, aprobación e integridad.
+- **Reducción — `/reduccion`:** conserva acciones, metas, inversión, ahorro, responsables, fechas y seguimiento.
+- **Escenarios — `/escenarios`:** conserva portafolios, adopción, cronograma, costo marginal y trayectoria.
 
 ## Mejoras
 
-`app/static/js/cth-outcomes.js` incorpora navegación de cinco etapas, `aria-current="step"`, propósito y siguiente acción, barras accesibles, trayectorias enfocables y búsqueda local tolerante a mayúsculas y tildes.
+`app/static/js/cth-outcomes.js` incorpora navegación de cinco etapas, `aria-current="step"`, orientación contextual, barras accesibles, trayectorias enfocables y búsqueda local tolerante a mayúsculas y tildes.
 
-`app/static/css/cth-outcomes.css` añade recorrido responsive, contexto de etapa, jerarquía de indicadores, numeración de entregables, herramientas de búsqueda, estados vacíos y foco visible.
+`app/static/css/cth-outcomes.css` añade recorrido responsive, jerarquía de indicadores, numeración de entregables, herramientas de búsqueda, estados vacíos y foco visible.
 
 ## Contratos preservados
 
