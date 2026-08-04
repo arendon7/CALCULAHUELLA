@@ -26,6 +26,10 @@ V0.49.0 se construyó sobre V0.48.0 y añade:
 - 108 pruebas funcionales y 7 controles de seguridad aprobados.
 - Alembic `20260804_0030`.
 
+## Estado del binario
+
+La Biblioteca del proyecto conserva el manifiesto, la validación y el checksum, pero el ZIP no está montado como archivo binario en el entorno activo. La importación no se declara ejecutada hasta que el archivo exacto sea cargado en `migration/inbox/` y GitHub Actions verifique su hash.
+
 ## Runtime canónico y distribución Windows
 
 La distribución `MAC/` fue ejecutada durante la validación original y se importa como runtime canónico del repositorio.
@@ -73,7 +77,7 @@ También se exigen al menos ocho imágenes modulares, incluidas:
 ```text
 01_dashboard_climatico.png
 02_calidad_de_datos.png
-08_metodologia_y_alcances.png
+08_metodologia_y_alcANCES.png
 ```
 
 Los SVG históricos no son sustitutos válidos de la Marca Maestra.
