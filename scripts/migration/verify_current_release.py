@@ -1,9 +1,10 @@
 #!/usr/bin/env python3
 """Verifica el paquete dual definido en migration/current-release.json.
 
-La entrega final puede acreditar métricas en su documento de validación y la
-integridad física mediante un manifiesto por archivo. El verificador acepta esa
-separación y comprueba realmente tamaño y SHA-256 de cada entrada inventariada.
+El contrato separa tres pruebas:
+- identidad del ZIP mediante SHA-256;
+- métricas funcionales mediante la validación técnica;
+- integridad física mediante el inventario SHA-256 por archivo.
 """
 
 from __future__ import annotations
@@ -20,40 +21,18 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 CONTRACT_PATH = ROOT / "migration" / "current-release.json"
 FORBIDDEN_PARTS = {
-    ".git",
-    "__MACOSX",
-    ".pytest_cache",
-    "__pycache__",
-    ".venv",
-    "venv",
-    "node_modules",
+    ".git", "__MACOSX", ".pytest_cache", "__pycache__",
+    ".venv", "venv", "node_modules",
 }
 FORBIDDEN_SUFFIXES = {
-    ".db",
-    ".sqlite",
-    ".sqlite3",
-    ".log",
-    ".pyc",
-    ".pem",
-    ".key",
-    ".p12",
-    ".pfx",
+    ".db", ".sqlite", ".sqlite3", ".log", ".pyc",
+    ".pem", ".key", ".p12", ".pfx",
 }
-FORBIDDEN_EXACT = {
-    ".env",
-    ".env.local",
-    "credentials.json",
-    "secrets.json",
-}
+FORBIDDEN_EXACT = {".env", ".env.local", "credentials.json", "secrets.json"}
 CORE_PREFIXES = ("app/", "migrations/", "tests/")
 CORE_FILES = {
-    "alembic.ini",
-    "Dockerfile",
-    "requirements.txt",
-    "requirements-dev.txt",
-    "requirements-prod.txt",
-    "run.py",
-    "start_prod.sh",
+    "alembic.ini", "Dockerfile", "requirements.txt",
+    "requirements-dev.txt", "requirements-prod.txt", "run.py", "start_prod.sh",
 }
 INVENTORY_LINE = re.compile(
     r"^(?P<path>.+?)\s*\|\s*(?P<bytes>\d+)\s*\|\s*"
@@ -82,7 +61,7 @@ def sha256_bytes(data: bytes) -> str:
 
 
 def safe_members(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
-    result: dict[str, zipfile.ZipInfo] = {}
+    members: dict[str, zipfile.ZipInfo] = {}
     for item in archive.infolist():
         if item.is_dir():
             continue
@@ -90,12 +69,12 @@ def safe_members(archive: zipfile.ZipFile) -> dict[str, zipfile.ZipInfo]:
         if path.is_absolute() or ".." in path.parts:
             raise ReleaseError(f"Ruta insegura: {item.filename}")
         name = path.as_posix().lstrip("./")
-        if name in result:
-            raise ReleaseError(f"Ruta duplicada: {name}")
-        result[name] = item
-    if not result:
+        if not name or name in members:
+            raise ReleaseError(f"Ruta vacía o duplicada: {item.filename}")
+        members[name] = item
+    if not members:
         raise ReleaseError("El ZIP está vacío")
-    return result
+    return members
 
 
 def normalize_layout(
@@ -113,9 +92,9 @@ def normalize_layout(
     wrapper = next(iter(top))
     prefix = wrapper + "/"
     stripped = {
-        name[len(prefix) :]: item
+        name[len(prefix):]: item
         for name, item in members.items()
-        if name.startswith(prefix) and name[len(prefix) :]
+        if name.startswith(prefix) and name[len(prefix):]
     }
     if not any(name.startswith("MAC/") for name in stripped) or not any(
         name.startswith("WINDOWS/") for name in stripped
@@ -135,15 +114,11 @@ def ensure_clean(names: list[str]) -> None:
         ):
             violations.append(name)
         lowered = f"/{name.casefold()}/"
-        if any(
-            token in lowered
-            for token in ("/evidencias/", "/backups/", "/certificados/")
-        ):
+        if any(token in lowered for token in ("/evidencias/", "/backups/", "/certificados/")):
             violations.append(name)
     if violations:
         raise ReleaseError(
-            "Contenido prohibido: "
-            + ", ".join(sorted(set(violations))[:20])
+            "Contenido prohibido: " + ", ".join(sorted(set(violations))[:20])
         )
 
 
@@ -152,7 +127,7 @@ def distribution(
 ) -> dict[str, zipfile.ZipInfo]:
     prefix = root + "/"
     return {
-        name[len(prefix) :]: item
+        name[len(prefix):]: item
         for name, item in members.items()
         if name.startswith(prefix)
     }
@@ -168,9 +143,7 @@ def read_text(
     return archive.read(mapping[name]).decode("utf-8")
 
 
-def required_document_by_prefix(
-    contract: dict[str, Any], prefix: str
-) -> str:
+def required_document_by_prefix(contract: dict[str, Any], prefix: str) -> str:
     candidates = [
         str(name)
         for name in contract.get("required_documents", [])
@@ -191,23 +164,17 @@ def metric_pattern(labels: tuple[str, ...], value: int) -> str:
 
 def validate_release_summary(text: str, contract: dict[str, Any]) -> None:
     runtime = contract["runtime_contract"]
-    release = str(contract["release"])
-    display = str(contract.get("display_release", release))
-    release_patterns = {
-        re.escape(release).replace(r"\-", "[-–—]"),
-        re.escape(display).replace(r"\-", "[-–—]"),
+    release_labels = {
+        str(contract["release"]),
+        str(contract.get("display_release", contract["release"])),
     }
-    if not any(
-        re.search(pattern, text, re.IGNORECASE)
-        for pattern in release_patterns
-    ):
+    if not any(label.casefold() in text.casefold() for label in release_labels):
         raise ReleaseError("La validación no acredita la versión objetivo")
 
     metrics = {
         "routes": metric_pattern((r"rutas?(?:\s+FastAPI)?",), int(runtime["routes"])),
         "templates": metric_pattern(
-            (r"plantillas?(?:\s+(?:HTML|Jinja))?",),
-            int(runtime["jinja_templates"]),
+            (r"plantillas?(?:\s+(?:HTML|Jinja))?",), int(runtime["jinja_templates"])
         ),
         "models": metric_pattern(
             (r"modelos?(?:\s+ORM)?",), int(runtime["orm_models"])
@@ -228,9 +195,7 @@ def validate_release_summary(text: str, contract: dict[str, Any]) -> None:
 
     expected_tests = contract.get("validation", {}).get("suite_tests_passed")
     if expected_tests is not None and not re.search(
-        metric_pattern((r"pruebas?",), int(expected_tests)),
-        text,
-        re.IGNORECASE,
+        metric_pattern((r"pruebas?",), int(expected_tests)), text, re.IGNORECASE
     ):
         raise ReleaseError("La validación no acredita la suite documentada")
 
@@ -244,19 +209,15 @@ def parse_inventory(manifest: str) -> dict[str, tuple[int, str]]:
         path = PurePosixPath(match.group("path").strip()).as_posix().lstrip("./")
         if path in inventory:
             raise ReleaseError(f"Ruta repetida en manifiesto: {path}")
-        inventory[path] = (
-            int(match.group("bytes")),
-            match.group("sha").lower(),
-        )
+        inventory[path] = (int(match.group("bytes")), match.group("sha").lower())
     if not inventory:
         raise ReleaseError("El manifiesto no contiene inventario SHA-256")
     return inventory
 
 
 def validate_manifest_header(manifest: str, contract: dict[str, Any]) -> None:
-    release = str(contract.get("display_release", contract["release"]))
-    normalized = re.escape(release).replace(r"\-", "[-–—]")
-    if not re.search(normalized, manifest, re.IGNORECASE):
+    display = str(contract.get("display_release", contract["release"]))
+    if display.casefold() not in manifest.casefold():
         raise ReleaseError("El manifiesto no acredita la versión objetivo")
 
     total = contract.get("archive", {}).get("inventory_total_files")
@@ -269,13 +230,10 @@ def validate_manifest_header(manifest: str, contract: dict[str, Any]) -> None:
 
     for name in ("MAC", "WINDOWS"):
         expected = contract["distributions"][name].get("inventory_files")
-        if expected is None:
-            continue
-        pattern = rf"\b{name}\s*:\s*{int(expected)}\b"
-        if not re.search(pattern, manifest, re.IGNORECASE):
-            raise ReleaseError(
-                f"El manifiesto no acredita el inventario {name}"
-            )
+        if expected is not None and not re.search(
+            rf"\b{name}\s*:\s*{int(expected)}\b", manifest, re.IGNORECASE
+        ):
+            raise ReleaseError(f"El manifiesto no acredita el inventario {name}")
 
     if "despliegue controlado" not in manifest.casefold():
         raise ReleaseError(
@@ -288,10 +246,10 @@ def validate_inventory_entries(
     members: dict[str, zipfile.ZipInfo],
     inventory: dict[str, tuple[int, str]],
     contract: dict[str, Any],
+    manifest_name: str,
 ) -> dict[str, Any]:
     missing: list[str] = []
     mismatched: list[str] = []
-    verified = 0
     for path, (expected_size, expected_hash) in inventory.items():
         item = members.get(path)
         if item is None:
@@ -300,9 +258,6 @@ def validate_inventory_entries(
         data = archive.read(item)
         if len(data) != expected_size or sha256_bytes(data) != expected_hash:
             mismatched.append(path)
-            continue
-        verified += 1
-
     if missing or mismatched:
         raise ReleaseError(
             "Inventario físico inválido: "
@@ -310,13 +265,16 @@ def validate_inventory_entries(
         )
 
     for document in contract["required_documents"]:
+        if document == manifest_name:
+            continue
         if document not in inventory:
             raise ReleaseError(
                 f"El manifiesto no inventaría el documento requerido {document}"
             )
 
-    evidence_file = contract.get("validation", {}).get("evidence_file")
-    evidence_hash = contract.get("validation", {}).get("evidence_sha256")
+    validation = contract.get("validation", {})
+    evidence_file = validation.get("evidence_file")
+    evidence_hash = validation.get("evidence_sha256")
     if evidence_file and evidence_hash:
         for root in ("MAC", "WINDOWS"):
             path = f"{root}/{evidence_file}"
@@ -326,19 +284,23 @@ def validate_inventory_entries(
                     f"El manifiesto no acredita la evidencia final en {root}"
                 )
 
-    expected_minimum = sum(
-        int(values.get("inventory_files", 0))
-        for values in contract["distributions"].values()
-    )
-    if verified < expected_minimum:
-        raise ReleaseError(
-            f"Inventario verificado insuficiente: {verified} < {expected_minimum}"
-        )
+    expected_total = contract.get("archive", {}).get("inventory_total_files")
+    if expected_total is not None:
+        if len(members) != int(expected_total):
+            raise ReleaseError(
+                f"Archivos físicos: {len(members)}; esperados {expected_total}"
+            )
+        # El propio manifiesto puede quedar fuera de su inventario para evitar
+        # una referencia criptográfica circular.
+        if len(inventory) < int(expected_total) - 1:
+            raise ReleaseError(
+                f"Entradas inventariadas insuficientes: {len(inventory)}"
+            )
+
     return {
         "entries": len(inventory),
-        "verified_entries": verified,
-        "missing_entries": 0,
-        "mismatched_entries": 0,
+        "verified_entries": len(inventory),
+        "self_reference_excluded": manifest_name not in inventory,
     }
 
 
@@ -349,12 +311,8 @@ def validate_distribution(
     contract: dict[str, Any],
 ) -> dict[str, Any]:
     for required in (
-        "app/main.py",
-        "app/config.py",
-        "migrations/env.py",
-        "alembic.ini",
-        "run.py",
-        "requirements.txt",
+        "app/main.py", "app/config.py", "migrations/env.py",
+        "alembic.ini", "run.py", "requirements.txt",
     ):
         if required not in mapping:
             raise ReleaseError(f"{name}: falta {required}")
@@ -365,33 +323,24 @@ def validate_distribution(
         raise ReleaseError(f"{name}: app/config.py no declara {release}")
 
     templates = [
-        path
-        for path in mapping
+        path for path in mapping
         if path.startswith("app/templates/") and path.endswith(".html")
     ]
     expected_templates = int(contract["runtime_contract"]["jinja_templates"])
     if len(templates) != expected_templates:
         raise ReleaseError(
-            f"{name}: {len(templates)} plantillas; "
-            f"se esperaban {expected_templates}"
+            f"{name}: {len(templates)} plantillas; se esperaban {expected_templates}"
         )
 
     for asset in contract["required_brand_assets"]:
         if not any(path.endswith("/img/brand/" + asset) for path in mapping):
             raise ReleaseError(f"{name}: falta {asset}")
 
-    distribution_contract = contract["distributions"][name]
-    minimum = int(
-        distribution_contract.get(
-            "minimum_files",
-            distribution_contract.get("functional_files", 0),
-        )
-    )
-    exact = distribution_contract.get("inventory_files")
+    specification = contract["distributions"][name]
+    minimum = int(specification.get("minimum_files", specification.get("functional_files", 0)))
+    exact = specification.get("inventory_files")
     if len(mapping) < minimum:
-        raise ReleaseError(
-            f"{name}: solo {len(mapping)} archivos; mínimo {minimum}"
-        )
+        raise ReleaseError(f"{name}: solo {len(mapping)} archivos; mínimo {minimum}")
     if exact is not None and len(mapping) != int(exact):
         raise ReleaseError(
             f"{name}: {len(mapping)} archivos; inventario esperado {exact}"
@@ -399,13 +348,11 @@ def validate_distribution(
 
     head = str(contract["runtime_contract"]["alembic_head"])
     migration_files = [
-        (path, item)
-        for path, item in mapping.items()
+        (path, item) for path, item in mapping.items()
         if path.startswith("migrations/versions/") and path.endswith(".py")
     ]
     if not any(
-        head in path
-        or head in archive.read(item).decode("utf-8", errors="ignore")
+        head in path or head in archive.read(item).decode("utf-8", errors="ignore")
         for path, item in migration_files
     ):
         raise ReleaseError(f"{name}: no se encontró Alembic {head}")
@@ -429,12 +376,9 @@ def compare_core(
             if path in CORE_FILES or path.startswith(CORE_PREFIXES)
         }
 
-    left = hashes(mac)
-    right = hashes(windows)
+    left, right = hashes(mac), hashes(windows)
     changed = sorted(
-        path
-        for path in set(left) & set(right)
-        if left[path] != right[path]
+        path for path in set(left) & set(right) if left[path] != right[path]
     )
     missing = sorted(set(left) ^ set(right))
     if changed or missing:
@@ -450,7 +394,6 @@ def validate_archive(path: Path) -> dict[str, Any]:
     expected_archive = contract["archive"]
     if path.name != expected_archive["filename"]:
         raise ReleaseError(f"Nombre esperado: {expected_archive['filename']}")
-
     actual = sha256_file(path)
     if actual != expected_archive["sha256"]:
         raise ReleaseError(f"SHA-256 distinto: {actual}")
@@ -470,7 +413,7 @@ def validate_archive(path: Path) -> dict[str, Any]:
         validate_release_summary(validation, contract)
         inventory = parse_inventory(manifest)
         inventory_report = validate_inventory_entries(
-            archive, members, inventory, contract
+            archive, members, inventory, contract, manifest_name
         )
 
         mac = distribution(members, "MAC")
@@ -485,9 +428,7 @@ def validate_archive(path: Path) -> dict[str, Any]:
             "validation": validation_name,
             "inventory": inventory_report,
             "mac": validate_distribution(archive, "MAC", mac, contract),
-            "windows": validate_distribution(
-                archive, "WINDOWS", windows, contract
-            ),
+            "windows": validate_distribution(archive, "WINDOWS", windows, contract),
             "core": compare_core(archive, mac, windows),
         }
 
@@ -500,11 +441,7 @@ def main() -> int:
     try:
         report = validate_archive(args.archive.expanduser().resolve())
     except (
-        ReleaseError,
-        OSError,
-        UnicodeError,
-        json.JSONDecodeError,
-        zipfile.BadZipFile,
+        ReleaseError, OSError, UnicodeError, json.JSONDecodeError, zipfile.BadZipFile
     ) as exc:
         print(f"ERROR RELEASE: {exc}", file=sys.stderr)
         return 1
