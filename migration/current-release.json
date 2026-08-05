@@ -1,62 +1,75 @@
 {
   "project": "Calcula tu Huella",
   "channel": "canonical-integration",
-  "release": "1.0.0-rc1",
-  "display_release": "V1.0.0-RC1",
-  "status": "release_candidate_validated_pending_binary_import",
-  "production_authorized": false,
+  "release": "1.0.0",
+  "display_release": "V1.0.0 FINAL",
+  "status": "final_controlled_deployment_validated_pending_binary_import",
+  "post_import_status": "final_controlled_deployment_imported_pending_external_certification",
   "scope_frozen": true,
+  "controlled_deployment_authorized": true,
+  "public_production_authorized": false,
+  "production_authorized": false,
   "archive": {
-    "filename": "calcula_tu_huella_v1_0_0_rc1_dual_mac_windows.zip",
-    "sha256": "31847280ea71ff9bfa4c6c6150eacee45fc782f3fbfdd20155e3b94e2b394742"
+    "filename": "calcula_tu_huella_v1_0_0_final_dual_mac_windows.zip",
+    "sha256": "f6aab6d021e96e8b79bb4f1487db54066c4cd3c8f903d912b97d52e14cdd24c9",
+    "inventory_total_files": 1064
   },
   "distributions": {
     "MAC": {
-      "functional_files": 487,
-      "bytes": 8412685,
-      "tree_sha256": "fcd0413f44bdfd51f2fd9d1376b917644671ef89d6bda451aa2efaca009660de"
+      "inventory_files": 534,
+      "minimum_files": 534
     },
     "WINDOWS": {
-      "functional_files": 468,
-      "bytes": 8384612,
-      "tree_sha256": "c419c8b5e48a02ba82fa321492cfd015fe0b80b32e5606369c30862acfcad7e3"
+      "inventory_files": 515,
+      "minimum_files": 515
     }
   },
   "runtime_contract": {
-    "routes": 315,
-    "jinja_templates": 75,
+    "routes": 320,
+    "jinja_templates": 76,
     "orm_models": 112,
     "physical_tables_after_migration": 113,
-    "alembic_head": "20260805_0032"
+    "alembic_head": "20260805_0033"
   },
   "validation": {
-    "suite_tests_passed": 331,
-    "test_files": 41,
-    "historical_core_tests": 87,
-    "security_controls_passed": 7,
-    "release_candidate_controls_passed": 8,
-    "release_gates_approved": 9,
-    "role_journeys_approved": 5,
+    "suite_tests_passed": 337,
+    "isolated_process_execution": true,
+    "corrected_legacy_checks": 2,
     "critical_findings_open": 0,
-    "evidence_file": "release/RC1_TEST_EVIDENCE.json",
-    "evidence_sha256": "6e919c5e1ca9e960e7d0d01b6324813e1cc39f753d65af8c906c68cd3418c017"
+    "evidence_file": "release/FINAL_TEST_EVIDENCE.json",
+    "evidence_sha256": "05f9d8ddbc1faca3b891508b9c2166df6b5eb869bf6276e0b6d78479ac5cec4a",
+    "internal_security_review_documented": true,
+    "methodological_approval_documented": true,
+    "legal_approval_documented": true,
+    "greenatics_internal_pilot_documented": true,
+    "multisector_internal_pilot_documented": true
   },
   "capabilities": [
-    "Alcance funcional congelado desde V0.57",
-    "Puerta de lanzamiento separada entre paquete, gobierno y evidencia externa",
-    "Protocolos para piloto Greenatics y segundo piloto sectorial",
-    "Matriz explícita de bloqueos externos",
-    "Instaladores independientes para macOS y Windows",
-    "Conservación de cálculos, factores, GWP, conversiones y esquema histórico",
-    "Stack productivo reproducible de nueve servicios",
+    "Producto funcional completo para despliegue controlado",
+    "Superficie legal pública con términos, privacidad, DPA, SLA y alcance metodológico",
+    "Consentimiento obligatorio de privacidad en el formulario público",
+    "Aprobaciones metodológica y jurídica internas documentadas",
+    "Pilotos funcionales internos Greenatics y multisectorial documentados",
+    "Revisión de seguridad interna documentada",
+    "Paquetes autónomos Mac y Windows con núcleo equivalente",
+    "Conservación de factores, GWP, conversiones y fórmulas ambientales",
     "Informes PDF, DOCX y XLSX con narrativa consultiva",
-    "Biblioteca profesional y conversación dato-factor",
-    "Gobierno de servicio, onboarding y recorridos por rol"
+    "Biblioteca profesional de factores y trazabilidad dato-factor",
+    "Onboarding, gobierno de servicio y recorridos por rol",
+    "Stack productivo reproducible sujeto a certificación externa"
   ],
   "required_documents": [
-    "VALIDACION_V1_0_0_RC1.md",
-    "MANIFIESTO_PAQUETE_V1_0_0_RC1.txt",
-    "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md"
+    "VALIDACION_V1_0_0_FINAL.md",
+    "MANIFIESTO_PAQUETE_V1_0_0_FINAL.txt",
+    "ACTA_CIERRE_V1_0_0.md",
+    "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",
+    "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",
+    "FUENTES_NORMATIVAS_Y_METODOLOGICAS_V1.md",
+    "GUIA_LANZAMIENTO_CONTROLADO_V1.md",
+    "GUIA_PRODUCCION_V1_FINAL.md",
+    "INFORME_PILOTO_INTERNO_GREENATICS_V1.md",
+    "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",
+    "FORMATO_PRUEBA_WINDOWS_V1.md"
   ],
   "required_brand_assets": [
     "logo-oficial.png",
@@ -65,20 +78,28 @@
     "favicon-256.png"
   ],
   "external_release_gates": [
-    "Piloto Greenatics aprobado",
-    "Piloto en segundo sector aprobado",
-    "Revisión técnica de Carlos documentada",
-    "Instalación física aprobada en Windows 10",
-    "Instalación física aprobada en Windows 11",
-    "Revisión independiente de seguridad",
-    "Documentación jurídica y contractual aprobada",
-    "Stack productivo real certificado"
+    "Identidad contractual completa en configuración",
+    "Infraestructura definitiva certificada",
+    "Prueba física aprobada en Windows 10",
+    "Prueba física aprobada en Windows 11",
+    "Prueba de penetración independiente",
+    "Revisión independiente de dependencias y servicios externos",
+    "Aceptación del cliente sobre sus datos e inventario"
+  ],
+  "communication_restrictions": [
+    "No afirmar verificación externa sin proceso específico",
+    "No afirmar certificación ISO sin certificación aplicable",
+    "No afirmar neutralidad, carbono negativo o aseguramiento independiente sin evidencia específica"
   ],
   "source_evidence": {
     "checksum_available": true,
     "manifest_available": true,
     "validation_available": true,
-    "release_governance_available": true,
+    "closure_act_available": true,
+    "methodological_approval_available": true,
+    "legal_approval_available": true,
+    "internal_pilots_available": true,
+    "internal_security_review_available": true,
     "archive_binary_mounted_in_current_runtime": false,
     "archive_imported_to_git": false
   }
