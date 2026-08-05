@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Verifica el paquete dual definido en migration/current-release.json."""
+"""Verifica el paquete dual definido en migration/current-release.json.
+
+La entrega final puede acreditar métricas en su documento de validación y la
+integridad física mediante un manifiesto por archivo. El verificador acepta esa
+separación y comprueba realmente tamaño y SHA-256 de cada entrada inventariada.
+"""
 
 from __future__ import annotations
 
@@ -50,6 +55,10 @@ CORE_FILES = {
     "run.py",
     "start_prod.sh",
 }
+INVENTORY_LINE = re.compile(
+    r"^(?P<path>.+?)\s*\|\s*(?P<bytes>\d+)\s*\|\s*"
+    r"(?P<sha>[0-9a-fA-F]{64})\s*$"
+)
 
 
 class ReleaseError(RuntimeError):
@@ -159,15 +168,17 @@ def read_text(
     return archive.read(mapping[name]).decode("utf-8")
 
 
-def manifest_document(contract: dict[str, Any]) -> str:
+def required_document_by_prefix(
+    contract: dict[str, Any], prefix: str
+) -> str:
     candidates = [
         str(name)
         for name in contract.get("required_documents", [])
-        if Path(str(name)).name.upper().startswith("MANIFIESTO")
+        if Path(str(name)).name.upper().startswith(prefix.upper())
     ]
     if len(candidates) != 1:
         raise ReleaseError(
-            "El contrato debe declarar exactamente un documento MANIFIESTO"
+            f"El contrato debe declarar exactamente un documento {prefix}"
         )
     return candidates[0]
 
@@ -178,15 +189,22 @@ def metric_pattern(labels: tuple[str, ...], value: int) -> str:
     return rf"(?:\b{label}{separator}{value}\b|\b{value}{separator}{label}\b)"
 
 
-def validate_manifest(manifest: str, contract: dict[str, Any]) -> None:
+def validate_release_summary(text: str, contract: dict[str, Any]) -> None:
     runtime = contract["runtime_contract"]
     release = str(contract["release"])
-    normalized_release = re.escape(release).replace(r"\-", "[-–—]")
-    if not re.search(rf"\bV?{normalized_release}\b", manifest, re.IGNORECASE):
-        raise ReleaseError("El manifiesto no acredita la versión objetivo")
+    display = str(contract.get("display_release", release))
+    release_patterns = {
+        re.escape(release).replace(r"\-", "[-–—]"),
+        re.escape(display).replace(r"\-", "[-–—]"),
+    }
+    if not any(
+        re.search(pattern, text, re.IGNORECASE)
+        for pattern in release_patterns
+    ):
+        raise ReleaseError("La validación no acredita la versión objetivo")
 
     metrics = {
-        "routes": metric_pattern((r"rutas?",), int(runtime["routes"])),
+        "routes": metric_pattern((r"rutas?(?:\s+FastAPI)?",), int(runtime["routes"])),
         "templates": metric_pattern(
             (r"plantillas?(?:\s+(?:HTML|Jinja))?",),
             int(runtime["jinja_templates"]),
@@ -200,23 +218,128 @@ def validate_manifest(manifest: str, contract: dict[str, Any]) -> None:
         ),
     }
     for label, pattern in metrics.items():
-        if not re.search(pattern, manifest, re.IGNORECASE):
+        if not re.search(pattern, text, re.IGNORECASE):
             raise ReleaseError(
-                f"El manifiesto no acredita la métrica etiquetada: {label}"
+                f"La validación no acredita la métrica etiquetada: {label}"
             )
 
-    exact_tokens = (
-        str(runtime["alembic_head"]),
-        str(contract["distributions"]["MAC"]["tree_sha256"]),
-        str(contract["distributions"]["WINDOWS"]["tree_sha256"]),
-    )
-    for token in exact_tokens:
-        if token not in manifest:
-            raise ReleaseError(f"El manifiesto no contiene {token}")
+    if str(runtime["alembic_head"]) not in text:
+        raise ReleaseError("La validación no acredita la cabeza Alembic")
 
-    evidence = contract.get("validation", {}).get("evidence_sha256")
-    if evidence and str(evidence) not in manifest:
-        raise ReleaseError("El manifiesto no contiene el SHA-256 de evidencia")
+    expected_tests = contract.get("validation", {}).get("suite_tests_passed")
+    if expected_tests is not None and not re.search(
+        metric_pattern((r"pruebas?",), int(expected_tests)),
+        text,
+        re.IGNORECASE,
+    ):
+        raise ReleaseError("La validación no acredita la suite documentada")
+
+
+def parse_inventory(manifest: str) -> dict[str, tuple[int, str]]:
+    inventory: dict[str, tuple[int, str]] = {}
+    for raw_line in manifest.splitlines():
+        match = INVENTORY_LINE.match(raw_line.strip())
+        if not match:
+            continue
+        path = PurePosixPath(match.group("path").strip()).as_posix().lstrip("./")
+        if path in inventory:
+            raise ReleaseError(f"Ruta repetida en manifiesto: {path}")
+        inventory[path] = (
+            int(match.group("bytes")),
+            match.group("sha").lower(),
+        )
+    if not inventory:
+        raise ReleaseError("El manifiesto no contiene inventario SHA-256")
+    return inventory
+
+
+def validate_manifest_header(manifest: str, contract: dict[str, Any]) -> None:
+    release = str(contract.get("display_release", contract["release"]))
+    normalized = re.escape(release).replace(r"\-", "[-–—]")
+    if not re.search(normalized, manifest, re.IGNORECASE):
+        raise ReleaseError("El manifiesto no acredita la versión objetivo")
+
+    total = contract.get("archive", {}).get("inventory_total_files")
+    if total is not None and not re.search(
+        metric_pattern((r"archivos?\s+inventariados?",), int(total)),
+        manifest,
+        re.IGNORECASE,
+    ):
+        raise ReleaseError("El manifiesto no acredita el total inventariado")
+
+    for name in ("MAC", "WINDOWS"):
+        expected = contract["distributions"][name].get("inventory_files")
+        if expected is None:
+            continue
+        pattern = rf"\b{name}\s*:\s*{int(expected)}\b"
+        if not re.search(pattern, manifest, re.IGNORECASE):
+            raise ReleaseError(
+                f"El manifiesto no acredita el inventario {name}"
+            )
+
+    if "despliegue controlado" not in manifest.casefold():
+        raise ReleaseError(
+            "El manifiesto no conserva la clasificación de despliegue controlado"
+        )
+
+
+def validate_inventory_entries(
+    archive: zipfile.ZipFile,
+    members: dict[str, zipfile.ZipInfo],
+    inventory: dict[str, tuple[int, str]],
+    contract: dict[str, Any],
+) -> dict[str, Any]:
+    missing: list[str] = []
+    mismatched: list[str] = []
+    verified = 0
+    for path, (expected_size, expected_hash) in inventory.items():
+        item = members.get(path)
+        if item is None:
+            missing.append(path)
+            continue
+        data = archive.read(item)
+        if len(data) != expected_size or sha256_bytes(data) != expected_hash:
+            mismatched.append(path)
+            continue
+        verified += 1
+
+    if missing or mismatched:
+        raise ReleaseError(
+            "Inventario físico inválido: "
+            f"faltantes={missing[:10]} distintos={mismatched[:10]}"
+        )
+
+    for document in contract["required_documents"]:
+        if document not in inventory:
+            raise ReleaseError(
+                f"El manifiesto no inventaría el documento requerido {document}"
+            )
+
+    evidence_file = contract.get("validation", {}).get("evidence_file")
+    evidence_hash = contract.get("validation", {}).get("evidence_sha256")
+    if evidence_file and evidence_hash:
+        for root in ("MAC", "WINDOWS"):
+            path = f"{root}/{evidence_file}"
+            entry = inventory.get(path)
+            if entry is None or entry[1] != str(evidence_hash):
+                raise ReleaseError(
+                    f"El manifiesto no acredita la evidencia final en {root}"
+                )
+
+    expected_minimum = sum(
+        int(values.get("inventory_files", 0))
+        for values in contract["distributions"].values()
+    )
+    if verified < expected_minimum:
+        raise ReleaseError(
+            f"Inventario verificado insuficiente: {verified} < {expected_minimum}"
+        )
+    return {
+        "entries": len(inventory),
+        "verified_entries": verified,
+        "missing_entries": 0,
+        "mismatched_entries": 0,
+    }
 
 
 def validate_distribution(
@@ -257,11 +380,21 @@ def validate_distribution(
         if not any(path.endswith("/img/brand/" + asset) for path in mapping):
             raise ReleaseError(f"{name}: falta {asset}")
 
-    minimum = int(contract["distributions"][name]["functional_files"])
+    distribution_contract = contract["distributions"][name]
+    minimum = int(
+        distribution_contract.get(
+            "minimum_files",
+            distribution_contract.get("functional_files", 0),
+        )
+    )
+    exact = distribution_contract.get("inventory_files")
     if len(mapping) < minimum:
         raise ReleaseError(
-            f"{name}: solo {len(mapping)} archivos; "
-            f"mínimo documentado {minimum}"
+            f"{name}: solo {len(mapping)} archivos; mínimo {minimum}"
+        )
+    if exact is not None and len(mapping) != int(exact):
+        raise ReleaseError(
+            f"{name}: {len(mapping)} archivos; inventario esperado {exact}"
         )
 
     head = str(contract["runtime_contract"]["alembic_head"])
@@ -329,9 +462,16 @@ def validate_archive(path: Path) -> dict[str, Any]:
             if document not in members:
                 raise ReleaseError(f"Falta documento raíz {document}")
 
-        manifest_name = manifest_document(contract)
+        manifest_name = required_document_by_prefix(contract, "MANIFIESTO")
+        validation_name = required_document_by_prefix(contract, "VALIDACION")
         manifest = read_text(archive, members, manifest_name)
-        validate_manifest(manifest, contract)
+        validation = read_text(archive, members, validation_name)
+        validate_manifest_header(manifest, contract)
+        validate_release_summary(validation, contract)
+        inventory = parse_inventory(manifest)
+        inventory_report = validate_inventory_entries(
+            archive, members, inventory, contract
+        )
 
         mac = distribution(members, "MAC")
         windows = distribution(members, "WINDOWS")
@@ -342,6 +482,8 @@ def validate_archive(path: Path) -> dict[str, Any]:
             "sha256": actual,
             "wrapper": wrapper,
             "manifest": manifest_name,
+            "validation": validation_name,
+            "inventory": inventory_report,
             "mac": validate_distribution(archive, "MAC", mac, contract),
             "windows": validate_distribution(
                 archive, "WINDOWS", windows, contract
