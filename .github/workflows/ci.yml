@@ -18,7 +18,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 45
     env:
       APP_ENV: test
       SESSION_SECRET: ci-session-secret-only
@@ -63,7 +63,11 @@ jobs:
           assert contract['channel'] == 'canonical-integration'
           assert contract['archive']['filename'].endswith('.zip')
           assert len(contract['archive']['sha256']) == 64
-          print(f"Contrato actual: V{contract['release']} · {contract['status']}")
+          assert isinstance(contract.get('production_authorized'), bool)
+          print(
+              f"Contrato actual: {contract.get('display_release', contract['release'])} · "
+              f"{contract['status']} · producción={contract['production_authorized']}"
+          )
           PY
 
       - name: Detectar versión runtime y versión objetivo
@@ -103,6 +107,7 @@ jobs:
         if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
         run: |
           python - <<'PY'
+          import hashlib
           import json
           from pathlib import Path
           from sqlalchemy import inspect
@@ -112,17 +117,30 @@ jobs:
 
           contract = json.load(open('migration/current-release.json', encoding='utf-8'))
           expected = contract['runtime_contract']
+          validation = contract.get('validation', {})
           names = sorted(templates.env.list_templates())
           physical_tables = inspect(engine).get_table_names()
+
           assert settings.version == contract['release']
           assert len(app.routes) == expected['routes'], len(app.routes)
           assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
           assert len(physical_tables) == expected['physical_tables_after_migration'], physical_tables
           assert len(names) == expected['jinja_templates'], len(names)
+
           for asset in contract['required_brand_assets']:
               assert list(Path('app/static').glob(f'**/img/brand/{asset}')), asset
+
+          evidence_path = Path(validation['evidence_file'])
+          assert evidence_path.is_file(), evidence_path
+          digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+          assert digest == validation['evidence_sha256'], (digest, validation['evidence_sha256'])
           assert Path('platform/windows/OVERLAY_MANIFEST.json').is_file()
-          print('Runtime canónico aprobado')
+          assert contract['production_authorized'] is False
+          print(
+              f"Runtime canónico aprobado: {settings.version} · "
+              f"{len(app.routes)} rutas · {len(Base.metadata.tables)} modelos · "
+              f"{len(physical_tables)} tablas · {len(names)} plantillas"
+          )
           PY
           head="$(python - <<'PY'
           import json
@@ -184,7 +202,7 @@ jobs:
             tests/test_v0454_first_inventory.py \
             tests/test_v0455_guided_imports.py
 
-      - name: Ejecutar regresión de la release canónica
+      - name: Ejecutar suite canónica en procesos aislados
         if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
         run: |
           python - <<'PY'
@@ -193,25 +211,22 @@ jobs:
           import sys
           from pathlib import Path
 
-          release = json.load(open('migration/current-release.json', encoding='utf-8'))['release']
-          minor = int(release.split('.')[1])
-          version_patterns = [
-              f'test_v{value:03d}*.py'
-              for value in range(max(0, minor - 6), minor + 1)
-          ]
-          patterns = (*version_patterns, 'test_security*.py')
-          selected = sorted({
-              path
-              for pattern in patterns
-              for path in Path('tests').glob(pattern)
-          })
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected_files = contract.get('validation', {}).get('test_files')
+          selected = sorted(Path('tests').glob('test_*.py'))
           if not selected:
-              raise SystemExit(f'No se localizaron pruebas focalizadas para V{release}')
-          for path in selected:
+              raise SystemExit('No se localizaron archivos de pruebas de la release')
+          if expected_files is not None and len(selected) != int(expected_files):
+              raise SystemExit(
+                  f"Archivos de prueba esperados: {expected_files}; encontrados: {len(selected)}"
+              )
+          for index, path in enumerate(selected, start=1):
+              print(f"[{index}/{len(selected)}] {path}", flush=True)
               subprocess.run(
                   [sys.executable, '-m', 'pytest', '-q', str(path)],
                   check=True,
               )
+          print(f"Suite aislada aprobada: {len(selected)} archivos")
           PY
 
       - name: Construir imagen Docker
