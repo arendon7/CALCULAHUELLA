@@ -41,7 +41,7 @@ def validation_text() -> str:
         "337 pruebas recolectadas y aprobadas mediante procesos aislados.\n"
         "320 rutas FastAPI.\n"
         "112 modelos ORM.\n"
-        "76 plantillas HTML compiladas.\n"
+        "2 plantillas HTML compiladas.\n"
         "113 tablas físicas.\n"
         "Migración final: 20260805_0033.\n"
         "Versión final para despliegue controlado.\n"
