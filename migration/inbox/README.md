@@ -9,33 +9,66 @@ migration/current-release.json
 Entrega actual:
 
 ```text
-calcula_tu_huella_v0_52_0_onboarding_guiado_dual_mac_windows.zip
-SHA-256: 4186571c49741e86e899e9c6554e3cb78b40c2b657c5807d775d557540c85a01
+calcula_tu_huella_v1_0_0_rc1_dual_mac_windows.zip
+SHA-256: 31847280ea71ff9bfa4c6c6150eacee45fc782f3fbfdd20155e3b94e2b394742
 ```
 
 ## Estado
 
-El checksum, el manifiesto y la validación V0.52 están recuperados y registrados. El ZIP binario no está montado todavía en el entorno activo ni presente en esta carpeta; por eso la importación no se declara ejecutada.
+La entrega **V1.0.0-RC1** está aprobada internamente como candidata para pilotos y aceptación controlada. No está autorizada como V1.0 productiva.
+
+Están recuperados y registrados:
+
+- checksum exacto del ZIP;
+- manifiesto del paquete;
+- validación técnica;
+- documento de estabilización y lanzamiento;
+- conteos de rutas, modelos, tablas y plantillas;
+- árboles SHA-256 de Mac y Windows;
+- SHA-256 de la evidencia automatizada.
+
+El ZIP binario no está montado todavía en el entorno activo ni presente en esta carpeta. Por eso la importación no se declara ejecutada.
+
+## Contrato RC1
+
+```text
+Runtime: 1.0.0-rc1
+Rutas: 315
+Modelos ORM: 112
+Tablas físicas: 113
+Plantillas HTML: 75
+Alembic: 20260805_0032
+Archivos de prueba: 41
+Pruebas aprobadas documentadas: 331
+```
 
 ## Funcionamiento
 
-Cuando aparece un ZIP en esta carpeta, `.github/workflows/import-current-release.yml`:
+Cuando aparece el ZIP exacto, `.github/workflows/import-current-release.yml`:
 
-1. lee el nombre y SHA-256 desde `current-release.json`;
+1. lee nombre y SHA-256 desde `current-release.json`;
 2. rechaza nombres o hashes diferentes;
-3. exige las distribuciones `MAC/` y `WINDOWS/`;
-4. verifica que el núcleo compartido sea idéntico;
-5. rechaza bases, secretos, evidencias, certificados, logs y cachés;
-6. usa `MAC/` como runtime canónico;
-7. conserva diferencias Windows en `platform/windows/overlay/`;
-8. aplica Alembic desde una base vacía;
-9. comprueba versión, rutas, modelos y plantillas;
-10. ejecuta pruebas focalizadas y Docker;
-11. elimina el ZIP antes del commit automático;
-12. publica el resultado mediante CI, GitHub Pages y Codespaces.
+3. exige `MAC/`, `WINDOWS/` y los tres documentos de gobierno RC1;
+4. verifica el núcleo compartido y la evidencia automatizada;
+5. exige los cuatro activos oficiales de marca;
+6. rechaza bases, secretos, evidencias operativas, certificados privados, logs y cachés;
+7. usa `MAC/` como runtime canónico;
+8. conserva diferencias Windows en `platform/windows/overlay/`;
+9. aplica Alembic desde una base vacía;
+10. comprueba versión, 315 rutas, 112 modelos, 113 tablas y 75 plantillas;
+11. ejecuta los 41 archivos de pruebas en procesos aislados;
+12. construye Docker;
+13. elimina el ZIP antes del commit automático;
+14. publica el resultado mediante CI, GitHub Pages y Codespaces.
 
-El ZIP es un insumo transitorio. Nunca permanece versionado después de una importación aprobada.
+La importación mantiene siempre:
+
+```text
+production_authorized = false
+```
+
+Importar RC1 no aprueba pilotos, Windows 10/11, seguridad independiente, documentos jurídicos ni infraestructura productiva real.
 
 ## Versiones futuras
 
-No se crea una carpeta ni un workflow nuevo. Se actualiza `current-release.json` y se usa esta misma bandeja.
+No se crea otra carpeta ni otro workflow. Se actualiza `current-release.json` y se utiliza esta misma bandeja.
