@@ -2,32 +2,30 @@
 
 ## Rama permanente
 
-Toda iteración activa se realiza sobre:
+Toda mejora activa se realiza sobre:
 
 ```text
 integration/canonical
 ```
 
-La rama no cambia con cada versión. La entrega objetivo se registra en:
+La entrega objetivo se registra en:
 
 ```text
 migration/current-release.json
 ```
 
-Esto evita ramas y automatizaciones competidoras.
-
-## Ciclo normal de una iteración
+## Ciclo de trabajo
 
 1. Se analiza la necesidad en el chat.
-2. Se modifica directamente `integration/canonical`.
+2. Se modifica `integration/canonical`.
 3. Cada unidad coherente recibe un commit descriptivo.
 4. GitHub Actions ejecuta CI.
-5. Se genera siempre un snapshot descargable.
-6. GitHub Pages publica landing y login cuando está habilitado.
-7. Codespaces ejecuta la aplicación completa con backend y datos demo.
+5. Se genera un snapshot descargable.
+6. GitHub Pages publica landing y login.
+7. Codespaces ejecuta la aplicación completa.
 8. El PR permanente muestra lo pendiente frente a `develop`.
 
-## Publicación automática
+## Superficies de revisión
 
 ### GitHub Pages
 
@@ -37,7 +35,7 @@ Workflow:
 .github/workflows/pages-preview.yml
 ```
 
-Publica o conserva como artefacto:
+Expone:
 
 - landing;
 - login;
@@ -45,11 +43,9 @@ Publica o conserva como artefacto:
 - runtime ejecutado;
 - release objetivo;
 - rama y commit;
-- estado del paquete;
-- autorización productiva;
+- autorización de despliegue controlado;
+- bloqueo de producción pública;
 - puertas externas pendientes.
-
-Pages sirve para revisar diseño, redacción, identidad y responsive. No ejecuta formularios ni autenticación.
 
 ### GitHub Codespaces
 
@@ -59,65 +55,70 @@ Configuración:
 .devcontainer/
 ```
 
-Codespaces instala dependencias, migra SQLite demo, inicia FastAPI y expone el puerto 8765. Se utiliza para probar sesión, formularios, factores, cálculos, informes, onboarding, gobierno y APIs.
+Ejecuta FastAPI, sesión, formularios, factores, cálculos, informes, onboarding, gobierno y APIs en el puerto 8765.
 
 ## Ingreso de una entrega autocontenida
 
 1. `current-release.json` define nombre, hash, conteos, evidencia y activos.
 2. El ZIP se coloca transitoriamente en `migration/inbox/`.
-3. `import-current-release.yml` verifica el archivo.
+3. `import-current-release.yml` verifica identidad e inventario.
 4. `import_current_release.py` instala `MAC/` como runtime canónico.
 5. Las diferencias Windows se guardan en `platform/windows/overlay/`.
 6. El ZIP se elimina antes del commit automático.
-7. CI valida versión, Alembic, rutas, modelos, tablas, plantillas, evidencia, pruebas y Docker.
+7. CI valida versión, migraciones, rutas, modelos, tablas, plantillas, evidencia, pruebas y Docker.
 8. Pages y Codespaces se actualizan desde el mismo árbol.
 
 ## Estado transparente
 
-El contrato diferencia:
+`preview-status.json` diferencia:
 
+- runtime realmente ejecutado;
 - release objetivo;
-- runtime ejecutado;
-- paquete recibido;
-- árbol importado;
-- candidata pendiente de aceptación;
-- autorización productiva.
+- coincidencia entre ambos;
+- despliegue controlado autorizado;
+- producción pública bloqueada;
+- puertas externas pendientes.
 
-La vista expone esta información en:
-
-```text
-preview-status.json
-```
-
-Nunca se presenta una release como ejecutada si el binario no fue importado. Nunca se presenta una candidata como productiva sin aprobación expresa.
+Nunca se presenta una release como ejecutada si el binario no fue importado. Nunca se presenta un despliegue controlado como producción pública certificada.
 
 ## Release actual
 
 ```text
-V1.0.0-RC1
-runtime: 1.0.0-rc1
-scope_frozen: true
+V1.0.0 FINAL
+runtime objetivo: 1.0.0
+controlled_deployment_authorized: true
+public_production_authorized: false
 production_authorized: false
 ```
 
-RC1 congela el alcance construido hasta V0.57. Solo admite correcciones, seguridad, accesibilidad, rendimiento, ajustes derivados de pilotos, precisión metodológica o comunicacional y documentación de aceptación.
+V1.0.0 cierra el ciclo funcional y puede utilizarse para demostraciones, pilotos acompañados, inventarios internos, contratación privada y despliegues privados supervisados.
 
-## Criterio de fusión
+## Criterio de fusión a `develop`
 
-La rama puede fusionarse a `develop` cuando:
+- ZIP V1.0.0 importado y eliminado antes del commit;
+- CI verde;
+- inventario SHA-256 verificado;
+- runtime `1.0.0`;
+- 320 rutas, 112 modelos, 113 tablas y 76 plantillas;
+- Alembic `20260805_0033` desde base vacía;
+- evidencia final válida;
+- logos y favicons oficiales;
+- Pages revisado;
+- Codespaces probado;
+- overlay Windows generado;
+- ningún ZIP, base, secreto, evidencia operativa, log o caché en Git;
+- PR fusionable.
 
-- el ZIP RC1 fue importado;
-- CI está verde;
-- Pages fue revisado;
-- Codespaces fue probado;
-- no existen workflows competidores;
-- activos oficiales y evidencia están presentes;
-- las migraciones son reproducibles;
-- no quedan ZIP, bases, secretos, evidencias operativas, logs o cachés;
-- el PR es fusionable.
+La fusión a `develop` no autoriza producción pública.
 
-La fusión a `develop` no autoriza producción.
+## Trabajo posterior a V1.0.0
 
-## Regla para versiones futuras
+Solo se incorpora como:
 
-Una versión futura no crea otra infraestructura. Actualiza `current-release.json` y reutiliza el verificador, importador, CI, Pages, Codespaces y PR permanente.
+- corrección reproducible;
+- seguridad;
+- accesibilidad;
+- rendimiento;
+- ajuste derivado de operación controlada;
+- precisión metodológica, jurídica o comunicacional;
+- preparación verificable para producción pública.
