@@ -172,17 +172,35 @@ def manifest_document(contract: dict[str, Any]) -> str:
     return candidates[0]
 
 
+def metric_pattern(labels: tuple[str, ...], value: int) -> str:
+    label = "(?:" + "|".join(labels) + ")"
+    separator = r"\s*(?::|·|-)?\s*"
+    return rf"(?:\b{label}{separator}{value}\b|\b{value}{separator}{label}\b)"
+
+
 def validate_manifest(manifest: str, contract: dict[str, Any]) -> None:
     runtime = contract["runtime_contract"]
-    labeled_patterns = {
-        "release": rf"\bV?{re.escape(str(contract['release']))}\b",
-        "routes": rf"\b{int(runtime['routes'])}\s+rutas\b",
-        "templates": rf"\b{int(runtime['jinja_templates'])}\s+plantillas\b",
-        "models": rf"\b{int(runtime['orm_models'])}\s+modelos\b",
-        "tables": rf"\b{int(runtime['physical_tables_after_migration'])}\s+tablas\b",
+    release = str(contract["release"])
+    normalized_release = re.escape(release).replace(r"\-", "[-–—]")
+    if not re.search(rf"\bV?{normalized_release}\b", manifest, re.IGNORECASE):
+        raise ReleaseError("El manifiesto no acredita la versión objetivo")
+
+    metrics = {
+        "routes": metric_pattern((r"rutas?",), int(runtime["routes"])),
+        "templates": metric_pattern(
+            (r"plantillas?(?:\s+(?:HTML|Jinja))?",),
+            int(runtime["jinja_templates"]),
+        ),
+        "models": metric_pattern(
+            (r"modelos?(?:\s+ORM)?",), int(runtime["orm_models"])
+        ),
+        "tables": metric_pattern(
+            (r"tablas?(?:\s+físicas?)?(?:\s+desde\s+base\s+vacía)?",),
+            int(runtime["physical_tables_after_migration"]),
+        ),
     }
-    for label, pattern in labeled_patterns.items():
-        if not re.search(pattern, manifest, flags=re.IGNORECASE):
+    for label, pattern in metrics.items():
+        if not re.search(pattern, manifest, re.IGNORECASE):
             raise ReleaseError(
                 f"El manifiesto no acredita la métrica etiquetada: {label}"
             )
@@ -195,6 +213,10 @@ def validate_manifest(manifest: str, contract: dict[str, Any]) -> None:
     for token in exact_tokens:
         if token not in manifest:
             raise ReleaseError(f"El manifiesto no contiene {token}")
+
+    evidence = contract.get("validation", {}).get("evidence_sha256")
+    if evidence and str(evidence) not in manifest:
+        raise ReleaseError("El manifiesto no contiene el SHA-256 de evidencia")
 
 
 def validate_distribution(
@@ -216,7 +238,7 @@ def validate_distribution(
 
     release = str(contract["release"])
     config = read_text(archive, mapping, "app/config.py")
-    if release not in config:
+    if release.casefold() not in config.casefold():
         raise ReleaseError(f"{name}: app/config.py no declara {release}")
 
     templates = [
@@ -254,6 +276,10 @@ def validate_distribution(
         for path, item in migration_files
     ):
         raise ReleaseError(f"{name}: no se encontró Alembic {head}")
+
+    evidence_file = contract.get("validation", {}).get("evidence_file")
+    if evidence_file and str(evidence_file) not in mapping:
+        raise ReleaseError(f"{name}: falta la evidencia {evidence_file}")
 
     return {"files": len(mapping), "templates": len(templates)}
 
