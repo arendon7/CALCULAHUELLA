@@ -1,3 +1,4 @@
+import hashlib
 import importlib.util
 import json
 import sys
@@ -27,63 +28,68 @@ importer = load(
     ROOT / "scripts/migration/import_current_release.py",
 )
 
-EVIDENCE_CONTENT = b'{"passed": true}\n'
-EVIDENCE_SHA = "b1c95da5e181d95c3a837b01b04513e2725984388b2256107771b77a2407ce77"
+EVIDENCE_CONTENT = b'{"tests": 337, "passed": true}\n'
+EVIDENCE_SHA = hashlib.sha256(EVIDENCE_CONTENT).hexdigest()
+VALIDATION_NAME = "VALIDACION_V1_0_0_FINAL.md"
+MANIFEST_NAME = "MANIFIESTO_PAQUETE_V1_0_0_FINAL.txt"
+ACT_NAME = "ACTA_CIERRE_V1_0_0.md"
 
 
-def contract_for(path: Path, *, manifest_name="MANIFIESTO_ENTREGA.txt"):
-    return {
-        "release": "1.0.0-rc1",
-        "display_release": "V1.0.0-RC1",
-        "production_authorized": False,
-        "archive": {
-            "filename": path.name,
-            "sha256": verifier.sha256_file(path),
-        },
-        "distributions": {
-            "MAC": {"functional_files": 16, "tree_sha256": "mac-tree"},
-            "WINDOWS": {
-                "functional_files": 16,
-                "tree_sha256": "windows-tree",
-            },
-        },
-        "runtime_contract": {
-            "routes": 315,
-            "jinja_templates": 2,
-            "orm_models": 112,
-            "physical_tables_after_migration": 113,
-            "alembic_head": "20260805_0032",
-        },
-        "validation": {
-            "evidence_file": "release/RC1_TEST_EVIDENCE.json",
-            "evidence_sha256": EVIDENCE_SHA,
-        },
-        "required_documents": [
-            "VALIDACION_RELEASE.md",
-            manifest_name,
-            "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md",
-        ],
-        "required_brand_assets": [
-            "logo-oficial.png",
-            "logo-oficial-blanco.png",
-            "favicon-64.png",
-            "favicon-256.png",
-        ],
-    }
-
-
-def valid_manifest() -> str:
+def validation_text() -> str:
     return (
-        "CALCULA TU HUELLA V1.0.0-RC1\n"
-        "Rutas: 315.\n"
-        "Modelos ORM: 112.\n"
-        "Plantillas HTML: 2.\n"
-        "Tablas físicas desde base vacía: 113.\n"
-        "Cabeza Alembic: 20260805_0032.\n"
-        f"Evidencia SHA-256: {EVIDENCE_SHA}.\n"
-        "MAC árbol SHA-256 mac-tree.\n"
-        "WINDOWS árbol SHA-256 windows-tree.\n"
+        "# Validación técnica · Calcula tu Huella V1.0.0 final\n"
+        "337 pruebas recolectadas y aprobadas mediante procesos aislados.\n"
+        "320 rutas FastAPI.\n"
+        "112 modelos ORM.\n"
+        "76 plantillas HTML compiladas.\n"
+        "113 tablas físicas.\n"
+        "Migración final: 20260805_0033.\n"
+        "Versión final para despliegue controlado.\n"
     )
+
+
+def shared_runtime() -> dict[str, bytes]:
+    files: dict[str, bytes] = {
+        "app/main.py": b"app = object()\n",
+        "app/config.py": b'class Settings:\n    version: str = "1.0.0"\n',
+        "migrations/env.py": b"# env\n",
+        "migrations/versions/20260805_0033_final.py": (
+            b"revision = '20260805_0033'\n"
+        ),
+        "alembic.ini": b"[alembic]\n",
+        "run.py": b"print('ok')\n",
+        "requirements.txt": b"fastapi\n",
+        "tests/test_release.py": b"def test_ok(): assert True\n",
+        "release/FINAL_TEST_EVIDENCE.json": EVIDENCE_CONTENT,
+        "app/templates/a.html": b"<p>a</p>",
+        "app/templates/b.html": b"<p>b</p>",
+    }
+    for asset in (
+        "logo-oficial.png",
+        "logo-oficial-blanco.png",
+        "favicon-64.png",
+        "favicon-256.png",
+    ):
+        files[f"app/static/img/brand/{asset}"] = b"png"
+    return files
+
+
+def inventory_manifest(files: dict[str, bytes], *, bad_hash=False) -> bytes:
+    lines = [
+        "CALCULA TU HUELLA V1.0.0 FINAL · MANIFIESTO",
+        "Clasificación: despliegue controlado",
+        f"Archivos inventariados: {len(files) + 1}",
+        f"Mac: {sum(name.startswith('MAC/') for name in files)}",
+        f"Windows: {sum(name.startswith('WINDOWS/') for name in files)}",
+        "",
+        "RUTA | BYTES | SHA-256",
+    ]
+    for name, data in sorted(files.items()):
+        digest = hashlib.sha256(data).hexdigest()
+        if bad_hash and name == "MAC/app/main.py":
+            digest = "0" * 64
+        lines.append(f"{name} | {len(data)} | {digest}")
+    return ("\n".join(lines) + "\n").encode("utf-8")
 
 
 def write_package(
@@ -92,159 +98,149 @@ def write_package(
     wrapper=None,
     drift=False,
     forbidden=False,
-    manifest=None,
-    manifest_name="MANIFIESTO_ENTREGA.txt",
+    bad_inventory=False,
 ):
-    prefix = f"{wrapper}/" if wrapper else ""
-    shared = {
-        "app/main.py": "app = object()\n",
-        "app/config.py": 'version: str = "1.0.0-rc1"\n',
-        "migrations/env.py": "# env\n",
-        "migrations/versions/20260805_0032_release.py": (
-            "revision = '20260805_0032'\n"
-        ),
-        "alembic.ini": "[alembic]\n",
-        "run.py": "print('ok')\n",
-        "requirements.txt": "fastapi\n",
-        "tests/test_release.py": "def test_ok(): assert True\n",
-        "release/RC1_TEST_EVIDENCE.json": EVIDENCE_CONTENT,
-        "app/templates/a.html": "<p>a</p>",
-        "app/templates/b.html": "<p>b</p>",
+    files: dict[str, bytes] = {
+        VALIDATION_NAME: validation_text().encode("utf-8"),
+        ACT_NAME: b"V1.0.0 final para despliegue controlado\n",
     }
-    for asset in (
-        "logo-oficial.png",
-        "logo-oficial-blanco.png",
-        "favicon-64.png",
-        "favicon-256.png",
-    ):
-        shared[f"app/static/img/brand/{asset}"] = b"png"
+    runtime = shared_runtime()
+    for root in ("MAC", "WINDOWS"):
+        for name, content in runtime.items():
+            data = content
+            if drift and root == "WINDOWS" and name == "app/main.py":
+                data = b"WINDOWS_DRIFT = True\n"
+            files[f"{root}/{name}"] = data
+        files[f"{root}/platform.txt"] = root.encode("utf-8")
+    if forbidden:
+        files["MAC/instance/demo.sqlite3"] = b"database"
 
+    files[MANIFEST_NAME] = inventory_manifest(files, bad_hash=bad_inventory)
+    prefix = f"{wrapper}/" if wrapper else ""
     with zipfile.ZipFile(path, "w") as archive:
-        archive.writestr(prefix + "VALIDACION_RELEASE.md", "validated")
-        archive.writestr(
-            prefix + "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md",
-            "scope frozen",
-        )
-        archive.writestr(
-            prefix + manifest_name,
-            manifest if manifest is not None else valid_manifest(),
-        )
-        for root in ("MAC", "WINDOWS"):
-            for name, content in shared.items():
-                if drift and root == "WINDOWS" and name == "app/main.py":
-                    content = "drift = True\n"
-                archive.writestr(f"{prefix}{root}/{name}", content)
-            archive.writestr(f"{prefix}{root}/platform.txt", root)
-        if forbidden:
-            archive.writestr(prefix + "MAC/instance/demo.sqlite3", b"db")
+        for name, content in files.items():
+            archive.writestr(prefix + name, content)
 
 
-def test_verifier_accepts_rc1_metrics_in_label_first_format(
+def archive_names(path: Path) -> list[str]:
+    with zipfile.ZipFile(path) as archive:
+        names = [item.filename for item in archive.infolist() if not item.is_dir()]
+    top = {Path(name).parts[0] for name in names}
+    if len(top) == 1 and next(iter(top)) not in {"MAC", "WINDOWS"}:
+        names = [Path(*Path(name).parts[1:]).as_posix() for name in names]
+    return names
+
+
+def contract_for(path: Path):
+    names = archive_names(path)
+    return {
+        "release": "1.0.0",
+        "display_release": "V1.0.0 FINAL",
+        "status": "final_controlled_deployment_validated_pending_binary_import",
+        "post_import_status": (
+            "final_controlled_deployment_imported_pending_external_certification"
+        ),
+        "controlled_deployment_authorized": True,
+        "public_production_authorized": False,
+        "production_authorized": False,
+        "archive": {
+            "filename": path.name,
+            "sha256": verifier.sha256_file(path),
+            "inventory_total_files": len(names),
+        },
+        "distributions": {
+            "MAC": {
+                "inventory_files": sum(name.startswith("MAC/") for name in names),
+                "minimum_files": sum(name.startswith("MAC/") for name in names),
+            },
+            "WINDOWS": {
+                "inventory_files": sum(
+                    name.startswith("WINDOWS/") for name in names
+                ),
+                "minimum_files": sum(
+                    name.startswith("WINDOWS/") for name in names
+                ),
+            },
+        },
+        "runtime_contract": {
+            "routes": 320,
+            "jinja_templates": 2,
+            "orm_models": 112,
+            "physical_tables_after_migration": 113,
+            "alembic_head": "20260805_0033",
+        },
+        "validation": {
+            "suite_tests_passed": 337,
+            "evidence_file": "release/FINAL_TEST_EVIDENCE.json",
+            "evidence_sha256": EVIDENCE_SHA,
+        },
+        "required_documents": [VALIDATION_NAME, MANIFEST_NAME, ACT_NAME],
+        "required_brand_assets": [
+            "logo-oficial.png",
+            "logo-oficial-blanco.png",
+            "favicon-64.png",
+            "favicon-256.png",
+        ],
+        "source_evidence": {},
+    }
+
+
+def test_verifier_accepts_direct_and_wrapped_final_packages(
     tmp_path, monkeypatch
 ):
-    for wrapper in (None, "release"):
+    for wrapper in (None, "calcula_tu_huella_v1_0_0_final"):
         archive = tmp_path / ("wrapped.zip" if wrapper else "direct.zip")
         write_package(archive, wrapper=wrapper)
         monkeypatch.setattr(
-            verifier,
-            "load_contract",
-            lambda p=archive: contract_for(p),
+            verifier, "load_contract", lambda p=archive: contract_for(p)
         )
 
         report = verifier.validate_archive(archive)
 
-        assert report["release"] == "1.0.0-rc1"
+        assert report["release"] == "1.0.0"
         assert report["wrapper"] == wrapper
-        assert report["manifest"] == "MANIFIESTO_ENTREGA.txt"
-        assert report["core"]["shared_files"] >= 11
+        assert report["inventory"]["verified_entries"] == 34
+        assert report["inventory"]["self_reference_excluded"] is True
+        assert report["mac"]["files"] == 16
+        assert report["windows"]["files"] == 16
 
 
-def test_verifier_accepts_number_first_metric_format(tmp_path, monkeypatch):
-    archive = tmp_path / "number-first.zip"
-    manifest = (
-        "V1.0.0-RC1\n"
-        "315 rutas\n2 plantillas Jinja\n112 modelos ORM\n"
-        "113 tablas físicas\n20260805_0032\n"
-        f"{EVIDENCE_SHA}\nmac-tree\nwindows-tree\n"
-    )
-    write_package(archive, manifest=manifest)
-    monkeypatch.setattr(
-        verifier,
-        "load_contract",
-        lambda: contract_for(archive),
-    )
+def test_verifier_rejects_inventory_mismatch(tmp_path, monkeypatch):
+    archive = tmp_path / "bad-inventory.zip"
+    write_package(archive, bad_inventory=True)
+    monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(archive))
 
-    assert verifier.validate_archive(archive)["release"] == "1.0.0-rc1"
-
-
-def test_verifier_rejects_unlabeled_manifest_metrics(tmp_path, monkeypatch):
-    archive = tmp_path / "unlabeled.zip"
-    write_package(
-        archive,
-        manifest=(
-            "1.0.0-rc1 315 2 112 113 20260805_0032 "
-            f"{EVIDENCE_SHA} mac-tree windows-tree"
-        ),
-    )
-    monkeypatch.setattr(
-        verifier,
-        "load_contract",
-        lambda: contract_for(archive),
-    )
-
-    with pytest.raises(verifier.ReleaseError, match="métrica etiquetada"):
+    with pytest.raises(verifier.ReleaseError, match="Inventario físico inválido"):
         verifier.validate_archive(archive)
 
 
-def test_verifier_rejects_missing_evidence_hash(tmp_path, monkeypatch):
-    archive = tmp_path / "missing-evidence.zip"
-    write_package(
-        archive,
-        manifest=valid_manifest().replace(EVIDENCE_SHA, "other"),
-    )
-    monkeypatch.setattr(
-        verifier,
-        "load_contract",
-        lambda: contract_for(archive),
-    )
-
-    with pytest.raises(verifier.ReleaseError, match="SHA-256 de evidencia"):
-        verifier.validate_archive(archive)
-
-
-def test_verifier_rejects_hash_core_drift_and_database(
+def test_verifier_rejects_core_drift_forbidden_data_and_wrong_zip_hash(
     tmp_path, monkeypatch
 ):
-    archive = tmp_path / "release.zip"
-    write_package(archive, drift=True)
-    monkeypatch.setattr(
-        verifier,
-        "load_contract",
-        lambda: contract_for(archive),
-    )
+    drift = tmp_path / "drift.zip"
+    write_package(drift, drift=True)
+    monkeypatch.setattr(verifier, "load_contract", lambda: contract_for(drift))
     with pytest.raises(verifier.ReleaseError, match="divergente"):
-        verifier.validate_archive(archive)
+        verifier.validate_archive(drift)
 
-    database = tmp_path / "database.zip"
-    write_package(database, forbidden=True)
+    forbidden = tmp_path / "forbidden.zip"
+    write_package(forbidden, forbidden=True)
     monkeypatch.setattr(
-        verifier,
-        "load_contract",
-        lambda: contract_for(database),
+        verifier, "load_contract", lambda: contract_for(forbidden)
     )
-    with pytest.raises(verifier.ReleaseError, match="prohibido"):
-        verifier.validate_archive(database)
+    with pytest.raises(verifier.ReleaseError, match="Contenido prohibido"):
+        verifier.validate_archive(forbidden)
 
-    clean = tmp_path / "clean.zip"
-    write_package(clean)
-    contract = contract_for(clean)
+    wrong_hash = tmp_path / "wrong-hash.zip"
+    write_package(wrong_hash)
+    contract = contract_for(wrong_hash)
     contract["archive"]["sha256"] = "0" * 64
     monkeypatch.setattr(verifier, "load_contract", lambda: contract)
-    with pytest.raises(verifier.ReleaseError, match="SHA-256"):
-        verifier.validate_archive(clean)
+    with pytest.raises(verifier.ReleaseError, match="SHA-256 distinto"):
+        verifier.validate_archive(wrong_hash)
 
 
-def test_importer_preserves_governance_and_builds_overlay(tmp_path):
+def test_importer_preserves_governance_and_builds_controlled_overlay(tmp_path):
     for name in (".git", ".github", ".devcontainer", "migration"):
         (tmp_path / name).mkdir()
     (tmp_path / ".gitignore").write_text("instance/\n", encoding="utf-8")
@@ -252,13 +248,9 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
         "* text=auto\n", encoding="utf-8"
     )
     (tmp_path / "old").mkdir()
-
     importer.clear_runtime(tmp_path)
-
     assert not (tmp_path / "old").exists()
-    assert all(
-        (tmp_path / name).exists() for name in importer.PRESERVE_TOP_LEVEL
-    )
+    assert all((tmp_path / name).exists() for name in importer.PRESERVE_TOP_LEVEL)
 
     mac = tmp_path / "mac"
     windows = tmp_path / "windows"
@@ -268,14 +260,11 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
     (mac / "app/same.py").write_text("same", encoding="utf-8")
     (windows / "app/same.py").write_text("same", encoding="utf-8")
     (windows / "app/windows.py").write_text("windows", encoding="utf-8")
-    placeholder = tmp_path / "placeholder.zip"
-    placeholder.write_bytes(b"synthetic")
+    archive = tmp_path / "contract.zip"
+    write_package(archive)
 
     result = importer.build_windows_overlay(
-        mac,
-        windows,
-        repo,
-        contract_for(placeholder),
+        mac, windows, repo, contract_for(archive)
     )
 
     assert result["files"] == 1
@@ -285,25 +274,30 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
         )
     )
     assert manifest["files"][0]["path"] == "app/windows.py"
+    assert manifest["controlled_deployment_authorized"] is True
+    assert manifest["public_production_authorized"] is False
     assert manifest["production_authorized"] is False
-    assert manifest["release"] == "1.0.0-rc1"
 
 
-def test_mark_imported_never_authorizes_production(tmp_path):
+def test_mark_imported_uses_final_status_without_authorizing_public_production(
+    tmp_path,
+):
     migration = tmp_path / "migration"
     migration.mkdir()
     archive = tmp_path / "release.zip"
-    archive.write_bytes(b"synthetic")
+    write_package(archive)
     contract = contract_for(archive)
-    contract["status"] = "release_candidate_validated_pending_binary_import"
-    contract["source_evidence"] = {}
     (migration / "current-release.json").write_text(
         json.dumps(contract), encoding="utf-8"
     )
 
     result = importer.mark_imported(tmp_path)
 
+    assert result["status"] == (
+        "final_controlled_deployment_imported_pending_external_certification"
+    )
+    assert result["controlled_deployment_authorized"] is True
+    assert result["public_production_authorized"] is False
     assert result["production_authorized"] is False
-    assert result["status"] == "release_candidate_imported_pending_acceptance"
-    assert result["source_evidence"]["archive_binary_received_and_verified"] is True
-    assert result["source_evidence"]["archive_binary_mounted_in_current_runtime"] is False
+    assert result["source_evidence"]["archive_imported_to_git"] is True
+    assert result["source_evidence"]["runtime_matches_release"] is True
