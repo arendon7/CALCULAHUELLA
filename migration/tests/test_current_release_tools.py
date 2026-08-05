@@ -27,20 +27,23 @@ importer = load(
     ROOT / "scripts/migration/import_current_release.py",
 )
 
-EVIDENCE_SHA = "evidence-sha"
+EVIDENCE_CONTENT = b'{"passed": true}\n'
+EVIDENCE_SHA = "b1c95da5e181d95c3a837b01b04513e2725984388b2256107771b77a2407ce77"
 
 
 def contract_for(path: Path, *, manifest_name="MANIFIESTO_ENTREGA.txt"):
     return {
         "release": "1.0.0-rc1",
+        "display_release": "V1.0.0-RC1",
+        "production_authorized": False,
         "archive": {
             "filename": path.name,
             "sha256": verifier.sha256_file(path),
         },
         "distributions": {
-            "MAC": {"functional_files": 13, "tree_sha256": "mac-tree"},
+            "MAC": {"functional_files": 16, "tree_sha256": "mac-tree"},
             "WINDOWS": {
-                "functional_files": 13,
+                "functional_files": 16,
                 "tree_sha256": "windows-tree",
             },
         },
@@ -104,7 +107,7 @@ def write_package(
         "run.py": "print('ok')\n",
         "requirements.txt": "fastapi\n",
         "tests/test_release.py": "def test_ok(): assert True\n",
-        "release/RC1_TEST_EVIDENCE.json": '{"passed": true}\n',
+        "release/RC1_TEST_EVIDENCE.json": EVIDENCE_CONTENT,
         "app/templates/a.html": "<p>a</p>",
         "app/templates/b.html": "<p>b</p>",
     }
@@ -266,7 +269,12 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
     (windows / "app/same.py").write_text("same", encoding="utf-8")
     (windows / "app/windows.py").write_text("windows", encoding="utf-8")
 
-    result = importer.build_windows_overlay(mac, windows, repo)
+    result = importer.build_windows_overlay(
+        mac,
+        windows,
+        repo,
+        contract_for(tmp_path / "placeholder.zip"),
+    )
 
     assert result["files"] == 1
     manifest = json.loads(
@@ -275,3 +283,23 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
         )
     )
     assert manifest["files"][0]["path"] == "app/windows.py"
+    assert manifest["production_authorized"] is False
+    assert manifest["release"] == "1.0.0-rc1"
+
+
+def test_mark_imported_never_authorizes_production(tmp_path):
+    migration = tmp_path / "migration"
+    migration.mkdir()
+    contract = contract_for(tmp_path / "release.zip")
+    contract["status"] = "release_candidate_validated_pending_binary_import"
+    contract["source_evidence"] = {}
+    (migration / "current-release.json").write_text(
+        json.dumps(contract), encoding="utf-8"
+    )
+
+    result = importer.mark_imported(tmp_path)
+
+    assert result["production_authorized"] is False
+    assert result["status"] == "release_candidate_imported_pending_acceptance"
+    assert result["source_evidence"]["archive_binary_received_and_verified"] is True
+    assert result["source_evidence"]["archive_binary_mounted_in_current_runtime"] is False
