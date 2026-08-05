@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Importa la entrega dual definida en migration/current-release.json.
 
-MAC se utiliza como runtime canónico. Las diferencias exclusivas de Windows se
-preservan como overlay. La infraestructura GitHub y el contrato de release no se
-reemplazan. Importar una candidata nunca equivale a autorizar producción.
+MAC se utiliza como runtime canónico y las diferencias Windows se conservan
+como overlay. Importar una versión final controlada no autoriza producción
+pública ni certificaciones externas.
 """
 
 from __future__ import annotations
@@ -23,17 +23,9 @@ from typing import Any
 ROOT = Path(__file__).resolve().parents[2]
 VERIFIER_PATH = ROOT / "scripts" / "migration" / "verify_current_release.py"
 PRESERVE_TOP_LEVEL = {
-    ".git",
-    ".github",
-    ".devcontainer",
-    "migration",
-    ".gitignore",
-    ".gitattributes",
+    ".git", ".github", ".devcontainer", "migration", ".gitignore", ".gitattributes",
 }
-PRESERVE_NESTED = {
-    Path("scripts/migration"),
-    Path("scripts/preview"),
-}
+PRESERVE_NESTED = {Path("scripts/migration"), Path("scripts/preview")}
 
 
 class ImportReleaseError(RuntimeError):
@@ -66,19 +58,13 @@ def extract_safely(archive_path: Path, destination: Path) -> Path:
                 raise ImportReleaseError(f"Entrada insegura: {item.filename}")
             target = (destination / Path(*path.parts)).resolve()
             if root not in target.parents and target != root:
-                raise ImportReleaseError(
-                    f"Ruta fuera del staging: {item.filename}"
-                )
+                raise ImportReleaseError(f"Ruta fuera del staging: {item.filename}")
         archive.extractall(destination)
 
-    if (destination / "MAC").is_dir() and (
-        destination / "WINDOWS"
-    ).is_dir():
+    if (destination / "MAC").is_dir() and (destination / "WINDOWS").is_dir():
         return destination
-
     entries = [
-        entry
-        for entry in destination.iterdir()
+        entry for entry in destination.iterdir()
         if entry.name != "__MACOSX" and not entry.name.startswith("._")
     ]
     if (
@@ -119,9 +105,7 @@ def copy_tree(source: Path, destination: Path) -> None:
         target = destination / entry.name
         if target.exists():
             shutil.rmtree(target) if target.is_dir() else target.unlink()
-        shutil.copytree(entry, target) if entry.is_dir() else shutil.copy2(
-            entry, target
-        )
+        shutil.copytree(entry, target) if entry.is_dir() else shutil.copy2(entry, target)
 
 
 def restore_preserved(repo: Path, backup: Path) -> None:
@@ -162,17 +146,21 @@ def build_windows_overlay(
             }
         )
 
+    windows_spec = contract["distributions"]["WINDOWS"]
     manifest = {
         "release": contract["release"],
         "display_release": contract.get("display_release"),
         "strategy": "windows_overlay_on_mac_runtime",
         "canonical_runtime": "MAC",
-        "production_authorized": contract.get(
-            "production_authorized", False
+        "controlled_deployment_authorized": contract.get(
+            "controlled_deployment_authorized", False
         ),
-        "windows_tree_sha256": contract["distributions"]["WINDOWS"][
-            "tree_sha256"
-        ],
+        "public_production_authorized": contract.get(
+            "public_production_authorized", False
+        ),
+        "production_authorized": contract.get("production_authorized", False),
+        "windows_inventory_files": windows_spec.get("inventory_files"),
+        "windows_tree_sha256": windows_spec.get("tree_sha256"),
         "files": files,
     }
     manifest_path = repo / "platform" / "windows" / "OVERLAY_MANIFEST.json"
@@ -181,25 +169,19 @@ def build_windows_overlay(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    readme = repo / "platform" / "windows" / "README.md"
-    readme.write_text(
+    (repo / "platform" / "windows" / "README.md").write_text(
         "# Overlay Windows\n\n"
         "El runtime raíz procede de la distribución MAC validada. Esta carpeta "
-        "conserva únicamente las diferencias necesarias para reconstruir la "
-        "distribución Windows. La ejecución física en Windows 10 y Windows 11 "
-        "sigue siendo una puerta externa de la candidata.\n",
+        "conserva solo las diferencias necesarias para reconstruir Windows. "
+        "La prueba física en Windows 10 y Windows 11 continúa como puerta para "
+        "producción pública certificada.\n",
         encoding="utf-8",
     )
-    return {
-        "files": len(files),
-        "manifest": manifest_path.relative_to(repo).as_posix(),
-    }
+    return {"files": len(files), "manifest": manifest_path.relative_to(repo).as_posix()}
 
 
 def copy_release_docs(
-    package: Path,
-    repo: Path,
-    contract: dict[str, Any],
+    package: Path, repo: Path, contract: dict[str, Any]
 ) -> list[str]:
     slug = str(contract["release"]).replace("/", "-")
     destination = repo / "docs" / "releases" / f"v{slug}"
@@ -218,15 +200,20 @@ def copy_release_docs(
 def mark_imported(repo: Path) -> dict[str, Any]:
     contract_path = repo / "migration" / "current-release.json"
     contract = json.loads(contract_path.read_text(encoding="utf-8"))
-    if contract.get("production_authorized") is True:
+    if contract.get("public_production_authorized") is True or contract.get(
+        "production_authorized"
+    ) is True:
         raise ImportReleaseError(
-            "Una importación automática no puede autorizar producción"
+            "Una importación automática no puede autorizar producción pública"
         )
-    contract["status"] = "release_candidate_imported_pending_acceptance"
+    contract["status"] = contract.get(
+        "post_import_status", "runtime_imported_pending_external_certification"
+    )
     evidence = contract.setdefault("source_evidence", {})
     evidence["archive_binary_received_and_verified"] = True
     evidence["archive_binary_mounted_in_current_runtime"] = False
     evidence["archive_imported_to_git"] = True
+    evidence["runtime_matches_release"] = True
     contract_path.write_text(
         json.dumps(contract, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
@@ -234,15 +221,10 @@ def mark_imported(repo: Path) -> dict[str, Any]:
     return contract
 
 
-def post_checks(
-    repo: Path,
-    contract: dict[str, Any],
-) -> dict[str, object]:
+def post_checks(repo: Path, contract: dict[str, Any]) -> dict[str, object]:
     config = (repo / "app" / "config.py").read_text(encoding="utf-8")
     if str(contract["release"]).casefold() not in config.casefold():
-        raise ImportReleaseError(
-            "La versión importada no coincide con el contrato"
-        )
+        raise ImportReleaseError("La versión importada no coincide con el contrato")
 
     templates = list((repo / "app" / "templates").glob("*.html"))
     expected = int(contract["runtime_contract"]["jinja_templates"])
@@ -258,9 +240,7 @@ def post_checks(
     validation = contract.get("validation", {})
     evidence_path = repo / str(validation.get("evidence_file", ""))
     if not evidence_path.is_file():
-        raise ImportReleaseError(
-            f"Falta la evidencia de release {evidence_path}"
-        )
+        raise ImportReleaseError(f"Falta la evidencia de release {evidence_path}")
     digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
     if digest != validation.get("evidence_sha256"):
         raise ImportReleaseError(
@@ -270,9 +250,13 @@ def post_checks(
     overlay = repo / "platform" / "windows" / "OVERLAY_MANIFEST.json"
     if not overlay.is_file():
         raise ImportReleaseError("No se generó el overlay Windows")
+    if contract.get("public_production_authorized") is not False:
+        raise ImportReleaseError(
+            "La versión importada debe permanecer sin autorización pública"
+        )
     if contract.get("production_authorized") is not False:
         raise ImportReleaseError(
-            "La candidata importada debe permanecer sin autorización productiva"
+            "La versión importada debe conservar production_authorized=false"
         )
 
     return {
@@ -280,6 +264,10 @@ def post_checks(
         "templates": len(templates),
         "brand_assets": len(contract["required_brand_assets"]),
         "evidence_sha256": digest,
+        "controlled_deployment_authorized": contract.get(
+            "controlled_deployment_authorized", False
+        ),
+        "public_production_authorized": False,
         "production_authorized": False,
     }
 
@@ -299,9 +287,7 @@ def main() -> int:
 
     verifier = load_module()
     contract = json.loads(
-        (repo / "migration" / "current-release.json").read_text(
-            encoding="utf-8"
-        )
+        (repo / "migration" / "current-release.json").read_text(encoding="utf-8")
     )
     try:
         verification = verifier.validate_archive(archive)
