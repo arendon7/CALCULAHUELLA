@@ -8,6 +8,7 @@ on:
       - "feature/**"
       - "release/**"
       - "migration/**"
+      - "integration/**"
   pull_request:
     branches: [main, develop]
 
@@ -17,7 +18,7 @@ permissions:
 jobs:
   validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 45
     env:
       APP_ENV: test
       SESSION_SECRET: ci-session-secret-only
@@ -27,6 +28,7 @@ jobs:
       CSRF_ENABLED: "false"
       SCHEDULER_ENABLED: "false"
       DEPLOYMENT_STRICT: "false"
+      SESSION_HTTPS_ONLY: "false"
     steps:
       - uses: actions/checkout@v4
 
@@ -37,7 +39,7 @@ jobs:
       - name: Verificar árbol fuente
         run: |
           missing=0
-          for path in requirements-dev.txt run.py alembic.ini app tests migrations Dockerfile; do
+          for path in requirements-dev.txt run.py alembic.ini app tests migrations Dockerfile migration/current-release.json migration/tests scripts/migration scripts/preview; do
             if [[ ! -e "$path" ]]; then
               echo "::error file=$path::Falta $path en esta rama."
               missing=1
@@ -50,10 +52,40 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install -r requirements-dev.txt
 
-      - name: Validar Python y scripts
+      - name: Validar Python, shell y contrato de release
         run: |
-          python -m compileall -q app scripts tests run.py
+          python -m compileall -q app scripts tests migration/tests run.py
           find . -type f \( -name '*.sh' -o -name '*.command' \) -print0 | xargs -0 -r -n1 bash -n
+          python -m pytest -q migration/tests/test_current_release_tools.py
+          python - <<'PY'
+          import json
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          assert contract['channel'] == 'canonical-integration'
+          assert contract['archive']['filename'].endswith('.zip')
+          assert len(contract['archive']['sha256']) == 64
+          assert isinstance(contract.get('production_authorized'), bool)
+          print(
+              f"Contrato actual: {contract.get('display_release', contract['release'])} · "
+              f"{contract['status']} · producción={contract['production_authorized']}"
+          )
+          PY
+
+      - name: Detectar versión runtime y versión objetivo
+        id: runtime
+        run: |
+          runtime="$(python - <<'PY'
+          from app.config import settings
+          print(settings.version)
+          PY
+          )"
+          target="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['release'])
+          PY
+          )"
+          echo "runtime=$runtime" >> "$GITHUB_OUTPUT"
+          echo "target=$target" >> "$GITHUB_OUTPUT"
+          echo "Runtime: $runtime · objetivo: $target"
 
       - name: Migrar base limpia
         run: |
@@ -71,7 +103,96 @@ jobs:
           print(f"Plantillas compiladas: {len(names)}")
           PY
 
-      - name: Ejecutar regresión v0.45.x
+      - name: Validar runtime canónico importado
+        if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          from sqlalchemy import inspect
+          from app.config import settings
+          from app.database import Base, engine
+          from app.main import app, templates
+
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected = contract['runtime_contract']
+          validation = contract.get('validation', {})
+          names = sorted(templates.env.list_templates())
+          physical_tables = inspect(engine).get_table_names()
+
+          assert settings.version == contract['release']
+          assert len(app.routes) == expected['routes'], len(app.routes)
+          assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
+          assert len(physical_tables) == expected['physical_tables_after_migration'], physical_tables
+          assert len(names) == expected['jinja_templates'], len(names)
+
+          for asset in contract['required_brand_assets']:
+              assert list(Path('app/static').glob(f'**/img/brand/{asset}')), asset
+
+          evidence_path = Path(validation['evidence_file'])
+          assert evidence_path.is_file(), evidence_path
+          digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+          assert digest == validation['evidence_sha256'], (digest, validation['evidence_sha256'])
+          assert Path('platform/windows/OVERLAY_MANIFEST.json').is_file()
+          assert contract['production_authorized'] is False
+          print(
+              f"Runtime canónico aprobado: {settings.version} · "
+              f"{len(app.routes)} rutas · {len(Base.metadata.tables)} modelos · "
+              f"{len(physical_tables)} tablas · {len(names)} plantillas"
+          )
+          PY
+          head="$(python - <<'PY'
+          import json
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['runtime_contract']['alembic_head'])
+          PY
+          )"
+          python -m alembic current | grep -q "$head"
+
+      - name: Probar vista HTTP y construir snapshot Pages
+        env:
+          HOST: 127.0.0.1
+          PORT: "8765"
+        run: |
+          python run.py > instance/ci-preview.log 2>&1 &
+          server_pid=$!
+          cleanup() {
+            kill "$server_pid" 2>/dev/null || true
+            wait "$server_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+          ready=0
+          for attempt in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8765/api/health >/dev/null; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          if [[ "$ready" -ne 1 ]]; then
+            cat instance/ci-preview.log
+            exit 1
+          fi
+          curl -fsS -o /dev/null http://127.0.0.1:8765/
+          curl -fsS -o /dev/null http://127.0.0.1:8765/login
+          python scripts/preview/build_static_preview.py \
+            --output _site \
+            --commit "${{ github.event.pull_request.head.sha || github.sha }}" \
+            --branch "${{ github.head_ref || github.ref_name }}"
+          test -f _site/index.html
+          test -f _site/login/index.html
+          test -f _site/preview-status.json
+
+      - name: Guardar snapshot de la revisión
+        uses: actions/upload-artifact@v4
+        with:
+          name: preview-${{ github.event.pull_request.head.sha || github.sha }}
+          path: _site
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Ejecutar regresión provisional
+        if: steps.runtime.outputs.runtime != steps.runtime.outputs.target
         run: |
           python -m pytest -q \
             tests/test_v045_product_intelligence.py \
@@ -80,6 +201,33 @@ jobs:
             tests/test_v0453_guided_onboarding.py \
             tests/test_v0454_first_inventory.py \
             tests/test_v0455_guided_imports.py
+
+      - name: Ejecutar suite canónica en procesos aislados
+        if: steps.runtime.outputs.runtime == steps.runtime.outputs.target
+        run: |
+          python - <<'PY'
+          import json
+          import subprocess
+          import sys
+          from pathlib import Path
+
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected_files = contract.get('validation', {}).get('test_files')
+          selected = sorted(Path('tests').glob('test_*.py'))
+          if not selected:
+              raise SystemExit('No se localizaron archivos de pruebas de la release')
+          if expected_files is not None and len(selected) != int(expected_files):
+              raise SystemExit(
+                  f"Archivos de prueba esperados: {expected_files}; encontrados: {len(selected)}"
+              )
+          for index, path in enumerate(selected, start=1):
+              print(f"[{index}/{len(selected)}] {path}", flush=True)
+              subprocess.run(
+                  [sys.executable, '-m', 'pytest', '-q', str(path)],
+                  check=True,
+              )
+          print(f"Suite aislada aprobada: {len(selected)} archivos")
+          PY
 
       - name: Construir imagen Docker
         run: docker build -t calcula-tu-huella:${{ github.sha }} .

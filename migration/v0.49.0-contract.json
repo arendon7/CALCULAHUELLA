@@ -1,0 +1,7 @@
+{
+  "status": "superseded_historical_reference",
+  "release": "0.49.0",
+  "superseded_by": "migration/current-release.json",
+  "active_import_workflow": ".github/workflows/import-current-release.yml",
+  "note": "Este archivo no gobierna CI, importación ni preview. Se conserva únicamente para trazabilidad histórica."
+}
