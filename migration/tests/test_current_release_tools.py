@@ -268,12 +268,14 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
     (mac / "app/same.py").write_text("same", encoding="utf-8")
     (windows / "app/same.py").write_text("same", encoding="utf-8")
     (windows / "app/windows.py").write_text("windows", encoding="utf-8")
+    placeholder = tmp_path / "placeholder.zip"
+    placeholder.write_bytes(b"synthetic")
 
     result = importer.build_windows_overlay(
         mac,
         windows,
         repo,
-        contract_for(tmp_path / "placeholder.zip"),
+        contract_for(placeholder),
     )
 
     assert result["files"] == 1
@@ -290,7 +292,9 @@ def test_importer_preserves_governance_and_builds_overlay(tmp_path):
 def test_mark_imported_never_authorizes_production(tmp_path):
     migration = tmp_path / "migration"
     migration.mkdir()
-    contract = contract_for(tmp_path / "release.zip")
+    archive = tmp_path / "release.zip"
+    archive.write_bytes(b"synthetic")
+    contract = contract_for(archive)
     contract["status"] = "release_candidate_validated_pending_binary_import"
     contract["source_evidence"] = {}
     (migration / "current-release.json").write_text(
