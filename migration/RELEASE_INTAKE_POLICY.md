@@ -2,14 +2,15 @@
 
 ## Propósito
 
-Evitar cambios repetidos de base por iteraciones todavía en desarrollo y separar cuatro decisiones distintas:
+Separar cinco decisiones distintas:
 
 1. una versión existe;
 2. el paquete fue validado;
 3. el runtime fue importado a GitHub;
-4. la versión está autorizada para producción.
+4. la versión está autorizada para despliegue controlado;
+5. la versión está autorizada para producción pública certificada.
 
-Ninguna de estas decisiones implica automáticamente la siguiente.
+Ninguna decisión implica automáticamente la siguiente.
 
 ## Rama permanente
 
@@ -19,105 +20,98 @@ Toda integración se realiza en:
 integration/canonical
 ```
 
-Las versiones futuras actualizan `migration/current-release.json`. No crean otra infraestructura ni otra rama principal de migración.
+Las versiones actualizan `migration/current-release.json`; no crean otra infraestructura ni otra rama principal de migración.
 
 ## Estados
 
 ### En desarrollo
 
-Existe código o una iteración activa, pero falta uno o varios elementos:
-
-- ZIP cerrado;
-- SHA-256;
-- manifiesto;
-- validación;
-- inventario de archivos;
-- migración desde base vacía;
-- pruebas funcionales y de seguridad;
-- activos visuales completos.
-
-No reemplaza el contrato canónico.
+Falta uno o varios elementos: ZIP cerrado, checksum, manifiesto, validación, inventario, migración reproducible, pruebas, seguridad o activos oficiales.
 
 ### Paquete validado pendiente de importación
 
-Existen ZIP, checksum, manifiesto, validación e inventarios, pero el binario todavía no se ha importado y ejecutado en GitHub.
+Existen ZIP, checksum, manifiesto, validación e inventario, pero el binario todavía no se ha ejecutado desde GitHub.
 
 ### Runtime canónico importado
 
-El ZIP fue verificado, descomprimido y eliminado; CI pasó y la vista previa ejecuta la versión objetivo.
+El ZIP fue verificado, descomprimido y eliminado; CI pasó y el preview ejecuta la versión objetivo.
 
-### Candidata de lanzamiento
+### Final para despliegue controlado
 
-El runtime está técnicamente congelado y dispone de gobierno de release. Puede utilizarse para pilotos y aceptación controlada, pero no se presenta como producción.
+Permite demostraciones, pilotos reales acompañados, inventarios internos, contratación privada supervisada y despliegues privados controlados.
 
-### Autorizada para producción
+### Producción pública certificada
 
-Solo procede con evidencia externa completa, defectos críticos y altos resueltos o decididos formalmente, e infraestructura productiva certificada.
+Exige adicionalmente identidad contractual completa, infraestructura definitiva, Windows 10/11, seguridad independiente, revisión de dependencias externas y aceptación del cliente sobre sus datos.
 
 ## Puertas de ingreso
 
-Una entrega solo puede gobernar `current-release.json` cuando se dispone de:
+Una entrega solo puede gobernar `current-release.json` cuando dispone de:
 
-1. nombre exacto del ZIP;
-2. SHA-256 del ZIP;
-3. manifiesto;
-4. validación técnica;
-5. versión runtime coherente;
-6. cabeza Alembic;
-7. conteo de rutas, modelos, tablas y plantillas;
-8. suite funcional y seguridad;
-9. inventario sin bases, secretos, evidencias operativas, logs ni cachés;
-10. logos y favicons oficiales;
-11. árboles o inventarios verificables por plataforma;
-12. limitaciones declaradas.
+1. nombre y SHA-256 exactos del ZIP;
+2. manifiesto por archivo;
+3. validación técnica;
+4. documento de decisión o cierre;
+5. versión runtime y cabeza Alembic;
+6. conteos de rutas, modelos, tablas y plantillas;
+7. suite funcional y seguridad;
+8. inventario limpio;
+9. logos y favicons oficiales;
+10. limitaciones y alcance de autorización declarados.
 
 ## Puertas de importación GitHub
 
 1. hash exacto del ZIP;
 2. extracción segura;
-3. paridad del núcleo Mac/Windows;
-4. evidencia interna verificada por SHA-256;
-5. versión y activos correctos;
-6. Alembic desde base vacía;
-7. rutas, modelos, tablas y plantillas conforme al contrato;
-8. archivos de pruebas ejecutados en procesos aislados;
-9. Docker construido;
-10. snapshot y Codespaces operativos;
-11. ZIP eliminado antes del commit;
-12. `production_authorized` permanece sin alteración automática.
-
-## Puertas de producción
-
-Una importación o fusión nunca autoriza producción por sí sola. La autorización exige evidencia de:
-
-- pilotos definidos;
-- revisión técnica independiente de la construcción;
-- instalación real en sistemas soportados;
-- seguridad independiente;
-- documentos jurídicos y contractuales;
-- infraestructura real de datos, objetos, correo, DNS, TLS, secretos, monitoreo y restauración;
-- aprobación formal de salida.
+3. tamaños y SHA-256 del inventario;
+4. paridad del núcleo Mac/Windows;
+5. evidencia final verificada;
+6. versión y activos correctos;
+7. Alembic desde base vacía;
+8. rutas, modelos, tablas y plantillas conforme al contrato;
+9. pruebas ejecutadas en procesos aislados;
+10. Docker construido;
+11. snapshot y Codespaces operativos;
+12. ZIP eliminado antes del commit;
+13. la autorización pública permanece bloqueada.
 
 ## Versión vigente
 
-**V1.0.0-RC1** es la última entrega cerrada y validada internamente.
+**V1.0.0 FINAL** es la última entrega cerrada.
 
 Estado:
 
 ```text
-release_candidate_validated_pending_binary_import
+final_controlled_deployment_validated_pending_binary_import
+controlled_deployment_authorized = true
+public_production_authorized = false
 production_authorized = false
 ```
 
-La candidata congela el alcance funcional construido hasta V0.57. Durante RC1 solo se admiten defectos reproducibles, seguridad, accesibilidad, rendimiento, ajustes de piloto, precisión metodológica o comunicacional y documentación de aceptación.
+## Puertas externas de producción pública
 
-## Reconciliación de mejoras paralelas
+- identidad contractual completa en configuración;
+- infraestructura definitiva certificada;
+- prueba física en Windows 10;
+- prueba física en Windows 11;
+- prueba de penetración independiente;
+- revisión independiente de dependencias y servicios externos;
+- aceptación del cliente sobre sus datos e inventario.
 
-El PR #4 se conserva como inventario histórico. Después de importar RC1 se compara por capacidad. Solo se porta aquello que:
+## Regla de comunicación
 
-- no esté ya presente;
-- no retroceda la versión;
-- no sustituya activos oficiales;
-- respete el alcance congelado;
-- no cambie metodología sin decisión explícita;
-- conserve seguridad, pruebas y trazabilidad.
+No se afirmará verificación externa, certificación ISO, neutralidad, carbono negativo ni aseguramiento independiente sin el proceso específico correspondiente.
+
+## Mejoras posteriores
+
+V1.0.0 cierra el ciclo funcional. Los cambios posteriores deben clasificarse como:
+
+- corrección reproducible;
+- seguridad;
+- accesibilidad;
+- rendimiento;
+- ajuste derivado de operación controlada;
+- precisión metodológica, jurídica o comunicacional;
+- preparación verificable para producción pública.
+
+El PR #4 permanece cerrado como antecedente histórico. Cualquier idea útil debe reimplementarse sobre la línea final, no fusionarse desde una versión anterior.
