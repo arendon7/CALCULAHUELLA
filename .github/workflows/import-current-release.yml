@@ -18,7 +18,7 @@ concurrency:
 jobs:
   import:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
         with:
@@ -85,7 +85,9 @@ jobs:
           rm -f instance/canonical-import.sqlite3
           python -m alembic upgrade head
           python - <<'PY'
+          import hashlib
           import json
+          from pathlib import Path
           from sqlalchemy import inspect
           from app.config import settings
           from app.database import Base, engine
@@ -93,19 +95,30 @@ jobs:
 
           contract = json.load(open('migration/current-release.json', encoding='utf-8'))
           expected = contract['runtime_contract']
+          validation = contract.get('validation', {})
           names = sorted(templates.env.list_templates())
           physical_tables = inspect(engine).get_table_names()
           for name in names:
               templates.env.get_template(name)
+
           assert settings.version == contract['release'], (settings.version, contract['release'])
           assert len(app.routes) == expected['routes'], len(app.routes)
           assert len(Base.metadata.tables) == expected['orm_models'], len(Base.metadata.tables)
           assert len(physical_tables) == expected['physical_tables_after_migration'], physical_tables
           assert len(names) == expected['jinja_templates'], len(names)
+
+          for asset in contract['required_brand_assets']:
+              assert list(Path('app/static').glob(f'**/img/brand/{asset}')), asset
+
+          evidence_path = Path(validation['evidence_file'])
+          assert evidence_path.is_file(), evidence_path
+          digest = hashlib.sha256(evidence_path.read_bytes()).hexdigest()
+          assert digest == validation['evidence_sha256'], (digest, validation['evidence_sha256'])
+          assert contract['production_authorized'] is False
           print(
               f"Release {settings.version}: {len(app.routes)} rutas · "
               f"{len(Base.metadata.tables)} modelos · {len(physical_tables)} tablas · "
-              f"{len(names)} plantillas"
+              f"{len(names)} plantillas · evidencia {digest}"
           )
           PY
           current="$(python -m alembic current 2>/dev/null | tr -d '\r')"
@@ -117,7 +130,7 @@ jobs:
           echo "$current" | grep -q "$head"
           test -f platform/windows/OVERLAY_MANIFEST.json
 
-      - name: Ejecutar pruebas focalizadas
+      - name: Ejecutar suite importada en procesos aislados
         if: steps.release.outputs.found == 'true'
         run: |
           python - <<'PY'
@@ -126,21 +139,17 @@ jobs:
           import sys
           from pathlib import Path
 
-          release = json.load(open('migration/current-release.json', encoding='utf-8'))['release']
-          minor = int(release.split('.')[1])
-          version_patterns = [
-              f'test_v{value:03d}*.py'
-              for value in range(max(0, minor - 6), minor + 1)
-          ]
-          patterns = (*version_patterns, 'test_security*.py')
-          selected = sorted({
-              path
-              for pattern in patterns
-              for path in Path('tests').glob(pattern)
-          })
+          contract = json.load(open('migration/current-release.json', encoding='utf-8'))
+          expected_files = contract.get('validation', {}).get('test_files')
+          selected = sorted(Path('tests').glob('test_*.py'))
           if not selected:
-              raise SystemExit(f'No se localizaron pruebas focalizadas para V{release}')
-          for path in selected:
+              raise SystemExit('No se localizaron archivos de pruebas de la entrega')
+          if expected_files is not None and len(selected) != int(expected_files):
+              raise SystemExit(
+                  f"Archivos de prueba esperados: {expected_files}; encontrados: {len(selected)}"
+              )
+          for index, path in enumerate(selected, start=1):
+              print(f"[{index}/{len(selected)}] {path}", flush=True)
               subprocess.run(
                   [sys.executable, '-m', 'pytest', '-q', str(path)],
                   check=True,
@@ -161,8 +170,8 @@ jobs:
           fi
           version="$(python - <<'PY'
           import json
-          print(json.load(open('migration/current-release.json', encoding='utf-8'))['release'])
+          print(json.load(open('migration/current-release.json', encoding='utf-8'))['display_release'])
           PY
           )"
-          git commit -m "feat: importar fuente canónica V${version}"
+          git commit -m "feat: importar fuente canónica ${version}"
           git push origin HEAD:integration/canonical
