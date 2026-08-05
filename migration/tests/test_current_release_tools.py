@@ -27,29 +27,39 @@ importer = load(
     ROOT / "scripts/migration/import_current_release.py",
 )
 
+EVIDENCE_SHA = "evidence-sha"
+
 
 def contract_for(path: Path, *, manifest_name="MANIFIESTO_ENTREGA.txt"):
     return {
-        "release": "0.52.0",
+        "release": "1.0.0-rc1",
         "archive": {
             "filename": path.name,
             "sha256": verifier.sha256_file(path),
         },
         "distributions": {
-            "MAC": {"functional_files": 12, "tree_sha256": "mac-tree"},
+            "MAC": {"functional_files": 13, "tree_sha256": "mac-tree"},
             "WINDOWS": {
-                "functional_files": 12,
+                "functional_files": 13,
                 "tree_sha256": "windows-tree",
             },
         },
         "runtime_contract": {
-            "routes": 298,
+            "routes": 315,
             "jinja_templates": 2,
-            "orm_models": 111,
-            "physical_tables_after_migration": 112,
-            "alembic_head": "20260804_0031",
+            "orm_models": 112,
+            "physical_tables_after_migration": 113,
+            "alembic_head": "20260805_0032",
         },
-        "required_documents": ["VALIDACION_RELEASE.md", manifest_name],
+        "validation": {
+            "evidence_file": "release/RC1_TEST_EVIDENCE.json",
+            "evidence_sha256": EVIDENCE_SHA,
+        },
+        "required_documents": [
+            "VALIDACION_RELEASE.md",
+            manifest_name,
+            "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md",
+        ],
         "required_brand_assets": [
             "logo-oficial.png",
             "logo-oficial-blanco.png",
@@ -61,14 +71,15 @@ def contract_for(path: Path, *, manifest_name="MANIFIESTO_ENTREGA.txt"):
 
 def valid_manifest() -> str:
     return (
-        "CALCULA TU HUELLA V0.52.0\n"
-        "298 rutas registradas\n"
-        "2 plantillas Jinja\n"
-        "111 modelos ORM\n"
-        "112 tablas físicas después de migración\n"
-        "Alembic head 20260804_0031\n"
-        "MAC árbol SHA-256 mac-tree\n"
-        "WINDOWS árbol SHA-256 windows-tree\n"
+        "CALCULA TU HUELLA V1.0.0-RC1\n"
+        "Rutas: 315.\n"
+        "Modelos ORM: 112.\n"
+        "Plantillas HTML: 2.\n"
+        "Tablas físicas desde base vacía: 113.\n"
+        "Cabeza Alembic: 20260805_0032.\n"
+        f"Evidencia SHA-256: {EVIDENCE_SHA}.\n"
+        "MAC árbol SHA-256 mac-tree.\n"
+        "WINDOWS árbol SHA-256 windows-tree.\n"
     )
 
 
@@ -84,15 +95,16 @@ def write_package(
     prefix = f"{wrapper}/" if wrapper else ""
     shared = {
         "app/main.py": "app = object()\n",
-        "app/config.py": 'version: str = "0.52.0"\n',
+        "app/config.py": 'version: str = "1.0.0-rc1"\n',
         "migrations/env.py": "# env\n",
-        "migrations/versions/20260804_0031_onboarding.py": (
-            "revision = '20260804_0031'\n"
+        "migrations/versions/20260805_0032_release.py": (
+            "revision = '20260805_0032'\n"
         ),
         "alembic.ini": "[alembic]\n",
         "run.py": "print('ok')\n",
         "requirements.txt": "fastapi\n",
         "tests/test_release.py": "def test_ok(): assert True\n",
+        "release/RC1_TEST_EVIDENCE.json": '{"passed": true}\n',
         "app/templates/a.html": "<p>a</p>",
         "app/templates/b.html": "<p>b</p>",
     }
@@ -107,6 +119,10 @@ def write_package(
     with zipfile.ZipFile(path, "w") as archive:
         archive.writestr(prefix + "VALIDACION_RELEASE.md", "validated")
         archive.writestr(
+            prefix + "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md",
+            "scope frozen",
+        )
+        archive.writestr(
             prefix + manifest_name,
             manifest if manifest is not None else valid_manifest(),
         )
@@ -120,7 +136,7 @@ def write_package(
             archive.writestr(prefix + "MAC/instance/demo.sqlite3", b"db")
 
 
-def test_verifier_accepts_direct_wrapped_and_generic_manifest_names(
+def test_verifier_accepts_rc1_metrics_in_label_first_format(
     tmp_path, monkeypatch
 ):
     for wrapper in (None, "release"):
@@ -134,17 +150,38 @@ def test_verifier_accepts_direct_wrapped_and_generic_manifest_names(
 
         report = verifier.validate_archive(archive)
 
-        assert report["release"] == "0.52.0"
+        assert report["release"] == "1.0.0-rc1"
         assert report["wrapper"] == wrapper
         assert report["manifest"] == "MANIFIESTO_ENTREGA.txt"
-        assert report["core"]["shared_files"] >= 10
+        assert report["core"]["shared_files"] >= 11
+
+
+def test_verifier_accepts_number_first_metric_format(tmp_path, monkeypatch):
+    archive = tmp_path / "number-first.zip"
+    manifest = (
+        "V1.0.0-RC1\n"
+        "315 rutas\n2 plantillas Jinja\n112 modelos ORM\n"
+        "113 tablas físicas\n20260805_0032\n"
+        f"{EVIDENCE_SHA}\nmac-tree\nwindows-tree\n"
+    )
+    write_package(archive, manifest=manifest)
+    monkeypatch.setattr(
+        verifier,
+        "load_contract",
+        lambda: contract_for(archive),
+    )
+
+    assert verifier.validate_archive(archive)["release"] == "1.0.0-rc1"
 
 
 def test_verifier_rejects_unlabeled_manifest_metrics(tmp_path, monkeypatch):
     archive = tmp_path / "unlabeled.zip"
     write_package(
         archive,
-        manifest="0.52.0 298 2 111 112 20260804_0031 mac-tree windows-tree",
+        manifest=(
+            "1.0.0-rc1 315 2 112 113 20260805_0032 "
+            f"{EVIDENCE_SHA} mac-tree windows-tree"
+        ),
     )
     monkeypatch.setattr(
         verifier,
@@ -153,6 +190,22 @@ def test_verifier_rejects_unlabeled_manifest_metrics(tmp_path, monkeypatch):
     )
 
     with pytest.raises(verifier.ReleaseError, match="métrica etiquetada"):
+        verifier.validate_archive(archive)
+
+
+def test_verifier_rejects_missing_evidence_hash(tmp_path, monkeypatch):
+    archive = tmp_path / "missing-evidence.zip"
+    write_package(
+        archive,
+        manifest=valid_manifest().replace(EVIDENCE_SHA, "other"),
+    )
+    monkeypatch.setattr(
+        verifier,
+        "load_contract",
+        lambda: contract_for(archive),
+    )
+
+    with pytest.raises(verifier.ReleaseError, match="SHA-256 de evidencia"):
         verifier.validate_archive(archive)
 
 
