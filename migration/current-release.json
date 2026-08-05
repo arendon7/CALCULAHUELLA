@@ -1,49 +1,62 @@
 {
   "project": "Calcula tu Huella",
   "channel": "canonical-integration",
-  "release": "0.52.0",
-  "status": "validated_package_pending_binary_import",
+  "release": "1.0.0-rc1",
+  "display_release": "V1.0.0-RC1",
+  "status": "release_candidate_validated_pending_binary_import",
+  "production_authorized": false,
+  "scope_frozen": true,
   "archive": {
-    "filename": "calcula_tu_huella_v0_52_0_onboarding_guiado_dual_mac_windows.zip",
-    "sha256": "4186571c49741e86e899e9c6554e3cb78b40c2b657c5807d775d557540c85a01"
+    "filename": "calcula_tu_huella_v1_0_0_rc1_dual_mac_windows.zip",
+    "sha256": "31847280ea71ff9bfa4c6c6150eacee45fc782f3fbfdd20155e3b94e2b394742"
   },
   "distributions": {
     "MAC": {
-      "functional_files": 432,
-      "tree_sha256": "a8bfc002d73692960e78b270773ecb3e9969964633df822748e2c6d332aa278c"
+      "functional_files": 487,
+      "bytes": 8412685,
+      "tree_sha256": "fcd0413f44bdfd51f2fd9d1376b917644671ef89d6bda451aa2efaca009660de"
     },
     "WINDOWS": {
-      "functional_files": 412,
-      "tree_sha256": "908dfb082691109dbc2235b81ffe044c2329c4b681d5b80a4dc54623f00b2de0"
+      "functional_files": 468,
+      "bytes": 8384612,
+      "tree_sha256": "c419c8b5e48a02ba82fa321492cfd015fe0b80b32e5606369c30862acfcad7e3"
     }
   },
   "runtime_contract": {
-    "routes": 298,
-    "jinja_templates": 68,
-    "orm_models": 111,
-    "physical_tables_after_migration": 112,
-    "alembic_head": "20260804_0031"
+    "routes": 315,
+    "jinja_templates": 75,
+    "orm_models": 112,
+    "physical_tables_after_migration": 113,
+    "alembic_head": "20260805_0032"
   },
   "validation": {
-    "suite_tests_passed": 291,
-    "focused_functional_tests_passed": 127,
+    "suite_tests_passed": 331,
+    "test_files": 41,
+    "historical_core_tests": 87,
     "security_controls_passed": 7,
-    "focused_controls_total": 134,
-    "windows_structural_controls": 9
+    "release_candidate_controls_passed": 8,
+    "release_gates_approved": 9,
+    "role_journeys_approved": 5,
+    "critical_findings_open": 0,
+    "evidence_file": "release/RC1_TEST_EVIDENCE.json",
+    "evidence_sha256": "6e919c5e1ca9e960e7d0d01b6324813e1cc39f753d65af8c906c68cd3418c017"
   },
   "capabilities": [
-    "Asistente persistente de cinco pasos",
-    "Ruta gráfica de diez etapas",
-    "Recomendación de metodología, cobertura, GWP, revisión y materialidad",
-    "Paquetes iniciales para servicios, industria, agro y residuos",
-    "Aplicación idempotente y no destructiva al inventario",
-    "Lista Excel de tres hojas",
-    "Permisos por rol y API de resumen",
-    "Integración con centro de trabajo y configuración inicial"
+    "Alcance funcional congelado desde V0.57",
+    "Puerta de lanzamiento separada entre paquete, gobierno y evidencia externa",
+    "Protocolos para piloto Greenatics y segundo piloto sectorial",
+    "Matriz explícita de bloqueos externos",
+    "Instaladores independientes para macOS y Windows",
+    "Conservación de cálculos, factores, GWP, conversiones y esquema histórico",
+    "Stack productivo reproducible de nueve servicios",
+    "Informes PDF, DOCX y XLSX con narrativa consultiva",
+    "Biblioteca profesional y conversación dato-factor",
+    "Gobierno de servicio, onboarding y recorridos por rol"
   ],
   "required_documents": [
-    "VALIDACION_V0_52.md",
-    "MANIFIESTO_PAQUETE_V0_52_0.txt"
+    "VALIDACION_V1_0_0_RC1.md",
+    "MANIFIESTO_PAQUETE_V1_0_0_RC1.txt",
+    "V100_RC1_ESTABILIZACION_Y_LANZAMIENTO.md"
   ],
   "required_brand_assets": [
     "logo-oficial.png",
@@ -51,10 +64,22 @@
     "favicon-64.png",
     "favicon-256.png"
   ],
+  "external_release_gates": [
+    "Piloto Greenatics aprobado",
+    "Piloto en segundo sector aprobado",
+    "Revisión técnica de Carlos documentada",
+    "Instalación física aprobada en Windows 10",
+    "Instalación física aprobada en Windows 11",
+    "Revisión independiente de seguridad",
+    "Documentación jurídica y contractual aprobada",
+    "Stack productivo real certificado"
+  ],
   "source_evidence": {
     "checksum_available": true,
     "manifest_available": true,
     "validation_available": true,
-    "archive_binary_mounted_in_current_runtime": false
+    "release_governance_available": true,
+    "archive_binary_mounted_in_current_runtime": false,
+    "archive_imported_to_git": false
   }
 }
