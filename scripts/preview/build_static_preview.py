@@ -1,10 +1,5 @@
 #!/usr/bin/env python3
-"""Construye una vista estática pública a partir de la aplicación en ejecución.
-
-La vista sirve para revisar landing, identidad, responsive y contenido en cada
-commit. No intenta simular autenticación ni operaciones del backend; para eso se
-mantiene GitHub Codespaces.
-"""
+"""Construye una vista estática pública a partir de la aplicación en ejecución."""
 
 from __future__ import annotations
 
@@ -37,41 +32,33 @@ def inject_banner(
     runtime_version: str,
     target_release: str | None,
     release_status: str | None,
-    production_authorized: bool,
+    controlled_deployment_authorized: bool,
+    public_production_authorized: bool,
 ) -> str:
     relative = "../" * depth
     runtime_label = html_module.escape(runtime_version)
     target_label = html_module.escape(target_release or "sin definir")
     status_label = html_module.escape(release_status or "sin contrato")
-    production_label = "sí" if production_authorized else "no"
+    controlled_label = "sí" if controlled_deployment_authorized else "no"
+    public_label = "sí" if public_production_authorized else "no"
     banner = f"""
 <div role="status" style="position:sticky;top:0;z-index:99999;padding:10px 16px;background:#0B3B2E;color:#fff;font:600 14px/1.4 Inter,Arial,sans-serif;text-align:center">
   Vista previa estática · runtime {runtime_label} · objetivo {target_label}
-  ({status_label}) · producción autorizada: {production_label} ·
-  formularios y sesión deshabilitados ·
+  ({status_label}) · despliegue controlado: {controlled_label} ·
+  producción pública: {public_label} · formularios y sesión deshabilitados ·
   <a href="{CODESPACES_URL}" style="color:#fff;text-decoration:underline">abrir aplicación completa en Codespaces</a>
 </div>
 """
     if re.search(r"<body[^>]*>", html, flags=re.I):
         html = re.sub(
-            r"(<body[^>]*>)",
-            r"\1" + banner,
-            html,
-            count=1,
-            flags=re.I,
+            r"(<body[^>]*>)", r"\1" + banner, html, count=1, flags=re.I
         )
     else:
         html = banner + html
-    html = html.replace(
-        'action="/login"', 'action="#" onsubmit="return false"'
-    )
-    html = html.replace(
-        'action="/logout"', 'action="#" onsubmit="return false"'
-    )
+    html = html.replace('action="/login"', 'action="#" onsubmit="return false"')
+    html = html.replace('action="/logout"', 'action="#" onsubmit="return false"')
     html = re.sub(
-        r'action="/[^"]*"',
-        'action="#" onsubmit="return false"',
-        html,
+        r'action="/[^"]*"', 'action="#" onsubmit="return false"', html
     )
     html = html.replace('href="/static/', f'href="{relative}static/')
     html = html.replace('src="/static/', f'src="{relative}static/')
@@ -94,8 +81,7 @@ def main() -> int:
     parser.add_argument("--output", type=Path, default=ROOT / "_site")
     parser.add_argument("--commit", default=os.getenv("GITHUB_SHA", "local"))
     parser.add_argument(
-        "--branch",
-        default=os.getenv("GITHUB_REF_NAME", "integration/canonical"),
+        "--branch", default=os.getenv("GITHUB_REF_NAME", "integration/canonical")
     )
     args = parser.parse_args()
 
@@ -109,35 +95,32 @@ def main() -> int:
     target_release = release.get("release")
     display_release = release.get("display_release", target_release)
     release_status = release.get("status")
-    production_authorized = release.get("production_authorized") is True
+    controlled = release.get("controlled_deployment_authorized") is True
+    public = release.get("public_production_authorized") is True
+    production = release.get("production_authorized") is True
 
     output = args.output.resolve()
     if output.exists():
         shutil.rmtree(output)
     output.mkdir(parents=True)
 
+    banner_args = {
+        "runtime_version": running_version,
+        "target_release": display_release,
+        "release_status": release_status,
+        "controlled_deployment_authorized": controlled,
+        "public_production_authorized": public,
+    }
     landing = inject_banner(
-        fetch(args.base_url.rstrip("/") + "/"),
-        depth=0,
-        runtime_version=running_version,
-        target_release=display_release,
-        release_status=release_status,
-        production_authorized=production_authorized,
+        fetch(args.base_url.rstrip("/") + "/"), depth=0, **banner_args
     )
     login = inject_banner(
-        fetch(args.base_url.rstrip("/") + "/login"),
-        depth=1,
-        runtime_version=running_version,
-        target_release=display_release,
-        release_status=release_status,
-        production_authorized=production_authorized,
+        fetch(args.base_url.rstrip("/") + "/login"), depth=1, **banner_args
     )
 
     (output / "index.html").write_text(landing, encoding="utf-8")
     (output / "login").mkdir()
-    (output / "login" / "index.html").write_text(
-        login, encoding="utf-8"
-    )
+    (output / "login" / "index.html").write_text(login, encoding="utf-8")
 
     static_source = ROOT / "app" / "static"
     if not static_source.is_dir():
@@ -154,8 +137,13 @@ def main() -> int:
         "matches_target": running_version == target_release,
         "release_status": release_status,
         "scope_frozen": release.get("scope_frozen", False),
-        "production_authorized": production_authorized,
+        "controlled_deployment_authorized": controlled,
+        "public_production_authorized": public,
+        "production_authorized": production,
         "external_release_gates": release.get("external_release_gates", []),
+        "communication_restrictions": release.get(
+            "communication_restrictions", []
+        ),
         "full_preview": CODESPACES_URL,
     }
     (output / "preview-status.json").write_text(
