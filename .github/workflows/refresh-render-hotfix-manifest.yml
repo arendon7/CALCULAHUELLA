@@ -1,0 +1,63 @@
+name: Actualizar manifiesto hotfix Render
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - scripts/runtime_python.sh
+      - app/storage.py
+      - .github/workflows/refresh-render-hotfix-manifest.yml
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Actualizar hashes modificados
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          manifest = Path('MANIFIESTO_SHA256_CANONICO.txt')
+          targets = {
+              'scripts/runtime_python.sh': Path('scripts/runtime_python.sh'),
+              'app/storage.py': Path('app/storage.py'),
+          }
+          hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in targets.items()}
+          output = []
+          found = set()
+          for line in manifest.read_text(encoding='utf-8').splitlines():
+              if not line.strip():
+                  continue
+              _, rel = line.split('  ', 1)
+              if rel in hashes:
+                  output.append(f'{hashes[rel]}  {rel}')
+                  found.add(rel)
+              else:
+                  output.append(line)
+          missing = set(targets) - found
+          if missing:
+              raise SystemExit(f'Entradas ausentes: {sorted(missing)}')
+          manifest.write_text('\n'.join(output) + '\n', encoding='utf-8')
+          PY
+      - name: Publicar manifiesto
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add MANIFIESTO_SHA256_CANONICO.txt
+          if git diff --cached --quiet; then
+            echo "El manifiesto ya estaba actualizado."
+            exit 0
+          fi
+          git commit -m "chore: actualizar hashes del hotfix Render"
+          git push origin HEAD:main
