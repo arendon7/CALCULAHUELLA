@@ -1,0 +1,48 @@
+name: Diagnosticar paquete canónico
+
+on:
+  push:
+    branches:
+      - migration/canonical-v1.0.0
+    paths:
+      - canonical-upload.zip
+      - .github/workflows/diagnose-canonical.yml
+
+permissions:
+  contents: read
+
+jobs:
+  diagnosticar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validar archivo y estructura
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f canonical-upload.zip
+          echo "SHA256=$(sha256sum canonical-upload.zip | cut -d' ' -f1)"
+          echo "SIZE=$(stat -c '%s' canonical-upload.zip)"
+          unzip -tq canonical-upload.zip
+          rm -rf /tmp/canon
+          mkdir -p /tmp/canon
+          unzip -q canonical-upload.zip -d /tmp/canon
+          SOURCE="$(find /tmp/canon -type f -name CANONICAL_RELEASE.md -printf '%h\n' | head -n 1)"
+          test -n "$SOURCE"
+          echo "SOURCE=$SOURCE"
+          test -d "$SOURCE/app"
+          test -d "$SOURCE/migrations"
+          test -d "$SOURCE/site"
+          sha256sum "$SOURCE/MANIFIESTO_SHA256_CANONICO.txt"
+          sha256sum "$SOURCE/CANONICAL_RELEASE.md"
+          sha256sum "$SOURCE/RELEASE_CANONICA.json"
+          sha256sum "$SOURCE/VERSION"
+          sha256sum "$SOURCE/app/config.py"
+          sha256sum "$SOURCE/tools/verify_canonical.py"
+          sha256sum "$SOURCE/.github/workflows/pages.yml"
+          cd "$SOURCE"
+          python tools/verify_canonical.py
+          python -m compileall -q app migrations scripts tools
+          test "$(cat VERSION)" = "1.0.0"
