@@ -2,14 +2,37 @@
 
 cth_runtime_python() {
   local root="${1:-$PWD}"
-  local candidate="${CTH_PYTHON_BIN:-$root/.venv/bin/python}"
-  if [ ! -x "$candidate" ]; then
-    echo "No existe un Python local ejecutable en: $candidate" >&2
-    echo "Ejecuta primero: ./install_mac.sh" >&2
-    return 1
+  local configured="${CTH_PYTHON_BIN:-}"
+  local candidate=""
+
+  if [ -n "$configured" ] && [ -x "$configured" ]; then
+    CTH_RUNTIME_PYTHON="$configured"
+    export CTH_RUNTIME_PYTHON
+    return 0
   fi
-  CTH_RUNTIME_PYTHON="$candidate"
-  export CTH_RUNTIME_PYTHON
+
+  candidate="$root/.venv/bin/python"
+  if [ -x "$candidate" ]; then
+    CTH_RUNTIME_PYTHON="$candidate"
+    export CTH_RUNTIME_PYTHON
+    return 0
+  fi
+
+  # Los instaladores locales usan la .venv del proyecto. En Docker, las
+  # dependencias se instalan en el Python del contenedor y no existe .venv.
+  if [ -f "/.dockerenv" ] || [ "${CTH_ALLOW_SYSTEM_PYTHON:-false}" = "true" ]; then
+    candidate="$(command -v python3 2>/dev/null || command -v python 2>/dev/null || true)"
+    if [ -n "$candidate" ] && [ -x "$candidate" ]; then
+      CTH_RUNTIME_PYTHON="$candidate"
+      export CTH_RUNTIME_PYTHON
+      return 0
+    fi
+  fi
+
+  echo "No existe un Python ejecutable para Calcula tu Huella." >&2
+  echo "Instalación local: ejecuta primero ./install_mac.sh" >&2
+  echo "Docker: verifica que la imagen incluya python3 o define CTH_PYTHON_BIN." >&2
+  return 1
 }
 
 cth_port_in_use() {
