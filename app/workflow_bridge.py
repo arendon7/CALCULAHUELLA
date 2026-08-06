@@ -5,8 +5,10 @@ from datetime import UTC, datetime
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import workflow_service as _workflow_service
 from .database import DataRequest, Inventory, WorkItem
 from .workflow_service import (
+    create_work_item as _base_create_work_item,
     sync_data_request as _base_sync_data_request,
     transition_work_item as _base_transition_work_item,
 )
@@ -47,6 +49,16 @@ def _snapshot(item: WorkItem | None) -> tuple[object, ...] | None:
         item.closed_at,
         item.version,
     )
+
+
+def create_work_item(session: Session, user: dict[str, object], **kwargs) -> WorkItem:
+    """Ensure an area-only assignment has a visible operational owner."""
+    area = str(kwargs.get("assignee_area") or "").strip()
+    email = str(kwargs.get("assignee_email") or "").strip()
+    role = str(kwargs.get("assignee_role") or "").strip()
+    if area and not email and not role:
+        kwargs["assignee_role"] = "Cliente"
+    return _base_create_work_item(session, user, **kwargs)
 
 
 def _sync_request_from_work_item(session: Session, item: WorkItem) -> None:
@@ -121,3 +133,9 @@ def sync_data_requests(session: Session, organization_id: int, actor_email: str)
         )
         changed += int(item_changed)
     return {"total": len(requests), "changed": changed}
+
+
+# experience_web imports workflow_bridge before workflow_service. Replacing this
+# reference keeps the generic service independent while applying the compatibility
+# default to tasks created from the current web form.
+_workflow_service.create_work_item = create_work_item
