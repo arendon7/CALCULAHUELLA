@@ -1,1 +1,1 @@
-window.CTH_CONFIG = { fullAppUrl: "", repositoryUrl: "https://github.com/arendon7/CALCULAHUELLA" };
+window.CALCULA_TU_HUELLA_CONFIG = { appBaseUrl: "" };
