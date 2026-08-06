@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - integration/workflow-v1.5.0
+  pull_request:
+    branches:
+      - integration/uiux-v1.4.0
+    types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
 permissions:
