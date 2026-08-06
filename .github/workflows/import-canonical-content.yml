@@ -1,0 +1,64 @@
+name: Importar contenido canónico
+
+on:
+  push:
+    branches:
+      - migration/canonical-v1.0.0
+    paths:
+      - .github/workflows/import-canonical-content.yml
+
+permissions:
+  contents: write
+
+concurrency:
+  group: canonical-content-import
+  cancel-in-progress: false
+
+jobs:
+  importar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Descargar rama segura
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extraer y verificar paquete
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f canonical-upload.zip
+          rm -rf /tmp/canon
+          mkdir -p /tmp/canon
+          unzip -tq canonical-upload.zip
+          unzip -q canonical-upload.zip -d /tmp/canon
+          SOURCE="$(find /tmp/canon -type f -name CANONICAL_RELEASE.md -printf '%h\n' | head -n 1)"
+          test -n "$SOURCE"
+          test "$(sha256sum "$SOURCE/MANIFIESTO_SHA256_CANONICO.txt" | cut -d' ' -f1)" = "d4da015d9054e49670ef7d09e2b8df2eefa02925f2179d0852e79dc0fa6c43a5"
+          test "$(sha256sum "$SOURCE/CANONICAL_RELEASE.md" | cut -d' ' -f1)" = "879e54aa1bc744c6ea7c5fd3561b6451a7be2434af80a0a6558d1ef15ddc089f"
+          cd "$SOURCE"
+          python tools/verify_canonical.py
+          python -m compileall -q app migrations scripts tools
+          test "$(cat VERSION)" = "1.0.0"
+          echo "SOURCE=$SOURCE" >> "$GITHUB_ENV"
+
+      - name: Importar producto sin modificar workflows
+        shell: bash
+        run: |
+          set -euo pipefail
+          rsync -a --delete --exclude='.git/' --exclude='.github/workflows/' "$SOURCE/" ./
+          test -f CANONICAL_RELEASE.md
+          test -d app
+          test -d migrations
+          test -d site
+
+      - name: Publicar contenido canónico
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "release: importar contenido V1.0.0 canónico"
+          git push origin HEAD:migration/canonical-v1.0.0
