@@ -44,6 +44,13 @@ from .inventory import (
     VerificationFinding,
 )
 
+from .workflow import (
+    WorkItem,
+    WorkItemEvent,
+    WorkItemLink,
+    WorkItemDependency,
+)
+
 from .supply_chain import (
     Supplier,
     SupplierCampaign,
@@ -132,7 +139,6 @@ from .governance import (
     ReferenceCaseResult,
 )
 
-
 from .product_intelligence import (
     OrganizationCarbonProfile,
     DiagnosticAssessment,
@@ -191,6 +197,10 @@ __all__ = [
     "ReductionScenario",
     "ReductionScenarioAction",
     "VerificationFinding",
+    "WorkItem",
+    "WorkItemEvent",
+    "WorkItemLink",
+    "WorkItemDependency",
     "Supplier",
     "SupplierCampaign",
     "Scope3CategoryAssessment",
