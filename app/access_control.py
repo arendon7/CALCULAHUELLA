@@ -20,6 +20,8 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         "view_customer_success", "manage_impact", "view_impact", "manage_climate_risk",
         "view_climate_risk", "manage_climate_disclosure", "view_climate_disclosure",
         "manage_consolidation", "view_consolidation", "review", "approve", "view_methodology",
+        "manage_workflow", "execute_workflow", "validate_workflow", "review_workflow",
+        "approve_workflow", "audit_workflow",
     },
     "Consultor": {
         "manage_inventory", "manage_sources", "manage_supply_chain", "manage_automations",
@@ -29,20 +31,23 @@ ROLE_CAPABILITIES: dict[str, set[str]] = {
         "manage_impact", "view_impact", "manage_climate_risk", "view_climate_risk",
         "manage_climate_disclosure", "view_climate_disclosure", "manage_consolidation",
         "view_consolidation", "review", "view_methodology",
+        "manage_workflow", "execute_workflow", "validate_workflow", "review_workflow",
     },
     "Cliente": {
         "provide_data", "manage_supply_chain", "manage_support", "view_customer_success",
-        "view_impact", "view_climate_risk", "view_climate_disclosure",
+        "view_impact", "view_climate_risk", "view_climate_disclosure", "execute_workflow",
     },
     "Revisor": {
         "review", "approve", "view_methodology", "manage_portfolio", "manage_compliance",
         "view_compliance", "manage_documents", "manage_methodology_governance", "manage_support",
         "view_customer_success", "view_impact", "view_climate_risk",
         "manage_climate_disclosure", "view_climate_disclosure", "view_consolidation",
+        "validate_workflow", "review_workflow", "approve_workflow",
     },
     "Verificador": {
         "view_methodology", "external_audit", "manage_portfolio", "view_compliance",
         "view_impact", "view_climate_risk", "view_climate_disclosure", "view_consolidation",
+        "audit_workflow",
     },
 }
 
@@ -79,6 +84,12 @@ CAPABILITY_LABELS = {
     "view_climate_disclosure": "Consultar divulgación climática",
     "manage_consolidation": "Gestionar consolidación V1.0",
     "view_consolidation": "Consultar consolidación V1.0",
+    "manage_workflow": "Crear, asignar y cancelar trabajo",
+    "execute_workflow": "Aceptar y entregar trabajo asignado",
+    "validate_workflow": "Validar entregas y controles de calidad",
+    "review_workflow": "Revisar y aceptar entregas",
+    "approve_workflow": "Cerrar o reabrir trabajo controlado",
+    "audit_workflow": "Consultar trazabilidad del trabajo",
 }
 
 
