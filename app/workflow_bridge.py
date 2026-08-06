@@ -7,6 +7,9 @@ from sqlalchemy.orm import Session
 
 from . import workflow_service as _workflow_service
 from .database import DataRequest, Inventory, WorkItem
+from .notifications import create_notification, notify_roles
+from .workflow_domain import STATUS_BY_CODE
+from .workflow_integrations import mirror_source_from_work_item, sync_specialized_work_items
 from .workflow_service import (
     create_work_item as _base_create_work_item,
     sync_data_request as _base_sync_data_request,
@@ -51,14 +54,96 @@ def _snapshot(item: WorkItem | None) -> tuple[object, ...] | None:
     )
 
 
+def _status_label(item: WorkItem) -> str:
+    definition = STATUS_BY_CODE.get(item.status_code)
+    return definition.label if definition else item.status_code
+
+
+def _notify_assignee(
+    session: Session,
+    item: WorkItem,
+    *,
+    actor_user_id: int | None,
+    title: str,
+    message: str,
+    priority: str = "Normal",
+) -> None:
+    if item.assignee_user_id and item.assignee_user_id != actor_user_id:
+        create_notification(
+            session,
+            item.organization_id,
+            title,
+            message,
+            user_id=item.assignee_user_id,
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority=priority,
+        )
+        return
+    if item.assignee_role:
+        notify_roles(
+            session,
+            item.organization_id,
+            {item.assignee_role},
+            title,
+            message,
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority=priority,
+        )
+
+
+def _notify_requester(
+    session: Session,
+    item: WorkItem,
+    *,
+    actor_user_id: int | None,
+    title: str,
+    message: str,
+    fallback_roles: set[str] | None = None,
+) -> None:
+    if item.requester_user_id and item.requester_user_id != actor_user_id:
+        create_notification(
+            session,
+            item.organization_id,
+            title,
+            message,
+            user_id=item.requester_user_id,
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority="Normal",
+        )
+        return
+    if fallback_roles:
+        notify_roles(
+            session,
+            item.organization_id,
+            fallback_roles,
+            title,
+            message,
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority="Normal",
+        )
+
+
 def create_work_item(session: Session, user: dict[str, object], **kwargs) -> WorkItem:
-    """Ensure an area-only assignment has a visible operational owner."""
+    """Ensure an area-only assignment has a visible owner and notify it."""
     area = str(kwargs.get("assignee_area") or "").strip()
     email = str(kwargs.get("assignee_email") or "").strip()
     role = str(kwargs.get("assignee_role") or "").strip()
     if area and not email and not role:
         kwargs["assignee_role"] = "Cliente"
-    return _base_create_work_item(session, user, **kwargs)
+    item = _base_create_work_item(session, user, **kwargs)
+    _notify_assignee(
+        session,
+        item,
+        actor_user_id=int(user["id"]),
+        title=f"Nueva tarea: {item.title}",
+        message=f"Se te asignó una tarea. Próxima acción: {item.next_action}",
+        priority="Alta" if item.priority in {"high", "critical"} else "Normal",
+    )
+    return item
 
 
 def _sync_request_from_work_item(session: Session, item: WorkItem) -> None:
@@ -74,10 +159,74 @@ def _sync_request_from_work_item(session: Session, item: WorkItem) -> None:
     request_record.completed_at = item.closed_at if mapped_status == "Completado" else None
 
 
+def _notify_transition(
+    session: Session,
+    item: WorkItem,
+    user: dict[str, object],
+    previous_status: str,
+) -> None:
+    label = _status_label(item)
+    title = f"Tarea #{item.id}: {label}"
+    message = f"{item.title}. Próxima acción: {item.next_action}"
+    actor_user_id = int(user["id"])
+
+    if item.status_code in {"assigned", "accepted_by_assignee", "in_progress", "blocked", "returned"}:
+        _notify_assignee(
+            session,
+            item,
+            actor_user_id=actor_user_id,
+            title=title,
+            message=message,
+            priority="Alta" if item.status_code in {"blocked", "returned"} else "Normal",
+        )
+    elif item.status_code in {"submitted", "validating", "under_review"}:
+        notify_roles(
+            session,
+            item.organization_id,
+            {"Consultor", "Revisor"},
+            title,
+            message,
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority="Alta" if item.priority in {"high", "critical"} else "Normal",
+        )
+    elif item.status_code in {"accepted_by_reviewer", "closed", "cancelled"}:
+        _notify_requester(
+            session,
+            item,
+            actor_user_id=actor_user_id,
+            title=title,
+            message=message,
+            fallback_roles={"Administrador", "Consultor"},
+        )
+
+    if previous_status == "closed" and item.status_code == "returned":
+        notify_roles(
+            session,
+            item.organization_id,
+            {"Administrador", "Consultor", "Revisor"},
+            f"Tarea reabierta: {item.title}",
+            "Una tarea previamente cerrada fue reabierta con motivo documentado.",
+            link=f"/mi-trabajo#tarea-{item.id}",
+            category="Mi trabajo",
+            priority="Alta",
+        )
+
+
 def transition_work_item(session: Session, item: WorkItem, user: dict[str, object], **kwargs) -> WorkItem:
-    """Apply the canonical transition and mirror it to the legacy request when present."""
+    """Apply a canonical transition, mirror its source and notify the next actor."""
+    previous_status = item.status_code
+    comment = str(kwargs.get("comment") or "")
     result = _base_transition_work_item(session, item, user, **kwargs)
     _sync_request_from_work_item(session, result)
+    mirror_source_from_work_item(
+        session,
+        result,
+        actor_email=str(user["email"]),
+        actor_role=str(user["role"]),
+        comment=comment,
+    )
+    _notify_transition(session, result, user, previous_status)
     return result
 
 
@@ -114,7 +263,7 @@ def sync_data_request(
     return item, before is None or before != _snapshot(item)
 
 
-def sync_data_requests(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
+def _sync_data_requests_only(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
     requests = list(
         session.scalars(
             select(DataRequest)
@@ -135,7 +284,17 @@ def sync_data_requests(session: Session, organization_id: int, actor_email: str)
     return {"total": len(requests), "changed": changed}
 
 
+def sync_data_requests(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
+    """Synchronize every supported work source while preserving the legacy return contract."""
+    requests = _sync_data_requests_only(session, organization_id, actor_email)
+    specialized = sync_specialized_work_items(session, organization_id, actor_email)
+    return {
+        "total": requests["total"],
+        "changed": requests["changed"] + int(specialized["changed"]),
+    }
+
+
 # experience_web imports workflow_bridge before workflow_service. Replacing this
-# reference keeps the generic service independent while applying the compatibility
-# default to tasks created from the current web form.
+# reference keeps the generic service independent while applying compatibility
+# defaults and notifications to tasks created from the current web form.
 _workflow_service.create_work_item = create_work_item
