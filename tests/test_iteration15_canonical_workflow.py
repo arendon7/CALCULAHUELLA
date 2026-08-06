@@ -21,6 +21,8 @@ from app.workflow_domain import (
     validate_transition,
 )
 
+pytestmark = pytest.mark.smoke
+
 
 def test_canonical_process_has_exactly_eight_ordered_stages():
     validate_catalogue()
