@@ -4,6 +4,7 @@ on:
   push:
     branches: [main]
     paths:
+      - Dockerfile
       - scripts/runtime_python.sh
       - app/storage.py
       - .github/workflows/refresh-render-hotfix-manifest.yml
@@ -28,6 +29,7 @@ jobs:
 
           manifest = Path('MANIFIESTO_SHA256_CANONICO.txt')
           targets = {
+              'Dockerfile': Path('Dockerfile'),
               'scripts/runtime_python.sh': Path('scripts/runtime_python.sh'),
               'app/storage.py': Path('app/storage.py'),
           }
