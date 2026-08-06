@@ -24,7 +24,7 @@ CATEGORY_ROUTING = {
     "Soporte funcional": "Equipo de soporte",
 }
 
-OPEN_STATUSES = {"Abierto", "En gestión", "Esperando cliente", "Esperando equipo"}
+OPEN_STATUSES = {"Abierto", "En gestión", "Esperando cliente", "Esperando equipo", "En revisión", "Bloqueado"}
 CLOSED_STATUSES = {"Resuelto", "Cerrado"}
 
 
