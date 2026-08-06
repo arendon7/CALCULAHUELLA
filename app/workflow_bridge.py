@@ -26,6 +26,29 @@ WORK_ITEM_TO_DATA_REQUEST_STATUS = {
 }
 
 
+def _snapshot(item: WorkItem | None) -> tuple[object, ...] | None:
+    if item is None:
+        return None
+    return (
+        item.inventory_id,
+        item.title,
+        item.description,
+        item.status_code,
+        item.assignee_user_id,
+        item.assignee_email,
+        item.assignee_role,
+        item.assignee_area,
+        item.requester_user_id,
+        item.requester_email,
+        item.due_date,
+        item.acceptance_criteria,
+        item.next_action,
+        item.source_route,
+        item.closed_at,
+        item.version,
+    )
+
+
 def _sync_request_from_work_item(session: Session, item: WorkItem) -> None:
     if item.source_entity_type != "DataRequest" or not item.source_entity_id:
         return
@@ -54,26 +77,29 @@ def sync_data_request(
     actor_email: str,
 ) -> tuple[WorkItem, bool]:
     """Import a legacy request without leaking visibility through the importing user."""
-    item, changed = _base_sync_data_request(
+    existing = session.scalar(
+        select(WorkItem).where(
+            WorkItem.organization_id == organization_id,
+            WorkItem.source_entity_type == "DataRequest",
+            WorkItem.source_entity_id == request_record.id,
+        )
+    )
+    before = _snapshot(existing)
+    item, _ = _base_sync_data_request(
         session,
         request_record,
         organization_id=organization_id,
         actor_email=actor_email,
     )
     is_email_assignment = "@" in request_record.requested_to.strip()
-    desired_role = item.assignee_role or ("Cliente" if not is_email_assignment else "")
-    corrections = False
-    if item.requester_email:
+    if item.requester_email or item.requester_user_id:
         item.requester_email = ""
         item.requester_user_id = None
-        corrections = True
-    if item.assignee_role != desired_role:
-        item.assignee_role = desired_role
-        corrections = True
+    if not is_email_assignment and not item.assignee_role:
+        item.assignee_role = "Cliente"
     if item.status_code == "closed" and item.closed_at is None:
         item.closed_at = request_record.completed_at or datetime.now(UTC)
-        corrections = True
-    return item, bool(changed or corrections)
+    return item, before is None or before != _snapshot(item)
 
 
 def sync_data_requests(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
