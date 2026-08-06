@@ -1,0 +1,91 @@
+name: Iteración 4 · estabilización integral
+
+on:
+  push:
+    branches:
+      - integration/workflow-v1.5.0
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iteration4-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stabilize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Compilar Python y verificar paquete canónico
+        run: |
+          python -m compileall -q app tests scripts migrations
+          rm -rf /tmp/calculahuella-canonical-check
+          mkdir -p /tmp/calculahuella-canonical-check
+          rsync -a --exclude='.git/' ./ /tmp/calculahuella-canonical-check/
+          cd /tmp/calculahuella-canonical-check
+          python tools/verify_canonical.py --skip-manifest
+
+      - name: Ejecutar pruebas de estabilización y flujo
+        run: |
+          pytest -q \
+            tests/test_iteration15_canonical_workflow.py \
+            tests/test_iteration16_area_assignment.py \
+            tests/test_iteration16_work_items.py \
+            tests/test_iteration17_integrated_workflow.py \
+            tests/test_iteration18_stabilization.py \
+            --junitxml=iteration4-targeted.xml
+
+      - name: Migración desde base vacía
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-fresh"
+          mkdir -p "${RUNNER_TEMP}/cth-fresh"
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-fresh" python -m alembic upgrade head
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-fresh" python -m alembic current
+
+      - name: Migración incremental 0036 a head
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-existing"
+          mkdir -p "${RUNNER_TEMP}/cth-existing"
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic upgrade 20260805_0036
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic upgrade head
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic current
+
+      - name: Suite smoke
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 420
+
+      - name: Suite integral aislada
+        run: |
+          set -o pipefail
+          python scripts/run_test_tier.py full --durations 5 --timeout 420 2>&1 | tee iteration4-full.log
+
+      - name: Publicar evidencia de estabilización
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iteration4-stabilization-evidence
+          path: |
+            iteration4-targeted.xml
+            iteration4-full.log
+          if-no-files-found: warn
+          retention-days: 14
