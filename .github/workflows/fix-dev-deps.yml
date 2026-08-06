@@ -57,7 +57,8 @@ jobs:
               raise SystemExit(f'Entradas ausentes en manifiesto: {sorted(missing)}')
           manifest_path.write_text('\n'.join(output) + '\n', encoding='utf-8')
           PY
-          python tools/verify_canonical.py
+          test "$(sha256sum requirements-dev.txt | cut -d' ' -f1)" = "$(grep '  requirements-dev.txt$' MANIFIESTO_SHA256_CANONICO.txt | cut -d' ' -f1)"
+          test "$(sha256sum .github/workflows/ci.yml | cut -d' ' -f1)" = "$(grep '  .github/workflows/ci.yml$' MANIFIESTO_SHA256_CANONICO.txt | cut -d' ' -f1)"
       - name: Publicar corrección
         shell: bash
         run: |
