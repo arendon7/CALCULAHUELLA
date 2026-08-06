@@ -1,6 +1,6 @@
-# Calcula tu Huella — V1.4.0 Integración controlada · Etapa 1
+# Calcula tu Huella — V1.4.0 Integración controlada
 
-## Base inmutable
+## Base
 
 - Repositorio: `arendon7/CALCULAHUELLA`
 - Rama fuente: `migration/canonical-v1.0.0`
@@ -8,21 +8,43 @@
 - Identificador canónico: `v1.0.0-canonica.20260805`
 - Rama de integración: `integration/uiux-v1.4.0`
 
-## Alcance de este commit
+## Principio de no regresión
 
-Esta primera etapa integra exclusivamente la capa visual global de la aplicación autenticada. No cambia rutas, modelos, migraciones, permisos, autenticación, repositorios, cálculos ni plantillas funcionales.
+La integración no reemplaza motores, repositorios, migraciones, permisos, autenticación, modelos ni cálculos. La V1.4 modifica la presentación pública, la capa visual global y las pruebas/documentación asociadas.
 
-## Reversibilidad
+## Etapa 1 — aplicación autenticada
 
-El `app/static/css/app.css` canónico se conserva, sin alteraciones, como `app/static/css/app-canonical-v1.css` mediante el mismo blob Git SHA `8534c3b398dab062b2fcc12a9115cc7383e99e27`.
+La primera etapa conserva el CSS canónico como `app/static/css/app-canonical-v1.css` reutilizando exactamente su blob Git SHA `8534c3b398dab062b2fcc12a9115cc7383e99e27`.
 
-El nuevo archivo de entrada carga:
+El archivo `app/static/css/app.css` importa primero esa base y después `v1.4.css`. La reversión consiste en restaurar `app.css` al blob canónico y retirar las capas añadidas.
 
-1. `app-canonical-v1.css` — base completa certificada.
-2. `v1.4.css` — ajustes de identidad, jerarquía, espaciado y responsive.
+## Etapa 2 — experiencia pública
 
-La reversión consiste en devolver `app.css` al blob canónico y eliminar los dos archivos añadidos.
+La segunda etapa incorpora:
 
-## Exclusiones expresas
+- Landing pública servida por FastAPI mediante `public_base.html` y `public_home.html`.
+- Hoja pública independiente, cargada después del CSS canónico, para aislar la nueva experiencia comercial.
+- JavaScript público sin dependencias remotas y con navegación accesible.
+- Sitio estático autocontenido para GitHub Pages dentro de `site/`.
+- Pruebas de rutas reales, consistencia estática, reserva metodológica y reversibilidad del CSS.
 
-La landing V1.4 completa, sus componentes públicos y el sitio estático se mantienen en el overlay local validado y se integrarán en un commit separado. Esta separación impide dejar la rama con referencias a recursos públicos incompletos.
+## Separación de superficies
+
+- `site/`: presentación pública estática para GitHub Pages. No simula persistencia empresarial ni reemplaza el backend.
+- `app/templates/public_*`: presentación pública servida por FastAPI y conectada con rutas reales de diagnóstico, acceso y páginas legales.
+- Aplicación autenticada: conserva la lógica y los datos canónicos; recibe únicamente la capa visual global.
+
+## Validación
+
+- Plantillas Jinja analizadas sin errores.
+- JavaScript validado con `node --check`.
+- Anclas y recursos estáticos consistentes.
+- Sin referencias locales de desarrollo en las superficies públicas.
+- 4 pruebas de integración pública aprobadas.
+- Evidencia visual en escritorio, portátil y móvil: cero desbordamientos y cero errores de consola.
+
+## Límites y lenguaje de confianza
+
+La V1.4 no declara producción pública certificada, verificación automática ni cumplimiento garantizado. La plataforma organiza datos, evidencia, factores, cálculos, revisión y entregables; la verificación independiente corresponde a un tercero competente y a un alcance específico.
+
+La publicación definitiva exige infraestructura, dominio, TLS, correo, almacenamiento, pruebas físicas y auditorías independientes conforme a la documentación canónica.

@@ -1,41 +1,51 @@
 <!doctype html>
-<html lang="es">
+<html lang="es-CO">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}Calcula tu Huella{% endblock %}</title>
-  <meta name="description" content="Plataforma y acompañamiento profesional para diagnosticar, medir, comprender y reducir la huella de carbono según el sector y la realidad de cada organización.">
-  <meta name="theme-color" content="#0F2D4D">
+  <meta name="color-scheme" content="light">
+  <meta name="theme-color" content="#0B3B2E">
+  <title>{% block title %}Calcula tu Huella | Gestión de carbono{% endblock %}</title>
+  <meta name="description" content="Centraliza datos, evidencias, solicitudes, cálculos e informes para gestionar la huella de carbono con acompañamiento profesional y trazabilidad.">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Calcula tu Huella | Toda tu gestión de carbono, conectada">
+  <meta property="og:description" content="Plataforma colaborativa de gestión de carbono con acompañamiento profesional.">
   <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/public-v1.4.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+  <script defer src="{{ url_for('static', path='js/public-v1.4.js') }}"></script>
 </head>
-<body class="public-body">
+<body class="public-v14-body">
 <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
-<header class="public-header">
-  <a class="public-brand" href="/" aria-label="Calcula tu Huella, inicio"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
-  <button class="public-menu-button" id="publicMenuButton" type="button" aria-expanded="false" aria-controls="publicNav"><span></span><span></span><span></span><b>Menú</b></button>
-  <nav id="publicNav" aria-label="Navegación principal">
-    <a href="/#quienes-somos">Quiénes somos</a>
-    <a href="/#proceso">Cómo funciona</a>
-    <a href="/#diferencias">Por qué elegirnos</a>
-    <a href="/#precios">Planes</a>
-    <a href="/#equipo">Equipo</a>
-    <a href="/#preguntas">Preguntas</a>
-    <a href="/#contacto">Contacto</a>
-  </nav>
-  <div class="public-actions">
-    {% if user %}<a class="button secondary" href="/dashboard">Ir a la plataforma</a>{% else %}<a class="button secondary" href="/login">Iniciar sesión</a>{% endif %}
-    <a class="button primary" href="/diagnostico">Comenzar diagnóstico</a>
+<header class="site-header" id="inicio">
+  <div class="container nav">
+    <a class="brand" href="/" aria-label="Calcula tu Huella, inicio"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
+    <nav class="nav-links" aria-label="Navegación principal">
+      <a href="/#plataforma">Plataforma</a><a href="/#como-funciona">Cómo funciona</a><a href="/#informes">Informes</a><a href="/#soluciones">Soluciones</a><a href="/#experiencia">Experiencia</a><a href="/#recursos">Recursos</a>
+    </nav>
+    <div class="nav-actions">
+      {% if user %}<a class="login-link" href="/dashboard">Ir a la plataforma</a>{% else %}<a class="login-link" href="/login">Iniciar sesión</a>{% endif %}
+      <a class="btn btn-primary" href="/diagnostico">Realizar diagnóstico</a>
+      <button class="menu-button" type="button" data-menu-button aria-expanded="false" aria-controls="mobilePanel" aria-label="Abrir menú"><span></span></button>
+    </div>
   </div>
+  <aside class="mobile-panel" id="mobilePanel" data-mobile-panel aria-label="Menú móvil">
+    <a href="/#plataforma">Plataforma</a><a href="/#como-funciona">Cómo funciona</a><a href="/#informes">Informes</a><a href="/#soluciones">Soluciones</a><a href="/#experiencia">Experiencia</a><a href="/#recursos">Recursos</a>
+    {% if user %}<a href="/dashboard">Ir a la plataforma</a>{% else %}<a href="/login">Iniciar sesión</a>{% endif %}<a class="btn btn-primary" href="/diagnostico">Realizar diagnóstico</a>
+  </aside>
 </header>
 <main id="contenido-principal">{% block content %}{% endblock %}</main>
-<footer class="public-footer">
-  <div class="public-footer-brand"><img src="{{ url_for('static', path='img/brand-reversed.svg') }}" alt="Calcula tu Huella"><p>Diagnostica. Mide. Comprende. Reduce. Gestión climática con información trazable y acompañamiento profesional.</p><b>Potenciado por GREENATICS</b></div>
-  <div><strong>Conócenos</strong><a href="/#quienes-somos">Quiénes somos</a><a href="/#diferencias">Diferencias</a><a href="/#equipo">Equipo técnico</a><a href="/#contacto">Contacto</a></div>
-  <div><strong>Plataforma</strong><a href="/#proceso">Cómo funciona</a><a href="/#resultados">Entregables</a><a href="/#precios">Planes y precios</a><a href="/diagnostico">Diagnóstico</a><a href="/login">Acceso clientes</a></div>
-  <div><strong>Legal y confianza</strong><a href="/legal/terminos">Términos</a><a href="/legal/privacidad">Privacidad</a><a href="/legal/dpa">Tratamiento de datos</a><a href="/legal/sla">Nivel de servicio</a><a href="/legal/metodologia">Alcance metodológico</a></div>
-  <small>© 2026 Calcula tu Huella · Potenciado por Greenatics · Los resultados dependen de la calidad de los datos y de la revisión metodológica aplicable.</small>
+<footer class="public-footer-v14">
+  <div class="container">
+    <div class="footer-grid">
+      <div><img src="{{ url_for('static', path='img/brand-reversed.svg') }}" alt="Calcula tu Huella"><p>Plataforma colaborativa de gestión de carbono con acompañamiento profesional. Información conectada para medir, explicar y actuar.</p><strong>Potenciado por GREENATICS</strong></div>
+      <div><strong>Plataforma</strong><a href="/#plataforma">Centro de trabajo</a><a href="/#como-funciona">Cómo funciona</a><a href="/#informes">Informes</a><a href="/#reduccion">Reducción</a></div>
+      <div><strong>Soluciones</strong><a href="/#soluciones">Huella Esencial</a><a href="/#soluciones">Gestión de Carbono</a><a href="/#soluciones">Gestión Avanzada</a><a href="/diagnostico">Diagnóstico</a></div>
+      <div><strong>Legal y confianza</strong><a href="/legal/terminos">Términos</a><a href="/legal/privacidad">Privacidad</a><a href="/legal/dpa">Tratamiento de datos</a><a href="/legal/metodologia">Alcance metodológico</a></div>
+    </div>
+    <div class="footer-legal"><span>© 2026 Calcula tu Huella · V1.4.0 integración controlada</span><span>Los resultados dependen de la calidad de los datos y de la revisión metodológica aplicable. La plataforma no actúa automáticamente como organismo verificador o certificador.</span></div>
+  </div>
 </footer>
 </body>
 </html>

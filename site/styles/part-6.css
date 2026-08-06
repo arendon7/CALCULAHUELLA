@@ -1,0 +1,11 @@
+@media(max-width:900px){
+  .process-nav{grid-template-columns:repeat(4,1fr)}.process-step:nth-child(4){border-right:0}.process-step:nth-child(-n+4){border-bottom:1px solid var(--line)}.process-content{grid-template-columns:1fr}.process-copy{padding:36px}.process-visual{min-height:380px}.trace-map{grid-template-columns:1fr}.trace-map>i{transform:none}.report-page{width:300px;height:415px}.report-stack{min-height:475px}.report-page-front img{margin-bottom:32px}.report-number{margin-top:35px}.decision-benefits{grid-template-columns:1fr}.diagnostic-actions{align-items:flex-start;flex-direction:column}
+}
+@media(max-width:700px){
+  .agility-grid{grid-template-columns:1fr}.flow-row{display:grid;grid-template-columns:1fr}.flow-row i{display:none}.flow-row strong{min-width:0}.process-nav{display:flex;overflow-x:auto}.process-step{min-width:105px;border-bottom:0!important}.process-copy{padding:28px 20px}.process-panel h3{font-size:1.65rem}.process-visual{padding:24px 16px;min-height:340px}.diagnostic-card{margin:16px;padding:18px}.trace-map{gap:7px}.trace-node{grid-template-columns:32px 1fr}.reports-layout{gap:20px}.report-stack{min-height:430px;transform:scale(.88);transform-origin:top center;margin-bottom:-45px}.report-catalogue{gap:8px}.report-item{grid-template-columns:35px 1fr}.report-item>b{grid-column:2}.decision-body{padding:16px}.decision-metrics{grid-template-columns:1fr}.decision-action{align-items:flex-start;flex-direction:column}.reduction-steps{grid-template-columns:1fr}.reduction-note{grid-column:auto}.reduction-row{grid-template-columns:1fr 80px}.reduction-row>.reduction-state{grid-column:1}.reduction-row>div{grid-column:1}.reduction-row strong{grid-column:2;grid-row:1;text-align:right}.reduction-row>i{grid-column:2;grid-row:2;text-align:right}.diagnostic-cta{padding:78px 0}.diagnostic-copy h2{font-size:2.6rem}
+}
+@media(max-width:420px){
+  .process-step{min-width:95px}.process-visual{padding:18px 9px}.process-window-top{padding:0 11px}.report-stack{transform:scale(.76);margin-left:-24px;margin-bottom:-100px}.report-item p{font-size:.65rem}.decision-copy h2{font-size:2.5rem}.reduction-head{align-items:flex-start;gap:15px}.reduction-row{padding:15px}.diagnostic-copy h2{font-size:2.35rem}
+}
+
+
