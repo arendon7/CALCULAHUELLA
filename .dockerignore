@@ -1,8 +1,0 @@
-.venv
-__pycache__
-.pytest_cache
-.git
-instance/*
-!instance/.gitkeep
-*.zip
-.env
