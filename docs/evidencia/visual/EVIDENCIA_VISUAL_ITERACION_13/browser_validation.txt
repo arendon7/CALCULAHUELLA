@@ -1,0 +1,7 @@
+Validación navegador Iteración 13
+- Recorrido de primer ingreso: aprobado
+- Ayuda contextual: aprobada
+- Resumen de errores de formulario: aprobado
+- Tablas con caption y región desplazable: aprobado
+- Menú móvil con foco, inert y Escape: aprobado
+- Errores de consola: 0

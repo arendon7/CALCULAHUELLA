@@ -1,0 +1,21 @@
+{
+  "acceptance_evidence": "release/ITERACION_10_ACCEPTANCE_EVIDENCE.json",
+  "application": "Calcula tu Huella",
+  "collected_count": 392,
+  "duration_seconds": 30.62,
+  "generated_at": "2026-08-05T21:32:52.744724+00:00",
+  "limitations": [
+    "La ejecución se realizó en Linux; no acredita instalación física en macOS externo ni Windows 10/11.",
+    "La carga usa ASGI local y no sustituye pruebas distribuidas de red o infraestructura.",
+    "No se ejecutó pentest independiente.",
+    "Producción pública requiere PostgreSQL, TLS, almacenamiento externo, respaldo fuera del volumen y monitoreo real.",
+    "La aprobación técnica de la plataforma no equivale a verificación independiente de un inventario específico."
+  ],
+  "migration_head": "20260805_0036",
+  "release_class": "V1.0 final para despliegue controlado",
+  "scope": "regresión automatizada, aceptación multiempresa, continuidad y controles estructurales",
+  "skipped_count": 0,
+  "status": "passed",
+  "test_count": 392,
+  "version": "1.0.0"
+}

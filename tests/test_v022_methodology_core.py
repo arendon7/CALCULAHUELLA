@@ -25,8 +25,7 @@ from app.methodology_core import run_reference_suite, select_factor_candidates
 
 @pytest.fixture(autouse=True)
 def fresh_database_v022():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -94,7 +93,7 @@ def test_v022_reference_suite_passes_all_active_cases():
     with SessionLocal() as session:
         run = run_reference_suite(session, "prueba@calculatuhuella.local")
         session.commit()
-        assert run.engine_version == "0.45.0"
+        assert run.engine_version == "1.1.0"
         assert run.total_cases >= 12
         assert run.passed_cases == run.total_cases
         assert run.failed_cases == 0
@@ -110,7 +109,7 @@ def test_v022_page_api_and_role_access():
         assert "Núcleo metodológico" in page.text
         api = client.get("/api/metodologia/nucleo")
         assert api.status_code == 200
-        assert api.json()["engine_version"] == "0.45.0"
+        assert api.json()["engine_version"] == "1.1.0"
         assert api.json()["metrics"]["formal_factors"] >= 1
         client.post("/logout")
 

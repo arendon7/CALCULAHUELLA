@@ -64,6 +64,75 @@ def get_request_id() -> str:
     return _request_id_var.get("")
 
 
+def secure_secret_matches(supplied: str | None, expected: str | None) -> bool:
+    """Constant-time comparison for API, metrics and webhook secrets."""
+    left = supplied or ""
+    right = expected or ""
+    return bool(right) and hmac.compare_digest(left.encode("utf-8"), right.encode("utf-8"))
+
+
+class RequestBodyLimitMiddleware:
+    """Reject oversized bodies before multipart parsing or CSRF buffering.
+
+    The limit applies to all HTTP request bodies and is intentionally slightly
+    larger than the configured upload limit to allow multipart boundaries.
+    """
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
+        limit = max(1, settings.max_request_mb) * 1024 * 1024
+        headers = Headers(scope=scope)
+        raw_length = headers.get("content-length", "")
+        if raw_length:
+            try:
+                if int(raw_length) > limit:
+                    response = Response(
+                        "Solicitud rechazada: el cuerpo supera el tamaño máximo permitido.",
+                        status_code=413,
+                        media_type="text/plain; charset=utf-8",
+                    )
+                    await response(scope, receive, send)
+                    return
+            except ValueError:
+                response = Response(
+                    "Solicitud rechazada: Content-Length inválido.",
+                    status_code=400,
+                    media_type="text/plain; charset=utf-8",
+                )
+                await response(scope, receive, send)
+                return
+
+        consumed = 0
+
+        async def limited_receive():
+            nonlocal consumed
+            message = await receive()
+            if message.get("type") == "http.request":
+                consumed += len(message.get("body", b""))
+                if consumed > limit:
+                    raise RequestBodyTooLarge
+            return message
+
+        try:
+            await self.app(scope, limited_receive, send)
+        except RequestBodyTooLarge:
+            response = Response(
+                "Solicitud rechazada: el cuerpo supera el tamaño máximo permitido.",
+                status_code=413,
+                media_type="text/plain; charset=utf-8",
+            )
+            await response(scope, receive, send)
+
+
+class RequestBodyTooLarge(Exception):
+    pass
+
+
 def _client_ip(scope: dict) -> str:
     client = scope.get("client")
     return str(client[0]) if client else "unknown"
@@ -239,13 +308,21 @@ class SecurityHeadersMiddleware:
                     b"x-frame-options": b"DENY",
                     b"referrer-policy": b"strict-origin-when-cross-origin",
                     b"permissions-policy": b"camera=(), microphone=(), geolocation=(), payment=()",
+                    b"cross-origin-opener-policy": b"same-origin",
+                    b"cross-origin-resource-policy": b"same-origin",
+                    b"x-permitted-cross-domain-policies": b"none",
                     b"content-security-policy": (
                         b"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
                         b"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
                     ),
                 }
                 path = str(scope.get("path", ""))
-                if path.startswith("/login") or path.startswith("/api/"):
+                sensitive_prefixes = (
+                    "/login", "/api/", "/inventarios", "/fuentes", "/reportes",
+                    "/operacion", "/usuarios", "/aseguramiento", "/huella-producto",
+                    "/proyectos-mitigacion", "/cadena-valor",
+                )
+                if path.startswith(sensitive_prefixes):
                     additions[b"cache-control"] = b"no-store"
                 if settings.is_production and settings.session_https_only:
                     additions[b"strict-transport-security"] = b"max-age=31536000; includeSubDomains"

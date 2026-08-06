@@ -4,9 +4,9 @@
 {% block content %}
 <section class="page-heading">
   <div>
-    <span class="eyebrow">OPERACIÓN Y CERTIFICACIÓN · V0.45</span>
-    <h1>Operación, seguridad y respaldos</h1>
-    <p>Comprueba el ambiente, la integridad de auditoría, la protección CSRF, los registros operativos, los respaldos y los requisitos mínimos antes de publicar la plataforma.</p>
+    <span class="eyebrow">OPERACIÓN, CONTINUIDAD Y CERTIFICACIÓN</span>
+    <h1>Preparación productiva, seguridad y continuidad</h1>
+    <p>Organiza la salida a producción por capas: aplicación, PostgreSQL, documentos, correo, respaldos, seguridad y observabilidad. Cada bloqueo muestra la siguiente acción concreta.</p>
   </div>
   <span class="status-badge {{ 'success' if snapshot.production_ready else 'warning' }}">
     {{ 'Lista para producción' if snapshot.production_ready else 'Requiere configuración' }}
@@ -21,6 +21,29 @@
   <article class="metric-card"><small>Bloqueos de acceso</small><strong>{{ snapshot.security_state.active_blocks }}</strong><span>{{ snapshot.security_state.tracked_keys }} claves controladas</span></article>
   <article class="metric-card"><small>Registro estructurado</small><strong>{{ snapshot.structured_log.records }}</strong><span>{{ snapshot.structured_log.size|bytes }} en JSONL</span></article>
   <article class="metric-card"><small>Ensayo de restauración</small><strong>{{ snapshot.restore_drill.status|upper }}</strong><span>{% if snapshot.restore_drill.age_days is not none %}Hace {{ snapshot.restore_drill.age_days }} días{% else %}Aún no ejecutado{% endif %}</span></article>
+</section>
+
+
+<section class="panel production-map" id="preparacion-productiva">
+  <div class="panel-heading">
+    <div><span class="eyebrow">V1.0 · MAPA PRODUCTIVO</span><h2>{{ production_profile.completed_stages }} de {{ production_profile.total_stages }} capas listas</h2><p>{{ production_profile.next_action }}</p></div>
+    <div class="production-score"><strong>{{ production_profile.score }}%</strong><span class="status-badge {{ 'success' if production_profile.ready else 'warning' }}">{{ 'LISTA' if production_profile.ready else 'EN PREPARACIÓN' }}</span></div>
+  </div>
+  <div class="production-stage-grid">
+    {% for stage in production_profile.stages %}
+    <article class="production-stage {{ 'ready' if stage.ready else 'blocked' }}">
+      <div class="stage-head"><span>{{ loop.index }}</span><div><strong>{{ stage.name }}</strong><small>{{ stage.description }}</small></div><b>{{ stage.status }}</b></div>
+      <div class="stage-checks">
+        {% for check in stage.checks %}<div><i class="{{ 'ok' if check.ok else 'fail' }}">{{ '✓' if check.ok else '!' }}</i><span><strong>{{ check.label }}</strong><small>{{ check.detail }}</small></span></div>{% endfor %}
+      </div>
+      <p><b>Siguiente acción:</b> {{ stage.next_action }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="finding-actions">
+    <a class="button primary" href="/operacion/configuracion/plantilla">Descargar plantilla .env productiva</a>
+    <a class="button secondary" href="/api/operacion/preparacion" target="_blank" rel="noopener">Ver diagnóstico JSON</a>
+  </div>
 </section>
 
 <div class="two-column-grid operation-layout">
@@ -62,7 +85,7 @@
     <div class="backup-list">
       {% for backup in backups %}
       <article class="backup-row">
-        <div><strong>{{ backup.name }}</strong><small>{{ backup.created_at.strftime('%d/%m/%Y %H:%M UTC') }} · {{ backup.size|bytes }}</small><code>{{ backup.sha256[:18] }}…</code></div>
+        <div><strong>{{ backup.name }}</strong><small>{{ backup.created_at.strftime('%d/%m/%Y %H:%M UTC') }} · {{ backup.size|bytes }}</small><code>{{ backup.sha256[:18] }}…</code><small>{{ 'Firmado HMAC' if backup.signed else 'Sin firma' }} · {{ 'Réplica externa confirmada' if backup.offsite_exists else ('Réplica no configurada' if not backup.offsite_key else 'Réplica pendiente') }}</small></div>
         <div class="finding-actions"><form action="/operacion/respaldos/{{ backup.name }}/verificar" method="post"><button class="button secondary small" type="submit">Verificar ZIP</button></form><form action="/operacion/respaldos/{{ backup.name }}/ensayar" method="post"><button class="button primary small" type="submit">Ensayar restauración</button></form><a class="button secondary small" href="/operacion/respaldos/{{ backup.name }}">Descargar</a></div>
       </article>
       {% endfor %}
@@ -130,7 +153,7 @@
 
 <section class="panel" id="certificacion">
   <div class="panel-heading">
-    <div><span class="eyebrow">CERTIFICACIÓN V0.45</span><h2>Evidencia operativa de la versión</h2></div>
+    <div><span class="eyebrow">CERTIFICACIÓN OPERATIVA</span><h2>Evidencia operativa de la versión</h2></div>
     {% set latest_certificate = release_certifications[0] if release_certifications else none %}
     <span class="status-badge {{ 'success' if latest_certificate and latest_certificate.production_approved else ('warning' if latest_certificate and latest_certificate.status == 'Validación local' else 'danger') }}">{{ latest_certificate.status if latest_certificate else 'SIN EJECUTAR' }}</span>
   </div>
@@ -179,10 +202,12 @@
 <section class="panel deployment-panel">
   <div class="panel-heading"><div><span class="eyebrow">DESPLIEGUE</span><h2>Ruta recomendada</h2></div></div>
   <div class="deployment-steps">
-    <article><b>1</b><strong>Configurar variables</strong><span>Copiar <code>.env.example</code>, generar secretos y definir el dominio.</span></article>
-    <article><b>2</b><strong>Usar PostgreSQL</strong><span>Ejecutar mediante Docker Compose o una base administrada.</span></article>
-    <article><b>3</b><strong>Publicar con HTTPS</strong><span>Caddy gestiona certificado, proxy inverso y cabeceras seguras.</span></article>
-    <article><b>4</b><strong>Verificar continuidad</strong><span>Automatizar respaldos, comprobar integridad y ensayar restauraciones.</span></article>
+    <article><b>1</b><strong>Configurar secretos</strong><span>Usar la plantilla sanitizada y un gestor de secretos; nunca copiar valores reales al repositorio.</span></article>
+    <article><b>2</b><strong>Migrar a PostgreSQL</strong><span>Ejecutar Alembic sobre una base administrada o el servicio del stack.</span></article>
+    <article><b>3</b><strong>Separar documentos</strong><span>Usar S3-compatible o volumen persistente con versionado o inmutabilidad.</span></article>
+    <article><b>4</b><strong>Activar comunicaciones</strong><span>Conectar SMTP y el worker de notificaciones y automatizaciones.</span></article>
+    <article><b>5</b><strong>Asegurar continuidad</strong><span>Firmar respaldos, replicarlos fuera del servidor y ensayar restauración.</span></article>
+    <article><b>6</b><strong>Observar y certificar</strong><span>Conectar Prometheus, Alertmanager y Grafana antes de ejecutar el modo estricto.</span></article>
   </div>
 </section>
 {% endblock %}

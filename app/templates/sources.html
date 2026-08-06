@@ -22,8 +22,14 @@
   <article class="mini-card"><small>CON DATOS</small><strong>{{ sources|selectattr('activity_records')|list|length }}</strong><p>Levantamiento iniciado</p></article>
 </div>
 
+<nav class="task-jumpbar source-taskbar" aria-label="Tareas del mapa de fuentes">
+  {% if user.can_manage_sources %}<a href="#paquetes"><span>1</span><strong>Usar paquete</strong><small>Base sectorial sin duplicados</small></a>{% endif %}
+  <a href="#mapa-fuentes"><span>{{ 2 if user.can_manage_sources else 1 }}</span><strong>Revisar mapa</strong><small>Inclusión, responsable y unidad</small></a>
+  {% if user.can_manage_sources %}<a href="#nueva-fuente"><span>3</span><strong>Agregar fuente</strong><small>Solo actividades faltantes</small></a>{% else %}<a href="/informacion#datos"><span>2</span><strong>Registrar información</strong><small>Datos y soportes de las fuentes</small></a>{% endif %}
+</nav>
+
 {% if user.can_manage_sources %}
-<details class="card starter-library" {% if not sources %}open{% endif %}>
+<details class="card starter-library" id="paquetes" data-exclusive-details="source-create" {% if not sources %}open{% endif %}>
   <summary><div><small>CONFIGURACIÓN ASISTIDA</small><strong>Agregar un paquete de fuentes</strong><p>Solo se crean las fuentes que todavía no existan.</p></div><span>Ver opciones</span></summary>
   <div class="starter-library-grid">
     {% for pack in starter_packs %}
@@ -41,7 +47,7 @@
 {% endif %}
 
 <div class="inventory-layout source-management-layout">
-  <section class="card table-card">
+  <section class="card table-card" id="mapa-fuentes">
     <div class="card-head"><div><small>MAPA OPERATIVO</small><h3>Fuentes identificadas</h3></div><span class="counter">{{ sources|length }}</span></div>
     {% if sources %}
     <div class="responsive-table"><table><thead><tr><th>Fuente</th><th>Sede</th><th>Alcance</th><th>Categoría</th><th>Responsable</th><th>Unidad</th><th>Materialidad</th><th>Estado</th><th></th></tr></thead><tbody>
@@ -54,8 +60,9 @@
   </section>
 
   {% if user.can_manage_sources %}
-  <aside class="card sticky-form">
-    <div class="card-head"><div><small>FUENTE PERSONALIZADA</small><h3>Agregar una actividad</h3></div></div>
+  <aside class="card sticky-form progressive-action-card" id="nueva-fuente">
+    <details class="task-form-disclosure" data-exclusive-details="source-create">
+      <summary><div><small>FUENTE PERSONALIZADA</small><strong>Agregar una actividad</strong><span>Úsala cuando el paquete sectorial no cubra una fuente material.</span></div><b>Crear</b></summary>
     <form method="post" action="/inventarios/{{ inventory.id }}/fuentes/nueva" class="stack-form">
       <label>Nombre<input name="name" required placeholder="Ej. Gas natural de caldera" maxlength="100"></label>
       <div class="form-grid two"><label>Alcance<select name="scope"><option value="1">Alcance 1</option><option value="2">Alcance 2</option><option value="3">Alcance 3</option></select></label><label>Unidad esperada<select name="preferred_unit"><option value="">Por definir</option>{% for unit in ['kWh','L','m³','kg','t','km','t·km','unidad'] %}<option>{{ unit }}</option>{% endfor %}</select></label></div>
@@ -65,12 +72,13 @@
       <div class="form-grid two"><label>Materialidad<select name="materiality"><option>Alta</option><option selected>Media</option><option>Baja</option></select></label><label>Frecuencia<select name="data_frequency"><option>Mensual</option><option>Trimestral</option><option>Anual</option><option>Por evento</option></select></label></div>
       <button class="btn btn-primary btn-block">Agregar fuente</button>
     </form>
+    </details>
   </aside>
   {% endif %}
 </div>
 
 <section class="card source-next-step">
   <div><small>SIGUIENTE PASO</small><h2>{{ 'Carga el primer dato y su soporte' if sources else 'Crea o agrega al menos una fuente' }}</h2><p>{{ 'Empieza con una factura, registro operativo o certificado fácil de verificar.' if sources else 'El mapa de fuentes define qué información deberá solicitarse y calcularse.' }}</p></div>
-  {% if sources %}<a class="btn btn-primary" href="/informacion#datos">Ir a datos y evidencias</a>{% else %}<a class="btn btn-outline" href="#">Usar configuración asistida</a>{% endif %}
+  {% if sources %}<a class="btn btn-primary" href="/informacion#datos">Ir a datos y evidencias</a>{% else %}<a class="btn btn-outline" href="#paquetes">Usar configuración asistida</a>{% endif %}
 </section>
 {% endblock %}

@@ -2,19 +2,32 @@ from __future__ import annotations
 
 """Canonical product map used by the module and consolidation views."""
 
-PRODUCT_MODULES: list[dict[str, object]] = [
+PRODUCT_MODULES: list[
+    {"layer": "Administración interna", "group": "Servicio SaaS", "name": "Operación del servicio e invitaciones seguras", "version": "V0.56", "status": "Funcional", "route": "/operacion-servicio", "audience": "Administradores y operación SaaS", "detail": "Capacidad contratada, alertas, bloqueos controlados, invitaciones temporales y continuidad administrativa."},
+dict[str, object]] = [
+    {"layer": "Avanzado", "group": "Huella de producto", "name": "Estudios de ciclo de vida por producto", "version": "Iteración 8", "status": "Piloto controlado", "route": "/huella-producto", "audience": "Consultor, revisor y dirección técnica", "detail": "Unidad declarada, flujo de referencia, límites, asignación, etapas, factores, remociones, carbono almacenado, emisiones evitadas y aprobación metodológica."},
+    {"layer": "Avanzado", "group": "Mitigación", "name": "Proyectos y monitoreo de reducciones", "version": "Iteración 8", "status": "Piloto controlado", "route": "/proyectos-mitigacion", "audience": "Consultor, revisor y dirección", "detail": "Línea base, escenario de proyecto, adicionalidad, fugas, remociones, titularidad, doble conteo y periodos MRV separados del inventario."},
+    {"layer": "Avanzado", "group": "Aseguramiento", "name": "Encargos de validación y verificación", "version": "Iteración 8", "status": "Piloto controlado", "route": "/aseguramiento", "audience": "Revisor, aprobador y verificador externo", "detail": "Independencia, competencia, criterios, alcance, nivel, materialidad, hallazgos y declaración controlada conforme a ISO 14064-3."},
+    {"layer": "Núcleo", "group": "Entregables", "name": "Taller de informe y borrador editable", "version": "V0.55", "status": "Funcional", "route": "/reportes/consultoria", "audience": "Dirección, consultores, revisores y responsables climáticos", "detail": "Convierte resultados en narrativa consultiva con comparación, intensidades, hallazgos, limitaciones, guardas de comunicación y un informe Word editable."},
+    {"layer": "Avanzado", "group": "Metodología", "name": "Biblioteca profesional de factores", "version": "V0.54", "status": "Funcional", "route": "/metodologia/biblioteca-factores", "audience": "Consultores, revisores y verificadores", "detail": "Centraliza pasaporte metodológico, filtros, comparación, vigencia, calidad documental, compatibilidad por dato y alertas contra doble conteo."},
+    {"layer": "Núcleo", "group": "Experiencia pública", "name": "Landing comercial y diagnóstico", "version": "V0.49", "status": "Funcional", "route": "/", "audience": "Prospectos, clientes y aliados", "detail": "Quiénes somos, Greenatics, diferenciadores, flujo sectorial, equipo, precios de referencia, contacto y diagnóstico inteligente."},
+    {"layer": "Núcleo", "group": "Acompañamiento", "name": "Mensajes, decisiones y requerimientos", "version": "V0.50", "status": "Funcional", "route": "/soporte", "audience": "Cliente, consultor, revisor y administrador", "detail": "Bandeja por organización, conversación, referencias, SLA, responsables, estados, notas internas y vínculos con inventario, fuente y dato."},
+    {"layer": "Núcleo", "group": "Metodología", "name": "Gobierno de la conversación dato–factor", "version": "V0.50", "status": "Funcional", "route": "/fuentes/1#conversacion-tecnica", "audience": "Consultor, revisor y responsable climático", "detail": "Compara candidatos por unidad, actividad, geografía, tiempo y soporte; separa propuesta, revisión y aprobación antes de aplicar un factor al cálculo."},
     {"layer": "Núcleo", "group": "Configuración", "name": "Perfil, diagnóstico y alcance configurable", "version": "V0.45", "status": "Funcional con aprobación humana", "route": "/inteligencia-producto", "audience": "Dirección, responsable ambiental, consultor y equipo comercial", "detail": "Perfila la operación, evalúa madurez y complejidad, recomienda alcance, paquete, módulos y plan de implementación sin sustituir la decisión metodológica humana."},
-    {"layer": "Núcleo", "group": "Experiencia", "name": "Trabajo por rol y recorrido único del inventario", "version": "V0.31", "status": "Funcional", "route": "/recorrido-inventario", "audience": "Todos los roles", "detail": "Vista esencial por defecto, navegación en seis espacios de trabajo, capacidades avanzadas separadas y recorrido de cinco etapas con siguiente acción visible."},
+    {"layer": "Núcleo", "group": "Experiencia", "name": "Trabajo por rol y recorrido único del inventario", "version": "V0.31", "status": "Funcional", "route": "/recorrido-inventario", "audience": "Todos los roles", "detail": "Vista esencial por defecto, navegación en seis espacios de trabajo, capacidades avanzadas separadas y recorrido de seis etapas con siguiente acción visible."},
     {"layer": "Administración interna", "group": "Plataforma", "name": "Instalación y actualización segura en macOS", "version": "V0.30", "status": "Funcional", "route": "/modulos", "audience": "Administradores y usuarios Mac", "detail": "Instalación por doble clic, datos persistentes, respaldo previo, migración automática, lanzador en Aplicaciones y limpieza controlada de versiones antiguas."},
-    {"layer": "Núcleo", "group": "Resumen", "name": "Dashboard ejecutivo", "version": "V0.1", "status": "Funcional", "route": "/dashboard", "audience": "Todos", "detail": "Indicadores, alcances y principales fuentes."},
+    {"layer": "Núcleo", "group": "Resumen", "name": "Centro de trabajo", "version": "V0.1", "status": "Funcional", "route": "/dashboard", "audience": "Todos", "detail": "Próxima acción, estado metodológico, publicación, requerimientos, emisiones y principales fuentes."},
     {"layer": "Núcleo", "group": "Inventario", "name": "Empresas, sedes y configuración", "version": "V0.2", "status": "Funcional", "route": "/inventarios", "audience": "Equipo del inventario", "detail": "CRUD, límites, metodología y asistente de creación."},
-    {"layer": "Núcleo", "group": "Información", "name": "Datos, solicitudes y evidencias", "version": "V0.3", "status": "Funcional", "route": "/informacion", "audience": "Equipo del inventario", "detail": "Registros mensuales, soportes, calidad e importación Excel."},
+    {"layer": "Núcleo", "group": "Información", "name": "Captura guiada y plan sectorial de datos", "version": "V0.53", "status": "Funcional", "route": "/captura-guiada", "audience": "Responsables de datos y equipo del inventario", "detail": "Prioriza fuentes y periodos, recomienda unidad y soporte, integra dato más evidencia y usa periodos anteriores solo como referencia provisional."},
+    {"layer": "Núcleo", "group": "Información", "name": "Historial, solicitudes y evidencias", "version": "V0.53", "status": "Funcional", "route": "/informacion", "audience": "Equipo del inventario", "detail": "Historial consolidado, solicitudes, soportes, calidad, plantilla sectorial e importación Excel."},
     {"layer": "Núcleo", "group": "Cálculo", "name": "Unidades, factores y motor", "version": "V0.4", "status": "Funcional", "route": "/calculos", "audience": "Consultor y revisor", "detail": "Conversiones, factores versionados, GWP y trazabilidad matemática."},
     {"layer": "Núcleo", "group": "Metodología", "name": "Fuentes, factores formales y casos patrón", "version": "V0.23", "status": "Parcial", "route": "/metodologia/nucleo", "audience": "Consultor, revisor y verificador", "detail": "Registro documental, UPME SIN 2024, GWP versionados, factores IPCC para tratamiento biológico y validación reproducible."},
     {"layer": "Núcleo", "group": "Piloto", "name": "Preparación del inventario real de Greenatics", "version": "V0.23", "status": "En preparación", "route": "/piloto-greenatics", "audience": "Equipo ambiental, operaciones y consultor", "detail": "Matriz por sede, responsables, evidencias, cobertura de factores y plantilla de captura para Yarumal y Támesis."},
     {"layer": "Núcleo", "group": "Control", "name": "Revisión, aprobación y auditoría", "version": "V0.5", "status": "Funcional", "route": "/control", "audience": "Consultor, revisor y aprobador", "detail": "Observaciones, segregación, cierre inmutable y reapertura versionada."},
-    {"layer": "Núcleo", "group": "Gestión", "name": "Análisis, indicadores y reducción", "version": "V0.6", "status": "Funcional", "route": "/analisis", "audience": "Equipo ambiental y dirección", "detail": "Intensidades, comparación histórica, metas y acciones de reducción."},
-    {"layer": "Núcleo", "group": "Entregables", "name": "Informes y memoria", "version": "V0.6", "status": "Funcional", "route": "/reportes", "audience": "Todos", "detail": "Informe ejecutivo, informe técnico y memoria de cálculo Excel."},
+    {"layer": "Núcleo", "group": "Gestión", "name": "Análisis e indicadores", "version": "V0.6", "status": "Funcional", "route": "/analisis", "audience": "Equipo ambiental y dirección", "detail": "Intensidades, comparación histórica, calidad y lectura del desempeño."},
+    {"layer": "Núcleo", "group": "Descarbonización", "name": "Portafolio de reducción y abatimiento", "version": "V0.48", "status": "Funcional", "route": "/reduccion", "audience": "Dirección, responsable climático y consultor", "detail": "Brecha frente a la meta, preparación por medida, economía, responsables, vencimientos, trayectoria y exportación de control."},
+    {"layer": "Núcleo", "group": "Entregables", "name": "Dirección ejecutiva del inventario", "version": "V0.48", "status": "Funcional", "route": "/entrega-profesional", "audience": "Todos", "detail": "Ocho puertas ponderadas, regla de publicación, confianza, cobertura del portafolio, responsables y plan priorizado de cierre."},
+    {"layer": "Núcleo", "group": "Entregables", "name": "Documentos y memoria", "version": "V0.55", "status": "Funcional", "route": "/reportes", "audience": "Todos", "detail": "Ficha ejecutiva, informes PDF, borrador Word editable y memoria Excel con narrativa, comparación, intensidades, reducción y control documental."},
     {"layer": "Avanzado", "group": "Configuración", "name": "Modelos sectoriales y metas", "version": "V0.7", "status": "Funcional", "route": "/sectorizacion", "audience": "Consultor", "detail": "Plantillas sectoriales, fuentes sugeridas y metas corporativas."},
     {"layer": "Avanzado", "group": "Descarbonización", "name": "Escenarios y curva de abatimiento", "version": "V0.8", "status": "Funcional", "route": "/escenarios", "audience": "Consultor y dirección", "detail": "Portafolios, adopción, costo marginal y trayectoria proyectada."},
     {"layer": "Avanzado", "group": "Aseguramiento", "name": "Portal del verificador", "version": "V0.8", "status": "Funcional", "route": "/verificacion", "audience": "Verificador", "detail": "Hallazgos externos, respuestas y paquete ZIP reproducible."},
@@ -44,8 +57,8 @@ ROLE_JOURNEYS: list[dict[str, object]] = [
         "code": "JRN-AMBIENTAL", "name": "Responsable ambiental", "role": "Cliente",
         "objective": "Completar información y llevar el inventario hasta cálculo.",
         "steps": [
-            ("Consultar inventario", "/inventarios"), ("Revisar solicitudes", "/informacion"),
-            ("Cargar archivo operativo", "/cargas-operativas"), ("Gestionar datos y evidencias", "/informacion"), ("Consultar avance", "/dashboard"),
+            ("Consultar inventario", "/inventarios"), ("Revisar plan de captura", "/captura-guiada"),
+            ("Cargar archivo operativo", "/cargas-operativas"), ("Gestionar historial y evidencias", "/informacion"), ("Consultar avance", "/dashboard"),
             ("Conciliar el periodo", "/cierre-mensual"), ("Responder observaciones", "/control"),
         ],
     },
@@ -55,7 +68,7 @@ ROLE_JOURNEYS: list[dict[str, object]] = [
         "steps": [
             ("Configurar límites", "/inventarios"), ("Definir fuentes", "/inventario"),
             ("Asignar factores", "/metodologia"), ("Recalcular", "/calculos"),
-            ("Enviar cierre mensual", "/cierre-mensual"), ("Gestionar observaciones", "/control"), ("Generar informes", "/reportes"),
+            ("Enviar cierre mensual", "/cierre-mensual"), ("Gestionar observaciones", "/control"), ("Preparar entrega", "/entrega-profesional"), ("Generar informes", "/reportes"),
         ],
     },
     {
@@ -81,8 +94,8 @@ ROLE_JOURNEYS: list[dict[str, object]] = [
         "objective": "Reproducir la evidencia y documentar una revisión externa.",
         "steps": [
             ("Consultar inventario", "/inventarios"), ("Revisar metodología", "/metodologia"),
-            ("Examinar paquete", "/verificacion"), ("Registrar hallazgos", "/verificacion"),
-            ("Verificar respuesta", "/verificacion"),
+            ("Definir encargo", "/aseguramiento"), ("Gestionar hallazgos", "/aseguramiento"),
+            ("Emitir declaración", "/aseguramiento"), ("Descargar paquete histórico", "/verificacion"),
         ],
     },
 ]
@@ -97,3 +110,4 @@ def product_layers() -> list[dict[str, object]]:
         }
         for layer in order
     ]
+    {"layer": "Núcleo", "group": "Metodología", "name": "Tierras, remociones y carbono biogénico", "version": "Iteración 7", "status": "Piloto controlado", "route": "/metodologia/tierras-remociones", "audience": "Consultor, revisor y verificador", "detail": "Libro mayor separado para emisiones de tierras, remociones, reversiones, almacenamiento en productos y beneficios circulares."},

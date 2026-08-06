@@ -1,36 +1,20 @@
-# Uso en macOS · V0.45
+# Uso en macOS · Calcula tu Huella V1.0.0
 
-## Instalación o actualización
+## Instalación
 
-Haz doble clic en `INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command`.
+1. Extrae completamente la carpeta `MAC`.
+2. Ejecuta `1_INSTALAR_Y_ABRIR.command`.
+3. Autoriza el archivo en **Privacidad y seguridad** si macOS lo bloquea.
+4. Usa `2_ABRIR_CALCULA_TU_HUELLA.command` para volver a abrir.
 
-El instalador:
+## Validación
 
-- crea o actualiza el entorno Python;
-- migra la base mediante Alembic;
-- respalda los datos antes de actualizar;
-- conserva evidencias, informes, importaciones, respaldos y certificados;
-- mueve versiones anteriores a la Papelera solo después de validar la nueva instalación;
-- deja accesos de apertura en Aplicaciones y Escritorio.
+Ejecuta `18_VALIDAR_VERSION_FINAL_V1.command`. La validación comprueba versión, arquitectura, plantillas, migraciones, documentación y limpieza.
 
-## Abrir
+## Datos persistentes
 
-Usa `ABRIR_CALCULA_TU_HUELLA.command`.
+La instalación conserva la información en `~/Library/Application Support/CalculaTuHuella`.
 
-## Preparar los demos
+## Producción
 
-Usa `15_PREPARAR_Y_CERTIFICAR_DEMO.command`. El comando:
-
-1. migra la base;
-2. completa Greenatics y Andinas;
-3. repara registros faltantes sin duplicarlos;
-4. genera un certificado JSON firmado con SHA-256.
-
-## Otros comandos
-
-- `6_ENSAYAR_RESTAURACION.command`
-- `12_ENSAYAR_DESPLIEGUE.command`
-- `13_INICIAR_STACK_ENSAYO.command`
-- `14_CERTIFICAR_VERSION.command`
-
-Si macOS bloquea un comando, usa clic derecho → **Abrir** una primera vez.
+Consulta `GUIA_PRODUCCION_V1_FINAL.md`. No publiques el servicio sin identidad contractual, HTTPS, PostgreSQL, almacenamiento externo, respaldo y monitoreo reales.

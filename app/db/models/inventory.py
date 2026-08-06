@@ -51,6 +51,8 @@ class Inventory(Base):
     reduction_scenarios: Mapped[list["ReductionScenario"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
     verification_findings: Mapped[list["VerificationFinding"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
     supplier_campaigns: Mapped[list["SupplierCampaign"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
+    scope3_assessments: Mapped[list["Scope3CategoryAssessment"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
+    land_carbon_entries: Mapped[list["LandCarbonEntry"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
     base_year_recalculations: Mapped[list["BaseYearRecalculation"]] = relationship(back_populates="inventory", cascade="all, delete-orphan")
 
 class InventoryFacility(Base):
@@ -144,6 +146,7 @@ class ActivityData(Base):
     source: Mapped[EmissionSource] = relationship(back_populates="activity_records")
     evidence: Mapped[EvidenceDocument | None] = relationship(back_populates="activity_records")
     calculations: Mapped[list["EmissionCalculation"]] = relationship(back_populates="activity_data", cascade="all, delete-orphan")
+    factor_selections: Mapped[list["ActivityFactorSelection"]] = relationship(back_populates="activity_data", cascade="all, delete-orphan")
 
 class DataRequest(Base):
     __tablename__ = "data_requests"

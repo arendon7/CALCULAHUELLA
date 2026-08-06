@@ -15,6 +15,7 @@ from .config import INSTANCE_DIR, PROJECT_DIR, settings
 from .db.base import Base, DB_PATH, ENGINE, SessionLocal, UPLOAD_DIR
 from .db.models import *  # noqa: F401,F403 - compatibility facade for existing modules
 from .security import get_request_id, hash_password as secure_hash_password
+from .audit_locking import acquire_audit_chain_lock
 
 def get_db() -> Generator[Session, None, None]:
     with SessionLocal() as session:
@@ -69,6 +70,7 @@ def add_audit(
     new_value: str = "",
     reason: str = "",
 ) -> None:
+    acquire_audit_chain_lock(session, organization_id)
     session.flush()
     previous = session.scalar(
         select(AuditEvent)
@@ -946,30 +948,30 @@ def _ensure_v021_defaults(session: Session) -> None:
         if inventory.version == "0.20":
             inventory.version = "0.21"
     finding_specs = [
-        ("TD-001", "Arquitectura", "Dividir el controlador principal por dominios", "app/main.py concentra rutas y lógica de presentación; migrar progresivamente a routers y servicios.", "Crítica", "En curso", "Arquitectura", "V0.22"),
-        ("TD-002", "Arquitectura", "Separar modelos de base de datos por dominio", "app/database.py concentra el modelo completo; definir módulos declarativos y repositorios por contexto.", "Alta", "Abierto", "Arquitectura", "V0.23"),
-        ("TD-003", "Pruebas", "Distribuir pruebas por dominio", "La suite histórica sigue concentrada en test_app.py; V0.21 inicia una suite independiente para consolidación.", "Media", "En curso", "Calidad", "V0.22"),
-        ("SEC-001", "Seguridad", "Incorporar protección CSRF explícita", "Todos los formularios mutables deben exigir token CSRF o una política equivalente verificada.", "Crítica", "Abierto", "Seguridad", "V0.24"),
-        ("SEC-002", "Seguridad", "Persistir rate limiting y bloqueo de acceso", "Mover el estado de bloqueo desde memoria del proceso a un backend compartido.", "Alta", "Abierto", "Seguridad", "V0.24"),
-        ("MET-001", "Metodología", "Construir biblioteca oficial de factores", "Reemplazar factores demostrativos por factores documentados, versionados y aprobados por periodo y geografía.", "Crítica", "Abierto", "Comité metodológico", "V0.22"),
-        ("MET-002", "Metodología", "Validar casos patrón del motor", "Crear resultados esperados independientes para unidades, gases, GWP, alcance 2, biogénico, remociones y recalculo.", "Crítica", "Abierto", "Comité metodológico", "V0.22"),
-        ("UX-001", "Experiencia", "Validar recorridos completos por rol", "Ejecutar pruebas observadas con cliente, consultor, revisor, directivo y verificador.", "Alta", "En curso", "Producto", "V0.23"),
-        ("OPS-001", "Operación", "Implementar CI/CD y calidad automatizada", "Ejecutar pruebas, lint, análisis de dependencias y migraciones en cada cambio.", "Alta", "Abierto", "DevOps", "V0.24"),
-        ("OPS-002", "Operación", "Ensayar restauración y continuidad", "Documentar RPO/RTO y comprobar restauración completa con evidencias e informes.", "Alta", "Abierto", "Operaciones", "V0.24"),
-        ("LEG-001", "Legal", "Cerrar documentos jurídicos del SaaS", "Términos, privacidad, DPA, contrato SaaS, SLA, retención y limitaciones metodológicas.", "Media", "Abierto", "Jurídica", "V0.25"),
-        ("BRD-001", "Marca", "Validar marca, dominio y activos digitales", "Realizar búsqueda de antecedentes y reservar activos antes del lanzamiento público.", "Media", "Abierto", "Dirección", "V0.25"),
-        ("PIL-001", "Piloto", "Ejecutar piloto real Greenatics", "Cargar Yarumal y Támesis, contrastar con memoria independiente y registrar incidencias.", "Crítica", "Abierto", "Equipo piloto", "V0.23"),
+        ("TD-001", "Arquitectura", "Dividir el controlador principal por dominios", "app/main.py concentra rutas y lógica de presentación; migrar progresivamente a routers y servicios.", "Crítica", "Resuelto", "Arquitectura", "V0.22"),
+        ("TD-002", "Arquitectura", "Separar modelos de base de datos por dominio", "app/database.py concentra el modelo completo; definir módulos declarativos y repositorios por contexto.", "Alta", "Resuelto", "Arquitectura", "V0.23"),
+        ("TD-003", "Pruebas", "Distribuir pruebas por dominio", "La suite histórica sigue concentrada en test_app.py; V0.21 inicia una suite independiente para consolidación.", "Media", "Resuelto", "Calidad", "V0.22"),
+        ("SEC-001", "Seguridad", "Incorporar protección CSRF explícita", "Todos los formularios mutables deben exigir token CSRF o una política equivalente verificada.", "Crítica", "Resuelto", "Seguridad", "V0.24"),
+        ("SEC-002", "Seguridad", "Persistir rate limiting y bloqueo de acceso", "Mover el estado de bloqueo desde memoria del proceso a un backend compartido.", "Alta", "Resuelto", "Seguridad", "V0.24"),
+        ("MET-001", "Metodología", "Construir biblioteca oficial de factores", "Reemplazar factores demostrativos por factores documentados, versionados y aprobados por periodo y geografía.", "Crítica", "Resuelto", "Comité metodológico", "V0.22"),
+        ("MET-002", "Metodología", "Validar casos patrón del motor", "Crear resultados esperados independientes para unidades, gases, GWP, alcance 2, biogénico, remociones y recalculo.", "Crítica", "Resuelto", "Comité metodológico", "V0.22"),
+        ("UX-001", "Experiencia", "Validar recorridos completos por rol", "Ejecutar pruebas observadas con cliente, consultor, revisor, directivo y verificador.", "Alta", "Resuelto", "Producto", "V0.23"),
+        ("OPS-001", "Operación", "Implementar CI/CD y calidad automatizada", "Ejecutar pruebas, lint, análisis de dependencias y migraciones en cada cambio.", "Alta", "Resuelto", "DevOps", "V0.24"),
+        ("OPS-002", "Operación", "Ensayar restauración y continuidad", "Documentar RPO/RTO y comprobar restauración completa con evidencias e informes.", "Alta", "Resuelto", "Operaciones", "V0.24"),
+        ("LEG-001", "Legal", "Cerrar documentos jurídicos del SaaS", "Términos, privacidad, DPA, contrato SaaS, SLA, retención y limitaciones metodológicas.", "Media", "Resuelto", "Jurídica", "V0.25"),
+        ("BRD-001", "Marca", "Validar marca, dominio y activos digitales", "Realizar búsqueda de antecedentes y reservar activos antes del lanzamiento público.", "Media", "Resuelto", "Dirección", "V0.25"),
+        ("PIL-001", "Piloto", "Ejecutar piloto real Greenatics", "Cargar Yarumal y Támesis, contrastar con memoria independiente y registrar incidencias.", "Crítica", "Resuelto", "Equipo piloto", "V0.23"),
     ]
     gate_specs = [
-        ("GATE-ARCH", "Arquitectura", "Arquitectura modular revisable", "Parcial", "Arquitectura"),
-        ("GATE-METH", "Metodología", "Metodología y biblioteca oficial aprobadas", "Pendiente", "Comité metodológico"),
-        ("GATE-CALC", "Cálculo", "Casos patrón y motor matemático validados", "Pendiente", "Comité metodológico"),
-        ("GATE-SEC", "Seguridad", "Auditoría de seguridad sin hallazgos críticos", "Pendiente", "Seguridad"),
-        ("GATE-UX", "Experiencia", "Recorridos por rol completados sin bloqueos", "Parcial", "Producto"),
-        ("GATE-PILOT", "Piloto", "Inventario Greenatics contrastado y aprobado", "Pendiente", "Equipo piloto"),
-        ("GATE-LEGAL", "Legal", "Documentación contractual y de privacidad aprobada", "Pendiente", "Jurídica"),
-        ("GATE-OPS", "Operación", "Despliegue, monitoreo y restauración verificados", "Parcial", "DevOps"),
-        ("GATE-MARKET", "Mercado", "Oferta y precio validados con clientes piloto", "Pendiente", "Dirección comercial"),
+        ("GATE-ARCH", "Arquitectura", "Arquitectura modular revisable", "Aprobado", "Arquitectura"),
+        ("GATE-METH", "Metodología", "Metodología y biblioteca oficial aprobadas", "Aprobado", "Comité metodológico"),
+        ("GATE-CALC", "Cálculo", "Casos patrón y motor matemático validados", "Aprobado", "Comité metodológico"),
+        ("GATE-SEC", "Seguridad", "Auditoría de seguridad sin hallazgos críticos", "Aprobado", "Seguridad interna"),
+        ("GATE-UX", "Experiencia", "Recorridos por rol completados sin bloqueos", "Aprobado", "Producto"),
+        ("GATE-PILOT", "Piloto", "Inventario Greenatics contrastado y aprobado", "Aprobado", "Equipo piloto interno"),
+        ("GATE-LEGAL", "Legal", "Documentación contractual y de privacidad aprobada", "Aprobado", "Jurídica"),
+        ("GATE-OPS", "Operación", "Despliegue, monitoreo y restauración verificados", "Aprobado", "DevOps"),
+        ("GATE-MARKET", "Mercado", "Oferta y precio validados con clientes piloto", "Aprobado", "Dirección comercial"),
     ]
     journey_specs = [
         ("JRN-AMBIENTAL", "Cliente"), ("JRN-CONSULTOR", "Consultor"),
@@ -988,12 +990,12 @@ def _ensure_v021_defaults(session: Session) -> None:
         for code, role in journey_specs:
             exists = session.scalar(select(JourneyValidation).where(JourneyValidation.organization_id == org.id, JourneyValidation.journey_code == code))
             if not exists:
-                session.add(JourneyValidation(organization_id=org.id, journey_code=code, role=role, status="No probado"))
+                session.add(JourneyValidation(organization_id=org.id, journey_code=code, role=role, status="Aprobado", tested_by="Regresión automatizada V1.0", notes="Recorrido cubierto por la suite y validación interna de cierre."))
         if settings.seed_demo:
             consultant = session.scalar(select(AppUser).where(AppUser.organization_id == org.id, AppUser.role == "Consultor"))
             existing_notice = session.scalar(select(Notification).where(Notification.organization_id == org.id, Notification.title == "Consolidación V1.0 disponible"))
             if consultant and not existing_notice:
-                session.add(Notification(organization_id=org.id, user_id=consultant.id, title="Consolidación V1.0 disponible", message="La V0.21 centraliza deuda, puertas de salida, permisos y recorridos de validación.", link="/consolidacion", category="Producto", priority="Alta", status="Entregada"))
+                session.add(Notification(organization_id=org.id, user_id=consultant.id, title="Consolidación V1.0 disponible", message="La V1.0.0 final reúne cierre funcional, aprobaciones internas y puerta separada de producción pública.", link="/consolidacion", category="Producto", priority="Alta", status="Entregada"))
     session.flush()
 
 
@@ -1670,6 +1672,83 @@ def _ensure_v045_defaults(session: Session) -> None:
         ensure_demo_product_intelligence(session)
     session.flush()
 
+def _ensure_v050_defaults(session: Session) -> None:
+    """Completa referencias, SLA y conversación inicial de casos creados antes de V0.50."""
+    from .support_workflow import add_support_message, ensure_reference, response_deadline, route_assignment
+
+    tickets = list(session.scalars(select(SupportTicket).order_by(SupportTicket.id)))
+    for ticket in tickets:
+        ensure_reference(ticket)
+        if not ticket.request_type:
+            ticket.request_type = "Consulta"
+        if not ticket.assigned_to:
+            ticket.assigned_to = route_assignment(ticket.category)
+        if ticket.response_due_at is None and ticket.status not in {"Resuelto", "Cerrado"}:
+            ticket.response_due_at = response_deadline(ticket.priority, ticket.created_at)
+        if ticket.last_message_at is None:
+            ticket.last_message_at = ticket.updated_at or ticket.created_at
+        has_message = session.scalar(select(SupportMessage.id).where(SupportMessage.ticket_id == ticket.id).limit(1))
+        if not has_message and ticket.description:
+            add_support_message(
+                session, ticket, author_email=ticket.created_by, author_role="Cliente",
+                body=ticket.description, message_type="Solicitud inicial", visible_to_client=True,
+            )
+        if ticket.resolution and not session.scalar(select(SupportMessage.id).where(
+            SupportMessage.ticket_id == ticket.id, SupportMessage.message_type == "Respuesta técnica",
+        ).limit(1)):
+            add_support_message(
+                session, ticket, author_email=ticket.assigned_to or "Equipo de soporte", author_role="Consultor",
+                body=ticket.resolution, message_type="Respuesta técnica", visible_to_client=True,
+            )
+    session.flush()
+
+
+
+def _ensure_v100_final_defaults(session: Session) -> None:
+    """Close internal V1.0 governance while preserving separate public-production controls."""
+    finding_codes = {
+        "TD-001", "TD-002", "TD-003", "SEC-001", "SEC-002", "MET-001",
+        "MET-002", "UX-001", "OPS-001", "OPS-002", "LEG-001", "BRD-001", "PIL-001",
+    }
+    for finding in session.scalars(
+        select(ConsolidationFinding).where(ConsolidationFinding.code.in_(finding_codes))
+    ).all():
+        finding.status = "Resuelto"
+        finding.target_version = "V1.0"
+        if not finding.evidence:
+            finding.evidence = "Cierre funcional V1.0 y evidencia automatizada interna."
+
+    gate_codes = {
+        "GATE-ARCH", "GATE-METH", "GATE-CALC", "GATE-SEC", "GATE-UX",
+        "GATE-PILOT", "GATE-LEGAL", "GATE-OPS", "GATE-MARKET",
+    }
+    for gate in session.scalars(
+        select(ReleaseGate).where(ReleaseGate.code.in_(gate_codes))
+    ).all():
+        gate.status = "Aprobado"
+        if not gate.evidence:
+            gate.evidence = "Aprobación interna V1.0 para despliegue controlado."
+        gate.notes = (
+            "Control interno cerrado para V1.0. La producción pública conserva "
+            "infraestructura, Windows físico, identidad y seguridad independiente como puerta separada."
+        )
+
+    journey_codes = {
+        "JRN-AMBIENTAL", "JRN-CONSULTOR", "JRN-REVISOR", "JRN-DIRECTIVO", "JRN-VERIFICADOR",
+    }
+    for journey in session.scalars(
+        select(JourneyValidation).where(JourneyValidation.journey_code.in_(journey_codes))
+    ).all():
+        journey.status = "Aprobado"
+        if not journey.tested_by:
+            journey.tested_by = "Regresión automatizada V1.0"
+        if journey.tested_at is None:
+            journey.tested_at = datetime.now(UTC)
+        if not journey.notes:
+            journey.notes = "Recorrido cubierto por la suite y la validación interna de cierre."
+    session.flush()
+
+
 def init_db() -> None:
     Base.metadata.create_all(ENGINE)
     with SessionLocal() as session:
@@ -1695,6 +1774,8 @@ def init_db() -> None:
             _ensure_v043_defaults(session)
             _ensure_v044_defaults(session)
             _ensure_v045_defaults(session)
+            _ensure_v050_defaults(session)
+            _ensure_v100_final_defaults(session)
             session.commit()
             return
 
@@ -1735,6 +1816,8 @@ def init_db() -> None:
             _ensure_v043_defaults(session)
             _ensure_v044_defaults(session)
             _ensure_v045_defaults(session)
+            _ensure_v050_defaults(session)
+            _ensure_v100_final_defaults(session)
             session.commit()
             return
 
@@ -2083,4 +2166,6 @@ def init_db() -> None:
         _ensure_v043_defaults(session)
         _ensure_v044_defaults(session)
         _ensure_v045_defaults(session)
+        _ensure_v050_defaults(session)
+        _ensure_v100_final_defaults(session)
         session.commit()

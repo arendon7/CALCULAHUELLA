@@ -8,6 +8,7 @@ from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from reportlab.lib import colors
+from reportlab.graphics.shapes import Drawing, Rect, String
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
@@ -24,7 +25,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .analytics import full_analysis
+from .config import settings
+from .delivery_readiness import professional_delivery_summary
 from .methodology_closure import closure_summary
+from .reduction_portfolio import portfolio_summary
+from .report_consulting import consulting_report_summary
+from .report_docx import generate_editable_consulting_docx
 from .storage import storage
 
 from .database import (
@@ -59,6 +65,19 @@ def _number(value: float, decimals: int = 1) -> str:
     return f"{value:,.{decimals}f}".replace(",", "X").replace(".", ",").replace("X", ".")
 
 
+def _pdf_text(value: object) -> str:
+    """Normalize glyphs not supported by ReportLab's built-in WinAnsi fonts."""
+    return (
+        str(value)
+        .replace("CO₂e", "CO2e")
+        .replace("CO₂", "CO2")
+        .replace("tCO₂e", "tCO2e")
+        .replace("–", "-")
+        .replace("—", "-")
+        .replace(" ", " ")
+    )
+
+
 def _report_path(inventory: Inventory, suffix: str, label: str) -> Path:
     folder = REPORTS_DIR / f"org_{inventory.organization_id}" / f"inventory_{inventory.id}"
     folder.mkdir(parents=True, exist_ok=True)
@@ -86,9 +105,34 @@ def _header_footer(canvas, doc):
     canvas.line(18 * mm, 14 * mm, 192 * mm, 14 * mm)
     canvas.setFont("Helvetica", 7)
     canvas.setFillColor(colors.HexColor("#61727B"))
-    canvas.drawString(18 * mm, 9 * mm, "Calcula tu Huella - documento generado desde la plataforma")
-    canvas.drawRightString(192 * mm, 9 * mm, f"Pagina {doc.page}")
+    canvas.drawString(18 * mm, 9 * mm, f"Calcula tu Huella {settings.version} - documento generado desde la plataforma")
+    canvas.drawRightString(192 * mm, 9 * mm, f"Página {doc.page}")
     canvas.restoreState()
+
+
+def _source_bar_chart(rows: list[dict[str, object]], width: float = 165 * mm, height: float = 48 * mm) -> Drawing:
+    """Compact horizontal bars for the highest-emitting sources."""
+    drawing = Drawing(width, height)
+    visible = rows[:6]
+    if not visible:
+        drawing.add(String(4, height / 2, "Sin fuentes calculadas", fontName="Helvetica", fontSize=8, fillColor=TEXT))
+        return drawing
+    max_value = max(float(item.get("emissions", 0) or 0) for item in visible) or 1.0
+    label_width = width * 0.39
+    bar_width = width * 0.47
+    row_height = height / max(len(visible), 1)
+    for index, item in enumerate(visible):
+        y = height - (index + 1) * row_height + row_height * 0.24
+        name = _pdf_text(str(item.get("name", "")))
+        if len(name) > 34:
+            name = name[:31] + "..."
+        value = float(item.get("emissions", 0) or 0)
+        share = float(item.get("share", 0) or 0)
+        drawing.add(String(0, y + 2, name, fontName="Helvetica", fontSize=6.8, fillColor=TEXT))
+        drawing.add(Rect(label_width, y, bar_width, row_height * 0.46, fillColor=colors.HexColor("#E7EFEC"), strokeColor=None))
+        drawing.add(Rect(label_width, y, bar_width * value / max_value, row_height * 0.46, fillColor=GREEN, strokeColor=None))
+        drawing.add(String(label_width + bar_width + 4, y + 1, f"{share:.1f}%", fontName="Helvetica-Bold", fontSize=6.8, fillColor=NAVY))
+    return drawing
 
 
 def _table(data, widths=None, header=True, font_size=8):
@@ -97,7 +141,7 @@ def _table(data, widths=None, header=True, font_size=8):
     prepared = []
     for row_index, row in enumerate(data):
         style = header_style if header and row_index == 0 else body_style
-        prepared.append([cell if isinstance(cell, Paragraph) else Paragraph(str(cell), style) for cell in row])
+        prepared.append([cell if isinstance(cell, Paragraph) else Paragraph(_pdf_text(cell), style) for cell in row])
     table = Table(prepared, colWidths=widths, repeatRows=1 if header else 0, hAlign="LEFT")
     commands = [
         ("FONTNAME", (0, 0), (-1, -1), "Helvetica"),
@@ -123,9 +167,84 @@ def _table(data, widths=None, header=True, font_size=8):
     return table
 
 
+
+def generate_decision_brief_pdf(session: Session, inventory: Inventory, output: Path) -> None:
+    """Generate a concise decision document with publication control."""
+    analysis = full_analysis(session, inventory)
+    closure = closure_summary(session, inventory)
+    delivery = professional_delivery_summary(session, inventory, analysis=analysis, closure=closure)
+    styles = _pdf_styles()
+    # The decision brief is intentionally constrained to one page. The tighter
+    # margins and compact styles preserve legibility while avoiding orphaned
+    # limitations or publication controls on a second page.
+    doc = SimpleDocTemplate(
+        str(output), pagesize=A4, rightMargin=14 * mm, leftMargin=14 * mm,
+        topMargin=11 * mm, bottomMargin=15 * mm,
+        title=f"Ficha ejecutiva {inventory.name}", author="Calcula tu Huella",
+    )
+    brief_section = ParagraphStyle(
+        "BriefSection", parent=styles["Section"], fontSize=12,
+        leading=14, spaceBefore=5, spaceAfter=3,
+    )
+    brief_body = ParagraphStyle(
+        "BriefBody", parent=styles["BodySmall"], fontSize=8,
+        leading=10.2, spaceAfter=0,
+    )
+    publication = delivery["publication"]
+    decision = delivery["decision"]
+    story = [
+        Paragraph("CALCULA TU HUELLA", styles["Brand"]),
+        Paragraph(f"Ficha ejecutiva para decisión · Plataforma {settings.version}", styles["Subtitle"]),
+        Spacer(1, 3 * mm),
+        Paragraph(_pdf_text(inventory.organization.name), styles["Title"]),
+        Paragraph(_pdf_text(f"Inventario: {inventory.name} | Periodo: {inventory.start_date:%d/%m/%Y} - {inventory.end_date:%d/%m/%Y}"), brief_body),
+        Paragraph(_pdf_text(f"Control de publicación: {publication['level']} | Estado formal: {inventory.status}"), brief_body),
+        Spacer(1, 3 * mm),
+    ]
+    top = decision["top_source"]
+    metric_rows = [
+        ["Emisiones", "Alistamiento", "Confianza", "Concentración top 3"],
+        [f"{_number(analysis['total'], 1)} tCO2e", f"{delivery['score']}%", f"{decision['confidence_label']} ({decision['confidence_score']}%)", f"{decision['top_three_share']:.1f}%"],
+    ]
+    story.extend([_table(metric_rows, [43 * mm] * 4, font_size=8), Spacer(1, 3 * mm)])
+    story.append(Paragraph("Decisión principal", brief_section))
+    story.append(Paragraph(_pdf_text(decision["primary_decision"]), brief_body))
+    story.append(Paragraph("Lectura del resultado", brief_section))
+    story.append(Paragraph(_pdf_text(delivery["narrative"]["headline"]), brief_body))
+    if top:
+        story.append(Paragraph(_pdf_text(f"Foco dominante: {top['name']} · alcance {top['scope']} · {top['share']:.1f}% del total."), brief_body))
+
+    hotspot_rows = [["Fuente prioritaria", "Alcance", "Sede", "tCO2e", "%"]]
+    for row in analysis["sources_summary"][:5]:
+        hotspot_rows.append([row["name"], row["scope"], row["facility"], _number(row["emissions"], 2), f"{row['share']:.1f}%"])
+    if len(hotspot_rows) == 1:
+        hotspot_rows.append(["Sin resultados", "-", "-", "0", "0%"] )
+    story.extend([Paragraph("Focos de emisión", brief_section), _table(hotspot_rows, [55 * mm, 18 * mm, 43 * mm, 28 * mm, 18 * mm], font_size=7.0), Spacer(1, 2 * mm)])
+
+    plan_rows = [["Prioridad", "Actividad", "Responsable", "Criterio de cierre"]]
+    for item in delivery["action_plan"][:5]:
+        plan_rows.append([item["priority"], item["title"], item["owner"], item["acceptance"]])
+    if len(plan_rows) == 1:
+        plan_rows.append(["Control", "Mantener expediente y control de versión", "Responsable climático", "Entrega conservada y trazable"])
+    story.extend([Paragraph("Plan inmediato de cierre", brief_section), _table(plan_rows, [23 * mm, 45 * mm, 38 * mm, 56 * mm], font_size=6.8), Spacer(1, 2 * mm)])
+
+    story.append(Paragraph("Recomendaciones para dirección", brief_section))
+    for item in decision["recommendations"]:
+        story.append(Paragraph(_pdf_text(f"- {item}"), brief_body))
+    story.append(Paragraph("Regla de comunicación", brief_section))
+    story.append(Paragraph(_pdf_text(publication["message"]), brief_body))
+    story.append(Paragraph(_pdf_text(publication["notice"]), brief_body))
+    story.append(Paragraph("Limitaciones", brief_section))
+    for item in delivery["narrative"]["limitations"][:4]:
+        story.append(Paragraph(_pdf_text(f"- {item}"), brief_body))
+    doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
+
 def generate_executive_pdf(session: Session, inventory: Inventory, output: Path) -> None:
     analysis = full_analysis(session, inventory)
     closure = closure_summary(session, inventory)
+    delivery = professional_delivery_summary(session, inventory, analysis=analysis, closure=closure)
+    portfolio = portfolio_summary(session, inventory)
+    consulting = consulting_report_summary(session, inventory, analysis=analysis, delivery=delivery, closure=closure, portfolio=portfolio)
     styles = _pdf_styles()
     doc = SimpleDocTemplate(
         str(output), pagesize=A4, rightMargin=18 * mm, leftMargin=18 * mm,
@@ -134,13 +253,22 @@ def generate_executive_pdf(session: Session, inventory: Inventory, output: Path)
     )
     story = [
         Paragraph("CALCULA TU HUELLA", styles["Brand"]),
-        Paragraph("Informe ejecutivo de huella de carbono", styles["Subtitle"]),
+        Paragraph(f"Informe ejecutivo de huella de carbono · Plataforma {settings.version}", styles["Subtitle"]),
         Spacer(1, 8 * mm),
         Paragraph(inventory.organization.name, styles["Title"]),
         Paragraph(f"Periodo: {inventory.start_date:%d/%m/%Y} - {inventory.end_date:%d/%m/%Y}", styles["BodySmall"]),
         Paragraph(f"Metodologia: {inventory.methodology} | GWP: {inventory.gwp_version}", styles["BodySmall"]),
+        Paragraph(_pdf_text(f"Control de publicación: {delivery['publication']['level']} | Alistamiento: {delivery['score']}%"), styles["BodySmall"]),
         Spacer(1, 8 * mm),
     ]
+    story.extend([
+        Paragraph("Conclusión ejecutiva", styles["Section"]),
+        Paragraph(_pdf_text(delivery["narrative"]["headline"]), styles["BodySmall"]),
+        Paragraph(_pdf_text(delivery["narrative"]["conclusion"]), styles["BodySmall"]),
+        Paragraph(_pdf_text(f"Decisión sugerida: {delivery['decision']['primary_decision']}"), styles["BodySmall"]),
+        Paragraph(_pdf_text(f"Confianza del resultado: {delivery['decision']['confidence_label']} ({delivery['decision']['confidence_score']}%)."), styles["BodySmall"]),
+        Spacer(1, 5 * mm),
+    ])
     history = analysis["history"]
     total_change = history["total_change"]
     metrics_data = [
@@ -181,7 +309,7 @@ def generate_executive_pdf(session: Session, inventory: Inventory, output: Path)
     ))
     story.extend([Spacer(1, 7 * mm), Paragraph("Resultados por alcance", styles["Section"])])
     scopes = analysis["scopes"]
-    scope_rows = [["Alcance", "tCO2e", "Participacion"]]
+    scope_rows = [["Alcance", "tCO2e", "Participación"]]
     for scope in (1, 2, 3):
         share = scopes[scope] / analysis["total"] * 100 if analysis["total"] else 0
         scope_rows.append([f"Alcance {scope}", _number(scopes[scope]), f"{share:.1f}%"])
@@ -192,65 +320,102 @@ def generate_executive_pdf(session: Session, inventory: Inventory, output: Path)
     source_rows = [["Fuente", "Alcance", "Sede", "tCO2e", "%"]]
     for row in analysis["sources_summary"][:8]:
         source_rows.append([row["name"], row["scope"], row["facility"], _number(row["emissions"]), f"{row['share']:.1f}%"])
-    story.extend([_table(source_rows, [42 * mm, 18 * mm, 45 * mm, 30 * mm, 20 * mm]), Spacer(1, 7 * mm)])
+    story.extend([_table(source_rows, [42 * mm, 18 * mm, 45 * mm, 30 * mm, 20 * mm]), Spacer(1, 4 * mm)])
+    story.extend([_source_bar_chart(analysis["sources_summary"]), Spacer(1, 5 * mm)])
 
-    story.append(Paragraph("Lectura ejecutiva", styles["Section"]))
-    top_sources = analysis["sources_summary"][:2]
-    observations = []
-    if top_sources:
-        observations.append(f"Las dos fuentes principales concentran {sum(row['share'] for row in top_sources):.1f}% de las emisiones.")
-    if total_change is not None:
-        direction = "aumentaron" if total_change > 0 else "disminuyeron"
-        observations.append(f"Las emisiones absolutas {direction} {abs(total_change):.1f}% frente al inventario anterior.")
-    intensity_change = history["intensity_change"]
-    if intensity_change is not None:
-        direction = "aumento" if intensity_change > 0 else "disminuyo"
-        observations.append(f"La intensidad de carbono {direction} {abs(intensity_change):.1f}% frente al periodo anterior.")
-    observations.append(f"La calidad consolidada de datos es {analysis['quality']['score']}%, con cobertura documental de {analysis['quality']['evidence_coverage']}%.")
-    for item in observations:
-        story.append(Paragraph(f"- {item}", styles["BodySmall"]))
-    story.extend([Spacer(1, 6 * mm), Paragraph("Plan de reduccion", styles["Section"])])
-    reduction = analysis["reduction"]
-    reduction_rows = [["Accion", "Fuente", "Reduccion esperada", "Inversion", "Estado"]]
-    for action in reduction["actions"]:
-        reduction_rows.append([
-            action.title,
-            action.source.name if action.source else "Corporativo",
-            f"{_number(action.expected_reduction)} tCO2e/anio",
-            _money_cop(action.investment_cost),
-            action.status,
+    story.append(Paragraph("Comparación e intensidades", styles["Section"]))
+    comparison = consulting["comparison"]
+    story.append(Paragraph(_pdf_text(
+        f"Periodo anterior: {comparison['previous_year'] if comparison['available'] else 'no disponible'}. "
+        f"Variación absoluta: {comparison['absolute_change']:+.1f}%" if comparison['absolute_change'] is not None else comparison['warning']
+    ), styles["BodySmall"]))
+    intensity_rows = [["Indicador", "Actual", "Anterior", "Variación", "Lectura"]]
+    for item in consulting["intensities"]:
+        intensity_rows.append([
+            item["name"],
+            "N/D" if item["value"] is None else _number(item["value"], 6),
+            "N/D" if item["previous_value"] is None else _number(item["previous_value"], 6),
+            "N/D" if item["change"] is None else f"{item['change']:+.1f}%",
+            item["direction"],
         ])
-    story.extend([_table(reduction_rows, [47 * mm, 30 * mm, 34 * mm, 32 * mm, 28 * mm], font_size=7.2), Spacer(1, 5 * mm)])
-    story.append(Paragraph(
-        "Nota: Este documento corresponde a un informe generado por la plataforma con base en la informacion registrada. "
-        "La revision interna no equivale a verificacion independiente.", styles["BodySmall"]
-    ))
+    story.extend([_table(intensity_rows, [32 * mm, 32 * mm, 32 * mm, 26 * mm, 38 * mm], font_size=7.0), Spacer(1, 6 * mm)])
+
+    story.append(Paragraph("Lectura ejecutiva explicable", styles["Section"]))
+    finding_rows = [["Prioridad", "Tema", "Hallazgo", "Recomendación"]]
+    for item in consulting["findings"][:6]:
+        finding_rows.append([item["level"], item["topic"], item["finding"], item["recommendation"]])
+    story.extend([_table(finding_rows, [22 * mm, 27 * mm, 55 * mm, 58 * mm], font_size=6.7), Spacer(1, 5 * mm)])
+    story.append(Paragraph("Limitaciones y cautelas", styles["Section"]))
+    for item in consulting["limitations"]:
+        story.append(Paragraph(_pdf_text(f"- {item['category']}: {item['detail']}"), styles["BodySmall"]))
+    story.append(Paragraph("Portafolio de reducción", styles["Section"]))
+    story.append(Paragraph(_pdf_text(
+        f"Estado: {portfolio['portfolio_status']}. Cobertura de la meta: {portfolio['coverage_percent']:.1f}%. "
+        f"Preparación: {portfolio['readiness_score']}%. Decisión: {portfolio['primary_decision']} "
+        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}."
+    ), styles["BodySmall"]))
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
 
 
 def generate_technical_pdf(session: Session, inventory: Inventory, output: Path) -> None:
     analysis = full_analysis(session, inventory)
     closure = closure_summary(session, inventory)
+    delivery = professional_delivery_summary(session, inventory, analysis=analysis, closure=closure)
+    portfolio = portfolio_summary(session, inventory)
+    consulting = consulting_report_summary(session, inventory, analysis=analysis, delivery=delivery, closure=closure, portfolio=portfolio)
     styles = _pdf_styles()
     doc = SimpleDocTemplate(
         str(output), pagesize=A4, rightMargin=15 * mm, leftMargin=15 * mm,
         topMargin=18 * mm, bottomMargin=20 * mm,
-        title=f"Informe tecnico {inventory.name}", author="Calcula tu Huella",
+        title=f"Informe técnico {inventory.name}", author="Calcula tu Huella",
     )
     story = [
         Paragraph("CALCULA TU HUELLA", styles["Brand"]),
-        Paragraph("Informe tecnico del inventario corporativo de GEI", styles["Subtitle"]),
+        Paragraph(f"Informe técnico del inventario corporativo de GEI · Plataforma {settings.version}", styles["Subtitle"]),
         Spacer(1, 6 * mm),
         Paragraph(inventory.organization.name, styles["Title"]),
         Paragraph(f"Inventario: {inventory.name} | Version: {inventory.version}", styles["BodySmall"]),
         Paragraph(f"Periodo: {inventory.start_date:%d/%m/%Y} - {inventory.end_date:%d/%m/%Y}", styles["BodySmall"]),
+        Paragraph(_pdf_text(f"Control de publicación: {delivery['publication']['level']} | Alistamiento integral: {delivery['score']}%"), styles["BodySmall"]),
+        Spacer(1, 8 * mm),
+        _table([
+            ["Emisiones", "Calidad", "Cobertura documental", "Confianza"],
+            [
+                f"{_number(analysis['total'], 1)} tCO2e",
+                f"{analysis['quality']['score']}%",
+                f"{analysis['quality']['evidence_coverage']}%",
+                f"{delivery['decision']['confidence_label']} ({delivery['decision']['confidence_score']}%)",
+            ],
+        ], [43 * mm] * 4, font_size=8),
+        Spacer(1, 8 * mm),
+        Paragraph("Propósito y lectura", styles["Section"]),
+        Paragraph(_pdf_text(delivery["narrative"]["conclusion"]), styles["BodySmall"]),
+        Paragraph(_pdf_text(f"Decisión sugerida: {delivery['decision']['primary_decision']}"), styles["BodySmall"]),
+        Spacer(1, 6 * mm),
+        Paragraph("Control documental", styles["Section"]),
+        _table([
+            ["Campo", "Valor"],
+            ["Documento", "Informe técnico del inventario corporativo de GEI"],
+            ["Versión del inventario", inventory.version],
+            ["Estado formal", inventory.status],
+            ["Nivel de publicación", delivery["publication"]["level"]],
+            ["Regla de uso", delivery["publication"]["notice"]],
+        ], [48 * mm, 118 * mm], font_size=7.5),
+        Spacer(1, 6 * mm),
+        Paragraph("Advertencia de uso", styles["Section"]),
+        Paragraph(
+            _pdf_text("Este informe refleja la información y los factores registrados en la plataforma. "
+                      "La revisión interna no equivale a verificación independiente y la comunicación externa "
+                      "debe respetar el nivel de publicación indicado."),
+            styles["BodySmall"],
+        ),
         PageBreak(),
         Paragraph("1. Perfil y objetivo", styles["Section"]),
         Paragraph(
             f"La organizacion pertenece al sector {inventory.organization.sector}, con {inventory.organization.employees} empleados. "
             f"El objetivo declarado del inventario es: {inventory.objective}", styles["BodySmall"]
         ),
-        Paragraph("2. Limites y metodologia", styles["Section"]),
+        Paragraph("2. Límites y metodología", styles["Section"]),
         Paragraph(
             f"Metodologia: {inventory.methodology}. Version metodologica: {inventory.methodology_version}. "
             f"Consolidacion: {inventory.consolidation_approach}. GWP: {inventory.gwp_version}. "
@@ -258,11 +423,11 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
         ),
         Paragraph("3. Fuentes incluidas", styles["Section"]),
     ]
-    source_rows = [["Fuente", "Alcance", "Categoria", "Sede", "Materialidad", "tCO2e"]]
+    source_rows = [["Fuente", "Alcance", "Categoría", "Sede", "Materialidad", "tCO2e"]]
     for row in analysis["sources_summary"]:
         source = next(item for item in inventory.sources if item.id == row["id"])
         source_rows.append([row["name"], row["scope"], row["category"], row["facility"], source.materiality, _number(row["emissions"], 3)])
-    story.extend([_table(source_rows, [30 * mm, 14 * mm, 38 * mm, 38 * mm, 25 * mm, 24 * mm], font_size=7), PageBreak()])
+    story.extend([_table(source_rows, [30 * mm, 14 * mm, 38 * mm, 38 * mm, 25 * mm, 24 * mm], font_size=7), Spacer(1, 5 * mm), _source_bar_chart(analysis["sources_summary"]), PageBreak()])
 
     story.append(Paragraph("4. Resultados consolidados", styles["Section"]))
     scope_rows = [["Alcance", "tCO2e"]] + [[f"Alcance {scope}", _number(value, 3)] for scope, value in analysis["scopes"].items()] + [["Total", _number(analysis["total"], 3)]]
@@ -307,7 +472,7 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
         elif name == "Empleados":
             intensity_label = f"{_number(analysis['intensity_employee'] or 0, 6)} tCO2e/persona"
         elif name == "Ingresos":
-            intensity_label = f"{_number(analysis['intensity_revenue'] or 0, 6)} tCO2e/millon COP"
+            intensity_label = f"{_number(analysis['intensity_revenue'] or 0, 6)} tCO2e/millón COP"
         else:
             intensity_label = "-"
         indicator_rows.append([name, _number(metric.value, 2), metric.unit, intensity_label])
@@ -328,14 +493,14 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
         .options(selectinload(SupplierResponse.request).selectinload(SupplierDataRequest.supplier))
         .order_by(SupplierResponse.calculated_emissions_tco2e.desc())
     ))
-    supplier_rows = [["Proveedor", "Producto/servicio", "Metodo", "Calidad", "Revision", "tCO2e"]]
+    supplier_rows = [["Proveedor", "Producto/servicio", "Método", "Calidad", "Revisión", "tCO2e"]]
     for response in supplier_responses:
         supplier_rows.append([response.request.supplier.name, response.request.product_service, response.method, response.quality_level, response.review_status, _number(response.calculated_emissions_tco2e, 3)])
     if len(supplier_rows) == 1:
         supplier_rows.append(["Sin respuestas", "-", "-", "-", "-", "0"] )
     story.extend([_table(supplier_rows, [38 * mm, 42 * mm, 34 * mm, 18 * mm, 24 * mm, 22 * mm], font_size=6.7), PageBreak()])
 
-    story.append(Paragraph("8. Memoria resumida de calculos", styles["Section"]))
+    story.append(Paragraph("8. Memoria resumida de cálculos", styles["Section"]))
     calculations = list(
         session.scalars(
             select(EmissionCalculation)
@@ -359,23 +524,40 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
         ])
     story.extend([_table(calc_rows, [21 * mm, 26 * mm, 25 * mm, 47 * mm, 15 * mm, 22 * mm, 20 * mm], font_size=6.2), PageBreak()])
 
-    story.append(Paragraph("9. Acciones de reduccion", styles["Section"]))
-    reduction_rows = [["Accion", "Fuente", "Reduccion", "Inversion", "Ahorro anual", "Avance"]]
-    for action in analysis["reduction"]["actions"]:
+    story.append(Paragraph("9. Portafolio de reducción y abatimiento", styles["Section"]))
+    story.append(Paragraph(_pdf_text(
+        f"Reducción requerida: {_number(portfolio['required_reduction'])} tCO2e/año; "
+        f"reducción estructurada: {_number(portfolio['expected_reduction'])} tCO2e/año; "
+        f"cobertura: {portfolio['coverage_percent']:.1f}%; brecha: {_number(portfolio['gap'])} tCO2e/año; "
+        f"preparación del portafolio: {portfolio['readiness_score']}%."
+    ), styles["BodySmall"]))
+    reduction_rows = [["Acción", "Clase", "Reducción", "Costo marginal", "Preparación", "Avance"]]
+    for item in portfolio["actions"]:
+        marginal = "Ahorro neto" if item["marginal_cost"] <= 0 else _money_cop(item["marginal_cost"]) + "/tCO2e"
         reduction_rows.append([
-            action.title,
-            action.source.name if action.source else "Corporativo",
-            f"{_number(action.expected_reduction)} tCO2e",
-            _money_cop(action.investment_cost),
-            _money_cop(action.annual_savings),
-            f"{action.progress_percent}%",
+            item["title"], item["classification"], f"{_number(item['expected_reduction'])} tCO2e",
+            marginal, f"{item['readiness_score']}%", f"{item['progress_percent']}%",
         ])
-    story.extend([_table(reduction_rows, [44 * mm, 29 * mm, 26 * mm, 32 * mm, 32 * mm, 18 * mm], font_size=6.8), Spacer(1, 6 * mm)])
-    story.append(Paragraph("10. Declaracion tecnica", styles["Section"]))
+    story.extend([_table(reduction_rows, [48 * mm, 30 * mm, 26 * mm, 35 * mm, 21 * mm, 18 * mm], font_size=6.5), Spacer(1, 6 * mm)])
+    story.append(Paragraph("10. Hallazgos y recomendaciones", styles["Section"]))
+    finding_rows = [["Prioridad", "Tema", "Hallazgo", "Evidencia", "Recomendación"]]
+    for item in consulting["findings"]:
+        finding_rows.append([item["level"], item["topic"], item["finding"], item["evidence"], item["recommendation"]])
+    story.extend([_table(finding_rows, [20 * mm, 24 * mm, 42 * mm, 42 * mm, 48 * mm], font_size=6.1), Spacer(1, 6 * mm)])
+
+    story.append(Paragraph("11. Puertas de entrega y limitaciones", styles["Section"]))
+    delivery_rows = [["Control", "Estado", "Detalle"]]
+    for gate in delivery["gates"]:
+        delivery_rows.append([gate["name"], gate["status"], gate["detail"]])
+    story.extend([_table(delivery_rows, [47 * mm, 26 * mm, 98 * mm], font_size=6.6), Spacer(1, 5 * mm)])
+    limitation_rows = [["Categoría", "Limitación"]] + [[item["category"], item["detail"]] for item in consulting["limitations"]]
+    story.extend([_table(limitation_rows, [38 * mm, 133 * mm], font_size=6.8), Spacer(1, 5 * mm)])
+    story.append(Paragraph("12. Declaración técnica", styles["Section"]))
     story.append(Paragraph(
-        "El inventario fue elaborado a partir de la informacion registrada por la organizacion y los factores seleccionados. "
-        "Los factores demostrativos deben sustituirse por fuentes oficiales o especificas antes de uso externo. "
-        "La aprobacion dentro de la plataforma corresponde a control interno y no constituye verificacion independiente.", styles["BodySmall"]
+        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "
+        "El inventario fue elaborado a partir de la información registrada por la organización y los factores seleccionados. "
+        "Los factores demostrativos deben sustituirse por fuentes oficiales o específicas antes de uso externo. "
+        "La aprobación dentro de la plataforma corresponde a control interno y no constituye verificación independiente.", styles["BodySmall"]
     ))
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
 
@@ -383,6 +565,9 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
 def generate_calculation_workbook(session: Session, inventory: Inventory, output: Path) -> None:
     analysis = full_analysis(session, inventory)
     closure = closure_summary(session, inventory)
+    delivery = professional_delivery_summary(session, inventory, analysis=analysis, closure=closure)
+    portfolio = portfolio_summary(session, inventory)
+    consulting = consulting_report_summary(session, inventory, analysis=analysis, delivery=delivery, closure=closure, portfolio=portfolio)
     wb = Workbook()
     ws = wb.active
     ws.title = "Resumen"
@@ -403,6 +588,61 @@ def generate_calculation_workbook(session: Session, inventory: Inventory, output
     ws.append(["Rango inferior (emisiones cubiertas)", closure["uncertainty"]["lower_tco2e"], "tCO2e"])
     ws.append(["Rango superior (emisiones cubiertas)", closure["uncertainty"]["upper_tco2e"], "tCO2e"])
     ws.append(["Preparación metodológica", closure["readiness_score"], "%"])
+    ws.append(["Alistamiento integral para entrega", delivery["score"], "%"])
+    ws.append(["Control de publicación", delivery["publication"]["level"], "estado"])
+    ws.append(["Confianza para decisión", delivery["decision"]["confidence_score"], "%"])
+    ws.append(["Decisión principal", delivery["decision"]["primary_decision"], "orientación"])
+
+
+    delivery_ws = wb.create_sheet("Control de entrega")
+    delivery_ws.append(["Puerta", "Estado", "Responsable", "Detalle", "Criterio de aceptación", "Acción", "Ruta"])
+    for gate in delivery["gates"]:
+        delivery_ws.append([gate["name"], gate["status"], gate["owner"], gate["detail"], gate["acceptance"], gate["action"], gate["href"]])
+    delivery_ws.append([])
+    delivery_ws.append(["Control de publicación", delivery["publication"]["level"], delivery["publication"]["audience"], delivery["publication"]["message"], delivery["publication"]["notice"]])
+    publication_row = delivery_ws.max_row
+    delivery_ws.append(["Decisión principal", delivery["decision"]["primary_decision"], "Dirección", delivery["narrative"]["headline"], f"Confianza {delivery['decision']['confidence_label']} ({delivery['decision']['confidence_score']}%)"])
+    decision_row = delivery_ws.max_row
+    delivery_ws.append([])
+    delivery_ws.append(["Plan priorizado", "Prioridad", "Responsable", "Detalle", "Criterio de cierre", "Acción", "Ruta"])
+    plan_header_row = delivery_ws.max_row
+    for item in delivery["action_plan"]:
+        delivery_ws.append([item["stage"], item["priority"], item["owner"], item["detail"], item["acceptance"], item["title"], item["href"]])
+    delivery_ws.append([])
+    delivery_ws.append(["Conclusión ejecutiva", delivery["narrative"]["headline"]])
+    narrative_start_row = delivery_ws.max_row
+    delivery_ws.append(["Conclusión de estado", delivery["narrative"]["conclusion"]])
+    for item in delivery["narrative"]["limitations"]:
+        delivery_ws.append(["Limitación", item])
+    narrative_end_row = delivery_ws.max_row
+
+    consulting_ws = wb.create_sheet("Narrativa consultoría")
+    consulting_ws.append(["CAPÍTULOS Y PREPARACIÓN EDITORIAL"])
+    consulting_ws.append(["Preparación editorial", consulting["report_score"], "%"])
+    consulting_ws.append(["Estado", consulting["status"], "control"])
+    consulting_ws.append(["Propósito", consulting["purpose"], "orientación"])
+    consulting_ws.append([])
+    consulting_ws.append(["Capítulo", "Estado", "Puntaje", "Acción requerida"])
+    consulting_header_row = consulting_ws.max_row
+    for item in consulting["chapters"]:
+        consulting_ws.append([item["name"], item["status"], item["score"], item["action"]])
+    consulting_ws.append([])
+    consulting_ws.append(["HALLAZGOS EXPLICABLES"])
+    consulting_ws.append(["Prioridad", "Tema", "Hallazgo", "Evidencia", "Implicación", "Recomendación"])
+    findings_header_row = consulting_ws.max_row
+    for item in consulting["findings"]:
+        consulting_ws.append([item["level"], item["topic"], item["finding"], item["evidence"], item["implication"], item["recommendation"]])
+    consulting_ws.append([])
+    consulting_ws.append(["LIMITACIONES Y REGLAS DE COMUNICACIÓN"])
+    consulting_ws.append(["Categoría", "Detalle"])
+    limitations_header_row = consulting_ws.max_row
+    for item in consulting["limitations"]:
+        consulting_ws.append([item["category"], item["detail"]])
+    consulting_ws.append([])
+    consulting_ws.append(["Afirmación", "Permitida", "Orientación"])
+    claims_header_row = consulting_ws.max_row
+    for item in consulting["claims"]:
+        consulting_ws.append([item["label"], "Sí" if item["allowed"] else "No", item["guidance"]])
 
     data_ws = wb.create_sheet("Datos de actividad")
     data_ws.append(["ID", "Fuente", "Sede", "Periodo inicial", "Periodo final", "Valor", "Unidad", "Origen", "Calidad", "Estimado", "Incertidumbre %", "Base incertidumbre", "Evidencia", "Estado", "Notas"])
@@ -502,18 +742,31 @@ def generate_calculation_workbook(session: Session, inventory: Inventory, output
         supplier_ws.append([req.campaign.name, req.supplier.name, req.supplier.tax_id, req.product_service, req.quantity, req.unit, req.spend_cop, response.method, response.emission_factor, response.factor_unit, response.calculated_emissions_tco2e, response.methodology, response.boundary, "Sí" if response.verified else "No", response.quality_level, response.review_status, response.evidence_sha256])
 
     reduction_ws = wb.create_sheet("Reducción")
-    reduction_ws.append(["Acción", "Fuente", "Descripción", "Línea base tCO2e", "Reducción esperada", "Inversión COP", "Ahorro anual COP", "Prioridad", "Responsable", "Fecha objetivo", "Estado", "Avance %", "Reducción real", "Ahorro real"])
-    for action in inventory.reduction_actions:
+    reduction_ws.append(["Clasificación", "Acción", "Fuente", "Descripción", "Reducción esperada", "Reducción real", "Impacto inventario %", "Inversión COP", "Ahorro anual COP", "Retorno años", "Costo marginal COP/tCO2e", "Preparación %", "Pendientes", "Prioridad", "Responsable", "Fecha objetivo", "Vencida", "Próximos 90 días", "Estado", "Avance %", "Viabilidad", "Riesgo"])
+    for item in portfolio["actions"]:
+        action = item["action"]
         reduction_ws.append([
-            action.title, action.source.name if action.source else "Corporativo", action.description,
-            action.baseline_emissions, action.expected_reduction, action.investment_cost, action.annual_savings,
-            action.priority, action.responsible, action.target_date, action.status, action.progress_percent,
-            action.actual_reduction, action.actual_savings,
+            item["classification"], action.title, item["source"], action.description,
+            item["expected_reduction"], item["actual_reduction"], item["impact_share"], item["investment"],
+            item["annual_savings"], item["payback_years"], item["marginal_cost"], item["readiness_score"],
+            "; ".join(item["missing"]), action.priority, item["owner"], item["target_date"],
+            "Sí" if item["overdue"] else "No", "Sí" if item["due_soon"] else "No", item["status"],
+            item["progress_percent"], item["feasibility"], item["risk_level"],
         ])
+
+    trajectory_ws = wb.create_sheet("Trayectoria reducción")
+    trajectory_ws.append(["Año", "Reducción acumulada tCO2e", "Emisiones proyectadas tCO2e", "Valor meta tCO2e"])
+    for point in portfolio["timeline"]:
+        trajectory_ws.append([point["year"], point["reduction"], point["projected_emissions"], point["target_value"]])
 
     header_fill = PatternFill("solid", fgColor="0F2D4D")
     header_font = Font(color="FFFFFF", bold=True)
     title_fill = PatternFill("solid", fgColor="EAF3EF")
+    warning_fill = PatternFill("solid", fgColor="FFF1ED")
+    decision_fill = PatternFill("solid", fgColor="EAF4F7")
+    ready_fill = PatternFill("solid", fgColor="E7F4EA")
+    progress_fill = PatternFill("solid", fgColor="FFF4D6")
+    blocked_fill = PatternFill("solid", fgColor="FDE7E5")
     for sheet in wb.worksheets:
         sheet.freeze_panes = "A2" if sheet.title != "Resumen" else "A8"
         header_row = 1 if sheet.title != "Resumen" else 8
@@ -522,8 +775,11 @@ def generate_calculation_workbook(session: Session, inventory: Inventory, output
             cell.font = header_font
             cell.alignment = Alignment(vertical="center", wrap_text=True)
         if sheet.title == "Resumen":
+            sheet.merge_cells("A1:C1")
             sheet["A1"].fill = title_fill
             sheet["A1"].font = Font(bold=True, size=16, color="0F2D4D")
+            sheet["A1"].alignment = Alignment(vertical="center", horizontal="left")
+            sheet.row_dimensions[1].height = 28
         for column_cells in sheet.columns:
             max_len = 0
             for cell in list(column_cells)[:200]:
@@ -531,12 +787,87 @@ def generate_calculation_workbook(session: Session, inventory: Inventory, output
                 max_len = max(max_len, len(value))
                 cell.alignment = Alignment(vertical="top", wrap_text=True)
             sheet.column_dimensions[get_column_letter(column_cells[0].column)].width = min(max(max_len + 2, 10), 42)
+        sheet.sheet_view.showGridLines = False
+        sheet.page_setup.fitToWidth = 1
+        sheet.page_setup.fitToHeight = 0
+        sheet.sheet_properties.pageSetUpPr.fitToPage = True
+        sheet.print_options.horizontalCentered = False
+
+    # Consulting narrative is a controlled editorial working paper.
+    consulting_ws.merge_cells("A1:F1")
+    consulting_ws["A1"].fill = title_fill
+    consulting_ws["A1"].font = Font(bold=True, size=15, color="0F2D4D")
+    consulting_ws["A1"].alignment = Alignment(vertical="center", horizontal="left")
+    consulting_ws.row_dimensions[1].height = 26
+    for header_index in (consulting_header_row, findings_header_row, limitations_header_row, claims_header_row):
+        for cell in consulting_ws[header_index]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+        consulting_ws.row_dimensions[header_index].height = 28
+    for row in range(2, consulting_ws.max_row + 1):
+        for column in range(1, 7):
+            consulting_ws.cell(row, column).alignment = Alignment(vertical="top", wrap_text=True)
+    for column, width in {"A": 25, "B": 24, "C": 38, "D": 42, "E": 42, "F": 45}.items():
+        consulting_ws.column_dimensions[column].width = width
+    consulting_ws.freeze_panes = f"A{consulting_header_row + 1}"
+    consulting_ws.page_setup.orientation = "landscape"
+    consulting_ws.print_area = f"A1:F{consulting_ws.max_row}"
+
+    # The delivery control sheet is a working paper, not a raw export. It has
+    # explicit sections, visual status cues and print settings for committee use.
+    for header_index in (1, plan_header_row):
+        for cell in delivery_ws[header_index]:
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+        delivery_ws.row_dimensions[header_index].height = 28
+    delivery_widths = {"A": 34, "B": 24, "C": 28, "D": 52, "E": 52, "F": 25, "G": 28}
+    for column, width in delivery_widths.items():
+        delivery_ws.column_dimensions[column].width = width
+    delivery_ws.page_setup.orientation = "landscape"
+    delivery_ws.print_title_rows = "1:1"
+    delivery_ws.print_area = f"A1:G{delivery_ws.max_row}"
+    delivery_ws.auto_filter.ref = f"A1:G{publication_row - 2}"
+
+    for row in range(2, delivery_ws.max_row + 1):
+        is_blank = all(delivery_ws.cell(row, column).value in (None, "") for column in range(1, 8))
+        delivery_ws.row_dimensions[row].height = 10 if is_blank else 46
+        for column in range(1, 8):
+            delivery_ws.cell(row, column).alignment = Alignment(vertical="top", wrap_text=True)
+        status = str(delivery_ws.cell(row, 2).value or "")
+        if status == "Listo":
+            delivery_ws.cell(row, 2).fill = ready_fill
+        elif status == "En progreso":
+            delivery_ws.cell(row, 2).fill = progress_fill
+        elif status == "Bloqueado":
+            delivery_ws.cell(row, 2).fill = blocked_fill
+
+    for column in range(1, 8):
+        delivery_ws.cell(publication_row, column).fill = warning_fill
+        delivery_ws.cell(decision_row, column).fill = decision_fill
+    delivery_ws.cell(publication_row, 1).font = Font(bold=True, color="9C2E22")
+    delivery_ws.cell(decision_row, 1).font = Font(bold=True, color="0F2D4D")
+    delivery_ws.row_dimensions[publication_row].height = 58
+    delivery_ws.row_dimensions[decision_row].height = 64
+
+    for row in range(narrative_start_row, narrative_end_row + 1):
+        delivery_ws.merge_cells(start_row=row, start_column=2, end_row=row, end_column=7)
+        delivery_ws.cell(row, 1).fill = title_fill
+        delivery_ws.cell(row, 1).font = Font(bold=True, color="0F2D4D")
+        delivery_ws.cell(row, 2).alignment = Alignment(vertical="top", wrap_text=True)
+        delivery_ws.row_dimensions[row].height = 48
+
     wb.save(output)
 
 
 def create_report_artifact(session: Session, inventory: Inventory, report_type: str, generated_by: str) -> ReportArtifact:
     normalized = report_type.lower()
-    if normalized == "ejecutivo":
+    if normalized == "ficha":
+        output = _report_path(inventory, "pdf", "ficha_ejecutiva")
+        generate_decision_brief_pdf(session, inventory, output)
+        label = "Ficha ejecutiva"
+    elif normalized == "ejecutivo":
         output = _report_path(inventory, "pdf", "informe_ejecutivo")
         generate_executive_pdf(session, inventory, output)
         label = "Informe ejecutivo"
@@ -548,11 +879,20 @@ def create_report_artifact(session: Session, inventory: Inventory, report_type: 
         output = _report_path(inventory, "xlsx", "memoria_calculo")
         generate_calculation_workbook(session, inventory, output)
         label = "Memoria de cálculo"
+    elif normalized == "editable":
+        output = _report_path(inventory, "docx", "informe_consultoria_editable")
+        generate_editable_consulting_docx(session, inventory, output)
+        label = "Informe de consultoría editable"
     else:
         raise ValueError("Tipo de informe no soportado")
     content = output.read_bytes()
     storage_key = str(output.relative_to(INSTANCE_DIR))
-    storage.put_bytes(storage_key, content, "application/pdf" if output.suffix.lower() == ".pdf" else "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+    media_types = {
+        ".pdf": "application/pdf",
+        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    }
+    storage.put_bytes(storage_key, content, media_types.get(output.suffix.lower(), "application/octet-stream"))
     artifact = ReportArtifact(
         inventory_id=inventory.id,
         report_type=label,

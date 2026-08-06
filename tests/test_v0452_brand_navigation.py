@@ -26,4 +26,4 @@ def test_public_experience_has_mobile_navigation_and_clear_results():
 
 def test_release_is_v0453():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
-    assert 'version: str = "0.45.5"' in config
+    assert 'version: str = "1.0.0"' in config

@@ -2,24 +2,39 @@
 {% block title %}Informes · Calcula tu Huella{% endblock %}
 {% block page_label %}Informes y entregables{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Reportes</p><h1>Informes y memoria</h1><p>Genera documentos trazables directamente desde datos, factores, cálculos e indicadores.</p></div><span class="phase-label">Generación real · V0.6</span></div>
+<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Entregables</p><h1>Documentos controlados para decisión y verificación</h1><p>Genera la ficha ejecutiva, los informes y la memoria de cálculo desde un mismo expediente trazable.</p></div><span class="phase-label">V0.55 · informe explicable</span></div>
 
 <div class="report-summary-strip">
-  <div><small>EMISIONES</small><strong>{{ total|number_es }} tCO₂e</strong></div><div><small>CALIDAD</small><strong>{{ quality.score }}%</strong></div><div><small>INTENSIDAD</small><strong>{{ (intensity_production or 0)|number_es(4) }} tCO₂e/t</strong></div><div><small>ESTADO</small><strong>{{ inventory.status }}</strong></div>
+  <div><small>EMISIONES</small><strong>{{ total|number_es }} tCO₂e</strong></div>
+  <div><small>ALISTAMIENTO</small><strong>{{ delivery.score }}%</strong></div>
+  <div><small>CALIDAD</small><strong>{{ quality.score }}%</strong></div>
+  <div><small>PUBLICACIÓN</small><strong>{{ delivery.publication.level }}</strong></div>
 </div>
+
+{% if delivery.blockers %}
+<div class="delivery-alert delivery-alert-blocked"><div><strong>Versión final bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) deben cerrarse. Puedes generar documentos de trabajo, pero conservarán estado de borrador.</p></div><a href="/entrega-profesional">Ver controles pendientes →</a></div>
+{% elif not delivery.approved %}
+<div class="delivery-alert delivery-alert-warning"><div><strong>Emisión condicionada</strong><p>El inventario aún no está aprobado o cerrado. Los documentos se generarán como borrador técnico.</p></div><a href="/control">Ir a revisión →</a></div>
+{% else %}
+<div class="delivery-alert delivery-alert-ready"><div><strong>Habilitado para entrega controlada</strong><p>La aprobación está registrada. Revisa la versión generada antes de compartirla.</p></div><a href="/entrega-profesional">Ver resumen de entrega →</a></div>
+{% endif %}
 
 <div class="report-layout-v6">
   <section class="card">
-    <div class="card-head"><div><small>GENERADOR</small><h3>Crear entregable</h3></div></div>
+    <div class="card-head"><div><small>GENERADOR VERSIONADO</small><h3>Crear entregable</h3></div><div class="table-actions"><a href="/reportes/consultoria">Taller de informe →</a><a href="/entrega-profesional">Centro de entrega →</a></div></div>
     <div class="deliverable-grid">
-      {% for code,title,desc,format in [('ejecutivo','Informe ejecutivo','Resumen para gerencia: resultados, tendencias y plan de reducción.','PDF'),('tecnico','Informe técnico','Metodología, límites, calidad, memoria resumida y declaración técnica.','PDF'),('memoria','Memoria de cálculo','Datos, factores, conversiones, fórmulas, indicadores y acciones.','Excel')] %}
-      <article class="deliverable-card"><span class="doc-icon">▤</span><div><small>{{ format }}</small><h3>{{ title }}</h3><p>{{ desc }}</p></div>{% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ code }}"><button class="btn btn-primary">Generar</button></form>{% endif %}</article>
+      {% for item in delivery.deliverables %}
+      <article class="deliverable-card delivery-document-card">
+        <div class="delivery-document-head"><span class="doc-icon">▤</span><span class="status-chip {{ 'complete' if item.status=='Listo' else 'progressing' }}">{{ item.status }}</span></div>
+        <div><small>{{ item.format }}</small><h3>{{ item.title }}</h3><p>{{ item.description }}</p><em>{{ item.condition }}</em></div>
+        {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary">Generar {{ item.format }}</button></form>{% endif %}
+      </article>
       {% endfor %}
     </div>
-    <div class="report-notice"><strong>Control de estado</strong><p>Mientras el inventario no esté aprobado o cerrado, los documentos se generan como borrador. La aprobación del informe queda registrada en auditoría.</p></div>
+    <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación.</p></div>
   </section>
 
-  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen actual</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Calidad de datos</span><b>{{ quality.score }}%</b><div class="progress"><i style="width:{{ quality.score }}%"></i></div></div><a href="/control">Revisar condiciones de cierre →</a></aside>
+  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen actual</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div><a href="/entrega-profesional">Revisar las ocho puertas →</a></aside>
 </div>
 
 <section class="card report-history">

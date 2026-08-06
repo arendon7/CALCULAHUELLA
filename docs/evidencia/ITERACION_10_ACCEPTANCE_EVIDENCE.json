@@ -1,0 +1,84 @@
+{
+  "acceptance": {
+    "audit_events_checked": 16,
+    "audit_failures": 0,
+    "certificate_hash": "8ba972d67f2481b1dd53fc1160000ef3670ebed0f253139f40225bd0be049615",
+    "checks": {
+      "audit_chain": true,
+      "backup_restore": true,
+      "concurrent_load": true,
+      "multi_organization_journeys": true,
+      "tenant_integrity": true
+    },
+    "concurrent_failures": 0,
+    "concurrent_p95_ms": 396.12,
+    "concurrent_requests": 32,
+    "journey_p95_ms": 97.98,
+    "journeys": 27,
+    "membership_enforced": true,
+    "ok": true,
+    "organizations": 3,
+    "requests_per_second": 30.12,
+    "status": "Aprobada",
+    "tenant_checks": 94,
+    "tenant_critical_issues": 0
+  },
+  "actual_restore_test": {
+    "audit_chain_after_restore": true,
+    "mode": "Respaldo firmado, alteración controlada y restauración atómica",
+    "ok": true,
+    "pre_restore_safety_backup_supported": true,
+    "restored_value": "Industrias Andinas Demo S.A.S.",
+    "tenant_integrity_after_restore": true,
+    "unsafe_zip_extraction_blocked": true
+  },
+  "application": "Calcula tu Huella",
+  "automated_tests": {
+    "mac_package": {
+      "collected": 392,
+      "duration_seconds": 30.62,
+      "execution": "Proceso pytest aislado y reproducible",
+      "passed": 392,
+      "skipped": 0
+    },
+    "windows_package_validated_from_linux": {
+      "collected": 392,
+      "execution": "Procesos aislados; no equivale a instalación física Windows",
+      "passed": 389,
+      "skip_reason": "Pruebas exclusivas del instalador macOS",
+      "skipped": 3
+    }
+  },
+  "calculation_regression": {
+    "calculations": 200,
+    "canonical_hash": "b0cb29d2bb898b47fd6e666f1c1bfd307bf41ed1ceee3bf4d4c5110c8678243d",
+    "identical_to_iteration_9": true,
+    "inventories": 4,
+    "source_total_tco2e": 954.412064,
+    "sources": 25
+  },
+  "certification": "Certificación técnica y aceptación local multiempresa",
+  "database_migrations": {
+    "mac_head": "20260805_0036",
+    "ok": true,
+    "tables_from_empty_database": 121,
+    "windows_head": "20260805_0036"
+  },
+  "generated_at": "2026-08-05T21:32:52.744724+00:00",
+  "iteration": 10,
+  "limitations": [
+    "La ejecución se realizó en Linux; no acredita instalación física en macOS externo ni Windows 10/11.",
+    "La carga usa ASGI local y no sustituye pruebas distribuidas de red o infraestructura.",
+    "No se ejecutó pentest independiente.",
+    "Producción pública requiere PostgreSQL, TLS, almacenamiento externo, respaldo fuera del volumen y monitoreo real.",
+    "La aprobación técnica de la plataforma no equivale a verificación independiente de un inventario específico."
+  ],
+  "security_and_continuity_controls": [
+    "Integridad referencial multiempresa y detección de relaciones cruzadas",
+    "Cadena de auditoría serializada para concurrencia SQLite y PostgreSQL",
+    "Restauración SQLite validada, atómica y sin extractall",
+    "Pruebas aisladas de plugins globales y runtime temporal"
+  ],
+  "status": "Aprobada para despliegue controlado",
+  "version": "1.0.0"
+}

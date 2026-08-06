@@ -6,11 +6,14 @@
   <div>
     <p class="breadcrumb">{{ inventory.name }} / Información</p>
     <h1>Datos y evidencias</h1>
-    <p>Registra la actividad por periodo, controla su calidad y conserva cada soporte.</p>
+    <p>Consulta el historial consolidado, gestiona solicitudes y conserva cada soporte. Para registrar información nueva usa la captura guiada.</p>
   </div>
   <div class="head-actions">
-    <a class="btn btn-outline" href="/informacion/plantilla.xlsx">↓ Plantilla Excel</a>
-    <a class="btn btn-primary" href="/informacion/importar">Importar datos</a>
+    <details class="head-action-menu">
+      <summary class="btn btn-outline">Otras formas de carga</summary>
+      <div><a href="/informacion/plantilla.xlsx">Descargar plantilla sectorial</a><a href="/informacion/importar">Importar archivo Excel</a></div>
+    </details>
+    <a class="btn btn-primary" href="/captura-guiada">Registrar un dato</a>
   </div>
 </div>
 
@@ -21,6 +24,12 @@
   <article class="mini-card"><small>SOLICITUDES ABIERTAS</small><strong>{{ requests|rejectattr('status','equalto','Completado')|list|length }}</strong><p>Requieren gestión</p></article>
 </div>
 
+<nav class="task-jumpbar" aria-label="Tareas de información" data-task-tabs="information" data-default-task="datos">
+  <a href="#datos" data-task-target="datos"><span>1</span><strong>Registrar datos</strong><small>Valor, periodo y fuente</small></a>
+  <a href="#solicitudes" data-task-target="solicitudes"><span>2</span><strong>Solicitar información</strong><small>Responsables y vencimientos</small></a>
+  <a href="#evidencias" data-task-target="evidencias"><span>3</span><strong>Gestionar evidencias</strong><small>Soportes e integridad</small></a>
+</nav>
+
 {% if not records %}
 <section class="card first-data-guide">
   <div><small>PRIMERA CARGA</small><h2>Empieza con un dato fácil de comprobar</h2><p>Selecciona una fuente, registra el primer mes y asocia una factura, certificado o registro operativo. Después podrás importar el resto en Excel.</p></div>
@@ -28,7 +37,7 @@
 </section>
 {% endif %}
 
-<section class="section-anchor" id="datos">
+<section class="section-anchor task-panel" id="datos" data-task-panel="datos">
   <div class="section-title-row">
     <div><span class="section-number">1</span><div><small>DATOS DE ACTIVIDAD</small><h2>Registros por periodo</h2></div></div>
     <span class="phase-label functional">Carga y validación activa</span>
@@ -39,7 +48,7 @@
       {% if records %}
       <div class="responsive-table"><table>
         <thead><tr><th>Fuente y sede</th><th>Periodo</th><th>Dato</th><th>Origen</th><th>Calidad</th><th>Incertidumbre</th><th>Estado</th><th>Soporte</th></tr></thead>
-        <tbody>{% for item in records %}
+        <tbody>{% for item in visible_records %}
           <tr>
             <td><a class="table-link" href="/fuentes/{{ item.source.id }}">{{ item.source.name }}</a><small class="table-sub">{{ item.source.facility.name if item.source.facility else 'Corporativo' }}</small></td>
             <td>{{ item.period_start.strftime('%m/%Y') }}</td>
@@ -52,6 +61,12 @@
           </tr>
         {% endfor %}</tbody>
       </table></div>
+      {% if records|length > 12 %}
+      <div class="table-history-control">
+        <span>Mostrando {{ visible_records|length }} de {{ records|length }} registros.</span>
+        {% if show_all %}<a class="btn btn-outline btn-small" href="/informacion#datos">Ver solo los más recientes</a>{% else %}<a class="btn btn-outline btn-small" href="/informacion?show_all=true#datos">Ver historial completo</a>{% endif %}
+      </div>
+      {% endif %}
       {% else %}<div class="inline-empty"><strong>No hay registros</strong><p>Usa el formulario para cargar el primer dato del inventario.</p></div>{% endif %}
     </section>
 
@@ -59,15 +74,22 @@
     <aside class="card sticky-form">
       <div class="card-head"><div><small>NUEVO REGISTRO</small><h3>Cargar dato</h3></div></div>
       {% if sources|selectattr('included')|list %}
-      <form method="post" action="/informacion/datos/nuevo" class="stack-form" data-activity-form>
-        <label>Fuente<select name="source_id" required data-activity-source>{% for source in sources if source.included %}<option value="{{ source.id }}" data-preferred-unit="{{ source.preferred_unit }}">{{ source.name }} · {{ source.facility.name if source.facility else 'Corporativo' }}</option>{% endfor %}</select><small data-source-unit-hint>Usaremos la unidad esperada de la fuente.</small></label>
-        <div class="form-grid two compact-fields"><label>Inicio<input name="period_start" type="date" value="{{ default_period_start }}" required></label><label>Final<input name="period_end" type="date" value="{{ default_period_end }}" required></label></div>
-        <div class="form-grid two compact-fields"><label>Valor<input name="value" type="number" step="any" min="0" required></label><label>Unidad<select name="unit" required data-activity-unit>{% for unit in allowed_units %}<option>{{ unit }}</option>{% endfor %}</select></label></div>
-        <label>Origen<select name="data_origin" required>{% for origin in data_origins %}<option>{{ origin }}</option>{% endfor %}</select></label>
-        <label>Evidencia asociada<select name="evidence_id"><option value="">Sin asociar todavía</option>{% for doc in documents %}<option value="{{ doc.id }}">{{ doc.name }}</option>{% endfor %}</select><small>{% if not documents %}<a href="#evidencias">Carga un soporte</a> y luego vuelve a este formulario.{% else %}Selecciona el soporte que respalda el valor.{% endif %}</small></label>
-        <label class="check-line"><input type="checkbox" name="is_estimated"> El valor es estimado</label>
-        <div class="form-grid two compact-fields"><label>Incertidumbre del dato (%)<input name="uncertainty_percentage" type="number" min="0" step="0.1" value="0"></label><label>Base de incertidumbre<input name="uncertainty_basis" placeholder="Medición, factura, estimación..."></label></div>
-        <label>Observaciones<textarea name="notes" placeholder="Supuestos, alcance del dato o aclaraciones"></textarea></label>
+      <form method="post" action="/informacion/datos/nuevo" class="stack-form task-focused-form" data-activity-form>
+        <div class="form-primary-fields">
+          <label>Fuente<select name="source_id" required data-activity-source>{% for source in sources if source.included %}<option value="{{ source.id }}" data-preferred-unit="{{ source.preferred_unit }}">{{ source.name }} · {{ source.facility.name if source.facility else 'Corporativo' }}</option>{% endfor %}</select><small data-source-unit-hint>Usaremos la unidad esperada de la fuente.</small></label>
+          <div class="form-grid two compact-fields"><label>Inicio<input name="period_start" type="date" value="{{ default_period_start }}" required></label><label>Final<input name="period_end" type="date" value="{{ default_period_end }}" required></label></div>
+          <div class="form-grid two compact-fields"><label>Valor<input name="value" type="number" step="any" min="0" required></label><label>Unidad<select name="unit" required data-activity-unit>{% for unit in allowed_units %}<option>{{ unit }}</option>{% endfor %}</select></label></div>
+          <label>Origen<select name="data_origin" required>{% for origin in data_origins %}<option>{{ origin }}</option>{% endfor %}</select></label>
+          <label>Evidencia asociada<select name="evidence_id"><option value="">Sin asociar todavía</option>{% for doc in documents %}<option value="{{ doc.id }}">{{ doc.name }}</option>{% endfor %}</select><small>{% if not documents %}<a href="#evidencias" data-task-target="evidencias">Carga un soporte</a> y luego vuelve a este formulario.{% else %}Selecciona el soporte que respalda el valor.{% endif %}</small></label>
+        </div>
+        <details class="advanced-form-fields" data-exclusive-details="information-create">
+          <summary><span>Opciones avanzadas</span><small>Estimación, incertidumbre y observaciones</small></summary>
+          <div class="advanced-form-fields-body">
+            <label class="check-line"><input type="checkbox" name="is_estimated"> El valor es estimado</label>
+            <div class="form-grid two compact-fields"><label>Incertidumbre del dato (%)<input name="uncertainty_percentage" type="number" min="0" step="0.1" value="0"></label><label>Base de incertidumbre<input name="uncertainty_basis" placeholder="Medición, factura, estimación..."></label></div>
+            <label>Observaciones<textarea name="notes" placeholder="Supuestos, alcance del dato o aclaraciones"></textarea></label>
+          </div>
+        </details>
         <button class="btn btn-primary btn-block">Guardar dato y recalcular</button>
       </form>
       {% else %}
@@ -78,7 +100,7 @@
   </div>
 </section>
 
-<section class="section-anchor" id="solicitudes">
+<section class="section-anchor task-panel" id="solicitudes" data-task-panel="solicitudes">
   <div class="section-title-row"><div><span class="section-number">2</span><div><small>FLUJO DE INFORMACIÓN</small><h2>Solicitudes al cliente</h2></div></div></div>
   <div class="information-layout">
     <section class="card">
@@ -94,18 +116,18 @@
       {% else %}<div class="inline-empty"><strong>Sin solicitudes abiertas</strong></div>{% endfor %}</div>
     </section>
 
-    {% if user.can_manage_sources %}<aside class="card sticky-form"><div class="card-head"><div><small>NUEVA SOLICITUD</small><h3>Pedir información</h3></div></div><form method="post" action="/informacion/solicitudes/nueva" class="stack-form">
+    {% if user.can_manage_sources %}<aside class="card sticky-form progressive-action-card"><details class="task-form-disclosure" data-exclusive-details="information-create"><summary><div><small>NUEVA SOLICITUD</small><strong>Pedir información</strong><span>Abre el formulario solo cuando necesites asignar un requerimiento.</span></div><b>Crear</b></summary><form method="post" action="/informacion/solicitudes/nueva" class="stack-form">
       <label>Título<input name="title" required placeholder="Ej. Facturas de electricidad"></label>
       <label>Fuente<select name="source_id"><option value="">General</option>{% for source in sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
       <label>Responsable<input name="requested_to" required placeholder="Área o persona"></label>
       <label>Fecha límite<input name="due_date" type="date" required></label>
       <label>Instrucciones<textarea name="instructions" placeholder="Dato, periodo y soporte requerido"></textarea></label>
       <button class="btn btn-primary btn-block">Crear solicitud</button>
-    </form></aside>{% endif %}
+    </form></details></aside>{% endif %}
   </div>
 </section>
 
-<section class="section-anchor" id="evidencias">
+<section class="section-anchor task-panel" id="evidencias" data-task-panel="evidencias">
   <div class="section-title-row"><div><span class="section-number">3</span><div><small>REPOSITORIO DOCUMENTAL</small><h2>Evidencias</h2></div></div><span class="phase-label functional">Carga y descarga real</span></div>
   <div class="information-layout wide-form-layout">
     <section class="card">
@@ -121,14 +143,14 @@
       </table></div>
     </section>
 
-    {% if user.can_provide_data %}<aside class="card sticky-form"><div class="card-head"><div><small>NUEVA EVIDENCIA</small><h3>Subir soporte</h3></div></div><form method="post" action="/informacion/evidencias/nueva" enctype="multipart/form-data" class="stack-form">
+    {% if user.can_provide_data %}<aside class="card sticky-form progressive-action-card"><details class="task-form-disclosure" data-exclusive-details="information-create"><summary><div><small>NUEVA EVIDENCIA</small><strong>Subir soporte</strong><span>Registra el documento y vincúlalo después con uno o varios datos.</span></div><b>Cargar</b></summary><form method="post" action="/informacion/evidencias/nueva" enctype="multipart/form-data" class="stack-form">
       <label>Archivo<input type="file" name="file" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png" required><small>Máximo 10 MB.</small></label>
       <label>Tipo<select name="document_type"><option>Factura</option><option>Registro operativo</option><option>Certificado</option><option>Imagen</option><option>Otro</option></select></label>
       <label>Fuente<select name="source_id"><option value="">General</option>{% for source in sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
       <label>Periodo<input name="period_label" placeholder="Ej. enero–marzo 2025"></label>
       <label>Notas<textarea name="notes"></textarea></label>
       <button class="btn btn-primary btn-block">Cargar evidencia</button>
-    </form></aside>{% endif %}
+    </form></details></aside>{% endif %}
   </div>
 </section>
 {% endblock %}

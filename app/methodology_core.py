@@ -27,7 +27,7 @@ from .database import (
     SourceFactorAssignment,
 )
 
-ENGINE_VERSION = "0.45.0"
+ENGINE_VERSION = "1.1.0"
 QUALITY_RANK = {"A": 4, "B": 3, "C": 2, "D": 1, "N/A": 0}
 
 OFFICIAL_SOURCE_SPECS: list[dict[str, Any]] = [
@@ -126,6 +126,18 @@ OFFICIAL_SOURCE_SPECS: list[dict[str, Any]] = [
         "citation": "UPME. Resolución 000085 de 23 de febrero de 2026, artículo 1, literal B.",
         "status": "Vigente",
         "notes": "Establece 0,220 tCO2e/MWh para inventarios de GEI del Sistema Interconectado Nacional, año 2024.",
+    },
+    {
+        "code": "XM-SIN-2025-PRELIM",
+        "title": "Resultado preliminar del factor de emisión del SIN 2025",
+        "issuing_body": "XM Compañía de Expertos en Mercados S.A. E.S.P.",
+        "document_type": "Resultado preliminar y vigilancia metodológica",
+        "publication_date": date(2026, 1, 30),
+        "jurisdiction": "Colombia",
+        "source_url": "https://www.xm.com.co/noticias/8688-resultado-preliminar-del-calculo-de-factor-de-emision-del-sistema-interconectado",
+        "citation": "XM. Resultado preliminar del cálculo de Factor de Emisión del Sistema Interconectado Nacional 2025, 30 de enero de 2026.",
+        "status": "Preliminar · no incorporado al cálculo",
+        "notes": "Fuente en vigilancia regulatoria. No se crea una versión de factor ni se habilita su uso hasta verificar el valor en una fuente oficial reproducible, resolver su condición preliminar y completar revisión documental independiente.",
     },
     {
         "code": "CTH-DEMO",

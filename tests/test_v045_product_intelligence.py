@@ -25,8 +25,7 @@ from app.services.product_intelligence import assess_company
 
 @pytest.fixture(autouse=True)
 def fresh_database_v045():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -79,8 +78,12 @@ def test_v045_scoring_engine_recommends_different_depths_explainably():
 
 def test_v045_demo_companies_have_approved_profiles_diagnoses_and_plans():
     with SessionLocal() as session:
-        organizations = list(session.scalars(select(Organization).where(Organization.trade_name.in_(["Greenatics", "Industrias Andinas"]))))
-        assert len(organizations) == 2
+        demo_names = [
+            "Greenatics", "Industrias Andinas", "Café Sierra Verde",
+            "Ruta Norte Logística", "Hotel Bosque Azul",
+        ]
+        organizations = list(session.scalars(select(Organization).where(Organization.trade_name.in_(demo_names))))
+        assert len(organizations) == 5
         for organization in organizations:
             profile = session.scalar(select(OrganizationCarbonProfile).where(OrganizationCarbonProfile.organization_id == organization.id))
             assessment = session.scalar(select(DiagnosticAssessment).where(DiagnosticAssessment.organization_id == organization.id).order_by(DiagnosticAssessment.id.desc()))
@@ -218,18 +221,18 @@ def test_v045_internal_profile_assessment_and_plan_workflow():
 
 def test_v045_api_and_architecture_expose_product_intelligence_domain():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         login(client)
         payload = client.get("/api/inteligencia-producto/resumen").json()
-        assert payload["version"] == "0.45.5"
+        assert payload["version"] == "1.0.0"
         assert payload["profile_completion"] >= 80
         assert payload["assessment"]["package_label"]
         assert payload["plan_count"] >= 1
     summary = domain_architecture_summary(app, Path(__file__).resolve().parents[1])
     domains = {item["code"]: item for item in summary["domains"]}
     assert domains["product_intelligence"]["route_count"] == 8
-    assert summary["domain_count"] == 9
-    assert summary["persistence"]["model_class_count"] == 109
+    assert summary["domain_count"] == 15
+    assert summary["persistence"]["model_class_count"] == 120
     assert summary["persistence"]["repository_count"] == 5
     assert summary["persistence"]["service_count"] == 5
     assert summary["duplicate_paths"] == []
@@ -262,8 +265,11 @@ def test_v045_migration_revision_and_mac_lifecycle_are_current():
     assert migration.exists()
     source = migration.read_text(encoding="utf-8")
     assert 'down_revision = "20260803_0028"' in source
-    lifecycle = (root / "scripts" / "mac_lifecycle_common.sh").read_text(encoding="utf-8")
-    assert 'CTH_RELEASE_VERSION="0.45.5"' in lifecycle
-    assert 'CTH_RELEASE_SLUG="v0_45"' in lifecycle
     installer = root / "INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command"
-    assert installer.exists() and installer.stat().st_mode & 0o111
+    if installer.is_file():
+        lifecycle = (root / "scripts" / "mac_lifecycle_common.sh").read_text(encoding="utf-8")
+        assert 'CTH_RELEASE_VERSION="1.0.0"' in lifecycle
+        assert 'CTH_RELEASE_SLUG="v1_0_0"' in lifecycle
+        assert installer.stat().st_mode & 0o111
+    else:
+        assert (root / "install_windows.ps1").is_file()

@@ -1,0 +1,39 @@
+{% extends "base.html" %}
+{% block title %}Comparación de factores · Calcula tu Huella{% endblock %}
+{% block page_label %}Metodología / Comparación de factores{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div><p class="breadcrumb">Biblioteca / Comparación controlada</p><h1>Compara antes de decidir</h1><p>Contrasta hasta seis versiones sin confundir similitud numérica con equivalencia metodológica.</p></div>
+  <span class="release-chip">{{ comparison["items"]|length }} versión(es)</span>
+</div>
+<div class="passport-actions"><a class="btn btn-outline" href="/metodologia/biblioteca-factores{% if context_query %}?{{ context_query }}{% endif %}">Volver a la biblioteca</a>{% if comparison["items"] %}<a class="btn btn-primary" href="/metodologia/biblioteca-factores/comparar/exportar.xlsx?{% for id in ids %}ids={{ id }}&{% endfor %}{{ context_query }}">Exportar comparación</a>{% endif %}</div>
+
+{% if record %}<section class="card factor-context-card"><div><small>DATO DE REFERENCIA</small><h2>{{ source.name }}</h2><p>{{ record.value|number_es(4) }} {{ record.unit }} · {{ record.period_start.strftime('%d/%m/%Y') }} a {{ record.period_end.strftime('%d/%m/%Y') }}</p></div><a class="btn btn-outline btn-small" href="/fuentes/{{ source.id }}?activity_data_id={{ record.id }}#conversacion-tecnica">Volver al dato</a></section>{% endif %}
+
+<section class="comparison-alert-stack" aria-label="Alertas de comparación">{% for alert in comparison["alerts"] %}<article class="comparison-alert alert-{{ alert.level }}"><strong>{% if alert.level == 'danger' %}Bloqueo potencial{% elif alert.level == 'warning' %}Revisar{% else %}Control superado{% endif %}</strong><span>{{ alert.message }}</span></article>{% endfor %}</section>
+
+{% if comparison["items"] %}<section class="card factor-comparison-table-card">
+  <div class="card-head"><div><small>MATRIZ DE DECISIÓN</small><h2>Diferencias metodológicas relevantes</h2></div></div>
+  <div class="responsive-table factor-comparison-table"><table>
+    <thead><tr><th>Criterio</th>{% for item in comparison["items"] %}<th><a href="/metodologia/biblioteca-factores/{{ item.version.id }}{% if context_query %}?{{ context_query }}{% endif %}">{{ item.factor.name }}</a><small>{{ item.gas.code }} · v{{ item.version.version }}</small></th>{% endfor %}</tr></thead>
+    <tbody>
+      <tr><th>Preparación</th>{% for item in comparison["items"] %}<td><span class="status-badge {% if item.decision_readiness == 'Listo para evaluación' %}success{% elif item.decision_readiness == 'Solo demostración' %}danger{% else %}warning{% endif %}">{{ item.decision_readiness }}</span></td>{% endfor %}</tr>
+      {% if record %}<tr><th>Compatibilidad con el dato</th>{% for item in comparison["items"] %}<td><strong>{{ item.advice.score }}%</strong><small>{{ item.advice.recommendation }} · {{ 'calculable' if item.advice.calculable else 'no calculable' }}</small></td>{% endfor %}</tr>{% endif %}
+      <tr><th>Valor y unidad</th>{% for item in comparison["items"] %}<td><strong>{{ item.version.value|number_es(10) }}</strong><small>{{ item.version.output_unit }} / {{ item.version.input_unit }}</small></td>{% endfor %}</tr>
+      <tr><th>Actividad / sector</th>{% for item in comparison["items"] %}<td>{{ item.factor.activity_type }}<small>{{ item.factor.sector }}</small></td>{% endfor %}</tr>
+      <tr><th>Gas</th>{% for item in comparison["items"] %}<td>{{ item.gas.name }}<small>{{ item.gas.code }}</small></td>{% endfor %}</tr>
+      <tr><th>Geografía</th>{% for item in comparison["items"] %}<td>{{ item.version.geographic_scope }}<small>{{ item.geography_state }}</small></td>{% endfor %}</tr>
+      <tr><th>Tecnología</th>{% for item in comparison["items"] %}<td>{{ item.version.technology_scope }}</td>{% endfor %}</tr>
+      <tr><th>Tiempo</th>{% for item in comparison["items"] %}<td>{{ item.version.publication_year }}<small>{{ item.effective_state }}</small></td>{% endfor %}</tr>
+      <tr><th>Tipo / uso</th>{% for item in comparison["items"] %}<td>{{ item.documentation.factor_kind if item.documentation else 'Sin clasificar' }}<small>{{ item.documentation.reporting_use if item.documentation else 'Sin clasificar' }}</small></td>{% endfor %}</tr>
+      <tr><th>Calidad y revisión</th>{% for item in comparison["items"] %}<td>Calidad {{ item.documentation.quality_grade if item.documentation else 'N/A' }}<small>{{ item.documentation.review_status if item.documentation else 'Sin documentación' }}</small></td>{% endfor %}</tr>
+      <tr><th>Completitud documental</th>{% for item in comparison["items"] %}<td><strong>{{ item.document_completeness }}%</strong><small>{{ item.review_due }}</small></td>{% endfor %}</tr>
+      <tr><th>Incertidumbre</th>{% for item in comparison["items"] %}<td>{{ item.version.uncertainty_percentage|number_es(2) }}%</td>{% endfor %}</tr>
+      <tr><th>Fuente</th>{% for item in comparison["items"] %}<td>{{ item.source_label }}<small>{% if item.documentation %}{{ item.documentation.page_reference }} {{ item.documentation.table_reference }}{% endif %}</small></td>{% endfor %}</tr>
+      <tr><th>Restricciones</th>{% for item in comparison["items"] %}<td>{{ item.documentation.restriction_notes if item.documentation and item.documentation.restriction_notes else item.version.notes or 'Sin restricciones documentadas' }}</td>{% endfor %}</tr>
+    </tbody>
+  </table></div>
+</section>
+<section class="card"><div class="card-head"><div><small>DECISIÓN PROFESIONAL</small><h2>Qué debe quedar documentado</h2></div></div><div class="decision-check-grid"><article><span>1</span><p>Por qué la actividad, material o proceso del dato coincide con la definición del factor.</p></article><article><span>2</span><p>Cómo se convierten las unidades y qué fuentes sustentan densidades, poderes caloríficos o equivalencias.</p></article><article><span>3</span><p>Por qué la geografía, tecnología y periodo son representativos o qué limitación se acepta.</p></article><article><span>4</span><p>Cómo se evita contar dos veces el mismo gas, componente o tramo de actividad.</p></article><article><span>5</span><p>Qué incertidumbre y restricción se revelará en el informe.</p></article></div></section>
+{% else %}<div class="empty-state"><strong>No hay versiones seleccionadas.</strong><p>Regresa a la biblioteca y marca entre dos y seis factores.</p></div>{% endif %}
+{% endblock %}

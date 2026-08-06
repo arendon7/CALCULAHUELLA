@@ -1,7 +1,7 @@
 {
   "brand": "Calcula tu Huella",
   "system": "Marca Maestra v1",
-  "release": "0.45.5",
+  "release": "1.0.0",
   "canonical_assets": {
     "brand-primary.svg": {
       "sha256": "3bc5a29975a3b49076d7c754b64732f91a5e501f252522a5298d708541a6ebba",

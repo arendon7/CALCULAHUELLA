@@ -12,6 +12,7 @@ from .data_quality import (
     data_quality_summary,
     resolve_finding,
 )
+from .config import settings
 from .database import get_db
 from .security import validate_upload_bytes
 
@@ -71,9 +72,10 @@ def register_data_quality_routes(app, templates, common_context, require_user, s
     ):
         if not _can_manage(user):
             raise HTTPException(403, "Tu rol no puede cargar lotes")
-        content = await file.read()
-        if len(content) > 10 * 1024 * 1024:
-            raise HTTPException(413, "El archivo supera 10 MB")
+        limit = settings.max_upload_mb * 1024 * 1024
+        content = await file.read(limit + 1)
+        if len(content) > limit:
+            raise HTTPException(413, f"El archivo supera {settings.max_upload_mb} MB")
         filename = file.filename or "carga.xlsx"
         valid, message, _ = validate_upload_bytes(filename, content, file.content_type, {".xlsx"})
         if not valid:

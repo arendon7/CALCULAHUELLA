@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime
+import json
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -10,6 +11,7 @@ from sqlalchemy.orm import Session, selectinload
 from .calculations import convert_value, recalculate_source, source_calculation_summary
 from .database import (
     ActivityData,
+    ActivityFactorSelection,
     EmissionCalculation,
     EmissionFactor,
     EmissionFactorVersion,
@@ -22,9 +24,11 @@ from .database import (
     get_db,
 )
 from .inventory_starters import add_starter_sources, starter_pack_catalog
+from .factor_advisor import advise_factor, conversation_for_record
 from .repositories.inventories import list_inventories as list_inventory_records
 from .repositories.organizations import list_active_facilities
 from .services.inventories import create_inventory as create_inventory_record
+from .service_operations import ensure_capacity
 
 
 def register_inventory_routes(
@@ -99,6 +103,7 @@ def register_inventory_routes(
         user: dict = Depends(require_user),
     ):
         ensure_capability(user, "manage_inventory")
+        ensure_capacity(session, int(user["organization_id"]), "inventories", 1)
         start = parse_date(start_date)
         end = parse_date(end_date)
         if end < start:
@@ -356,7 +361,7 @@ def register_inventory_routes(
 
 
     @app.get("/fuentes/{source_id}", response_class=HTMLResponse)
-    def source_detail(source_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+    def source_detail(source_id: int, request: Request, activity_data_id: int | None = None, show_all: bool = False, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         source = session.scalar(
             select(EmissionSource)
             .where(EmissionSource.id == source_id)
@@ -364,6 +369,8 @@ def register_inventory_routes(
                 selectinload(EmissionSource.inventory),
                 selectinload(EmissionSource.facility),
                 selectinload(EmissionSource.activity_records).selectinload(ActivityData.evidence),
+                selectinload(EmissionSource.activity_records).selectinload(ActivityData.factor_selections).selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.factor),
+                selectinload(EmissionSource.activity_records).selectinload(ActivityData.factor_selections).selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.gas),
                 selectinload(EmissionSource.activity_records).selectinload(ActivityData.calculations).selectinload(EmissionCalculation.factor_version).selectinload(EmissionFactorVersion.factor),
                 selectinload(EmissionSource.evidence_documents),
                 selectinload(EmissionSource.factor_assignments).selectinload(SourceFactorAssignment.factor_version).selectinload(EmissionFactorVersion.factor),
@@ -372,7 +379,11 @@ def register_inventory_routes(
         )
         if not source or source.inventory.organization_id != int(user["organization_id"]):
             raise HTTPException(404, "Fuente no encontrada")
-        records = sorted(source.activity_records, key=lambda item: item.period_start)
+        records = sorted(source.activity_records, key=lambda item: (item.period_start, item.id))
+        record_total = len(records)
+        display_records = records if show_all else records[-12:]
+        selected_record = next((item for item in records if item.id == activity_data_id), None)
+        conversation_records = [selected_record] if selected_record else records[-1:]
         total_activity = round(sum(item.value for item in records), 6)
         quality_counts = {level: sum(1 for item in records if item.quality_level == level) for level in ("A", "B", "C", "D")}
         primary_quality = max(quality_counts, key=quality_counts.get) if records else "Sin datos"
@@ -386,8 +397,10 @@ def register_inventory_routes(
                 .join(EmissionFactor)
             )
         )
+        factor_catalog = list(available_versions)
         assigned_ids = {item.factor_version_id for item in source.factor_assignments if item.active}
         available_versions = [item for item in available_versions if item.id not in assigned_ids]
+        factor_conversations = [conversation_for_record(session, source, record, factor_catalog) for record in conversation_records]
         conversion_examples = []
         for record in records[:3]:
             for assignment in source.factor_assignments[:1]:
@@ -412,7 +425,11 @@ def register_inventory_routes(
                 inventory=source.inventory,
                 source=source,
                 calculation=calculation,
-                records=records,
+                records=display_records,
+                all_records=records,
+                record_total=record_total,
+                show_all=show_all,
+                selected_activity_data_id=selected_record.id if selected_record else None,
                 documents=source.evidence_documents,
                 total_activity=total_activity,
                 quality_counts=quality_counts,
@@ -422,9 +439,229 @@ def register_inventory_routes(
                 available_versions=available_versions,
                 assignments=[item for item in source.factor_assignments if item.active],
                 conversion_examples=conversion_examples,
+                factor_conversations=factor_conversations,
                 facilities=list_active_facilities(session, int(user["organization_id"])),
             ),
         )
+
+
+    @app.post("/fuentes/{source_id}/datos/{activity_data_id}/factores/seleccionar")
+    def select_factor_for_record(
+        source_id: int,
+        activity_data_id: int,
+        request: Request,
+        factor_version_id: int = Form(...),
+        rationale: str = Form(...),
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        ensure_capability(user, "view_methodology")
+        source = session.scalar(select(EmissionSource).where(EmissionSource.id == source_id).options(selectinload(EmissionSource.inventory)))
+        record = session.get(ActivityData, activity_data_id)
+        factor = session.scalar(select(EmissionFactorVersion).where(EmissionFactorVersion.id == factor_version_id).options(selectinload(EmissionFactorVersion.factor), selectinload(EmissionFactorVersion.gas)))
+        if not source or source.inventory.organization_id != int(user["organization_id"]) or not record or record.source_id != source.id:
+            raise HTTPException(404, "Dato o fuente no encontrados")
+        if not factor or factor.status != "Aprobado":
+            raise HTTPException(400, "Solo pueden proponerse factores aprobados")
+        advice = advise_factor(session, source, record, factor)
+        if not advice["calculable"]:
+            set_flash(request, "El factor no puede proponerse: no existe una conversión aprobada entre las unidades.", "error")
+            return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+        normalized_rationale = rationale.strip()
+        if len(normalized_rationale) < 12:
+            set_flash(request, "Documenta brevemente por qué el factor representa este dato.", "error")
+            return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+        selection = session.scalar(select(ActivityFactorSelection).where(
+            ActivityFactorSelection.activity_data_id == record.id,
+            ActivityFactorSelection.factor_version_id == factor.id,
+        ))
+        documentation = advice.get("documentation")
+        snapshot = json.dumps({
+            "compatibility_score": advice["score"],
+            "breakdown": advice["breakdown"],
+            "blockers": advice["blockers"],
+            "hard_blockers": advice.get("hard_blockers", []),
+            "record": {"value": record.value, "unit": record.unit, "period_start": record.period_start.isoformat(), "period_end": record.period_end.isoformat()},
+            "factor": {"id": factor.id, "name": factor.factor.name, "version": factor.version, "input_unit": factor.input_unit, "output_unit": factor.output_unit, "gas": factor.gas.code},
+            "documentation": {
+                "reporting_use": documentation.reporting_use if documentation else "Sin clasificar",
+                "quality_grade": documentation.quality_grade if documentation else "N/A",
+                "review_status": documentation.review_status if documentation else "Sin documentación",
+                "data_year": documentation.data_year if documentation else None,
+            },
+        }, ensure_ascii=False)
+        if selection:
+            selection.active = True
+            selection.compatibility_score = int(advice["score"])
+            selection.rationale = normalized_rationale
+            selection.selection_status = "Propuesto"
+            selection.selected_by = str(user["email"])
+            selection.selected_at = datetime.now(UTC)
+            selection.reviewed_by = ""
+            selection.reviewed_at = None
+            selection.review_notes = ""
+            selection.decision_snapshot = snapshot
+            selection.applied_at = None
+        else:
+            selection = ActivityFactorSelection(
+                activity_data_id=record.id, factor_version_id=factor.id, active=True,
+                compatibility_score=int(advice["score"]), selection_status="Propuesto",
+                rationale=normalized_rationale, selected_by=str(user["email"]),
+                decision_snapshot=snapshot,
+            )
+            session.add(selection)
+        session.flush()
+        recalculate_source(session, source)
+        add_audit(
+            session, int(user["organization_id"]), str(user["email"]), "PROPONER",
+            "Factor por dato", f"Dato {record.id} · {factor.factor.name}",
+            detail=f"Compatibilidad {advice['score']}% · {normalized_rationale}",
+        )
+        session.commit()
+        set_flash(request, "Factor propuesto. Debe aprobarse antes de reemplazar los factores heredados en el cálculo.")
+        return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+
+
+    @app.post("/fuentes/{source_id}/datos/{activity_data_id}/factores/{selection_id}/revisar")
+    def review_factor_for_record(
+        source_id: int,
+        activity_data_id: int,
+        selection_id: int,
+        request: Request,
+        decision: str = Form(...),
+        review_notes: str = Form(...),
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        if not (user.get("can_review") or user.get("can_approve")):
+            raise HTTPException(403, "Tu rol no puede revisar decisiones metodológicas")
+        source = session.scalar(select(EmissionSource).where(EmissionSource.id == source_id).options(selectinload(EmissionSource.inventory)))
+        record = session.get(ActivityData, activity_data_id)
+        selection = session.scalar(select(ActivityFactorSelection).where(
+            ActivityFactorSelection.id == selection_id,
+            ActivityFactorSelection.activity_data_id == activity_data_id,
+        ).options(
+            selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.factor),
+            selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.gas),
+        ))
+        if not source or source.inventory.organization_id != int(user["organization_id"]) or not record or record.source_id != source.id or not selection:
+            raise HTTPException(404, "Selección no encontrada")
+        normalized_notes = review_notes.strip()
+        if len(normalized_notes) < 8:
+            set_flash(request, "La revisión debe explicar brevemente el criterio aplicado.", "error")
+            return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+        decision_map = {"Aprobar": "Aprobado", "Requiere ajuste": "Requiere ajuste", "Rechazar": "Rechazado"}
+        if decision not in decision_map:
+            raise HTTPException(400, "Decisión no válida")
+        advice = advise_factor(session, source, record, selection.factor_version)
+        if decision == "Aprobar" and not advice["calculable"]:
+            set_flash(request, "No puede aprobarse una selección sin conversión de unidades válida.", "error")
+            return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+        if decision == "Aprobar" and advice.get("hard_blockers"):
+            set_flash(request, "La selección no puede aprobarse mientras existan bloqueadores metodológicos: " + " ".join(advice["hard_blockers"]), "error")
+            return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+        selection.selection_status = decision_map[decision]
+        selection.reviewed_by = str(user["email"])
+        selection.reviewed_at = datetime.now(UTC)
+        selection.review_notes = normalized_notes
+        selection.active = decision != "Rechazar"
+        selection.applied_at = datetime.now(UTC) if decision == "Aprobar" else None
+        selection.decision_snapshot = json.dumps({
+            "compatibility_score": advice["score"],
+            "breakdown": advice["breakdown"],
+            "blockers": advice["blockers"],
+            "hard_blockers": advice.get("hard_blockers", []),
+            "review_decision": decision_map[decision],
+            "reviewed_by": str(user["email"]),
+            "reviewed_at": datetime.now(UTC).isoformat(),
+        }, ensure_ascii=False)
+        session.flush()
+        recalculate_source(session, source)
+        add_audit(
+            session, int(user["organization_id"]), str(user["email"]), decision.upper(),
+            "Factor por dato", f"Dato {record.id} · {selection.factor_version.factor.name}",
+            detail=normalized_notes, new_value=selection.selection_status,
+        )
+        session.commit()
+        message = "Factor aprobado y aplicado al cálculo." if decision == "Aprobar" else f"Selección marcada como {selection.selection_status.lower()}."
+        set_flash(request, message)
+        return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+
+
+    @app.post("/fuentes/{source_id}/datos/{activity_data_id}/factores/{selection_id}/retirar")
+    def remove_factor_from_record(
+        source_id: int, activity_data_id: int, selection_id: int, request: Request,
+        session: Session = Depends(get_db), user: dict = Depends(require_user),
+    ):
+        ensure_capability(user, "view_methodology")
+        source = session.scalar(select(EmissionSource).where(EmissionSource.id == source_id).options(selectinload(EmissionSource.inventory)))
+        record = session.get(ActivityData, activity_data_id)
+        selection = session.scalar(select(ActivityFactorSelection).where(
+            ActivityFactorSelection.id == selection_id, ActivityFactorSelection.activity_data_id == activity_data_id
+        ).options(selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.factor)))
+        if not source or source.inventory.organization_id != int(user["organization_id"]) or not record or record.source_id != source.id or not selection:
+            raise HTTPException(404, "Selección no encontrada")
+        selection.active = False
+        selection.selection_status = "Retirado"
+        selection.applied_at = None
+        session.flush()
+        recalculate_source(session, source)
+        add_audit(session, int(user["organization_id"]), str(user["email"]), "RETIRAR", "Factor por dato", f"Dato {record.id} · {selection.factor_version.factor.name}")
+        session.commit()
+        set_flash(request, "La selección específica fue retirada; el dato vuelve a heredar los factores de la fuente cuando no queden selecciones aprobadas.")
+        return RedirectResponse(f"/fuentes/{source.id}?activity_data_id={record.id}#conversacion-factor-{record.id}", status_code=303)
+
+
+    @app.get("/api/fuentes/{source_id}/datos/{activity_data_id}/factores")
+    def factor_conversation_api(
+        source_id: int, activity_data_id: int,
+        session: Session = Depends(get_db), user: dict = Depends(require_user),
+    ):
+        ensure_capability(user, "view_methodology")
+        source = session.scalar(select(EmissionSource).where(EmissionSource.id == source_id).options(
+            selectinload(EmissionSource.inventory),
+            selectinload(EmissionSource.activity_records).selectinload(ActivityData.factor_selections).selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.factor),
+            selectinload(EmissionSource.activity_records).selectinload(ActivityData.factor_selections).selectinload(ActivityFactorSelection.factor_version).selectinload(EmissionFactorVersion.gas),
+        ))
+        if not source or source.inventory.organization_id != int(user["organization_id"]):
+            raise HTTPException(404, "Fuente no encontrada")
+        record = next((item for item in source.activity_records if item.id == activity_data_id), None)
+        if not record:
+            raise HTTPException(404, "Dato no encontrado")
+        versions = list(session.scalars(select(EmissionFactorVersion).where(EmissionFactorVersion.status == "Aprobado").options(
+            selectinload(EmissionFactorVersion.factor), selectinload(EmissionFactorVersion.gas),
+        )))
+        conversation = conversation_for_record(session, source, record, versions)
+        return {
+            "record": {"id": record.id, "value": record.value, "unit": record.unit, "period_start": record.period_start.isoformat()},
+            "selection_mode": conversation["selection_mode"],
+            "control_status": conversation["control_status"],
+            "warnings": conversation["warnings"],
+            "selections": [
+                {
+                    "id": item.id,
+                    "factor": item.factor_version.factor.name,
+                    "factor_version_id": item.factor_version_id,
+                    "status": item.selection_status,
+                    "compatibility_score": item.compatibility_score,
+                    "rationale": item.rationale,
+                    "review_notes": item.review_notes,
+                }
+                for item in conversation["selections"]
+            ],
+            "candidates": [
+                {
+                    "factor_version_id": item["version"].id,
+                    "factor": item["version"].factor.name,
+                    "score": item["score"],
+                    "recommendation": item["recommendation"],
+                    "calculable": item["calculable"],
+                    "breakdown": item["breakdown"],
+                    "blockers": item["blockers"],
+                }
+                for item in conversation["candidates"]
+            ],
+        }
 
 
     @app.post("/fuentes/{source_id}/configurar")

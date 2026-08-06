@@ -14,7 +14,7 @@
     <p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</p>
     <dl><div><dt>Metodología</dt><dd>{{ inventory.methodology }}</dd></div><div><dt>Consolidación</dt><dd>{{ inventory.consolidation_approach }}</dd></div><div><dt>Etapa actual</dt><dd>{{ inventory.current_stage }}</dd></div><div><dt>Sedes</dt><dd>{{ inventory.facility_links|selectattr('included')|list|length }}</dd></div></dl>
     <div class="progress"><i style="width:{{ inventory.progress }}%"></i></div><small>{{ inventory.progress }}% de avance estructural</small>
-    <div class="card-actions"><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">Abrir</a>{% if user.can_manage_inventory %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">Configurar</a>{% endif %}</div>
+    <div class="card-actions"><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">Abrir</a>{% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">Configurar</a>{% elif inventory.locked %}<a class="btn btn-outline" href="/control">Ver versión cerrada</a>{% endif %}</div>
   </article>
 {% endfor %}
 </div>

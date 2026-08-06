@@ -5,10 +5,15 @@ import os
 import subprocess
 from pathlib import Path
 
+import pytest
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+MAC_INSTALLER = PROJECT_ROOT / "INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command"
+MAC_ONLY = pytest.mark.skipif(not MAC_INSTALLER.is_file(), reason="Prueba exclusiva del paquete macOS")
 
 
+@MAC_ONLY
 def test_v030_installer_test_mode_creates_stable_install_and_cleans_legacy(tmp_path: Path) -> None:
     home = tmp_path / "home"
     downloads = home / "Downloads"
@@ -28,7 +33,7 @@ def test_v030_installer_test_mode_creates_stable_install_and_cleans_legacy(tmp_p
     (legacy / "instance" / "uploads" / "evidencia.txt").write_text("soporte", encoding="utf-8")
     old_zip = downloads / "calcula_tu_huella_v0_29_completa_mac.zip"
     old_zip.write_bytes(b"old zip")
-    current_zip = downloads / "calcula_tu_huella_v0_45_completa_mac.zip"
+    current_zip = downloads / "calcula_tu_huella_v1_0_0_preparacion_productiva_dual_mac_windows.zip"
     current_zip.write_bytes(b"current zip")
 
     env = os.environ.copy()
@@ -64,7 +69,7 @@ def test_v030_installer_test_mode_creates_stable_install_and_cleans_legacy(tmp_p
     assert (desktop / "ABRIR CALCULA TU HUELLA.command").is_file()
 
     receipt = json.loads((install_root / "installation.json").read_text(encoding="utf-8"))
-    assert receipt["version"] == "0.45.5"
+    assert receipt["version"] == "1.0.0"
     assert receipt["data_dir"] == str(install_root / "data")
 
     assert not legacy.exists()
@@ -76,6 +81,7 @@ def test_v030_installer_test_mode_creates_stable_install_and_cleans_legacy(tmp_p
     assert (install_root / "data" / "uploads" / "evidencia.txt").read_text(encoding="utf-8") == "soporte"
 
 
+@MAC_ONLY
 def test_v030_shell_entrypoints_are_valid() -> None:
     scripts = [
         "INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command",

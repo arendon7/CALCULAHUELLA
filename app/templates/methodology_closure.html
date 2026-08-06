@@ -71,8 +71,10 @@
 <div class="methodology-two-col">
 <section class="card" id="incertidumbre">
   <div class="card-head"><div><small>IPCC APPROACH 1</small><h3>Incertidumbre consolidada</h3></div></div>
-  <div class="uncertainty-range"><div><small>Límite inferior cubierto</small><strong>{{ summary.uncertainty.lower_tco2e|number_es(3) }}</strong></div><div class="central"><small>Emisiones cubiertas</small><strong>{{ summary.uncertainty.covered_tco2e|number_es(3) }}</strong></div><div><small>Límite superior cubierto</small><strong>{{ summary.uncertainty.upper_tco2e|number_es(3) }}</strong></div></div>
+  <div class="uncertainty-range"><div><small>Rango orientativo inferior</small><strong>{{ summary.uncertainty.lower_tco2e|number_es(3) }}</strong></div><div class="central"><small>Emisiones cubiertas</small><strong>{{ summary.uncertainty.covered_tco2e|number_es(3) }}</strong></div><div><small>Rango orientativo superior</small><strong>{{ summary.uncertainty.upper_tco2e|number_es(3) }}</strong></div></div>
   <p>Combinación por raíz de suma de cuadrados del dato de actividad y del factor. Cobertura sobre las emisiones brutas: <strong>{{ summary.uncertainty.emission_coverage_percentage }}%</strong>. Total bruto: <strong>{{ summary.uncertainty.total_gross_tco2e|number_es(3) }} tCO2e</strong>.{% if summary.uncertainty.uncovered_sources %} Fuentes sin memoria de incertidumbre: <strong>{{ summary.uncertainty.uncovered_sources|length }}</strong>.{% endif %}</p>
+  <p class="field-help">{{ summary.uncertainty.method_note }}</p>
+  {% if summary.uncertainty.large_uncertainty_calculations %}<div class="report-notice"><strong>Revisar método</strong><p>{{ summary.uncertainty.large_uncertainty_calculations }} cálculo(s) tienen alguna entrada superior a 30 %. Evalúa asimetrías, correlaciones y Approach 2/Monte Carlo antes de una declaración formal.</p></div>{% endif %}
   {% if summary.uncertainty.missing_uncertainty %}<div class="report-notice"><strong>Información incompleta</strong><p>{{ summary.uncertainty.missing_uncertainty }} cálculo(s) bruto(s) todavía tienen incertidumbre igual a cero.</p></div>{% endif %}
 </section>
 <section class="card" id="scope2">

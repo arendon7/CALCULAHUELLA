@@ -26,8 +26,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def fresh_database_v028():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -38,7 +37,7 @@ def _login(client: TestClient, email: str = "consultor@calculatuhuella.local") -
 
 def test_v028_health_and_page():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         _login(client)
         page = client.get("/metodologia/colombia")
         assert page.status_code == 200
@@ -60,7 +59,7 @@ def test_v028_seeds_controlled_sources_factors_and_reference_suite():
         documentation = session.scalar(select(FactorDocumentation).join_from(FactorDocumentation, factor.versions[0].__class__).where(FactorDocumentation.factor_version_id == factor.versions[0].id))
         assert documentation.reporting_use == "Piloto"
         run = session.scalar(select(MethodologyValidationRun).order_by(MethodologyValidationRun.id.desc()))
-        assert run.engine_version == "0.45.0"
+        assert run.engine_version == "1.1.0"
         assert run.total_cases >= 20
         assert run.failed_cases == 0
 

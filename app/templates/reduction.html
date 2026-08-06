@@ -1,60 +1,167 @@
 {% extends "base.html" %}
-{% block title %}Reducción · Calcula tu Huella{% endblock %}
+{% block title %}Portafolio de reducción · Calcula tu Huella{% endblock %}
 {% block page_label %}Gestión / Reducción{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Reducción</p><h1>Plan de reducción</h1><p>Acciones persistentes con impacto, inversión, ahorro, responsable y seguimiento.</p></div><div class="head-actions"><a class="btn btn-outline" href="/escenarios">Comparar escenarios</a><span class="phase-label">Funcional · V0.8</span></div></div>
+<div class="page-head reduction-page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Reducción</p>
+    <h1>Portafolio de reducción y abatimiento</h1>
+    <p>Conecta la meta climática con medidas cuantificadas, decisiones de inversión, responsables y seguimiento de ejecución.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-outline" href="/escenarios">Comparar escenarios</a>
+    <a class="btn btn-outline" href="/reduccion/exportar.xlsx">Exportar control</a>
+    <span class="phase-label">V0.55 · recomendaciones explicables</span>
+  </div>
+</div>
 
-<section class="card reduction-hero">
-  <div><small>REDUCCIÓN ESPERADA</small><h2>{{ expected_reduction|number_es }} tCO₂e/año</h2><p>Potencial consolidado registrado.</p></div>
-  <div><small>INVERSIÓN ESTIMADA</small><h2>${{ (investment/1000000)|number_es(0) }} M</h2><p>CAPEX total de las acciones.</p></div>
-  <div><small>AHORRO ANUAL</small><h2>${{ (annual_savings/1000000)|number_es(0) }} M</h2><p>Retorno estimado: {{ payback_years|number_es(2) if payback_years else 'N/D' }} años.</p></div>
-  <div><small>AVANCE PROMEDIO</small><h2>{{ average_progress }}%</h2><p>{{ actions|length }} acciones registradas.</p></div>
+<section class="reduction-command card">
+  <div class="reduction-command-main">
+    <span class="eyebrow">DECISIÓN PRINCIPAL</span>
+    <h2>{{ portfolio.primary_decision }}</h2>
+    <p>Estado del portafolio: <strong>{{ portfolio.portfolio_status }}</strong>. La preparación consolidada es {{ portfolio.readiness_score }}%.</p>
+  </div>
+  <div class="reduction-command-score">
+    <div class="readiness-dial" style="--score:{{ portfolio.readiness_score }}"><strong>{{ portfolio.readiness_score }}%</strong><span>preparación</span></div>
+    <span class="status-badge {% if portfolio.decision_ready %}success{% elif portfolio.readiness_score >= 65 %}warning{% else %}danger{% endif %}">
+      {% if portfolio.decision_ready %}Lista para decisión{% elif portfolio.readiness_score >= 65 %}En estructuración{% else %}Requiere definición{% endif %}
+    </span>
+  </div>
 </section>
 
-<section class="card climate-target-section"><div class="card-head"><div><small>METAS CORPORATIVAS</small><h3>Trayectoria climática</h3></div><span class="counter">{{ targets|length }}</span></div>{% if targets %}<div class="target-grid">{% for target in targets %}<article class="target-card"><div class="target-top"><div><small>{{ target.metric_type|upper }} · {{ target.baseline_year }} → {{ target.target_year }}</small><h2>{{ target.name }}</h2></div><span class="status-chip active">{{ target.status }}</span></div><div class="target-values"><div><small>Línea base</small><strong>{{ target.baseline_value|number_es }} {{ target.unit }}</strong></div><div><small>Valor actual</small><strong>{{ target.current_value|number_es }} {{ target.unit }}</strong></div><div><small>Meta</small><strong>{{ target.target_value|number_es }} {{ target.unit }}</strong></div></div><div class="target-progress-label"><span>Avance hacia la meta</span><b>{{ target.progress_percent|round|int }}%</b></div><div class="progress"><i style="width:{{ target.progress_percent }}%"></i></div><p>Reducción comprometida: <strong>{{ target.reduction_percent|number_es }}%</strong>. {{ target.notes }}</p>{% if user.can_manage_inventory and not inventory.locked %}<div class="target-actions"><form action="/reduccion/metas/{{ target.id }}/sincronizar" method="post"><button class="btn btn-outline">Sincronizar inventario</button></form><details><summary>Actualizar</summary><form action="/reduccion/metas/{{ target.id }}/actualizar" method="post" class="stack-form compact-form"><label>Valor actual<input name="current_value" type="number" step="any" min="0" value="{{ target.current_value }}"></label><label>Estado<select name="status">{% for option in ['Activa','En riesgo','Cumplida','Suspendida'] %}<option {% if option==target.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label><label>Notas<textarea name="notes">{{ target.notes }}</textarea></label><button class="btn btn-primary btn-block">Guardar</button></form></details></div>{% endif %}</article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>No hay metas climáticas registradas.</strong><p>Crea una meta absoluta o de intensidad para orientar el plan de reducción.</p></div>{% endif %}</section>
+<section class="reduction-kpis">
+  <article class="card metric-card"><small>EMISIONES BASE</small><h2>{{ portfolio.baseline|number_es }} tCO₂e</h2><p>Inventario incluido en el análisis.</p></article>
+  <article class="card metric-card"><small>REDUCCIÓN REQUERIDA</small><h2>{{ portfolio.required_reduction|number_es }} tCO₂e/año</h2><p>{% if portfolio.primary_target %}Meta {{ portfolio.primary_target.target_year }} · {{ portfolio.primary_target.reduction_percent|number_es(1) }}%{% else %}Aún no existe una meta activa.{% endif %}</p></article>
+  <article class="card metric-card"><small>COBERTURA DEL PORTAFOLIO</small><h2>{{ portfolio.coverage_percent|number_es(1) }}%</h2><div class="progress"><i style="width:{{ [portfolio.coverage_percent,100]|min }}%"></i></div><p>Brecha: {{ portfolio.gap|number_es }} tCO₂e/año.</p></article>
+  <article class="card metric-card"><small>INVERSIÓN / AHORRO</small><h2>${{ (portfolio.investment/1000000)|number_es(0) }} M</h2><p>${{ (portfolio.annual_savings/1000000)|number_es(0) }} M/año · retorno {{ portfolio.payback_years|number_es(2) if portfolio.payback_years else 'N/D' }} años.</p></article>
+  <article class="card metric-card"><small>AVANCE PONDERADO</small><h2>{{ portfolio.weighted_progress }}%</h2><p>{{ portfolio.action_count }} medidas registradas.</p></article>
+</section>
 
-<div class="reduction-layout">
-  <section class="action-card-grid">
-    {% for action in actions %}
-    <article class="card action-card">
-      <div class="action-card-head"><span class="materiality materiality-{{ action.priority|lower }}">{{ action.priority }}</span><span class="status-chip progressing">{{ action.status }}</span></div>
-      <h2>{{ action.title }}</h2><p>{{ action.description }}</p>
-      <dl><div><dt>Fuente</dt><dd>{{ action.source.name if action.source else 'Corporativo' }}</dd></div><div><dt>Responsable</dt><dd>{{ action.responsible or 'Sin asignar' }}</dd></div><div><dt>Reducción</dt><dd>{{ action.expected_reduction|number_es }} tCO₂e/año</dd></div><div><dt>Ahorro</dt><dd>${{ (action.annual_savings/1000000)|number_es(1) }} M/año</dd></div><div><dt>Inversión</dt><dd>${{ (action.investment_cost/1000000)|number_es(1) }} M</dd></div><div><dt>Fecha objetivo</dt><dd>{{ action.target_date or 'Sin fecha' }}</dd></div></dl>
-      <div class="progress"><i style="width:{{ action.progress_percent }}%"></i></div><small>Avance {{ action.progress_percent }}%</small>
-      {% if user.can_manage_inventory and not inventory.locked %}
-      <details class="inline-editor"><summary>Actualizar acción</summary><form action="/reduccion/acciones/{{ action.id }}/actualizar" method="post" class="stack-form compact-form">
-        <label>Estado<select name="status">{% for option in ['Identificada','En evaluación','Diseño','Aprobada','En ejecución','Implementada','Verificada'] %}<option {% if option==action.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
-        <label>Avance %<input name="progress_percent" type="number" min="0" max="100" value="{{ action.progress_percent }}"></label>
-        <label>Reducción esperada<input name="expected_reduction" type="number" step="any" min="0" value="{{ action.expected_reduction }}"></label>
-        <label>Inversión COP<input name="investment_cost" type="number" step="any" min="0" value="{{ action.investment_cost }}"></label>
-        <label>Ahorro anual COP<input name="annual_savings" type="number" step="any" min="0" value="{{ action.annual_savings }}"></label>
-        <label>Reducción real<input name="actual_reduction" type="number" step="any" min="0" value="{{ action.actual_reduction }}"></label>
-        <label>Ahorro real<input name="actual_savings" type="number" step="any" min="0" value="{{ action.actual_savings }}"></label>
-        <label>Responsable<input name="responsible" value="{{ action.responsible }}"></label>
-        <div class="form-grid two"><label>Vida útil (años)<input name="useful_life_years" type="number" min="1" value="{{ action.useful_life_years }}"></label><label>Año implementación<input name="implementation_year" type="number" value="{{ action.implementation_year or '' }}"></label></div>
-        <div class="form-grid two"><label>Viabilidad<select name="feasibility">{% for option in ['Alta','Media','Baja'] %}<option {% if option==action.feasibility %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label><label>Riesgo<select name="risk_level">{% for option in ['Bajo','Medio','Alto'] %}<option {% if option==action.risk_level %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label></div>
-        <button class="btn btn-primary btn-block">Actualizar</button>
-      </form></details>{% endif %}
-    </article>{% endfor %}
+<section class="card target-command">
+  <div class="card-head">
+    <div><small>META Y TRAYECTORIA</small><h3>¿El portafolio alcanza el compromiso?</h3></div>
+    <span class="counter">{{ targets|length }}</span>
+  </div>
+  {% if portfolio.primary_target %}
+  <div class="target-command-grid">
+    <div class="target-command-values">
+      <div><span>Línea base</span><strong>{{ portfolio.primary_target.baseline_value|number_es }} {{ portfolio.primary_target.unit }}</strong></div>
+      <div><span>Valor objetivo</span><strong>{{ portfolio.primary_target.target_value|number_es }} {{ portfolio.primary_target.unit }}</strong></div>
+      <div><span>Reducción requerida</span><strong>{{ portfolio.required_reduction|number_es }} tCO₂e/año</strong></div>
+      <div><span>Reducción estructurada</span><strong>{{ portfolio.expected_reduction|number_es }} tCO₂e/año</strong></div>
+    </div>
+    <div class="coverage-visual">
+      <div class="coverage-track"><i style="width:{{ [portfolio.coverage_percent,100]|min }}%"></i><span class="coverage-target">100%</span></div>
+      <p>{% if portfolio.coverage_percent >= 100 %}La reducción estructurada cubre la meta. El foco debe pasar a aprobación, financiación y ejecución.{% else %}Faltan {{ portfolio.gap|number_es }} tCO₂e/año por estructurar para cubrir el compromiso.{% endif %}</p>
+    </div>
+  </div>
+  <div class="trajectory-grid">
+    {% for point in portfolio.timeline %}
+    <article><small>{{ point.year }}</small><strong>{{ point.projected_emissions|number_es }} tCO₂e</strong><span>-{{ point.reduction|number_es }} tCO₂e</span></article>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty-state"><strong>No existe una meta climática activa.</strong><p>Define una línea base, un año objetivo y un valor meta para medir la suficiencia del portafolio.</p></div>
+  {% endif %}
+</section>
+
+<div class="reduction-management-grid">
+  <section class="card">
+    <div class="card-head"><div><small>EMBUDO DE EJECUCIÓN</small><h3>Estado de las medidas</h3></div></div>
+    <div class="pipeline-list">
+      {% for item in portfolio.pipeline %}
+      <div><span>{{ item.status }}</span><div class="progress"><i style="width:{{ (item.count / [portfolio.action_count,1]|max * 100)|round }}%"></i></div><strong>{{ item.count }}</strong></div>
+      {% endfor %}
+    </div>
   </section>
-  {% if user.can_manage_inventory and not inventory.locked %}
-  <aside class="card sticky-form">
-    <div class="card-head"><div><small>NUEVA ACCIÓN</small><h3>Crear medida</h3></div></div>
+  <section class="card">
+    <div class="card-head"><div><small>RESPONSABILIDAD</small><h3>Carga por líder</h3></div></div>
+    <div class="owner-list">
+      {% for item in portfolio.owners %}
+      <article><div><strong>{{ item.owner }}</strong><span>{{ item.count }} acción(es)</span></div><b>{{ item.reduction|number_es }} tCO₂e/año</b></article>
+      {% else %}<p>No hay responsables asignados.</p>{% endfor %}
+    </div>
+  </section>
+  <section class="card alert-card {% if portfolio.overdue %}has-alert{% endif %}">
+    <div class="card-head"><div><small>CONTROL DE COMPROMISOS</small><h3>Fechas y pendientes</h3></div></div>
+    <dl class="control-counts">
+      <div><dt>Vencidas</dt><dd>{{ portfolio.overdue|length }}</dd></div>
+      <div><dt>Próximos 90 días</dt><dd>{{ portfolio.due_soon|length }}</dd></div>
+      <div><dt>Por estructurar</dt><dd>{{ portfolio.incomplete|length }}</dd></div>
+      <div><dt>Ganancias rápidas</dt><dd>{{ portfolio.quick_wins|length }}</dd></div>
+    </dl>
+  </section>
+</div>
+
+<section class="card action-portfolio-section">
+  <div class="card-head">
+    <div><small>PORTAFOLIO PRIORIZADO</small><h3>Medidas ordenadas para decisión</h3><p>La clasificación combina impacto, viabilidad, economía y calidad de estructuración.</p></div>
+    <span class="counter">{{ portfolio.action_count }}</span>
+  </div>
+  <div class="portfolio-table-wrap">
+    <table class="portfolio-table">
+      <thead><tr><th>Clasificación / acción</th><th>Impacto</th><th>Economía</th><th>Preparación</th><th>Responsable / fecha</th><th>Estado</th></tr></thead>
+      <tbody>
+      {% for item in portfolio.actions %}
+      {% set action = item.action %}
+      <tr class="{% if item.overdue %}row-overdue{% endif %}">
+        <td><span class="portfolio-class class-{{ item.classification|lower|replace(' ','-')|replace('ó','o') }}">{{ item.classification }}</span><strong>{{ item.title }}</strong><small>{{ item.source }} · {{ item.priority }}</small></td>
+        <td><strong>{{ item.expected_reduction|number_es }} tCO₂e/año</strong><small>{{ item.impact_share|number_es(1) }}% del inventario</small></td>
+        <td><strong>{% if item.marginal_cost <= 0 %}Ahorro neto{% else %}${{ item.marginal_cost|number_es(0) }}/tCO₂e{% endif %}</strong><small>Retorno {{ item.payback_years|number_es(2) if item.payback_years else 'N/D' }} años</small></td>
+        <td><div class="readiness-inline"><span>{{ item.readiness_score }}%</span><div class="progress"><i style="width:{{ item.readiness_score }}%"></i></div></div><small>{{ item.readiness_level }}</small>{% if item.missing %}<details><summary>{{ item.missing|length }} pendiente(s)</summary><ul>{% for missing in item.missing %}<li>{{ missing }}</li>{% endfor %}</ul></details>{% endif %}</td>
+        <td><strong>{{ item.owner }}</strong><small>{{ item.target_date or 'Sin fecha' }}{% if item.overdue %} · Vencida{% elif item.due_soon %} · Próxima{% endif %}</small></td>
+        <td><span class="status-chip progressing">{{ item.status }}</span><div class="progress"><i style="width:{{ item.progress_percent }}%"></i></div><small>{{ item.progress_percent }}% ejecutado</small>
+          {% if user.can_manage_inventory and not inventory.locked %}<details class="inline-editor"><summary>Actualizar</summary><form action="/reduccion/acciones/{{ action.id }}/actualizar" method="post" class="stack-form compact-form">
+            <label>Estado<select name="status">{% for option in ['Identificada','En evaluación','Diseño','Aprobada','En ejecución','Implementada','Verificada'] %}<option {% if option==action.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label>
+            <label>Avance %<input name="progress_percent" type="number" min="0" max="100" value="{{ action.progress_percent }}"></label>
+            <label>Reducción esperada<input name="expected_reduction" type="number" step="any" min="0" value="{{ action.expected_reduction }}"></label>
+            <label>Inversión COP<input name="investment_cost" type="number" step="any" min="0" value="{{ action.investment_cost }}"></label>
+            <label>Ahorro anual COP<input name="annual_savings" type="number" step="any" min="0" value="{{ action.annual_savings }}"></label>
+            <label>Reducción real<input name="actual_reduction" type="number" step="any" min="0" value="{{ action.actual_reduction }}"></label>
+            <label>Ahorro real<input name="actual_savings" type="number" step="any" min="0" value="{{ action.actual_savings }}"></label>
+            <label>Responsable<input name="responsible" value="{{ action.responsible }}"></label>
+            <div class="form-grid two"><label>Vida útil<input name="useful_life_years" type="number" min="1" value="{{ action.useful_life_years }}"></label><label>Año implementación<input name="implementation_year" type="number" value="{{ action.implementation_year or '' }}"></label></div>
+            <div class="form-grid two"><label>Viabilidad<select name="feasibility">{% for option in ['Alta','Media','Baja'] %}<option {% if option==action.feasibility %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label><label>Riesgo<select name="risk_level">{% for option in ['Bajo','Medio','Alto'] %}<option {% if option==action.risk_level %}selected{% endif %}>{{ option }}</option>{% endfor %}</select></label></div>
+            <button class="btn btn-primary btn-block">Guardar actualización</button>
+          </form></details>{% endif %}
+        </td>
+      </tr>
+      {% else %}<tr><td colspan="6"><div class="empty-state"><strong>No hay medidas registradas.</strong><p>Crea la primera acción y vincúlala con una fuente material.</p></div></td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+{% if user.can_manage_inventory and not inventory.locked %}
+<div class="reduction-create-grid">
+  <section class="card">
+    <div class="card-head"><div><small>NUEVA MEDIDA</small><h3>Estructurar acción de reducción</h3></div></div>
     <form action="/reduccion/acciones/nueva" method="post" class="stack-form">
       <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
-      <label>Título<input name="title" required></label>
+      <label>Título<input name="title" required placeholder="Ej. Sustitución de combustible en caldera"></label>
       <label>Fuente<select name="source_id"><option value="">Corporativo</option>{% for source in sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
-      <label>Descripción<textarea name="description"></textarea></label>
-      <label>Reducción esperada (tCO₂e/año)<input name="expected_reduction" type="number" step="any" min="0" value="0"></label>
-      <label>Inversión COP<input name="investment_cost" type="number" step="any" min="0" value="0"></label>
-      <label>Ahorro anual COP<input name="annual_savings" type="number" step="any" min="0" value="0"></label>
-      <div class="form-grid two"><label>Prioridad<select name="priority"><option>Alta</option><option selected>Media</option><option>Baja</option></select></label><label>Estado<select name="status"><option>Identificada</option><option>En evaluación</option><option>Diseño</option></select></label></div>
-      <label>Responsable<input name="responsible"></label>
-      <label>Fecha objetivo<input name="target_date" type="date"></label>
-      <div class="form-grid two"><label>Vida útil (años)<input name="useful_life_years" type="number" min="1" value="5"></label><label>Año implementación<input name="implementation_year" type="number" value="2026"></label></div>
+      <label>Descripción<textarea name="description" placeholder="Alcance técnico, supuesto de reducción y condiciones de implementación"></textarea></label>
+      <div class="form-grid three"><label>Reducción esperada<input name="expected_reduction" type="number" step="any" min="0" value="0"></label><label>Inversión COP<input name="investment_cost" type="number" step="any" min="0" value="0"></label><label>Ahorro anual COP<input name="annual_savings" type="number" step="any" min="0" value="0"></label></div>
+      <div class="form-grid three"><label>Prioridad<select name="priority"><option>Alta</option><option selected>Media</option><option>Baja</option></select></label><label>Estado<select name="status"><option>Identificada</option><option>En evaluación</option><option>Diseño</option></select></label><label>Responsable<input name="responsible"></label></div>
+      <div class="form-grid three"><label>Fecha objetivo<input name="target_date" type="date"></label><label>Vida útil<input name="useful_life_years" type="number" min="1" value="5"></label><label>Año implementación<input name="implementation_year" type="number" value="2026"></label></div>
       <div class="form-grid two"><label>Viabilidad<select name="feasibility"><option>Alta</option><option selected>Media</option><option>Baja</option></select></label><label>Riesgo<select name="risk_level"><option>Bajo</option><option selected>Medio</option><option>Alto</option></select></label></div>
-      <button class="btn btn-primary btn-block">Crear acción</button>
-    </form><hr class="section-divider"><div class="card-head"><div><small>NUEVA META</small><h3>Definir trayectoria</h3></div></div><form action="/reduccion/metas/nueva" method="post" class="stack-form"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><label>Nombre<input name="name" required placeholder="Reducir emisiones al 2030"></label><label>Tipo<select name="metric_type"><option>Absoluta</option><option>Intensidad</option></select></label><div class="form-grid two"><label>Año base<input name="baseline_year" type="number" value="{{ inventory.base_year }}" required></label><label>Año meta<input name="target_year" type="number" value="2030" required></label></div><label>Valor de línea base<input name="baseline_value" type="number" step="any" min="0.01" value="{{ (inventory.sources|sum(attribute='emissions'))|round(2) }}" required></label><label>Valor objetivo<input name="target_value" type="number" step="any" min="0" required></label><label>Unidad<input name="unit" value="tCO₂e"></label><label>Notas<textarea name="notes"></textarea></label><button class="btn btn-primary btn-block">Crear meta</button></form>
-  </aside>{% endif %}
+      <button class="btn btn-primary">Crear medida</button>
+    </form>
+  </section>
+  <section class="card">
+    <div class="card-head"><div><small>NUEVA META</small><h3>Definir trayectoria climática</h3></div></div>
+    <form action="/reduccion/metas/nueva" method="post" class="stack-form">
+      <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+      <label>Nombre<input name="name" required placeholder="Reducir emisiones absolutas al 2030"></label>
+      <label>Tipo<select name="metric_type"><option>Absoluta</option><option>Intensidad</option></select></label>
+      <div class="form-grid two"><label>Año base<input name="baseline_year" type="number" value="{{ inventory.base_year }}" required></label><label>Año meta<input name="target_year" type="number" value="2030" required></label></div>
+      <label>Valor de línea base<input name="baseline_value" type="number" step="any" min="0.01" value="{{ portfolio.baseline|round(2) }}" required></label>
+      <label>Valor objetivo<input name="target_value" type="number" step="any" min="0" required></label>
+      <label>Unidad<input name="unit" value="tCO₂e"></label>
+      <label>Notas<textarea name="notes" placeholder="Alcance, supuestos y gobierno de la meta"></textarea></label>
+      <button class="btn btn-primary">Crear meta</button>
+    </form>
+  </section>
 </div>
+{% endif %}
 {% endblock %}

@@ -19,6 +19,12 @@ DOMAIN_MODULES: tuple[dict[str, Any], ...] = (
         "prefixes": ("/informacion", "/evidencias"),
     },
     {
+        "code": "guided_capture",
+        "name": "Captura guiada y plan sectorial",
+        "module": "app/capture_web.py",
+        "prefixes": ("/captura-guiada", "/api/captura-guiada"),
+    },
+    {
         "code": "review",
         "name": "Revisión y cierre del inventario",
         "module": "app/review_web.py",
@@ -43,10 +49,28 @@ DOMAIN_MODULES: tuple[dict[str, Any], ...] = (
         "prefixes": ("/reportes",),
     },
     {
+        "code": "delivery",
+        "name": "Entrega profesional",
+        "module": "app/delivery_web.py",
+        "prefixes": ("/entrega-profesional", "/api/entrega-profesional"),
+    },
+    {
+        "code": "service_operations",
+        "name": "Operación del servicio",
+        "module": "app/service_operations_web.py",
+        "prefixes": ("/operacion-servicio", "/api/operacion-servicio"),
+    },
+    {
         "code": "operations",
         "name": "Operación y continuidad",
         "module": "app/operations_web.py",
         "prefixes": ("/operacion",),
+    },
+    {
+        "code": "integrations",
+        "name": "Integraciones y API de datos",
+        "module": "app/integrations_web.py",
+        "prefixes": ("/integraciones", "/api/v1"),
     },
     {
         "code": "product_intelligence",
@@ -60,6 +84,18 @@ DOMAIN_MODULES: tuple[dict[str, Any], ...] = (
         "module": "app/demo_web.py",
         "prefixes": ("/entorno-demo",),
     },
+    {
+        "code": "land_removals",
+        "name": "Tierras, remociones y carbono biogénico",
+        "module": "app/land_removals_web.py",
+        "prefixes": ("/metodologia/tierras-remociones", "/api/metodologia/tierras-remociones"),
+    },
+    {
+        "code": "product_project_assurance",
+        "name": "Producto, mitigación y aseguramiento",
+        "module": "app/product_project_assurance_web.py",
+        "prefixes": ("/huella-producto", "/proyectos-mitigacion", "/aseguramiento"),
+    },
 )
 
 
@@ -68,6 +104,8 @@ PERSISTENCE_MODEL_MODULES: tuple[str, ...] = (
     "app/db/models/operations.py",
     "app/db/models/inventory.py",
     "app/db/models/supply_chain.py",
+    "app/db/models/land.py",
+    "app/db/models/product_project_assurance.py",
     "app/db/models/methodology.py",
     "app/db/models/commercial.py",
     "app/db/models/product_intelligence.py",

@@ -21,7 +21,13 @@
   <article class="kpi-card featured"><span class="kpi-icon green">◇</span><div><small>PUERTAS DE CALIDAD</small><strong>{{ gates|selectattr('status','equalto','Aprobado')|list|length }}/{{ gates|length }}</strong><p>{{ 'Listo para aprobación' if can_approve else 'Existen bloqueos pendientes' }}</p></div></article>
 </div>
 
-<div class="control-layout v05-control-layout">
+<nav class="task-jumpbar control-taskbar" aria-label="Tareas de control profesional">
+  <a href="#puertas-control"><span>1</span><strong>Revisar puertas</strong><small>Condiciones para aprobar</small></a>
+  <a href="#observaciones-control"><span>2</span><strong>Gestionar hallazgos</strong><small>Corrección y decisión</small></a>
+  <a href="#historial-control"><span>3</span><strong>Consultar historial</strong><small>Decisiones y auditoría</small></a>
+</nav>
+
+<div class="control-layout v05-control-layout" id="puertas-control">
   <section class="card">
     <div class="card-head"><div><small>PUERTAS DE CALIDAD</small><h3>Condiciones del inventario</h3></div><span class="counter">{{ gates|length }}</span></div>
     <div class="gate-list">
@@ -90,8 +96,9 @@
 </div>
 
 {% if user.can_review and not inventory.locked %}
-<section class="card observation-create-card">
-  <div class="card-head"><div><small>NUEVO HALLAZGO</small><h3>Registrar observación</h3></div><span class="status-chip progressing">Revisor</span></div>
+<section class="card observation-create-card progressive-action-card">
+  <details class="task-form-disclosure" data-exclusive-details="control-create">
+    <summary><div><small>NUEVO HALLAZGO</small><strong>Registrar observación</strong><span>Documenta criterio, evidencia, responsable y corrección esperada.</span></div><b>Crear</b></summary>
   <form action="/control/observaciones/nueva" method="post" class="observation-create-form">
     <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
     <label>Elemento<select name="source_id"><option value="">Inventario general</option>{% for source in inventory.sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label>
@@ -103,10 +110,11 @@
     <label class="wide-field">Descripción<textarea name="description" required placeholder="Explica la evidencia, criterio y corrección esperada"></textarea></label>
     <button class="btn btn-primary">Crear observación</button>
   </form>
+  </details>
 </section>
 {% endif %}
 
-<section class="card observation-section">
+<section class="card observation-section" id="observaciones-control">
   <div class="card-head"><div><small>REVISIÓN PROFESIONAL</small><h3>Observaciones y correcciones</h3></div><span class="counter">{{ observations|length }}</span></div>
   <div class="observation-list">
     {% for observation in observations %}
@@ -136,7 +144,7 @@
       {% if observation.status != 'Cerrada' and not inventory.locked %}
       <div class="observation-actions">
         {% if user.can_provide_data or user.can_manage_sources or user.can_review %}
-        <details><summary>Responder o corregir</summary>
+        <details data-exclusive-details="observation-action"><summary>Responder o corregir</summary>
           <form action="/control/observaciones/{{ observation.id }}/responder" method="post" class="stack-form">
             <label>Respuesta<textarea name="response" required>{{ observation.response }}</textarea></label>
             <button class="btn btn-outline">Guardar respuesta</button>
@@ -147,7 +155,7 @@
         </details>
         {% endif %}
         {% if user.can_review %}
-        <details><summary>Decisión del revisor</summary>
+        <details data-exclusive-details="observation-action"><summary>Decisión del revisor</summary>
           <form action="/control/observaciones/{{ observation.id }}/cerrar" method="post" class="stack-form">
             <label>Conclusión<textarea name="resolution" required placeholder="Explica por qué se cierra o devuelve"></textarea></label>
             <label>Decisión<select name="decision"><option>Cerrar</option><option>Devolver</option></select></label>
@@ -164,7 +172,7 @@
   </div>
 </section>
 
-<div class="review-history-grid">
+<div class="review-history-grid" id="historial-control">
   <section class="card">
     <div class="card-head"><div><small>DECISIONES</small><h3>Historial formal</h3></div><span class="counter">{{ decisions|length }}</span></div>
     <div class="decision-list">

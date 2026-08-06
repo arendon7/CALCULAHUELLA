@@ -47,8 +47,20 @@ from .inventory import (
 from .supply_chain import (
     Supplier,
     SupplierCampaign,
+    Scope3CategoryAssessment,
     SupplierDataRequest,
     SupplierResponse,
+)
+
+from .land import LandCarbonEntry
+
+from .product_project_assurance import (
+    ProductFootprintStudy,
+    ProductLifeCycleStage,
+    MitigationProject,
+    MitigationMonitoringPeriod,
+    AssuranceEngagement,
+    AssuranceFinding,
 )
 
 from .methodology import (
@@ -59,6 +71,7 @@ from .methodology import (
     EmissionFactor,
     EmissionFactorVersion,
     SourceFactorAssignment,
+    ActivityFactorSelection,
     EmissionCalculation,
     MethodologyRelease,
     InventoryMethodologySnapshot,
@@ -75,6 +88,8 @@ from .commercial import (
     UsageCounter,
     CustomerOnboardingItem,
     SupportTicket,
+    SupportMessage,
+    UserInvitation,
     BillingInvoice,
     CommercialLead,
     CommercialProposal,
@@ -178,8 +193,16 @@ __all__ = [
     "VerificationFinding",
     "Supplier",
     "SupplierCampaign",
+    "Scope3CategoryAssessment",
     "SupplierDataRequest",
     "SupplierResponse",
+    "LandCarbonEntry",
+    "ProductFootprintStudy",
+    "ProductLifeCycleStage",
+    "MitigationProject",
+    "MitigationMonitoringPeriod",
+    "AssuranceEngagement",
+    "AssuranceFinding",
     "UnitDefinition",
     "UnitConversion",
     "Gas",
@@ -187,6 +210,7 @@ __all__ = [
     "EmissionFactor",
     "EmissionFactorVersion",
     "SourceFactorAssignment",
+    "ActivityFactorSelection",
     "EmissionCalculation",
     "MethodologyRelease",
     "InventoryMethodologySnapshot",
@@ -200,6 +224,8 @@ __all__ = [
     "UsageCounter",
     "CustomerOnboardingItem",
     "SupportTicket",
+    "SupportMessage",
+    "UserInvitation",
     "BillingInvoice",
     "CommercialLead",
     "CommercialProposal",

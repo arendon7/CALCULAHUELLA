@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import shutil
 from pathlib import Path
 
 from .config import INSTANCE_DIR, settings
@@ -11,7 +12,12 @@ class StorageError(RuntimeError):
 
 
 class StorageService:
-    """Almacenamiento local, filesystem externo o S3-compatible."""
+    """Almacenamiento local, filesystem externo o S3-compatible.
+
+    Los métodos de archivo evitan cargar respaldos completos en memoria y la
+    enumeración se utiliza para inventarios de continuidad, no para exponer
+    documentos al usuario.
+    """
 
     def __init__(self) -> None:
         self.backend = settings.storage_backend
@@ -57,7 +63,26 @@ class StorageService:
         return key
 
     def put_file(self, key: str, source: Path, content_type: str = "application/octet-stream") -> str:
-        return self.put_bytes(key, source.read_bytes(), content_type)
+        """Store a file without reading the complete payload into memory."""
+        key = self.normalize_key(key)
+        source = source.resolve()
+        if not source.is_file():
+            raise FileNotFoundError(source)
+        if self.backend in {"local", "filesystem"}:
+            destination = (self.local_root / key).resolve()
+            if self.local_root not in destination.parents and destination != self.local_root:
+                raise StorageError("Ruta de almacenamiento no permitida")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            if source != destination:
+                shutil.copy2(source, destination)
+            return key
+        assert self._client is not None
+        extra = {"ContentType": content_type} if content_type else None
+        if extra:
+            self._client.upload_file(str(source), settings.s3_bucket, key, ExtraArgs=extra)
+        else:
+            self._client.upload_file(str(source), settings.s3_bucket, key)
+        return key
 
     def local_path(self, key: str) -> Path | None:
         if self.backend not in {"local", "filesystem"}:
@@ -99,6 +124,39 @@ class StorageService:
         assert self._client is not None
         self._client.delete_object(Bucket=settings.s3_bucket, Key=key)
 
+    def list_objects(self, prefix: str = "") -> list[dict[str, object]]:
+        """Return a deterministic object inventory used by continuity checks."""
+        prefix = prefix.strip().lstrip("/")
+        if self.backend in {"local", "filesystem"}:
+            base = (self.local_root / prefix).resolve() if prefix else self.local_root
+            if self.local_root not in base.parents and base != self.local_root:
+                raise StorageError("Prefijo de almacenamiento no permitido")
+            if not base.exists():
+                return []
+            rows = []
+            for path in sorted(base.rglob("*")):
+                if path.is_file():
+                    rows.append({
+                        "key": str(path.relative_to(self.local_root)).replace("\\", "/"),
+                        "size": path.stat().st_size,
+                        "etag": "",
+                    })
+            return rows
+        assert self._client is not None
+        rows: list[dict[str, object]] = []
+        token = None
+        while True:
+            kwargs = {"Bucket": settings.s3_bucket, "Prefix": prefix}
+            if token:
+                kwargs["ContinuationToken"] = token
+            response = self._client.list_objects_v2(**kwargs)
+            for item in response.get("Contents", []):
+                rows.append({"key": item["Key"], "size": int(item.get("Size", 0)), "etag": str(item.get("ETag", "")).strip('"')})
+            if not response.get("IsTruncated"):
+                break
+            token = response.get("NextContinuationToken")
+        return sorted(rows, key=lambda item: str(item["key"]))
+
     def presigned_url(self, key: str, expires: int = 900) -> str:
         if self.backend != "s3":
             raise StorageError("Las URL firmadas solo aplican a S3")
@@ -110,9 +168,9 @@ class StorageService:
         )
 
     def verified_probe(self) -> dict[str, object]:
-        payload = b"Calcula tu Huella storage probe v0.43"
+        payload = b"Calcula tu Huella storage probe v1.0"
         expected = hashlib.sha256(payload).hexdigest()
-        key = ".health/storage-v044.probe"
+        key = ".health/storage-v100final.probe"
         try:
             self.put_bytes(key, payload, "text/plain")
             restored = self.get_bytes(key)

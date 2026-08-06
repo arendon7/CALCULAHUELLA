@@ -44,6 +44,24 @@ class SupplierCampaign(Base):
     inventory: Mapped[Inventory] = relationship(back_populates="supplier_campaigns")
     requests: Mapped[list["SupplierDataRequest"]] = relationship(back_populates="campaign", cascade="all, delete-orphan")
 
+class Scope3CategoryAssessment(Base):
+    __tablename__ = "scope3_category_assessments"
+    __table_args__ = (UniqueConstraint("inventory_id", "category_code", name="uq_scope3_assessment_inventory_category"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    inventory_id: Mapped[int] = mapped_column(ForeignKey("inventories.id"))
+    category_code: Mapped[str] = mapped_column(String(4))
+    status: Mapped[str] = mapped_column(String(30), default="Pendiente")
+    relevance_score: Mapped[float] = mapped_column(Float, default=0)
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    owner: Mapped[str] = mapped_column(String(120), default="Responsable ambiental")
+    data_strategy: Mapped[str] = mapped_column(String(180), default="Por definir")
+    updated_by: Mapped[str] = mapped_column(String(180), default="")
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
+
+    inventory: Mapped[Inventory] = relationship(back_populates="scope3_assessments")
+
+
 class SupplierDataRequest(Base):
     __tablename__ = "supplier_data_requests"
 

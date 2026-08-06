@@ -1,0 +1,70 @@
+{
+  "ok": true,
+  "status": "Aprobado",
+  "generated_at": "2026-08-05T20:59:30.596805+00:00",
+  "platform": "Linux-6.18.35-x86_64-with-glibc2.41",
+  "machine": "x86_64",
+  "python": "3.13.5",
+  "executable": "/opt/pyvenv/bin/python",
+  "checks": [
+    {
+      "code": "python_version",
+      "ok": true,
+      "detail": "3.13.5",
+      "critical": true
+    },
+    {
+      "code": "project_root",
+      "ok": true,
+      "detail": "/mnt/data/iter10_work/calcula_tu_huella_v1_0_0_iteracion_10_certificacion_aceptacion/MAC",
+      "critical": true
+    },
+    {
+      "code": "requirements",
+      "ok": true,
+      "detail": "requirements.txt presente",
+      "critical": true
+    },
+    {
+      "code": "migrations",
+      "ok": true,
+      "detail": "Alembic presente",
+      "critical": true
+    },
+    {
+      "code": "write_permissions",
+      "ok": true,
+      "detail": "Escritura local disponible",
+      "critical": true
+    },
+    {
+      "code": "sqlite_runtime",
+      "ok": true,
+      "detail": "3.46.1",
+      "critical": true
+    },
+    {
+      "code": "python_executable",
+      "ok": true,
+      "detail": "/opt/pyvenv/bin/python",
+      "critical": true
+    },
+    {
+      "code": "free_space",
+      "ok": true,
+      "detail": "39574 MB libres",
+      "critical": true
+    },
+    {
+      "code": "native_platform",
+      "ok": false,
+      "detail": "Entorno de validación Linux; no es una certificación física Mac/Windows.",
+      "critical": false
+    }
+  ],
+  "critical_failures": [],
+  "project_manifest": {
+    "requirements_sha256": "2decda025145161dc218419774bc75b9167693201c09bfd2711d86d97984093d",
+    "main_sha256": "a90061aa32a49d5406cf27f5d6ea669b79de8f26d8a731f391fb011fef291968"
+  }
+}

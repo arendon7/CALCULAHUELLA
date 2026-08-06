@@ -10,8 +10,7 @@ from app.product_experience import journey_detail, navigation_for
 
 @pytest.fixture(autouse=True)
 def fresh_database():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -34,10 +33,12 @@ def test_navigation_defaults_to_inventory_core() -> None:
     }
     navigation = navigation_for(user, "essential")
     labels = [item["label"] for section in navigation["core"] for item in section["items"]]
-    assert "Mi trabajo" in labels
-    assert "Recorrido del inventario" in labels
+    assert "Centro de trabajo" in labels
+    assert "Continuar recorrido" in labels
     assert "Datos y evidencias" in labels
-    assert "Cierre metodológico" in labels
+    assert "Datos y evidencias" in labels
+    assert "Cierre e informes" in labels
+    assert len(labels) <= 9
     assert navigation["advanced"] == []
     assert navigation["internal"] == []
 
@@ -66,9 +67,9 @@ def test_dashboard_switches_between_essential_and_complete_view() -> None:
         login(client, "consultor@calculatuhuella.local")
         essential = client.get("/dashboard")
         assert essential.status_code == 200
-        assert "Vista esencial" in essential.text
+        assert "Mostrar vista completa" in essential.text
         assert "Herramientas avanzadas" not in essential.text
-        assert "Recorrido del inventario" in essential.text
+        assert "RECORRIDO DEL INVENTARIO" in essential.text
 
         response = client.post(
             "/preferencias/vista",
@@ -77,7 +78,7 @@ def test_dashboard_switches_between_essential_and_complete_view() -> None:
         )
         assert response.status_code == 303
         complete = client.get("/dashboard")
-        assert "Vista completa" in complete.text
+        assert "Volver a vista esencial" in complete.text
         assert "Herramientas avanzadas" in complete.text
         assert "Administración interna" in complete.text
 
@@ -90,7 +91,7 @@ def test_inventory_journey_has_five_decision_stages() -> None:
         for stage in ["Configurar", "Recolectar", "Calcular", "Revisar", "Reportar"]:
             assert stage in response.text
         assert "Responsable de información" in response.text
-        assert "Un solo proceso, cinco etapas" in response.text
+        assert "Tu ruta para completar el inventario" in response.text
 
 
 def test_dashboard_uses_calculated_monthly_data_not_placeholder_trend() -> None:
@@ -99,7 +100,7 @@ def test_dashboard_uses_calculated_monthly_data_not_placeholder_trend() -> None:
         response = client.get("/dashboard")
         assert response.status_code == 200
         assert "▼ 8,4%" not in response.text
-        assert "periodo seleccionado" in response.text
+        assert "HUELLA DEL PERIODO" in response.text
         assert "monthly-chart" in response.text or "Aún no hay resultados mensuales calculados" in response.text
 
 

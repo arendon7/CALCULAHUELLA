@@ -10,10 +10,13 @@ from pathlib import Path
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.worksheet.datavalidation import DataValidation
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .calculations import recalculate_inventory, recalculate_source
+from .capture_guidance import capture_summary
 from .config import settings
 from .database import (
     ActivityData, DataRequest, EmissionSource, EvidenceDocument, Inventory,
@@ -49,7 +52,7 @@ def register_information_routes(
     DATA_ORIGINS = data_origins
     _parse_excel_period = parse_excel_period
     @app.get("/informacion", response_class=HTMLResponse)
-    def information_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+    def information_page(request: Request, show_all: bool = False, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
         requests = list(session.scalars(select(DataRequest).where(DataRequest.inventory_id == inventory.id).order_by(DataRequest.due_date)))
         documents = list(session.scalars(select(EvidenceDocument).where(EvidenceDocument.inventory_id == inventory.id).order_by(EvidenceDocument.uploaded_at.desc())))
@@ -63,6 +66,7 @@ def register_information_routes(
             )
         )
         quality_counts = {level: sum(1 for item in records if item.quality_level == level) for level in ("A", "B", "C", "D")}
+        visible_records = records if show_all else records[:12]
         first_period_start = inventory.start_date
         first_period_end = min(
             inventory.end_date,
@@ -80,6 +84,8 @@ def register_information_routes(
                 requests=requests,
                 documents=documents,
                 records=records,
+                visible_records=visible_records,
+                show_all=show_all,
                 sources=inventory.sources,
                 quality_counts=quality_counts,
                 allowed_units=ALLOWED_UNITS,
@@ -365,28 +371,83 @@ def register_information_routes(
     @app.get("/informacion/plantilla.xlsx")
     def activity_template(session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
+        summary = capture_summary(inventory)
         workbook = Workbook()
-        sheet = workbook.active
-        sheet.title = "Datos"
+        plan = workbook.active
+        plan.title = "Plan de captura"
+        plan_headers = ["Prioridad", "Fuente", "Alcance", "Categoría", "Frecuencia", "Responsable", "Unidad esperada", "Soporte recomendado", "Próximo inicio", "Próximo final", "Cobertura %", "Estado"]
+        plan.append(plan_headers)
+        for position, item in enumerate(summary["cards"], 1):
+            plan.append([
+                position,
+                item["source"].name,
+                item["source"].scope,
+                item["source"].category,
+                item["source"].data_frequency,
+                item["source"].responsible,
+                item["profile"]["unit"],
+                item["profile"]["evidence"],
+                item["next_start"].isoformat() if item["next_start"] else "",
+                item["next_end"].isoformat() if item["next_end"] else "",
+                item["coverage"],
+                item["status"],
+            ])
+        data = workbook.create_sheet("Datos")
         headers = ["Fuente", "Periodo", "Valor", "Unidad", "Origen", "Estimado", "Incertidumbre %", "Base incertidumbre", "Observaciones"]
-        sheet.append(headers)
-        sheet.append(["Electricidad", "2025-01", 18450, "kWh", "Factura", "No", 5, "Facturación medida", "Ejemplo; reemplaza o elimina esta fila"])
-        sheet.freeze_panes = "A2"
-        sheet.auto_filter.ref = "A1:I2"
-        for column, width in {"A": 26, "B": 14, "C": 15, "D": 14, "E": 26, "F": 12, "G": 18, "H": 28, "I": 45}.items():
-            sheet.column_dimensions[column].width = width
-        catalog = workbook.create_sheet("Catálogos")
-        catalog.append(["Fuentes", "Unidades", "Orígenes"])
+        data.append(headers)
+        data.append(["Electricidad", f"{inventory.start_date:%Y-%m}", 18450, "kWh", "Factura", "No", 5, "Facturación medida", "Fila de ejemplo: reemplázala o elimínala antes de importar"])
+        catalogs = workbook.create_sheet("Catálogos")
+        catalogs.append(["Fuentes", "Unidades", "Orígenes"])
         max_rows = max(len(inventory.sources), len(ALLOWED_UNITS), len(DATA_ORIGINS))
         for index in range(max_rows):
-            catalog.append([
+            catalogs.append([
                 inventory.sources[index].name if index < len(inventory.sources) else "",
                 ALLOWED_UNITS[index] if index < len(ALLOWED_UNITS) else "",
                 DATA_ORIGINS[index] if index < len(DATA_ORIGINS) else "",
             ])
+        instructions = workbook.create_sheet("Instrucciones")
+        instructions.append(["Paso", "Qué hacer", "Control de calidad"])
+        instruction_rows = [
+            (1, "Revisa el Plan de captura y prioriza las fuentes pendientes.", "La prioridad combina materialidad, periodos faltantes y soportes."),
+            (2, "Completa la hoja Datos sin cambiar los encabezados.", "Usa una fila por fuente y periodo; no combines unidades."),
+            (3, "Conserva facturas, certificados o registros del mismo periodo.", "El archivo Excel no reemplaza las evidencias."),
+            (4, "Marca Estimado cuando el valor no provenga de medición o soporte directo.", "Documenta la base de incertidumbre y los supuestos."),
+            (5, "Importa el archivo y resuelve todos los errores antes de aplicar.", "La plataforma evita importaciones parciales."),
+        ]
+        for row in instruction_rows:
+            instructions.append(row)
+        header_fill = PatternFill("solid", fgColor="1F5B45")
+        header_font = Font(color="FFFFFF", bold=True)
+        for sheet in (plan, data, catalogs, instructions):
+            sheet.freeze_panes = "A2"
+            for cell in sheet[1]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(vertical="center", wrap_text=True)
+            sheet.auto_filter.ref = sheet.dimensions
+        widths = {
+            "Plan de captura": [10, 30, 10, 28, 14, 24, 16, 38, 14, 14, 13, 18],
+            "Datos": [30, 14, 15, 14, 26, 12, 18, 30, 50],
+            "Catálogos": [30, 20, 30],
+            "Instrucciones": [10, 58, 58],
+        }
+        for sheet_name, values in widths.items():
+            sheet = workbook[sheet_name]
+            for index, width in enumerate(values, 1):
+                sheet.column_dimensions[chr(64 + index)].width = width
+        source_validation = DataValidation(type="list", formula1=f"'Catálogos'!$A$2:$A${len(inventory.sources)+1}", allow_blank=False)
+        unit_validation = DataValidation(type="list", formula1=f"'Catálogos'!$B$2:$B${len(ALLOWED_UNITS)+1}", allow_blank=False)
+        origin_validation = DataValidation(type="list", formula1=f"'Catálogos'!$C$2:$C${len(DATA_ORIGINS)+1}", allow_blank=False)
+        estimated_validation = DataValidation(type="list", formula1='"Sí,No"', allow_blank=False)
+        for validation in (source_validation, unit_validation, origin_validation, estimated_validation):
+            data.add_data_validation(validation)
+        source_validation.add("A2:A1000")
+        unit_validation.add("D2:D1000")
+        origin_validation.add("E2:E1000")
+        estimated_validation.add("F2:F1000")
         output = BytesIO()
         workbook.save(output)
-        filename = f"Plantilla_datos_{inventory.base_year}.xlsx"
+        filename = f"Plantilla_sectorial_datos_{inventory.base_year}.xlsx"
         return Response(
             output.getvalue(),
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",

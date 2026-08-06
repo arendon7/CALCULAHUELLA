@@ -26,8 +26,7 @@ from app.pilot_execution import (
 
 @pytest.fixture(autouse=True)
 def fresh_database_v033():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -38,7 +37,7 @@ def login(client: TestClient, email: str = "consultor@calculatuhuella.local") ->
 
 def test_v033_health_and_schema_are_current():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
     assert "pilot_source_comparisons" in inspect(ENGINE).get_table_names()
 
 

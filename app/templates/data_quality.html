@@ -10,7 +10,7 @@
   </div>
   <div class="head-actions">
     <a class="btn btn-outline" href="/calidad-datos/reporte.xlsx">Exportar control</a>
-    <a class="btn btn-primary" href="/calidad-datos/plantilla.xlsx">Descargar plantilla</a>
+    {% if summary.execution %}<a class="btn btn-primary" href="/calidad-datos/plantilla.xlsx">Descargar plantilla</a>{% else %}<span class="btn btn-primary" aria-disabled="true" title="Inicia la ejecución del piloto para habilitar la plantilla">Plantilla pendiente de piloto</span>{% endif %}
   </div>
 </section>
 

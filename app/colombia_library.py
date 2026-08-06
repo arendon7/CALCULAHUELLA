@@ -5,9 +5,11 @@ from io import BytesIO
 from typing import Any
 
 from openpyxl import Workbook
+from openpyxl.styles import Alignment, Font
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .factor_library import HIERARCHY_LEVELS, factor_passport
 from .database import (
     EmissionFactor,
     EmissionFactorVersion,
@@ -25,6 +27,7 @@ METHANE_DENSITY_KG_M3 = 0.7168
 
 COLOMBIA_SOURCE_CODES = {
     "UPME-R085-2026",
+    "XM-SIN-2025-PRELIM",
     "UPME-FECOC-2016",
     "UPME-FECOCPLUS-3-2023",
     "COL-DECRETO-926-2017",
@@ -245,52 +248,86 @@ def colombia_library_summary(session: Session) -> dict[str, Any]:
         .order_by(EmissionFactor.activity_type, EmissionFactor.name, EmissionFactorVersion.version)
     ))
     documented: list[dict[str, Any]] = []
+    referenced_source_ids: set[int] = set()
     for version in versions:
         doc = session.scalar(select(FactorDocumentation).where(FactorDocumentation.factor_version_id == version.id).options(selectinload(FactorDocumentation.source_document)))
         if not doc or not doc.source_document or doc.source_document.code not in COLOMBIA_SOURCE_CODES:
             continue
-        documented.append({"factor": version.factor, "version": version, "gas": version.gas, "documentation": doc, "source": doc.source_document})
+        passport = factor_passport(session, version, documentation=doc)
+        referenced_source_ids.add(doc.source_document.id)
+        documented.append({
+            "factor": version.factor,
+            "version": version,
+            "gas": version.gas,
+            "documentation": doc,
+            "source": doc.source_document,
+            "passport": passport,
+        })
     cases = list(session.scalars(select(ReferenceCalculationCase).where(ReferenceCalculationCase.code >= "REF-013").order_by(ReferenceCalculationCase.code)))
+    preliminary_documents = [item for item in documents if any(marker in (item.status or "").lower() for marker in ("preliminar", "borrador", "consulta", "proyecto", "no incorporado"))]
     counts = {
         "documents": len(documents),
         "factors": len(documented),
-        "formal": sum(1 for item in documented if item["documentation"].reporting_use == "Formal"),
+        "formal": sum(1 for item in documented if item["passport"]["formal"]),
         "pilot": sum(1 for item in documented if item["documentation"].reporting_use == "Piloto"),
+        "official_national": sum(1 for item in documented if item["passport"]["hierarchy_tier"] == 2),
+        "ready": sum(1 for item in documented if item["passport"]["decision_readiness"] == "Listo para evaluación"),
+        "review_overdue": sum(1 for item in documented if item["passport"]["review_overdue"]),
+        "preliminary_documents": len(preliminary_documents),
         "reference_cases": len(cases),
     }
+    document_usage = {item.id: item.id in referenced_source_ids for item in documents}
+    governance_policy = [
+        {"tier": tier, "label": label, "rationale": rationale}
+        for tier, (label, rationale) in HIERARCHY_LEVELS.items()
+    ]
     return {
         "version": LIBRARY_VERSION,
+        "governance_version": "1.1.0",
         "documents": documents,
+        "document_usage": document_usage,
         "factors": documented,
         "cases": cases,
         "counts": counts,
+        "governance_policy": governance_policy,
         "fuel_options": FUEL_CALCULATOR_FACTORS,
         "limitations": [
             "Los factores del Decreto 926 son equivalencias regulatorias y se mantienen como uso piloto condicionado; no reemplazan una evaluación metodológica del inventario corporativo.",
             "Los valores FECOC B10/E10 fueron transcritos desde una fuente secundaria que cita FECOC 2016 y permanecen en revisión documental.",
+            "El resultado preliminar XM del SIN 2025 se registra únicamente para vigilancia metodológica; no crea un factor calculable ni sustituye el factor oficial UPME aplicable al inventario 2024.",
+            "Para electricidad debe priorizarse el factor oficial del año del consumo. Una diferencia temporal debe quedar justificada y aprobada.",
             "El cálculo de aguas residuales exige carga orgánica y MCF del sistema real; el consumo de agua por sí solo no basta.",
             "Las emisiones por fertilizantes corresponden a aplicación de nitrógeno al suelo y no a fabricación del producto.",
             "El balance de biogás es una herramienta operativa; las mediciones de planta tienen prioridad.",
         ],
     }
 
-
 def build_colombia_workbook(summary: dict[str, Any]) -> bytes:
     wb = Workbook()
     ws = wb.active
     ws.title = "Factores"
-    ws.append(["Factor", "Versión", "Gas", "Valor", "Unidad entrada", "Unidad salida", "Uso", "Revisión", "Fuente", "Página/tabla", "Restricciones"])
+    ws.append(["Factor", "Versión", "Gas", "Valor", "Unidad entrada", "Unidad salida", "Jerarquía", "Alineación temporal", "Estado fuente", "Uso", "Revisión", "Próxima revisión", "Fuente", "Página/tabla", "Restricciones"])
     for item in summary["factors"]:
         version = item["version"]
         doc = item["documentation"]
-        ws.append([item["factor"].name, version.version, item["gas"].code, version.value, version.input_unit, version.output_unit, doc.reporting_use, doc.review_status, item["source"].code, f"{doc.page_reference} {doc.table_reference}".strip(), doc.restriction_notes])
+        passport = item["passport"]
+        ws.append([
+            item["factor"].name, version.version, item["gas"].code, version.value, version.input_unit, version.output_unit,
+            f"{passport['hierarchy_tier']} · {passport['hierarchy_label']}", passport["temporal_alignment"], passport["source_status"],
+            doc.reporting_use, doc.review_status, doc.next_review_date.isoformat() if doc.next_review_date else "",
+            item["source"].code, f"{doc.page_reference} {doc.table_reference}".strip(), doc.restriction_notes,
+        ])
     ws.freeze_panes = "A2"
     ws.auto_filter.ref = ws.dimensions
 
     docs = wb.create_sheet("Fuentes")
-    docs.append(["Código", "Título", "Entidad", "Fecha", "Jurisdicción", "Estado", "URL", "Citación", "Notas"])
+    docs.append(["Código", "Título", "Entidad", "Fecha", "Jurisdicción", "Estado", "Incorporado al cálculo", "Consultado", "URL", "Citación", "Notas"])
     for item in summary["documents"]:
-        docs.append([item.code, item.title, item.issuing_body, item.publication_date.isoformat() if item.publication_date else "", item.jurisdiction, item.status, item.source_url, item.citation, item.notes])
+        docs.append([
+            item.code, item.title, item.issuing_body, item.publication_date.isoformat() if item.publication_date else "",
+            item.jurisdiction, item.status, "Sí" if summary["document_usage"].get(item.id) else "No",
+            item.accessed_at.isoformat() if item.accessed_at else "", item.source_url, item.citation, item.notes,
+        ])
 
     refs = wb.create_sheet("Casos patrón")
     refs.append(["Código", "Título", "Categoría", "Actividad", "Unidad", "Factor", "Unidad factor", "Gas", "GWP", "kg CO2e esperados", "Fuente"])
@@ -302,21 +339,58 @@ def build_colombia_workbook(summary: dict[str, Any]) -> bytes:
     for item in summary["limitations"]:
         limits.append([item])
 
+    governance = wb.create_sheet("Gobierno")
+    governance.append(["Nivel", "Jerarquía", "Criterio"])
+    for item in summary["governance_policy"]:
+        governance.append([item["tier"], item["label"], item["rationale"]])
+
     for sheet in wb.worksheets:
+        for cell in sheet[1]:
+            cell.font = Font(bold=True)
         for column in sheet.columns:
             letter = column[0].column_letter
             sheet.column_dimensions[letter].width = min(55, max(12, max(len(str(cell.value or "")) for cell in column) + 2))
+        for row in sheet.iter_rows():
+            for cell in row:
+                cell.alignment = Alignment(wrap_text=True, vertical="top")
     output = BytesIO()
     wb.save(output)
     return output.getvalue()
 
-
 def summary_json(summary: dict[str, Any]) -> str:
     payload = {
         "version": summary["version"],
+        "governance_version": summary["governance_version"],
         "counts": summary["counts"],
-        "documents": [{"code": item.code, "title": item.title, "issuing_body": item.issuing_body, "status": item.status, "source_url": item.source_url} for item in summary["documents"]],
-        "factors": [{"name": item["factor"].name, "version": item["version"].version, "gas": item["gas"].code, "value": item["version"].value, "input_unit": item["version"].input_unit, "reporting_use": item["documentation"].reporting_use, "review_status": item["documentation"].review_status, "source_code": item["source"].code} for item in summary["factors"]],
+        "governance_policy": summary["governance_policy"],
+        "documents": [
+            {
+                "code": item.code,
+                "title": item.title,
+                "issuing_body": item.issuing_body,
+                "status": item.status,
+                "source_url": item.source_url,
+                "incorporated_into_calculation": summary["document_usage"].get(item.id, False),
+            }
+            for item in summary["documents"]
+        ],
+        "factors": [
+            {
+                "name": item["factor"].name,
+                "version": item["version"].version,
+                "gas": item["gas"].code,
+                "value": item["version"].value,
+                "input_unit": item["version"].input_unit,
+                "reporting_use": item["documentation"].reporting_use,
+                "review_status": item["documentation"].review_status,
+                "source_code": item["source"].code,
+                "hierarchy_tier": item["passport"]["hierarchy_tier"],
+                "hierarchy_label": item["passport"]["hierarchy_label"],
+                "temporal_alignment": item["passport"]["temporal_alignment"],
+                "source_status": item["passport"]["source_status"],
+            }
+            for item in summary["factors"]
+        ],
         "limitations": summary["limitations"],
     }
     return json.dumps(payload, ensure_ascii=False, indent=2)

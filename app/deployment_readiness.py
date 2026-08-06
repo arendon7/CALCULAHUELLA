@@ -65,6 +65,11 @@ def production_checks(strict: bool | None = None) -> list[dict[str, object]]:
         _check("metrics", "Métricas operativas", True, f"{metrics_snapshot['request_count']} solicitudes observadas", critical=False),
         _check("metrics_token", "Protección de métricas", bool(settings.metrics_token), "Token configurado" if settings.metrics_token else "METRICS_TOKEN no configurado", critical=strict_mode),
         _check("alert_secret", "Autenticación de alertas", bool(settings.alert_webhook_secret), "Secreto configurado" if settings.alert_webhook_secret else "ALERT_WEBHOOK_SECRET no configurado", critical=strict_mode),
+        _check("backup_signature", "Firma de respaldos", len(settings.backup_signing_secret) >= 32, "HMAC-SHA256 configurada" if len(settings.backup_signing_secret) >= 32 else "BACKUP_SIGNING_SECRET ausente o corto", critical=strict_mode),
+        _check("backup_offsite", "Réplica externa de respaldos", settings.backup_offsite_enabled, f"Prefijo: {settings.backup_storage_prefix or 'sin definir'}", critical=strict_mode),
+        _check("storage_versioning", "Versionado o inmutabilidad", settings.object_storage_versioning_confirmed, "Confirmado" if settings.object_storage_versioning_confirmed else "No confirmado", critical=strict_mode),
+        _check("smtp_backend", "Correo transaccional SMTP", settings.email_backend == "smtp" and bool(settings.smtp_host), f"Backend: {settings.email_backend} · host: {settings.smtp_host or 'sin configurar'}", critical=strict_mode),
+        _check("scheduler", "Worker y automatizaciones", settings.scheduler_enabled, f"SCHEDULER_ENABLED={settings.scheduler_enabled}", critical=strict_mode),
     ]
     service_specs = (
         ("object_storage_service", "Servicio de almacenamiento", settings.object_storage_health_url),

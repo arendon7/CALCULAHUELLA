@@ -13,8 +13,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def fresh_database_v036():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -29,12 +28,12 @@ def login(client: TestClient, email: str = "admin@calculatuhuella.local") -> Non
 
 def test_v036_health_and_expanded_domain_route_parity():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         login(client)
         summary = client.get("/api/arquitectura/resumen").json()
     assert summary["route_parity_ok"] is True
     assert summary["duplicate_paths"] == []
-    assert summary["domain_count"] == 9
+    assert summary["domain_count"] == 15
     assert summary["owned_route_count"] >= 48
     assert summary["main_lines"] < 4700
 
@@ -45,14 +44,20 @@ def test_v036_routes_are_owned_by_new_domain_modules():
     actual = {item["code"]: item["route_count"] for item in summary["domains"]}
     assert actual == {
         "demo_environment": 4,
+        "guided_capture": 3,
         "organizations": 4,
         "information": 10,
+        "integrations": 6,
         "review": 10,
-        "users": 4,
-        "inventories": 13,
-        "reports": 4,
-        "operations": 14,
+        "users": 8,
+        "inventories": 17,
+        "reports": 6,
+        "delivery": 2,
+        "operations": 15,
+        "service_operations": 2,
         "product_intelligence": 8,
+        "land_removals": 4,
+        "product_project_assurance": 17,
     }
     main_source = (project_dir / "app" / "main.py").read_text(encoding="utf-8")
     for decorator in (
@@ -62,11 +67,14 @@ def test_v036_routes_are_owned_by_new_domain_modules():
         '@app.post("/sedes/nueva"',
         '@app.post("/informacion/datos/nuevo"',
         '@app.post("/control/inventario/aprobar"',
+        '@app.get("/integraciones"',
+        '@app.post("/api/v1/activity-data"',
     ):
         assert decorator not in main_source
     assert "register_organization_routes(" in main_source
     assert "register_information_routes(" in main_source
     assert "register_review_routes(" in main_source
+    assert "register_integration_routes(" in main_source
 
 
 def test_v036_organization_information_and_review_pages_load():

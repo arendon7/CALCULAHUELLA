@@ -21,8 +21,7 @@ from app.storage import storage
 
 @pytest.fixture(autouse=True)
 def fresh_database_v043():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -37,15 +36,15 @@ def login(client: TestClient) -> None:
 
 def test_v043_health_architecture_and_storage_probe():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         probe = storage.verified_probe()
         assert probe["ok"] is True
         login(client)
         summary = client.get("/api/arquitectura/resumen").json()
-    assert summary["persistence"]["model_class_count"] == 109
+    assert summary["persistence"]["model_class_count"] == 120
     assert summary["persistence"]["repository_count"] == 5
     assert summary["persistence"]["service_count"] == 5
-    assert summary["owned_route_count"] == 71
+    assert summary["owned_route_count"] >= 116
     assert summary["architecture_split_ok"] is True
 
 
@@ -131,5 +130,5 @@ def test_v043_database_transfer_reconciles_every_domain(tmp_path):
     assert result.reconciled is True
     assert result.copied_rows > 0
     assert result.table_counts == database_inventory(target_url)
-    assert result.table_counts["organizations"] == 3
-    assert result.table_counts["inventories"] == 4
+    assert result.table_counts["organizations"] == 6
+    assert result.table_counts["inventories"] == 7

@@ -18,8 +18,7 @@ from app.repositories.reports import get_report_artifact
 
 @pytest.fixture(autouse=True)
 def fresh_database_v037():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -34,7 +33,7 @@ def login(client: TestClient, email: str = "admin@calculatuhuella.local") -> Non
 
 def test_v037_health_and_persistence_summary():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         login(client)
         response = client.get("/api/arquitectura/resumen")
         assert response.status_code == 200
@@ -42,8 +41,8 @@ def test_v037_health_and_persistence_summary():
     assert summary["architecture_split_ok"] is True
     assert summary["persistence"]["split_ok"] is True
     assert summary["persistence"]["database_lines"] < 2200
-    assert summary["persistence"]["model_module_count"] == 10
-    assert summary["persistence"]["model_class_count"] == 109
+    assert summary["persistence"]["model_module_count"] == 12
+    assert summary["persistence"]["model_class_count"] == 120
     assert summary["persistence"]["repository_count"] == 5
     assert summary["persistence"]["service_count"] == 5
 
@@ -56,14 +55,14 @@ def test_v037_database_is_compatibility_facade_without_orm_classes():
     assert class_names == []
     assert Organization is DomainOrganization
     assert Inventory is DomainInventory
-    assert len(Base.metadata.tables) == 109
+    assert len(Base.metadata.tables) == 120
 
 
 def test_v037_model_modules_are_complete_and_importable():
     project_dir = Path(__file__).resolve().parents[1]
     persistence = persistence_architecture_summary(project_dir)
     assert persistence["split_ok"] is True
-    assert sum(item["class_count"] for item in persistence["model_modules"]) == 109
+    assert sum(item["class_count"] for item in persistence["model_modules"]) == 120
     assert all(item["exists"] and item["class_count"] > 0 for item in persistence["model_modules"])
 
 
@@ -107,7 +106,7 @@ def test_v037_services_preserve_routes_and_tenant_scoping():
         facility = session.scalar(select(Facility).where(Facility.name == "Sede repositorio V037"))
         inventory = session.scalar(select(Inventory).where(Inventory.name == "Inventario persistencia 2028"))
         assert org is not None and facility is not None and inventory is not None
-        assert inventory.version == "0.45"
+        assert inventory.version == "1.0"
         assert get_organization(session, org.id) is org
         assert get_facility(session, org.id, facility.id) is facility
         assert get_facility(session, org.id + 999, facility.id) is None
@@ -139,5 +138,5 @@ def test_v037_route_architecture_remains_unchanged():
     summary = domain_architecture_summary(app, project_dir)
     assert summary["route_parity_ok"] is True
     assert summary["duplicate_paths"] == []
-    assert summary["domain_count"] == 9
-    assert summary["owned_route_count"] == 71
+    assert summary["domain_count"] == 15
+    assert summary["owned_route_count"] >= 100

@@ -97,17 +97,66 @@ class SupportTicket(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    inventory_id: Mapped[int | None] = mapped_column(ForeignKey("inventories.id"), nullable=True, index=True)
+    source_id: Mapped[int | None] = mapped_column(ForeignKey("emission_sources.id"), nullable=True, index=True)
+    activity_data_id: Mapped[int | None] = mapped_column(ForeignKey("activity_data.id"), nullable=True, index=True)
+    public_reference: Mapped[str] = mapped_column(String(40), default="", index=True)
     created_by: Mapped[str] = mapped_column(String(180))
+    request_type: Mapped[str] = mapped_column(String(60), default="Consulta")
     category: Mapped[str] = mapped_column(String(80), default="Soporte funcional")
     priority: Mapped[str] = mapped_column(String(30), default="Normal")
     status: Mapped[str] = mapped_column(String(30), default="Abierto")
     subject: Mapped[str] = mapped_column(String(220))
     description: Mapped[str] = mapped_column(Text)
+    desired_outcome: Mapped[str] = mapped_column(Text, default="")
     assigned_to: Mapped[str] = mapped_column(String(180), default="Equipo de soporte")
     resolution: Mapped[str] = mapped_column(Text, default="")
+    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    response_due_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
+    last_message_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
     closed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    organization: Mapped[Organization] = relationship()
+    inventory: Mapped["Inventory | None"] = relationship()
+    source: Mapped["EmissionSource | None"] = relationship()
+    activity_data: Mapped["ActivityData | None"] = relationship()
+    messages: Mapped[list["SupportMessage"]] = relationship(back_populates="ticket", cascade="all, delete-orphan", order_by="SupportMessage.created_at")
+
+
+class SupportMessage(Base):
+    __tablename__ = "support_messages"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    ticket_id: Mapped[int] = mapped_column(ForeignKey("support_tickets.id"), index=True)
+    author_email: Mapped[str] = mapped_column(String(180))
+    author_role: Mapped[str] = mapped_column(String(40), default="Cliente")
+    message_type: Mapped[str] = mapped_column(String(50), default="Mensaje")
+    body: Mapped[str] = mapped_column(Text)
+    visible_to_client: Mapped[bool] = mapped_column(Boolean, default=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), index=True)
+
+    ticket: Mapped[SupportTicket] = relationship(back_populates="messages")
+
+class UserInvitation(Base):
+    __tablename__ = "user_invitations"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    organization_id: Mapped[int] = mapped_column(ForeignKey("organizations.id"), index=True)
+    email: Mapped[str] = mapped_column(String(180), index=True)
+    invited_name: Mapped[str] = mapped_column(String(140), default="")
+    role: Mapped[str] = mapped_column(String(40), default="Cliente")
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    status: Mapped[str] = mapped_column(String(30), default="Pendiente", index=True)
+    invited_by: Mapped[str] = mapped_column(String(180), default="sistema")
+    expires_at: Mapped[datetime] = mapped_column(DateTime)
+    accepted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+
+    organization: Mapped[Organization] = relationship()
+
 
 class BillingInvoice(Base):
     __tablename__ = "billing_invoices"

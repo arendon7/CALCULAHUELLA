@@ -111,6 +111,35 @@ class SourceFactorAssignment(Base):
     source: Mapped[EmissionSource] = relationship(back_populates="factor_assignments")
     factor_version: Mapped[EmissionFactorVersion] = relationship(back_populates="assignments")
 
+
+class ActivityFactorSelection(Base):
+    """Selección metodológica específica para un dato de actividad.
+
+    Permite que un mismo dato converse con uno o varios factores aprobados.
+    Cuando existen selecciones activas, reemplazan los factores por defecto de la fuente
+    únicamente para ese registro.
+    """
+    __tablename__ = "activity_factor_selections"
+    __table_args__ = (UniqueConstraint("activity_data_id", "factor_version_id", name="uq_activity_factor_selection"),)
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    activity_data_id: Mapped[int] = mapped_column(ForeignKey("activity_data.id"), index=True)
+    factor_version_id: Mapped[int] = mapped_column(ForeignKey("emission_factor_versions.id"), index=True)
+    active: Mapped[bool] = mapped_column(Boolean, default=True)
+    compatibility_score: Mapped[int] = mapped_column(Integer, default=0)
+    selection_status: Mapped[str] = mapped_column(String(30), default="Seleccionado")
+    rationale: Mapped[str] = mapped_column(Text, default="")
+    selected_by: Mapped[str] = mapped_column(String(180), default="sistema")
+    selected_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
+    reviewed_by: Mapped[str] = mapped_column(String(180), default="")
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    review_notes: Mapped[str] = mapped_column(Text, default="")
+    decision_snapshot: Mapped[str] = mapped_column(Text, default="{}")
+    applied_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+    activity_data: Mapped[ActivityData] = relationship(back_populates="factor_selections")
+    factor_version: Mapped[EmissionFactorVersion] = relationship()
+
 class EmissionCalculation(Base):
     __tablename__ = "emission_calculations"
 

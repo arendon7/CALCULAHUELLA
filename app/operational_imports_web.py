@@ -225,7 +225,7 @@ def register_operational_import_routes(
         ))
         if not inventory:
             raise HTTPException(404, "Inventario no encontrado.")
-        content = await file.read()
+        content = await file.read(max_upload_size + 1)
         if len(content) > max_upload_size:
             set_flash(request, "El archivo supera el tamaño máximo permitido.", "error")
             return RedirectResponse(f"/cargas-operativas?inventory_id={inventory_id}", status_code=303)

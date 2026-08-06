@@ -26,8 +26,7 @@ from app.pilot_execution import start_pilot_execution
 
 @pytest.fixture(autouse=True)
 def fresh_database_v026():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -63,7 +62,7 @@ def test_v026_health_version():
     with TestClient(app) as client:
         response = client.get("/api/health")
         assert response.status_code == 200
-        assert response.json()["version"] == "0.45.5"
+        assert response.json()["version"] == "1.0.0"
 
 
 def test_v026_template_contains_controlled_sheets():

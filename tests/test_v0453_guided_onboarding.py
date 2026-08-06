@@ -15,8 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def fresh_database():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -46,7 +45,7 @@ def test_diagnosis_is_a_four_step_accessible_wizard():
 
 def test_onboarding_is_visible_in_essential_navigation():
     product_experience = (ROOT / "app" / "product_experience.py").read_text(encoding="utf-8")
-    assert '_item("Puesta en marcha", "/onboarding", "onboarding", "▶")' in product_experience
+    assert '_item("Configuración inicial", "/onboarding", "onboarding", "▶")' in product_experience
 
 
 def test_public_and_authenticated_guided_surfaces_render():
@@ -65,4 +64,4 @@ def test_public_and_authenticated_guided_surfaces_render():
         assert onboarding.status_code == 200
         assert "Seis actividades, un resultado operativo" in onboarding.text
         assert dashboard.status_code == 200
-        assert "Puesta en marcha" in dashboard.text
+        assert "Configuración inicial" in dashboard.text

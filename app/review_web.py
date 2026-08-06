@@ -236,7 +236,7 @@ def register_review_routes(
         inventory.approved_at = datetime.now(UTC)
         inventory.approved_by = str(user["email"])
         session.add(InventoryDecision(inventory_id=inventory.id, decision_type="Aprobación final", decision="Aprobado", comments=comments.strip(), decided_by=str(user["email"]), inventory_version=inventory.version))
-        notify_roles(session, int(user["organization_id"]), {"Administrador", "Consultor", "Cliente"}, "Inventario aprobado", f"{inventory.name} fue aprobado por {user['name']}.", link="/reportes", category="Aprobación", priority="Alta", email_requested=True)
+        notify_roles(session, int(user["organization_id"]), {"Administrador", "Consultor", "Cliente"}, "Inventario aprobado", f"{inventory.name} fue aprobado por {user['name']}.", link="/entrega-profesional", category="Aprobación", priority="Alta", email_requested=True)
         add_audit(session, int(user["organization_id"]), str(user["email"]), "APROBAR", "Inventario", inventory.name, "Aprobación final registrada", reason=comments.strip())
         session.commit()
         set_flash(request, "El inventario fue aprobado. Ahora puede cerrarse y quedar inmutable.")

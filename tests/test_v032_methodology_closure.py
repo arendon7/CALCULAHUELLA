@@ -28,8 +28,7 @@ from app.reporting import generate_calculation_workbook
 
 @pytest.fixture(autouse=True)
 def fresh_database():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -41,7 +40,7 @@ def login(client: TestClient, email: str = "consultor@calculatuhuella.local") ->
 def test_health_and_closure_page_load() -> None:
     with TestClient(app) as client:
         login(client)
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         page = client.get("/metodologia/cierre")
         assert page.status_code == 200
         assert "Cierre metodológico" in page.text

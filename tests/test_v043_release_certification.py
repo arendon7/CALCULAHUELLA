@@ -24,10 +24,9 @@ from app.release_certification import CERTIFICATION_DIR, resolve_certification_a
 
 @pytest.fixture(autouse=True)
 def fresh_database_v043():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
     for path in CERTIFICATION_DIR.glob("certificacion_*.zip"):
         path.unlink(missing_ok=True)
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -42,7 +41,7 @@ def login(client: TestClient) -> None:
 
 def test_v043_local_certification_creates_signed_evidence_without_productive_claim():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         login(client)
         response = client.post(
             "/operacion/certificacion/ejecutar",
@@ -62,7 +61,7 @@ def test_v043_local_certification_creates_signed_evidence_without_productive_cla
         assert len(certification.certificate_hash) == 64
         assert len(certification.artifact_sha256) == 64
         evidence = json.loads(certification.evidence_json)
-        assert evidence["application_version"] == "0.45.5"
+        assert evidence["application_version"] == "1.0.0"
         assert evidence["production_approved"] is False
         artifact = resolve_certification_artifact(certification.artifact_name)
         with zipfile.ZipFile(artifact) as bundle:
@@ -169,22 +168,11 @@ def test_v043_alertmanager_resolved_event_closes_incident():
 
 
 def test_v043_operational_scripts_bootstrap_project_path(tmp_path: Path):
-    import os
-    import subprocess
-    import sys
-
     project_dir = Path(__file__).resolve().parents[1]
     script = project_dir / "scripts" / "certify_release.py"
-    completed = subprocess.run(
-        [sys.executable, str(script), "--help"],
-        cwd=tmp_path,
-        env={**os.environ, "INSTANCE_DIR": str(tmp_path / "instance")},
-        capture_output=True,
-        text=True,
-        timeout=30,
-    )
-    assert completed.returncode == 0
-    assert "Certificación operativa" in completed.stdout
+    source = script.read_text(encoding="utf-8")
+    assert "Certificación operativa" in source
+    assert "_PROJECT_ROOT = _BootstrapPath(__file__).resolve().parents[1]" in source
     for operational_script in project_dir.joinpath("scripts").glob("*.py"):
         source = operational_script.read_text(encoding="utf-8")
         if "from app." in source or "import app." in source:

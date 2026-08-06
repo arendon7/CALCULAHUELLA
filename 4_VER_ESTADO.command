@@ -11,7 +11,7 @@ export CTH_DATA_DIR="$DATA_DIR" CTH_RUNTIME_DIR="$RUNTIME_DIR"
 source "$CHECK_ROOT/scripts/easy_mac_common.sh"
 cth_easy_prepare "$CHECK_ROOT"
 clear 2>/dev/null || true
-echo "Calcula tu Huella V0.45 · estado"
+echo "Calcula tu Huella V1.0.0 · estado"
 echo "Código: $CHECK_ROOT"
 echo "Datos: $DATA_DIR"
 echo

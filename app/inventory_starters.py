@@ -67,6 +67,22 @@ _PACKS: tuple[StarterPack, ...] = (
         ),
     ),
     StarterPack(
+        code="agro",
+        name="Operación agropecuaria",
+        summary="Organiza energía, combustibles, fertilización, suelos, ganadería, residuos e insumos con unidades productivas explícitas.",
+        recommended_for="Agricultura, ganadería, silvicultura, cultivos permanentes y agroindustria primaria.",
+        sources=(
+            StarterSource("Electricidad comprada", 2, "Electricidad adquirida", "kWh", "Alta", "Mensual", "bolt", True, "Factura o reporte del comercializador"),
+            StarterSource("Combustibles de maquinaria y vehículos", 1, "Combustión móvil", "L", "Alta", "Mensual", "fuel", True, "Facturas, vales o control de abastecimiento"),
+            StarterSource("Fertilización nitrogenada y enmiendas", 1, "Emisiones agropecuarias", "kg", "Alta", "Mensual", "activity", True, "Plan de fertilización, compras y registro de aplicación"),
+            StarterSource("Manejo de suelos y residuos agrícolas", 1, "Suelos y biomasa", "ha", "Alta", "Trimestral", "activity", True, "Bitácoras de lote, área, práctica y material incorporado"),
+            StarterSource("Fermentación entérica y manejo de estiércol", 1, "Ganadería", "cabeza·mes", "Media", "Mensual", "activity", True, "Inventario animal, dieta, sistema productivo y manejo de estiércol"),
+            StarterSource("Fugas de refrigerantes", 1, "Emisiones fugitivas", "kg", "Baja", "Anual", "snow", True, "Registro de mantenimiento o recarga"),
+            StarterSource("Insumos agropecuarios adquiridos", 3, "Bienes y servicios adquiridos", "kg", "Media", "Mensual", "activity", False, "Compras, inventarios y fichas de producto"),
+            StarterSource("Transporte contratado de insumos y producto", 3, "Transporte aguas arriba y abajo", "t·km", "Media", "Mensual", "truck", False, "Remisiones, distancias, carga y reporte del transportador"),
+        ),
+    ),
+    StarterPack(
         code="waste",
         name="Gestión de residuos",
         summary="Organiza las fuentes típicas de recolección, transporte, tratamiento y valorización de residuos.",

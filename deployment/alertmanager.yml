@@ -1,0 +1,13 @@
+route:
+  receiver: calcula-tu-huella
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+receivers:
+  - name: calcula-tu-huella
+    webhook_configs:
+      - url: http://app:8765/api/operacion/alertas
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: REEMPLAZAR_ALERT_WEBHOOK_SECRET

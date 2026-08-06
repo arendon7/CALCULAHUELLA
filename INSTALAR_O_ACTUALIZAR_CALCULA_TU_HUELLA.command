@@ -13,7 +13,7 @@ LEGACY_DB=""
 clear 2>/dev/null || true
 cat <<'BANNER'
 ============================================================
-      CALCULA TU HUELLA V0.45.5 · INSTALAR O ACTUALIZAR
+      CALCULA TU HUELLA V1.0.0 · INSTALAR O ACTUALIZAR
 ============================================================
 
 Este único comando:

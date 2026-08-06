@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from urllib.parse import urlsplit
+
 """Centralized role/capability policy for the web application.
 
 V0.21 moves authorization metadata out of the HTTP controller so the policy can
@@ -97,3 +99,55 @@ def permission_matrix() -> list[dict[str, object]]:
         }
         for capability in all_capabilities
     ]
+
+
+# Visibility rules mirror route-level authorization. They do not replace backend
+# checks; they prevent the interface from offering actions the active role cannot open.
+ROUTE_ACCESS_RULES: tuple[tuple[str, tuple[str, ...]], ...] = (
+    ("/administracion-plataforma", ("manage_operations",)),
+    ("/administracion-saas", ("manage_saas",)),
+    ("/alistamiento", ("manage_readiness",)),
+    ("/automatizaciones", ("manage_automations",)),
+    ("/cadena-valor", ("manage_supply_chain", "review", "approve")),
+    ("/centro-documental", ("manage_documents",)),
+    ("/comercial", ("manage_commercial",)),
+    ("/consolidacion", ("view_consolidation", "manage_consolidation")),
+    ("/cumplimiento", ("view_compliance", "manage_compliance")),
+    ("/direccion-ejecutiva", ("manage_portfolio",)),
+    ("/entorno-demo", ("manage_portfolio",)),
+    ("/exito-cliente", ("view_customer_success", "manage_customer_success")),
+    ("/aseguramiento", ("external_audit", "review", "approve")),
+    ("/huella-producto", ("view_methodology", "review", "approve")),
+    ("/proyectos-mitigacion", ("view_methodology", "review", "approve")),
+    ("/gobierno-metodologico", ("manage_methodology_governance",)),
+    ("/integraciones", ("manage_integrations",)),
+    ("/inteligencia-producto", ("manage_org", "view_methodology", "manage_portfolio", "view_consolidation")),
+    ("/metodologia", ("view_methodology",)),
+    ("/operacion-comercial", ("manage_commercial",)),
+    ("/operacion-servicio", ("manage_subscription",)),
+    ("/operacion", ("manage_operations",)),
+    ("/portafolio", ("manage_portfolio",)),
+    ("/usuarios", ("manage_org",)),
+    ("/verificacion", ("external_audit", "review", "approve")),
+)
+
+
+def can_open_route(user: dict[str, object], route: str | None) -> bool:
+    """Return whether a rendered navigation target is meaningful for this role."""
+    if not route:
+        return False
+    path = urlsplit(str(route)).path.rstrip("/") or "/"
+    capabilities = set(user.get("capabilities") or set())
+
+    if path.startswith("/inventarios/") and path.endswith("/editar"):
+        return "manage_inventory" in capabilities
+
+    if path.startswith("/fuentes/") and "/factores" in path:
+        if path.endswith("/revisar"):
+            return bool({"review", "approve"} & capabilities)
+        return "view_methodology" in capabilities
+
+    for prefix, required in ROUTE_ACCESS_RULES:
+        if path == prefix or path.startswith(prefix + "/"):
+            return bool(set(required) & capabilities)
+    return True

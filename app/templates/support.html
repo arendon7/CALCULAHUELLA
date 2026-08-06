@@ -1,11 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Soporte · Calcula tu Huella{% endblock %}
-{% block page_label %}Centro de soporte{% endblock %}
+{% block title %}Mensajes y requerimientos · Calcula tu Huella{% endblock %}
+{% block page_label %}Mensajes y requerimientos{% endblock %}
 {% block content %}
-<section class="page-heading"><div><span class="eyebrow">ACOMPAÑAMIENTO</span><h1>Casos y solicitudes</h1><p>Centraliza incidencias funcionales, dudas metodológicas y necesidades de implementación.</p></div><span class="status-badge {{ 'warning' if stats.open else 'success' }}">{{ stats.open }} abiertos</span></section>
-<section class="metrics-grid"><article class="metric-card"><small>Casos abiertos</small><strong>{{ stats.open }}</strong><span>requieren seguimiento</span></article><article class="metric-card"><small>Prioridad alta</small><strong>{{ stats.critical }}</strong><span>abiertos</span></article><article class="metric-card"><small>Cerrados</small><strong>{{ stats.closed }}</strong><span>histórico</span></article><article class="metric-card"><small>Canal</small><strong>Portal</strong><span>trazabilidad completa</span></article></section>
-<div class="two-column-grid support-layout">
-<section class="panel"><div class="panel-heading"><div><span class="eyebrow">BANDEJA</span><h2>Casos de la organización</h2></div></div>{% if tickets %}<div class="ticket-list">{% for ticket in tickets %}<article class="ticket-card priority-{{ ticket.priority|lower }}"><div class="ticket-head"><div><span>#{{ ticket.id }} · {{ ticket.category }}</span><h3>{{ ticket.subject }}</h3></div><span class="status-badge {{ 'success' if ticket.status=='Cerrado' else 'warning' }}">{{ ticket.status }}</span></div><p>{{ ticket.description }}</p><small>Creado por {{ ticket.created_by }} · {{ ticket.created_at.strftime('%Y-%m-%d %H:%M') }} · Asignado a {{ ticket.assigned_to }}</small>{% if ticket.resolution %}<div class="resolution-box"><strong>Respuesta</strong><p>{{ ticket.resolution }}</p></div>{% endif %}{% if user.role!='Cliente' and user.can_manage_support %}<form action="/soporte/{{ ticket.id }}/actualizar" method="post" class="ticket-form"><select name="status"><option>Abierto</option><option {% if ticket.status=='En gestión' %}selected{% endif %}>En gestión</option><option {% if ticket.status=='Esperando cliente' %}selected{% endif %}>Esperando cliente</option><option {% if ticket.status=='Resuelto' %}selected{% endif %}>Resuelto</option><option {% if ticket.status=='Cerrado' %}selected{% endif %}>Cerrado</option></select><input name="assigned_to" value="{{ ticket.assigned_to }}"><textarea name="resolution" rows="2" placeholder="Respuesta o solución">{{ ticket.resolution }}</textarea><button class="button secondary small">Actualizar</button></form>{% endif %}</article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sin casos</strong><span>No hay solicitudes registradas.</span></div>{% endif %}</section>
-<section class="panel"><div class="panel-heading"><div><span class="eyebrow">NUEVO CASO</span><h2>Solicitar acompañamiento</h2></div></div><form action="/soporte/nuevo" method="post" class="stacked-form"><label>Asunto<input name="subject" required maxlength="220"></label><label>Categoría<select name="category"><option>Soporte funcional</option><option>Duda metodológica</option><option>Problema técnico</option><option>Acompañamiento inicial</option><option>Facturación y cuenta</option></select></label><label>Prioridad<select name="priority"><option>Baja</option><option selected>Normal</option><option>Alta</option><option>Crítica</option></select></label><label>Descripción<textarea name="description" rows="6" required></textarea></label><button class="button primary">Crear caso</button></form><div class="callout support-note"><strong>Uso responsable</strong><br>La prioridad crítica debe reservarse para indisponibilidad, pérdida de acceso o bloqueo de una entrega inmediata.</div></section>
+<section class="page-heading support-heading"><div><span class="eyebrow">ACOMPAÑAMIENTO TRAZABLE</span><h1>Centro de conversaciones y requerimientos</h1><p>Documenta una necesidad, asígnala a la persona correcta y conserva la respuesta junto al inventario, la fuente o el dato relacionado.</p></div><div class="support-heading-actions"><span class="status-badge {{ 'warning' if stats.open else 'success' }}">{{ stats.open }} abiertos</span><a class="button primary small" href="#nuevo-caso">Crear requerimiento</a></div></section>
+<section class="metrics-grid support-metrics">
+  <article class="metric-card"><small>Casos abiertos</small><strong>{{ stats.open }}</strong><span>requieren seguimiento</span></article>
+  <article class="metric-card"><small>Fuera de SLA</small><strong>{{ stats.overdue }}</strong><span>respuesta inicial vencida</span></article>
+  <article class="metric-card"><small>Esperando cliente</small><strong>{{ stats.waiting_client }}</strong><span>requieren información</span></article>
+  <article class="metric-card"><small>Metodología</small><strong>{{ stats.methodology }}</strong><span>dudas o factores</span></article>
+</section>
+<section class="panel support-filter-panel">
+  <form method="get" action="/soporte" class="support-filters">
+    <label>Buscar<input name="q" value="{{ filters.q }}" placeholder="Referencia, asunto o responsable"></label>
+    <label>Estado<select name="status"><option value="">Todos</option>{% for item in ['Abierto','En gestión','Esperando cliente','Esperando equipo','Resuelto','Cerrado'] %}<option value="{{ item }}" {% if filters.status==item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+    <label>Categoría<select name="category"><option value="">Todas</option>{% for item in ['Soporte funcional','Duda metodológica','Revisión de factor','Requerimiento de información','Problema técnico','Acompañamiento inicial','Facturación y cuenta'] %}<option value="{{ item }}" {% if filters.category==item %}selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+    <button class="button secondary small">Filtrar</button><a class="tiny-link" href="/soporte">Limpiar</a>
+  </form>
+</section>
+<div class="support-workspace">
+<section class="panel support-inbox"><div class="panel-heading"><div><span class="eyebrow">BANDEJA</span><h2>Requerimientos de la organización</h2></div><span class="counter">{{ tickets|length }}</span></div>
+  {% if tickets %}<div class="ticket-list enhanced-ticket-list">{% for ticket in tickets %}
+  <article class="ticket-card priority-{{ ticket.priority|lower }} {% if ticket_overdue(ticket) %}ticket-overdue{% endif %}">
+    <a class="ticket-card-link" href="/soporte/{{ ticket.id }}">
+      <div class="ticket-head"><div><span>{{ ticket.public_reference or ('#' ~ ticket.id) }} · {{ ticket.category }}</span><h3>{{ ticket.subject }}</h3></div><span class="status-badge {{ status_class(ticket.status) }}">{{ ticket.status }}</span></div>
+      <p>{{ ticket.description|truncate(180) }}</p>
+      <div class="ticket-context-row">{% for item in ticket_context(ticket) %}<span><b>{{ item.label }}:</b> {{ item.value }}</span>{% endfor %}</div>
+      <div class="ticket-meta-grid"><span><b>Prioridad</b>{{ ticket.priority }}</span><span><b>Responsable</b>{{ ticket.assigned_to }}</span><span><b>Conversación</b>{{ ticket.messages|length }} mensajes</span><span><b>Último movimiento</b>hace {{ ticket_waiting_days(ticket) }} días</span></div>
+      {% if ticket_overdue(ticket) %}<div class="sla-alert">SLA de primera respuesta vencido</div>{% endif %}
+    </a>
+  </article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sin resultados</strong><span>No hay requerimientos que coincidan con los filtros.</span></div>{% endif %}
+</section>
+<section class="panel support-create-panel" id="nuevo-caso"><div class="panel-heading"><div><span class="eyebrow">NUEVO REQUERIMIENTO</span><h2>Describe qué debe resolverse</h2></div></div>
+  <form action="/soporte/nuevo" method="post" class="stacked-form support-create-form">
+    <div class="form-two"><label>Tipo<select name="request_type"><option>Consulta</option><option>Requerimiento</option><option>Incidencia</option><option>Decisión metodológica</option></select></label><label>Prioridad<select name="priority"><option>Baja</option><option selected>Normal</option><option>Alta</option><option>Crítica</option></select></label></div>
+    <label>Categoría<select name="category"><option {% if prefill.category=='Revisión de factor' %}selected{% endif %}>Revisión de factor</option><option {% if not prefill.category %}selected{% endif %}>Soporte funcional</option><option>Duda metodológica</option><option>Requerimiento de información</option><option>Problema técnico</option><option>Acompañamiento inicial</option><option>Facturación y cuenta</option></select></label>
+    <label>Asunto<input name="subject" required minlength="6" maxlength="220" value="{% if prefill.activity_data_id %}Revisar selección de factor para el dato #{{ prefill.activity_data_id }}{% endif %}" placeholder="Describe la decisión o bloqueo"></label>
+    <label>Descripción<textarea name="description" rows="5" required minlength="12" placeholder="Explica el contexto, la información disponible, el bloqueo y la decisión que necesitas."></textarea></label>
+    <label>Resultado esperado<textarea name="desired_outcome" rows="3" placeholder="Ej.: confirmar el factor aplicable, solicitar un soporte o aprobar una unidad."></textarea></label>
+    <div class="form-two"><label>Inventario<select name="inventory_id"><option value="">Sin vincular</option>{% for inventory in inventories %}<option value="{{ inventory.id }}" {% if prefill.inventory_id==inventory.id %}selected{% endif %}>{{ inventory.name }}</option>{% endfor %}</select></label><label>Fuente<select name="source_id"><option value="">Sin vincular</option>{% for source in sources %}<option value="{{ source.id }}" {% if prefill.source_id==source.id %}selected{% endif %}>{{ source.name }}</option>{% endfor %}</select></label></div>
+    <input type="hidden" name="activity_data_id" value="{{ prefill.activity_data_id or '' }}">
+    <label>Fecha requerida<input name="due_date" type="date"></label>
+    <button class="button primary">Registrar y asignar requerimiento</button>
+  </form>
+  <div class="callout support-note"><strong>Prioridad y SLA</strong><br>Crítica: 4 h · Alta: 12 h · Normal: 36 h · Baja: 72 h para primera respuesta. La fecha requerida corresponde al resultado esperado, no al primer contacto.</div>
+</section>
 </div>
 {% endblock %}

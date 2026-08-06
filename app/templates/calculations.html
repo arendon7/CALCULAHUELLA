@@ -30,6 +30,6 @@
 
 <section class="card engine-rules">
   <div class="card-head"><div><small>REGLAS ACTIVAS</small><h3>Cómo calcula esta versión</h3></div></div>
-  <div class="rule-grid"><article><span>1</span><div><strong>Normaliza la unidad</strong><p>Busca conversión exacta y bloquea dimensiones incompatibles.</p></div></article><article><span>2</span><div><strong>Aplica componentes</strong><p>Una fuente puede usar factores separados para CO₂, CH₄ y N₂O.</p></div></article><article><span>3</span><div><strong>Convierte a CO₂e</strong><p>Usa el GWP configurado en el inventario y congela la fórmula.</p></div></article><article><span>4</span><div><strong>Consolida</strong><p>Suma registros y actualiza automáticamente las emisiones por fuente.</p></div></article></div>
+  <div class="rule-grid"><article><span>1</span><div><strong>Normaliza la unidad</strong><p>Busca una ruta de conversión aprobada, incluso encadenada, y bloquea dimensiones incompatibles.</p></div></article><article><span>2</span><div><strong>Aplica componentes</strong><p>Normaliza la salida del factor a kg y permite componentes separados para CO₂, CH₄ y N₂O; no los mezcla con CO₂e agregado.</p></div></article><article><span>3</span><div><strong>Convierte a CO₂e</strong><p>Exige que el inventario identifique AR4, AR5 o AR6, aplica GWP100 y congela la fórmula completa.</p></div></article><article><span>4</span><div><strong>Consolida</strong><p>Suma registros y actualiza automáticamente las emisiones por fuente.</p></div></article></div>
 </section>
 {% endblock %}

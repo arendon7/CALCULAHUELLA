@@ -29,8 +29,7 @@ from app.pilot_execution import (
 
 @pytest.fixture(autouse=True)
 def fresh_database_v025():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -43,7 +42,7 @@ def test_v025_health_version():
     with TestClient(app) as client:
         response = client.get("/api/health")
         assert response.status_code == 200
-        assert response.json()["version"] == "0.45.5"
+        assert response.json()["version"] == "1.0.0"
 
 
 def test_v025_start_pilot_creates_inventory_sources_requests_and_issues():
@@ -80,8 +79,8 @@ def test_v025_execution_page_and_guided_dashboard_are_available():
         assert "Datos mensuales del piloto" in page.text
         dashboard = client.get("/dashboard")
         assert dashboard.status_code == 200
-        assert "CENTRO DE TRABAJO GUIADO" in dashboard.text
-        assert "Avanzar piloto Greenatics" in dashboard.text
+        assert "TU SIGUIENTE ACCIÓN" in dashboard.text
+        assert "Seis etapas, una ruta clara" in dashboard.text
 
 
 def test_v025_workbook_import_creates_activity_data_and_calculates_electricity():
@@ -132,7 +131,7 @@ def test_v025_guided_workspace_returns_role_specific_actions():
             "capabilities": {"manage_inventory", "view_methodology"},
         }
         workspace = guided_workspace(session, user, inventory)
-        assert workspace["total"] == 5
+        assert workspace["total"] == 6
         assert 0 <= workspace["score"] <= 100
         assert workspace["actions"]
         assert any("piloto Greenatics" in action["title"] for action in workspace["actions"])

@@ -20,6 +20,7 @@ from .database import (
     SupplierDataRequest,
 )
 from .notifications import create_notification, get_or_create_preference, process_pending_notifications
+from .operations import create_backup
 
 AUTOMATION_TYPES = [
     "Recordatorio de solicitudes",
@@ -28,6 +29,7 @@ AUTOMATION_TYPES = [
     "Resumen ejecutivo",
     "Recalcular inventario",
     "Procesar notificaciones",
+    "Respaldo programado",
 ]
 CADENCES = ["Diaria", "Semanal", "Mensual", "Manual"]
 ROLE_OPTIONS = ["Administrador", "Consultor", "Cliente", "Revisor", "Verificador"]
@@ -223,6 +225,22 @@ def execute_automation(session: Session, automation: ScheduledAutomation, *, tri
             result = process_pending_notifications(session, limit=100)
             processed = result["processed"]
             details.append(f"{result['sent']} correos entregados; {result['failed']} con error")
+
+        elif automation.automation_type == "Respaldo programado":
+            result = create_backup(created_by=f"automatización:{automation.id}", label="programado")
+            processed = 1
+            details.append(
+                f"{result['name']} · firmado={result.get('signed', False)} · "
+                f"réplica={result.get('offsite_key') or 'no configurada'}"
+            )
+            _notify(
+                session,
+                automation,
+                "Respaldo programado completado",
+                f"Se generó {result['name']} con SHA-256 {result['sha256'][:16]}…",
+                "/operacion#respaldos",
+                "Normal",
+            )
         else:
             raise ValueError("Tipo de automatización no soportado")
 

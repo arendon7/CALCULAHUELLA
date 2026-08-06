@@ -59,12 +59,88 @@ def _item(
     }
 
 
+ESSENTIAL_SECTIONS: tuple[dict[str, object], ...] = (
+    {
+        "label": "TRABAJO PRINCIPAL",
+        "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Continuar recorrido", "/recorrido-inventario", "journey", "→"),
+            _item("Datos y evidencias", "/informacion", "information", "▦"),
+            _item("Resultados", "/calculos", "calculations", "∑"),
+            _item("Cierre e informes", "/entrega-profesional", "delivery", "◆"),
+        ),
+    },
+)
+
+# La vista esencial no es un menú recortado genérico. Cada rol recibe únicamente
+# las decisiones que forman parte de su trabajo cotidiano. Las funciones restantes
+# siguen disponibles en la vista completa, sin perder capacidades ni rutas.
+ROLE_ESSENTIAL_SECTIONS: dict[str, tuple[dict[str, object], ...]] = {
+    "Cliente": (
+        {"label": "MIS TAREAS", "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Continuar mi recorrido", "/recorrido-inventario", "journey", "→"),
+            _item("Cargar datos", "/captura-guiada", "guided_capture", "✦", any_capability=("provide_data", "manage_sources")),
+            _item("Datos y soportes", "/informacion", "information", "▦"),
+            _item("Revisar calidad", "/calidad-datos", "data_quality", "✓"),
+            _item("Ver resultados", "/calculos", "calculations", "∑"),
+        )},
+    ),
+    "Consultor": (
+        {"label": "DIRIGIR EL INVENTARIO", "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Continuar recorrido", "/recorrido-inventario", "journey", "→"),
+            _item("Fuentes y límites", "/inventario", "sources", "⌁", any_capability=("manage_sources", "manage_inventory")),
+            _item("Datos y evidencias", "/informacion", "information", "▦"),
+            _item("Calidad y revisión", "/control", "control", "◇"),
+            _item("Resultados", "/calculos", "calculations", "∑"),
+            _item("Cierre e informes", "/entrega-profesional", "delivery", "◆"),
+            _item("Plan de reducción", "/reduccion", "reduction", "↘"),
+        )},
+    ),
+    "Revisor": (
+        {"label": "REVISAR Y RESOLVER", "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Prioridades de revisión", "/recorrido-inventario", "journey", "→"),
+            _item("Calidad de datos", "/calidad-datos", "data_quality", "✓"),
+            _item("Revisión técnica", "/control", "control", "◇"),
+            _item("Resultados calculados", "/calculos", "calculations", "∑"),
+            _item("Cierre metodológico", "/metodologia/cierre", "methodology_closure", "◎", any_capability=("review", "approve", "view_methodology")),
+            _item("Expediente de cierre", "/entrega-profesional", "delivery", "◆"),
+        )},
+    ),
+    "Verificador": (
+        {"label": "VERIFICAR", "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Plan de verificación", "/recorrido-inventario", "journey", "→"),
+            _item("Paquete verificable", "/entrega-profesional", "delivery", "◆"),
+            _item("Metodología y límites", "/metodologia/cierre", "methodology_closure", "◎", any_capability=("external_audit", "review", "view_methodology")),
+            _item("Reproducir resultados", "/calculos", "calculations", "∑"),
+            _item("Hallazgos", "/control", "control", "◇"),
+            _item("Aseguramiento", "/aseguramiento", "assurance", "◈", any_capability=("external_audit", "review", "approve")),
+        )},
+    ),
+    "Administrador": (
+        {"label": "DIRIGIR Y DECIDIR", "items": (
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Portafolio de empresas", "/portafolio", "portfolio", "▦", any_capability=("manage_portfolio",)),
+            _item("Continuar recorrido", "/recorrido-inventario", "journey", "→"),
+            _item("Datos y avance", "/informacion", "information", "▥"),
+            _item("Calidad y riesgos", "/control", "control", "◇"),
+            _item("Resultados", "/calculos", "calculations", "∑"),
+            _item("Cierre e informes", "/entrega-profesional", "delivery", "◆"),
+            _item("Plan de reducción", "/reduccion", "reduction", "↘"),
+        )},
+    ),
+}
+
+
 CORE_SECTIONS: tuple[dict[str, object], ...] = (
     {
         "label": "INICIO",
         "items": (
-            _item("Mi trabajo", "/dashboard", "dashboard", "⌂"),
-            _item("Puesta en marcha", "/onboarding", "onboarding", "▶"),
+            _item("Centro de trabajo", "/dashboard", "dashboard", "⌂"),
+            _item("Configuración inicial", "/onboarding", "onboarding", "▶"),
             _item("Perfil y diagnóstico", "/inteligencia-producto", "product_intelligence", "◎", any_capability=("manage_org", "view_methodology", "manage_portfolio", "view_consolidation")),
             _item("Recorrido del inventario", "/recorrido-inventario", "journey", "→"),
         ),
@@ -79,7 +155,8 @@ CORE_SECTIONS: tuple[dict[str, object], ...] = (
     {
         "label": "DATOS Y EVIDENCIAS",
         "items": (
-            _item("Datos y evidencias", "/informacion", "information", "▦"),
+            _item("Captura guiada", "/captura-guiada", "guided_capture", "✦"),
+            _item("Historial y evidencias", "/informacion", "information", "▦"),
             _item(
                 "Cargas operativas",
                 "/cargas-operativas",
@@ -106,14 +183,16 @@ CORE_SECTIONS: tuple[dict[str, object], ...] = (
     {
         "label": "RESULTADOS Y CIERRE",
         "items": (
-            _item("Motor y resultados", "/calculos", "calculations", "∑"),
-            _item("Revisión y auditoría", "/control", "control", "◇"),
+            _item("Resultados calculados", "/calculos", "calculations", "∑"),
+            _item("Revisión técnica", "/control", "control", "◇"),
             _item("Cierre metodológico", "/metodologia/cierre", "methodology_closure", "◎", any_capability=("view_methodology", "review", "approve")),
-            _item("Informes", "/reportes", "reports", "▤"),
+            _item("Tierras y remociones", "/metodologia/tierras-remociones", "land_removals", "♧", any_capability=("view_methodology", "review", "approve")),
+            _item("Cierre y entrega", "/entrega-profesional", "delivery", "◆"),
+            _item("Documentos finales", "/reportes", "reports", "▤"),
             _item(
-                "Portal del verificador",
-                "/verificacion",
-                "verification",
+                "Aseguramiento independiente",
+                "/aseguramiento",
+                "assurance",
                 "◈",
                 any_capability=("external_audit", "review", "approve"),
             ),
@@ -134,6 +213,7 @@ ADVANCED_SECTIONS: tuple[dict[str, object], ...] = (
         "items": (
             _item("Metodología", "/metodologia", "methodology", "⌘", any_capability=("view_methodology",)),
             _item("Núcleo metodológico", "/metodologia/nucleo", "methodology_core", "◈", any_capability=("view_methodology",)),
+            _item("Biblioteca de factores", "/metodologia/biblioteca-factores", "factor_library", "≋", any_capability=("view_methodology",)),
             _item("Biblioteca Colombia", "/metodologia/colombia", "colombia_library", "CO", any_capability=("view_methodology",)),
             _item("Gobierno metodológico", "/gobierno-metodologico", "methodology_governance", "◫", any_capability=("manage_methodology_governance",)),
             _item("Modelo sectorial", "/sectorizacion", "sectorization", "◎"),
@@ -142,6 +222,8 @@ ADVANCED_SECTIONS: tuple[dict[str, object], ...] = (
     {
         "label": "CAPACIDADES AVANZADAS",
         "items": (
+            _item("Huella de producto", "/huella-producto", "product_footprint", "◉", any_capability=("view_methodology", "review", "approve")),
+            _item("Proyectos de mitigación", "/proyectos-mitigacion", "mitigation_projects", "↘", any_capability=("view_methodology", "review", "approve")),
             _item("Cadena de valor", "/cadena-valor", "supply_chain", "♧", any_capability=("manage_supply_chain", "review", "approve")),
             _item("Escenarios y MACC", "/escenarios", "scenarios", "◒"),
             _item("Inteligencia de impacto", "/inteligencia-impacto", "impact", "◉", any_capability=("view_impact", "manage_impact")),
@@ -170,6 +252,7 @@ INTERNAL_SECTIONS: tuple[dict[str, object], ...] = (
             _item("Entorno demo", "/entorno-demo", "demo_environment", "◉", any_capability=("manage_portfolio",)),
             _item("Dirección ejecutiva", "/direccion-ejecutiva", "executive", "◉", any_capability=("manage_portfolio",)),
             _item("Cuenta y plan", "/cuenta-servicio", "service_account", "◌"),
+            _item("Operación del servicio", "/operacion-servicio", "service_operations", "◎", any_capability=("manage_subscription",)),
             _item("Soporte", "/soporte", "support", "?", any_capability=("manage_support",)),
         ),
     },
@@ -190,6 +273,56 @@ INTERNAL_SECTIONS: tuple[dict[str, object], ...] = (
         ),
     },
 )
+
+
+
+DEMO_STORIES: dict[str, dict[str, object]] = {
+    "Greenatics": {
+        "phase": "Recolección y revisión",
+        "headline": "Operación circular multisede con datos mensuales",
+        "summary": "Explora plantas de residuos, compostaje, digestión anaerobia, energía, logística y acciones de reducción.",
+        "highlights": ["Datos mensuales y evidencias", "Hallazgos en distintos estados", "Plan de reducción operativo"],
+        "route": "/captura-guiada",
+        "action": "Revisar captura mensual",
+    },
+    "Industrias Andinas": {
+        "phase": "Cálculo y cierre",
+        "headline": "Manufactura con energía, combustibles, refrigerantes y cadena de valor",
+        "summary": "Muestra un inventario corporativo avanzado con varias sedes, proveedores, revisión y preparación para verificación.",
+        "highlights": ["Inventario multisede", "Alcance 3 priorizado", "Cierre ejecutivo pendiente"],
+        "route": "/calculos",
+        "action": "Explorar resultados",
+    },
+    "Café Sierra Verde": {
+        "phase": "Recolección en curso",
+        "headline": "Agroindustria cafetera con campo, beneficio y transporte",
+        "summary": "Permite recorrer fertilización, consumo energético, maquinaria, residuos orgánicos y logística de exportación.",
+        "highlights": ["Fuentes agrícolas", "Meses reales y estimados", "Brechas de evidencia visibles"],
+        "route": "/informacion",
+        "action": "Completar evidencias",
+    },
+    "Ruta Norte Logística": {
+        "phase": "Revisión técnica",
+        "headline": "Flota, centros logísticos y transporte subcontratado",
+        "summary": "Demuestra cálculo por combustibles, energía, refrigerantes y tonelada-kilómetro con controles de calidad.",
+        "highlights": ["Operación de flota", "Cadena de frío", "Hallazgos de conciliación"],
+        "route": "/control",
+        "action": "Abrir revisión",
+    },
+    "Hotel Bosque Azul": {
+        "phase": "Inventario aprobado",
+        "headline": "Servicios y hotelería con expediente listo para presentar",
+        "summary": "Muestra un caso compacto y completo: energía, gas, refrigerantes, residuos, resultados y plan de reducción.",
+        "highlights": ["Cobertura completa", "Hallazgos cerrados", "Resultados listos para comité"],
+        "route": "/entrega-profesional",
+        "action": "Ver cierre e informes",
+    },
+}
+
+
+def demo_story_for(trade_name: str) -> dict[str, object] | None:
+    story = DEMO_STORIES.get(str(trade_name or "").strip())
+    return dict(story) if story else None
 
 
 def role_profile(role: str) -> dict[str, str]:
@@ -222,12 +355,13 @@ def navigation_for(user: dict[str, Any], mode: str) -> dict[str, object]:
     role = str(user.get("role", "Cliente"))
     capabilities = set(user.get("capabilities") or set())
     normalized = normalize_view_mode(mode)
+    core_sections = ROLE_ESSENTIAL_SECTIONS.get(role, ESSENTIAL_SECTIONS) if normalized == "essential" else CORE_SECTIONS
     return {
         "mode": normalized,
-        "core": _filter_sections(CORE_SECTIONS, role, capabilities),
+        "core": _filter_sections(core_sections, role, capabilities),
         "advanced": _filter_sections(ADVANCED_SECTIONS, role, capabilities) if normalized == "complete" else [],
         "internal": _filter_sections(INTERNAL_SECTIONS, role, capabilities) if normalized == "complete" else [],
-        "has_complete_view": bool(_filter_sections(ADVANCED_SECTIONS + INTERNAL_SECTIONS, role, capabilities)),
+        "has_complete_view": bool(_filter_sections(CORE_SECTIONS + ADVANCED_SECTIONS + INTERNAL_SECTIONS, role, capabilities)),
     }
 
 
@@ -238,6 +372,7 @@ def journey_detail(workspace: dict[str, Any], role: str) -> dict[str, Any]:
         "Recolectar": "Responsables de datos",
         "Calcular": "Consultor metodológico",
         "Revisar": "Revisor / aprobador",
+        "Reducir": "Dirección / responsables de acción",
         "Reportar": "Consultor / dirección",
     }
     descriptions = {
@@ -245,7 +380,8 @@ def journey_detail(workspace: dict[str, Any], role: str) -> dict[str, Any]:
         "Recolectar": "Completar datos mensuales y evidencias con controles de calidad.",
         "Calcular": "Asignar factores vigentes y reproducir los resultados por fuente y gas.",
         "Revisar": "Resolver observaciones, conciliar periodos y aprobar el inventario.",
-        "Reportar": "Emitir memoria de cálculo e informes para decisión y verificación.",
+        "Reducir": "Priorizar acciones, responsables, inversión, fechas y reducción esperada.",
+        "Reportar": "Emitir ficha ejecutiva, memoria de cálculo e informes controlados.",
     }
     steps: list[dict[str, Any]] = []
     first_pending_found = False

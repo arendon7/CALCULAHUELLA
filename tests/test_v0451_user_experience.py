@@ -18,9 +18,14 @@ def test_primary_surfaces_use_user_facing_language():
     assert "V0.45" not in dashboard
     assert "<span>V0.4</span>" not in source
 
-def test_topbar_routes_profile_and_scope():
-    assert 'href="/inteligencia-producto">Perfil y alcance' in read("base.html")
+def test_topbar_routes_to_current_delivery_control():
+    base = read("base.html")
+    assert 'href="/entrega-profesional"' in base
+    assert '<span>Inventario</span>' in base
+    assert 'aria-label="Estado del inventario:' in base
+    navigation = (ROOT / "app" / "product_experience.py").read_text(encoding="utf-8")
+    assert '"Perfil y diagnóstico", "/inteligencia-producto"' in navigation
 
 def test_application_release_is_v0453():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")
-    assert 'version: str = "0.45.5"' in config
+    assert 'version: str = "1.0.0"' in config

@@ -16,8 +16,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 @pytest.fixture(autouse=True)
 def fresh_database():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -52,7 +51,7 @@ def inventory_payload(**overrides: str) -> dict[str, str]:
 
 def test_starter_catalog_has_controlled_sector_packs():
     catalog = starter_pack_catalog()
-    assert [item["code"] for item in catalog] == ["services", "productive", "waste"]
+    assert [item["code"] for item in catalog] == ["services", "productive", "agro", "waste"]
     assert all(item["source_count"] >= 5 for item in catalog)
     waste = next(item for item in catalog if item["code"] == "waste")
     assert any(source["name"] == "Tratamiento biológico de residuos" for source in waste["sources"])

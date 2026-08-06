@@ -1,55 +1,61 @@
-# Calcula tu Huella V0.45.5 · importación y corrección guiada
+# Calcula tu Huella · V1.0.0 canónica
 
-Esta revisión convierte la carga masiva en un flujo completo: lectura configurable de CSV/XLSX, previsualización, mapeo de columnas, validación por fila, corrección dentro de la plataforma y aplicación controlada al inventario.
+Esta es la **fuente canónica única** de Calcula tu Huella. Consolida la aplicación completa, las migraciones, pruebas, despliegue, instaladores locales, documentación vigente y una vista previa estática para GitHub Pages.
 
-No modifica factores de emisión, conversiones, fórmulas, metodología, modelos de datos ni migraciones.
+## Estado
 
-## Cambios principales
+- Aplicación completa: FastAPI + Jinja + SQLAlchemy + Alembic.
+- Uso local: macOS y Windows mediante instaladores incluidos.
+- Despliegue completo: contenedor con PostgreSQL y almacenamiento externo.
+- GitHub Pages: vista previa estática ubicada en `site/`; no ejecuta Python, base de datos, autenticación ni cálculos persistentes.
+- Versión funcional: `1.0.0`.
+- Corte canónico: `2026-08-05`.
 
-- Selección de hoja en archivos Excel.
-- Configuración de la fila real de encabezados.
-- Detección o selección del separador CSV.
-- Mapeo automático y manual de columnas.
-- Indicador de campos mínimos antes de validar.
-- Política controlada para duplicados: rechazar, omitir o actualizar.
-- Corrección individual de fuente, fechas, valor, unidad, origen, evidencia y condición estimada.
-- Revalidación inmediata sin volver a cargar el archivo.
-- Cierre trazable de hallazgos anteriores.
-- Historial separado por inventario activo.
+## Inicio local
 
-## Recorrido recomendado
+### macOS
 
-1. Crea o selecciona el inventario.
-2. Confirma sus fuentes de emisión.
-3. Entra a **Cargas operativas**.
-4. Carga un archivo CSV o XLSX.
-5. Ajusta hoja, encabezados o separador cuando sea necesario.
-6. Relaciona las columnas y valida el lote.
-7. Corrige las filas señaladas dentro de la plataforma.
-8. Aplica el lote cuando no queden errores.
+1. Ejecuta `1_INSTALAR_Y_ABRIR.command`.
+2. Para volver a abrir: `2_ABRIR_CALCULA_TU_HUELLA.command`.
+3. Validación: `18_VALIDAR_VERSION_FINAL_V1.command`.
 
-## Inicio en macOS
+### Windows
 
-1. Descomprime completamente el ZIP.
-2. Abre `INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command`.
-3. Luego abre `ABRIR_CALCULA_TU_HUELLA.command`.
-4. Ingresa con un usuario demo.
+1. Ejecuta `1_INSTALAR_Y_ABRIR.bat`.
+2. Para volver a abrir: `2_ABRIR_CALCULA_TU_HUELLA.bat`.
+3. Validación: `5_VALIDAR_VERSION_FINAL_V1.bat`.
 
-La actualización conserva base de datos, evidencias, informes, importaciones, respaldos y certificados en `~/Library/Application Support/CalculaTuHuella`.
+## Desarrollo
 
-## Acceso demo
+```bash
+python3.12 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt -r requirements-dev.txt
+python scripts/run_test_tier.py smoke
+APP_ENV=local SEED_DEMO=true python run.py
+```
 
-Contraseña común: `Demo2026!`
+## Estructura
 
-- `admin@calculatuhuella.local`
-- `consultor@calculatuhuella.local`
-- `cliente@calculatuhuella.local`
-- `revisor@calculatuhuella.local`
-- `verificador@calculatuhuella.local`
+- `app/`: aplicación y motor ambiental.
+- `migrations/`: esquema Alembic hasta `20260805_0036`.
+- `tests/`: batería funcional y metodológica.
+- `scripts/`: certificación, respaldo, restauración y operación.
+- `deployment/`, `Dockerfile`, `docker-compose*.yml`: despliegue completo.
+- `site/`: vista previa estática publicable en GitHub Pages.
+- `docs/`: auditorías, aprobaciones, evidencia y guías.
+- `.github/workflows/`: CI y publicación de Pages.
 
-## Certificación
+## Repositorio objetivo
 
-- `14_CERTIFICAR_VERSION.command`: validación local o productiva.
-- `15_PREPARAR_Y_CERTIFICAR_DEMO.command`: preparación y verificación del entorno demostrativo.
+La migración posterior está preparada para `arendon7/CALCULAHUELLA`. Debe realizarse mediante una rama de respaldo y un reemplazo controlado del árbol, nunca borrando `main` sin conservar el commit anterior. Consulta `docs/migracion/REEMPLAZO_REPOSITORIO_GITHUB.md`.
 
-La certificación productiva estricta continúa condicionada a servicios externos reales.
+## Integridad
+
+Ejecuta:
+
+```bash
+python tools/verify_canonical.py
+```
+
+El archivo `MANIFIESTO_SHA256_CANONICO.txt` contiene la huella individual de cada archivo del paquete.

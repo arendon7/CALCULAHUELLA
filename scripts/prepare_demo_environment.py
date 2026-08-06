@@ -15,7 +15,7 @@ from app.demo_environment import certify_demo_environment, ensure_demo_environme
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Prepara y certifica el entorno demostrativo V0.45.")
+    parser = argparse.ArgumentParser(description="Prepara y certifica el entorno demostrativo de Calcula tu Huella.")
     parser.add_argument("--prepare-only", action="store_true", help="Prepara datos sin generar certificado.")
     parser.add_argument("--performed-by", default="comando-mac-demo")
     args = parser.parse_args()

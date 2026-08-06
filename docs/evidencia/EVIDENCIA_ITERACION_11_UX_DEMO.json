@@ -1,0 +1,52 @@
+{
+  "iteration": 11,
+  "focus": "UX, navegación y portafolio demostrativo",
+  "date": "2026-08-05",
+  "navigation": {
+    "essential_items_by_role": {
+      "Administrador": 9,
+      "Consultor": 9,
+      "Cliente": 9,
+      "Revisor": 8,
+      "Verificador": 8
+    },
+    "complete_items_by_role": {
+      "Administrador": 56,
+      "Consultor": 49,
+      "Cliente": 27,
+      "Revisor": 45,
+      "Verificador": 40
+    },
+    "organization_switcher": true,
+    "complete_navigation_search": true,
+    "progressive_disclosure_dashboard": true
+  },
+  "demo_portfolio": {
+    "organizations": 5,
+    "sectors": 5,
+    "facilities": 14,
+    "inventories": 6,
+    "sources": 37,
+    "activity_records": 290,
+    "calculations": 338,
+    "evidence": 19,
+    "requests": 17,
+    "observations": 15,
+    "implementation_plans": 5,
+    "companies": [
+      "Greenatics",
+      "Industrias Andinas",
+      "Café Sierra Verde",
+      "Ruta Norte Logística",
+      "Hotel Bosque Azul"
+    ]
+  },
+  "tests": {
+    "macos": {"passed": 397, "failed": 0, "skipped": 0},
+    "windows": {"passed": 394, "failed": 0, "skipped": 3},
+    "windows_skip_reason": "Pruebas exclusivas del instalador y ciclo de vida macOS"
+  },
+  "methodology_changed": false,
+  "factor_values_changed": false,
+  "calculation_formulas_changed": false
+}

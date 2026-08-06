@@ -74,7 +74,7 @@ if __name__ == "__main__":
     host = os.environ.get("HOST", "127.0.0.1")
     port = int(os.environ.get("PORT", "8765"))
     browser_host = "127.0.0.1" if host == "0.0.0.0" else host
-    url = f"http://{browser_host}:{port}/login"
+    url = f"http://{browser_host}:{port}/"
 
     print(f"\nCalcula tu Huella V{settings.version} · ambiente {settings.environment}")
     print(f"Abre en el navegador: {url}")

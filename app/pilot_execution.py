@@ -29,7 +29,7 @@ from .database import (
     refresh_progress,
 )
 
-PILOT_ENGINE_VERSION = "0.45.0"
+PILOT_ENGINE_VERSION = "1.0.0"
 
 SITE_NAMES = {
     "Yarumal": ("Planta Yarumal", "Planta de aprovechamiento", "Yarumal"),
@@ -886,13 +886,16 @@ def guided_workspace(session: Session, user: dict[str, Any], inventory: Inventor
     ) or 0
     open_observations = sum(1 for item in inventory.observations if item.status != "Cerrada")
     reports = len(inventory.reports)
+    reduction_actions = list(inventory.reduction_actions)
+    reduction_expected = sum(float(item.expected_reduction or 0) for item in reduction_actions)
     configured = bool(inventory.methodology and inventory.gwp_version and inventory.facility_links)
     milestones = [
         {"name": "Configurar", "done": configured, "detail": "Metodología, periodo y sedes", "href": f"/inventarios/{inventory.id}"},
-        {"name": "Recolectar", "done": source_count > 0 and complete_sources == source_count, "detail": f"{complete_sources}/{source_count} fuentes completas", "href": "/informacion"},
+        {"name": "Recolectar", "done": source_count > 0 and complete_sources == source_count, "detail": f"{complete_sources}/{source_count} fuentes completas", "href": "/captura-guiada"},
         {"name": "Calcular", "done": source_count > 0 and factor_sources == source_count, "detail": f"{factor_sources}/{source_count} con factor", "href": "/calculos"},
         {"name": "Revisar", "done": open_observations == 0 and inventory.status in {"En revisión", "Aprobado", "Cerrado"}, "detail": f"{open_observations} observaciones abiertas", "href": "/control"},
-        {"name": "Reportar", "done": reports > 0, "detail": f"{reports} informe(s) generado(s)", "href": "/reportes"},
+        {"name": "Reducir", "done": bool(reduction_actions), "detail": f"{len(reduction_actions)} acción(es) · {reduction_expected:.1f} tCO₂e/año", "href": "/reduccion"},
+        {"name": "Reportar", "done": reports > 0, "detail": f"{reports} documento(s) generado(s)", "href": "/entrega-profesional"},
     ]
     completed = sum(1 for item in milestones if item["done"])
     score = round(completed / len(milestones) * 100)
@@ -900,9 +903,9 @@ def guided_workspace(session: Session, user: dict[str, Any], inventory: Inventor
     actions: list[dict[str, str]] = []
     if role == "Cliente":
         if pending_requests:
-            actions.append({"title": "Responder solicitudes pendientes", "detail": f"Hay {pending_requests} solicitud(es) activas.", "href": "/informacion", "priority": "Alta"})
+            actions.append({"title": "Responder solicitudes pendientes", "detail": f"Hay {pending_requests} solicitud(es) activas.", "href": "/captura-guiada", "priority": "Alta"})
         if complete_sources < source_count:
-            actions.append({"title": "Completar datos y evidencias", "detail": f"Faltan {source_count - complete_sources} fuente(s).", "href": "/informacion", "priority": "Alta"})
+            actions.append({"title": "Completar datos y evidencias", "detail": f"Faltan {source_count - complete_sources} fuente(s).", "href": "/captura-guiada", "priority": "Alta"})
     elif role == "Revisor":
         actions.append({"title": "Revisar puertas de aprobación", "detail": f"Existen {open_observations} observación(es) abiertas.", "href": "/control", "priority": "Alta" if open_observations else "Media"})
         actions.append({"title": "Comprobar trazabilidad metodológica", "detail": "Verifica factores, conversiones y evidencia.", "href": "/calculos", "priority": "Media"})

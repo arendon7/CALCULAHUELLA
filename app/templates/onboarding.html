@@ -6,11 +6,11 @@
   <div>
     <p class="breadcrumb">Inicio / Puesta en marcha</p>
     <h1>Prepara el primer inventario sin perder el orden</h1>
-    <p>Completa seis decisiones fundamentales antes de operar el levantamiento, los cálculos y los informes.</p>
+    <p>Primero define el propósito, el perfil sectorial y la profundidad necesaria; después completa las actividades operativas de implementación.</p>
   </div>
   <div class="head-actions">
     <a class="btn btn-outline" href="/recorrido-inventario">Ver recorrido operativo</a>
-    {% if onboarding.next_step %}<a class="btn btn-primary" href="{{ onboarding.next_step.href }}">{{ onboarding.next_step.action }}</a>{% endif %}
+    <a class="btn btn-primary" href="/onboarding/guiado">Abrir asistente inicial</a>
   </div>
 </div>
 
@@ -23,7 +23,7 @@
     <div class="onboarding-next-action">
       <span>{{ onboarding.next_step.number }}</span>
       <div><small>SIGUIENTE ACTIVIDAD</small><strong>{{ onboarding.next_step.row.title }}</strong><p>{{ onboarding.next_step.outcome }}</p></div>
-      <a href="{{ onboarding.next_step.href }}">Abrir →</a>
+      {% if can_open_route(user, onboarding.next_step.href) %}<a href="{{ onboarding.next_step.href }}">Abrir →</a>{% else %}<span class="permission-note">Asignada a otro rol</span>{% endif %}
     </div>
     {% else %}
     <div class="onboarding-next-action completed">
@@ -41,6 +41,12 @@
       <span><b>{{ onboarding.blocked }}</b> bloqueadas</span>
     </div>
   </div>
+</section>
+
+<section class="guided-onboarding-entry card">
+  <div><span class="eyebrow">ANTES DE PEDIR INFORMACIÓN</span><h2>Convierte el diagnóstico en una ruta sectorial</h2><p>El nuevo asistente define propósito, perfil operativo, cobertura, preparación de datos, responsables y periodo. Luego propone metodología, fuentes y lista inicial de soportes sin modificar el inventario hasta tu aprobación.</p></div>
+  <div class="guided-onboarding-entry-route"><span>Diagnóstico</span><i>→</i><span>Metodología</span><i>→</i><span>Datos requeridos</span></div>
+  <a class="btn btn-primary" href="/onboarding/guiado">Iniciar diagnóstico guiado</a>
 </section>
 
 <section class="onboarding-outcomes" aria-label="Resultados de la puesta en marcha">
@@ -66,7 +72,7 @@
         <p>{{ step.row.description }}</p>
         <div class="onboarding-stage-result"><b>Resultado esperado</b><span>{{ step.outcome }}</span></div>
         <div class="onboarding-stage-actions">
-          <a class="btn btn-primary small" href="{{ step.href }}">{{ step.action }}</a>
+          {% if can_open_route(user, step.href) %}<a class="btn btn-primary small" href="{{ step.href }}">{{ step.action }}</a>{% else %}<span class="permission-note">Gestionado por otro rol</span>{% endif %}
           <details>
             <summary>Ver propósito y gestión</summary>
             <div class="onboarding-stage-details">

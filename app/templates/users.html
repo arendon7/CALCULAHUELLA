@@ -1,7 +1,55 @@
 {% extends "base.html" %}
-{% block title %}Usuarios y roles · Calcula tu Huella{% endblock %}
-{% block page_label %}Administración / Usuarios{% endblock %}
+{% block title %}Usuarios e invitaciones · Calcula tu Huella{% endblock %}
+{% block page_label %}Administración / Accesos{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">Administración / Usuarios y roles</p><h1>Gobierno de acceso</h1><p>Administra membresías, responsabilidades y segregación de funciones por organización.</p></div><span class="phase-label">Funcional · V0.27</span></div>
-<div class="user-governance-grid"><section class="card"><div class="card-head"><div><small>EQUIPO ACTIVO</small><h3>Usuarios de {{ org.trade_name or org.name }}</h3></div><span class="counter">{{ memberships|length }}</span></div><div class="governance-user-list">{% for membership in memberships %}{% set member = membership.user %}<article class="governance-user {% if not membership.active %}inactive-user{% endif %}"><div class="avatar">{{ member.name.split()[0][0] }}{{ member.name.split()[-1][0] }}</div><div class="user-identity"><strong>{{ member.name }}</strong><small>{{ member.email }}</small><span class="role-tag">{{ membership.role }}</span></div><div class="user-state"><span class="status-chip {% if membership.active %}active{% else %}pending{% endif %}">{{ 'Activo' if membership.active else 'Inactivo' }}</span><small>Último acceso: {{ member.last_login.strftime('%Y-%m-%d %H:%M') if member.last_login else 'Sin registro' }}</small></div><div class="user-actions"><form action="/usuarios/{{ member.id }}/estado" method="post"><input type="hidden" name="active" value="{{ 'false' if membership.active else 'true' }}"><button class="btn btn-outline" {% if member.id == user.id and membership.active %}disabled title="No puedes desactivar tu membresía"{% endif %}>{{ 'Desactivar' if membership.active else 'Activar' }}</button></form><details><summary>Restablecer clave</summary><form action="/usuarios/{{ member.id }}/restablecer" method="post" class="stack-form compact-form"><label>Nueva contraseña<input name="password" type="password" minlength="8" required></label><button class="btn btn-primary btn-block">Actualizar</button></form></details></div></article>{% endfor %}</div></section><aside class="card sticky-form"><div class="card-head"><div><small>NUEVO ACCESO</small><h3>Crear o vincular usuario</h3></div></div><form action="/usuarios/nuevo" method="post" class="stack-form"><label>Nombre completo<input name="name" required></label><label>Correo<input name="email" type="email" required></label><label>Rol en esta organización<select name="role">{% for role in roles %}<option>{{ role }}</option>{% endfor %}</select></label><label>Contraseña inicial<input name="password" type="password" minlength="8" value="Demo2026!" required></label><button class="btn btn-primary btn-block">Crear o vincular</button></form><div class="role-matrix"><h4>Matriz de responsabilidades</h4><dl><div><dt>Administrador</dt><dd>Organización, usuarios y aprobación.</dd></div><div><dt>Consultor</dt><dd>Inventario, fuentes, cálculos y revisión.</dd></div><div><dt>Cliente</dt><dd>Carga de datos, soportes y respuestas.</dd></div><div><dt>Revisor</dt><dd>Hallazgos, recomendación y aprobación.</dd></div><div><dt>Verificador</dt><dd>Consulta independiente y trazabilidad.</dd></div></dl></div></aside></div>
+<section class="page-heading">
+  <div><span class="eyebrow">GOBIERNO DE ACCESO</span><h1>Usuarios, roles e invitaciones</h1><p>Administra quién puede ingresar, con qué responsabilidad y dentro de qué capacidad contratada.</p></div>
+  <a class="button secondary" href="/operacion-servicio">Ver operación del servicio</a>
+</section>
+
+<section class="metrics-grid access-capacity-grid">
+  <article class="metric-card"><small>Usuarios activos</small><strong>{{ capacity.active_users }}</strong><span>de {{ capacity.metrics.users.limit|number_es(0) if capacity.metrics.users.limit else 'sin límite' }}</span><div class="progress"><span style="width:{{ capacity.metrics.users.percentage }}%"></span></div></article>
+  <article class="metric-card"><small>Invitaciones pendientes</small><strong>{{ invitations|length }}</strong><span>reservan capacidad hasta vencer o cancelarse</span></article>
+  <article class="metric-card"><small>Capacidad disponible</small><strong>{{ capacity.metrics.users.available|number_es(0) if capacity.metrics.users.available is not none else '—' }}</strong><span>accesos adicionales</span></article>
+  <article class="metric-card"><small>Estado de ampliación</small><strong>{{ 'Habilitada' if capacity.operational and capacity.metrics.users.status != 'blocked' else 'Bloqueada' }}</strong><span>{{ capacity.subscription.status if capacity.subscription else 'Sin plan' }}</span></article>
+</section>
+
+{% if invitation_url %}
+<section class="decision-banner invitation-link-banner"><div><small>ENLACE GENERADO</small><h2>Copia y comparte esta invitación</h2><p>El enlace es temporal, de un solo uso y debe enviarse únicamente al correo autorizado.</p><input id="invitationLink" value="{{ invitation_url }}" readonly></div><button class="button primary" type="button" onclick="navigator.clipboard.writeText(document.getElementById('invitationLink').value)">Copiar enlace</button></section>
+{% endif %}
+
+<div class="user-governance-grid">
+  <section class="card">
+    <div class="card-head"><div><small>EQUIPO ACTIVO</small><h3>Usuarios de {{ org.trade_name or org.name }}</h3></div><span class="counter">{{ memberships|length }}</span></div>
+    <div class="governance-user-list">
+      {% for membership in memberships %}{% set member = membership.user %}
+      <article class="governance-user {% if not membership.active %}inactive-user{% endif %}">
+        <div class="avatar">{{ member.name.split()[0][0] }}{{ member.name.split()[-1][0] }}</div>
+        <div class="user-identity"><strong>{{ member.name }}</strong><small>{{ member.email }}</small><span class="role-tag">{{ membership.role }}</span></div>
+        <div class="user-state"><span class="status-chip {% if membership.active %}active{% else %}pending{% endif %}">{{ 'Activo' if membership.active else 'Inactivo' }}</span><small>Último acceso: {{ member.last_login.strftime('%Y-%m-%d %H:%M') if member.last_login else 'Sin registro' }}</small></div>
+        <div class="user-actions"><form action="/usuarios/{{ member.id }}/estado" method="post"><input type="hidden" name="active" value="{{ 'false' if membership.active else 'true' }}"><button class="btn btn-outline" {% if member.id == user.id and membership.active %}disabled title="No puedes desactivar tu membresía"{% endif %}>{{ 'Desactivar' if membership.active else 'Activar' }}</button></form><details><summary>Restablecer clave</summary><form action="/usuarios/{{ member.id }}/restablecer" method="post" class="stack-form compact-form"><label>Nueva contraseña<input name="password" type="password" minlength="8" required></label><button class="btn btn-primary btn-block">Actualizar</button></form></details></div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  <aside class="card sticky-form">
+    <div class="card-head"><div><small>NUEVO ACCESO</small><h3>Invitar de forma segura</h3></div></div>
+    <form action="/usuarios/invitar" method="post" class="stack-form">
+      <label>Nombre de la persona<input name="name" autocomplete="name"></label>
+      <label>Correo autorizado<input name="email" type="email" required autocomplete="email"></label>
+      <label>Rol en esta organización<select name="role">{% for role in roles %}<option>{{ role }}</option>{% endfor %}</select></label>
+      <label>Vigencia del enlace<select name="validity_days"><option value="3">3 días</option><option value="7" selected>7 días</option><option value="14">14 días</option><option value="30">30 días</option></select></label>
+      <button class="btn btn-primary btn-block" {% if not capacity.operational or capacity.metrics.users.status=='blocked' %}disabled{% endif %}>Generar invitación</button>
+    </form>
+    <div class="callout"><strong>Acceso controlado</strong><br>La persona define su contraseña al aceptar. El enlace expira, no revela credenciales y queda invalidado después del primer uso.</div>
+    <details class="form-drawer"><summary>Crear acceso directamente</summary><form action="/usuarios/nuevo" method="post" class="stack-form compact-form"><label>Nombre<input name="name" required></label><label>Correo<input name="email" type="email" required></label><label>Rol<select name="role">{% for role in roles %}<option>{{ role }}</option>{% endfor %}</select></label><label>Contraseña inicial<input name="password" type="password" minlength="8" required></label><button class="button secondary">Crear acceso local</button></form></details>
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">INVITACIONES PENDIENTES</span><h2>Accesos todavía no aceptados</h2></div><span class="counter">{{ invitations|length }}</span></div>
+  {% if invitations %}<div class="responsive-table"><table><thead><tr><th>Persona</th><th>Rol</th><th>Invitada por</th><th>Vence</th><th>Acción</th></tr></thead><tbody>{% for invitation in invitations %}<tr><td><strong>{{ invitation.invited_name or 'Nombre pendiente' }}</strong><small>{{ invitation.email }}</small></td><td>{{ invitation.role }}</td><td>{{ invitation.invited_by }}</td><td>{{ invitation.expires_at.strftime('%Y-%m-%d %H:%M') }}</td><td><form action="/usuarios/invitaciones/{{ invitation.id }}/cancelar" method="post"><button class="button secondary small">Cancelar</button></form></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Sin invitaciones pendientes</strong><span>Los accesos aceptados aparecen en el equipo activo.</span></div>{% endif %}
+</section>
+
+<section class="panel role-matrix-panel"><div class="panel-heading"><div><span class="eyebrow">SEGREGACIÓN</span><h2>Responsabilidad por rol</h2></div></div><div class="role-matrix"><dl><div><dt>Administrador</dt><dd>Organización, usuarios y aprobación.</dd></div><div><dt>Consultor</dt><dd>Inventario, fuentes, cálculos y revisión.</dd></div><div><dt>Cliente</dt><dd>Carga de datos, soportes y respuestas.</dd></div><div><dt>Revisor</dt><dd>Hallazgos y recomendación independiente.</dd></div><div><dt>Verificador</dt><dd>Consulta externa y trazabilidad.</dd></div></dl></div></section>
 {% endblock %}

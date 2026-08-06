@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import hmac
 import json
 import os
 import shutil
@@ -141,6 +142,43 @@ def _dump_postgres(destination: Path) -> None:
     )
 
 
+def _canonical_json(payload: object) -> bytes:
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode("utf-8")
+
+
+def _sign_manifest(manifest: dict[str, object]) -> str:
+    if not settings.backup_signing_secret:
+        return ""
+    unsigned = {key: value for key, value in manifest.items() if key != "manifest_signature"}
+    return hmac.new(
+        settings.backup_signing_secret.encode("utf-8"),
+        _canonical_json(unsigned),
+        hashlib.sha256,
+    ).hexdigest()
+
+
+def _payload_entry(path: Path, archive_name: str) -> dict[str, object]:
+    return {"name": archive_name, "size": path.stat().st_size, "sha256": _sha256(path)}
+
+
+def _external_storage_inventory() -> dict[str, object]:
+    if settings.storage_backend == "local":
+        return {"backend": "local", "count": 0, "total_size": 0, "objects": []}
+    try:
+        objects = [
+            item for item in storage.list_objects()
+            if not str(item.get("key", "")).startswith((settings.backup_storage_prefix + "/", ".health/"))
+        ]
+        return {
+            "backend": settings.storage_backend,
+            "count": len(objects),
+            "total_size": sum(int(item.get("size", 0) or 0) for item in objects),
+            "objects": objects,
+        }
+    except Exception as exc:
+        return {"backend": settings.storage_backend, "count": 0, "total_size": 0, "objects": [], "error": str(exc)}
+
+
 def create_backup(created_by: str = "sistema", label: str = "manual") -> dict[str, object]:
     stamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%S%fZ")
     safe_label = "".join(ch for ch in label.lower().replace(" ", "-") if ch.isalnum() or ch in "-_")[:30] or "manual"
@@ -157,28 +195,61 @@ def create_backup(created_by: str = "sistema", label: str = "manual") -> dict[st
         else:
             raise RuntimeError(f"Backend no soportado para respaldo: {settings.database_backend}")
 
-        manifest = {
+        staged: list[tuple[Path, str]] = [(db_dump, db_dump.name)]
+        for folder_name in ("uploads", "reports"):
+            folder = INSTANCE_DIR / folder_name
+            if folder.exists():
+                for path in sorted(folder.rglob("*")):
+                    if path.is_file():
+                        staged.append((path, str(path.relative_to(INSTANCE_DIR)).replace("\\", "/")))
+
+        inventory = _external_storage_inventory()
+        inventory_path = temp_dir / "external_storage_inventory.json"
+        inventory_path.write_text(json.dumps(inventory, ensure_ascii=False, indent=2), encoding="utf-8")
+        staged.append((inventory_path, inventory_path.name))
+
+        payloads = [_payload_entry(path, archive_name) for path, archive_name in staged]
+        manifest: dict[str, object] = {
+            "backup_format_version": 2,
             "application": settings.app_name,
             "version": settings.version,
             "created_at": datetime.now(UTC).isoformat(),
             "created_by": created_by,
             "label": safe_label,
             "database_backend": settings.database_backend,
-        "storage_backend": settings.storage_backend,
-        "email_backend": settings.email_backend,
+            "storage_backend": settings.storage_backend,
+            "email_backend": settings.email_backend,
             "database_file": db_dump.name,
+            "payloads": payloads,
+            "external_storage": {
+                "backend": inventory.get("backend"),
+                "count": inventory.get("count", 0),
+                "total_size": inventory.get("total_size", 0),
+                "versioning_confirmed": settings.object_storage_versioning_confirmed,
+            },
+            "signature_algorithm": "HMAC-SHA256" if settings.backup_signing_secret else "none",
+            "manifest_signature": "",
         }
-        (temp_dir / "manifest.json").write_text(json.dumps(manifest, ensure_ascii=False, indent=2), encoding="utf-8")
+        manifest["manifest_signature"] = _sign_manifest(manifest)
+        manifest_path = temp_dir / "manifest.json"
+        manifest_path.write_text(json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=True), encoding="utf-8")
 
-        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as bundle:
-            bundle.write(db_dump, db_dump.name)
-            bundle.write(temp_dir / "manifest.json", "manifest.json")
-            for folder_name in ("uploads", "reports"):
-                folder = INSTANCE_DIR / folder_name
-                if folder.exists():
-                    for path in folder.rglob("*"):
-                        if path.is_file():
-                            bundle.write(path, str(path.relative_to(INSTANCE_DIR)))
+        with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED, allowZip64=True) as bundle:
+            bundle.write(manifest_path, "manifest.json")
+            for path, archive_name in staged:
+                bundle.write(path, archive_name)
+
+    offsite_key = ""
+    offsite_error = ""
+    if settings.backup_offsite_enabled:
+        try:
+            prefix = settings.backup_storage_prefix or "system-backups"
+            offsite_key = storage.put_file(f"{prefix}/{archive.name}", archive, "application/zip")
+        except Exception as exc:
+            offsite_error = str(exc)
+            if settings.is_production:
+                archive.unlink(missing_ok=True)
+                raise RuntimeError(f"El respaldo local se generó, pero la réplica externa falló: {exc}") from exc
 
     result = {
         "name": archive.name,
@@ -186,22 +257,37 @@ def create_backup(created_by: str = "sistema", label: str = "manual") -> dict[st
         "size": archive.stat().st_size,
         "sha256": _sha256(archive),
         "created_at": datetime.now(UTC),
+        "signed": bool(settings.backup_signing_secret),
+        "offsite_key": offsite_key,
+        "offsite_error": offsite_error,
     }
     prune_backups(settings.backup_retention)
     return result
 
-
 def list_backups() -> list[dict[str, object]]:
     results: list[dict[str, object]] = []
     for path in sorted(BACKUP_DIR.glob("calculatuhuella_*.zip"), key=lambda item: item.stat().st_mtime, reverse=True):
+        signed = False
+        format_version = 1
+        try:
+            with zipfile.ZipFile(path) as archive:
+                manifest = json.loads(archive.read("manifest.json").decode("utf-8"))
+                signed = bool(manifest.get("manifest_signature"))
+                format_version = int(manifest.get("backup_format_version", 1) or 1)
+        except Exception:
+            pass
+        offsite_key = f"{settings.backup_storage_prefix}/{path.name}" if settings.backup_offsite_enabled else ""
         results.append({
             "name": path.name,
             "size": path.stat().st_size,
             "created_at": datetime.fromtimestamp(path.stat().st_mtime, UTC),
             "sha256": _sha256(path),
+            "signed": signed,
+            "format_version": format_version,
+            "offsite_key": offsite_key,
+            "offsite_exists": bool(offsite_key and storage.exists(offsite_key)),
         })
     return results
-
 
 def prune_backups(retention: int) -> None:
     backups = sorted(BACKUP_DIR.glob("calculatuhuella_*.zip"), key=lambda item: item.stat().st_mtime, reverse=True)
@@ -265,8 +351,11 @@ def structured_log_snapshot() -> dict[str, object]:
 
 
 def verify_backup_archive(path: Path) -> dict[str, object]:
-    """Validate ZIP integrity, safe paths and mandatory manifest/database members."""
-    result: dict[str, object] = {"ok": False, "name": path.name, "sha256": "", "members": 0, "issues": []}
+    """Validate ZIP integrity, paths, payload hashes and optional HMAC signature."""
+    result: dict[str, object] = {
+        "ok": False, "name": path.name, "sha256": "", "members": 0,
+        "issues": [], "signature_valid": None, "payloads_checked": 0,
+    }
     issues: list[str] = []
     try:
         result["sha256"] = _sha256(path)
@@ -288,11 +377,40 @@ def verify_backup_archive(path: Path) -> dict[str, object]:
                 db_file = manifest.get("database_file", "")
                 if not db_file or db_file not in names:
                     issues.append("El archivo de base de datos declarado no existe")
+
+                signature = str(manifest.get("manifest_signature", ""))
+                if signature:
+                    if not settings.backup_signing_secret:
+                        issues.append("El respaldo está firmado, pero BACKUP_SIGNING_SECRET no está disponible para verificarlo")
+                        result["signature_valid"] = False
+                    else:
+                        expected = _sign_manifest(manifest)
+                        valid = hmac.compare_digest(signature, expected)
+                        result["signature_valid"] = valid
+                        if not valid:
+                            issues.append("La firma HMAC del manifiesto no coincide")
+                else:
+                    result["signature_valid"] = None
+
+                for payload in manifest.get("payloads", []):
+                    name = str(payload.get("name", ""))
+                    if not name or name not in names:
+                        issues.append(f"Falta payload declarado: {name or '(vacío)'}")
+                        continue
+                    content = archive.read(name)
+                    actual = hashlib.sha256(content).hexdigest()
+                    expected = str(payload.get("sha256", ""))
+                    if expected and not hmac.compare_digest(actual, expected):
+                        issues.append(f"SHA-256 no coincide: {name}")
+                    if int(payload.get("size", len(content)) or 0) != len(content):
+                        issues.append(f"Tamaño no coincide: {name}")
+                    result["payloads_checked"] += 1
     except (OSError, zipfile.BadZipFile, json.JSONDecodeError) as exc:
         issues.append(str(exc))
     result["issues"] = issues
     result["ok"] = not issues
     return result
+
 
 RESTORE_REQUIRED_TABLES = {
     "organizations",
@@ -343,6 +461,8 @@ def rehearse_backup_restore(path: Path) -> dict[str, object]:
             "manifest": bool(archive_check.get("manifest")),
             "database": False,
             "required_tables": False,
+            "tenant_integrity": False,
+            "audit_chain": False,
         },
         "issues": list(archive_check.get("issues", [])),
         "duration_ms": 0,
@@ -395,6 +515,33 @@ def rehearse_backup_restore(path: Path) -> dict[str, object]:
                         result["issues"].append(f"PRAGMA integrity_check: {integrity}")
                 finally:
                     connection.close()
+
+                # Validate company isolation and the immutable audit chain against
+                # the restored copy, not against the live database.
+                from sqlalchemy import create_engine
+                from sqlalchemy.orm import sessionmaker
+                from .tenant_integrity import audit_chain_integrity, audit_tenant_integrity
+
+                restored_engine = create_engine(f"sqlite:///{destination}", future=True)
+                RestoredSession = sessionmaker(bind=restored_engine, expire_on_commit=False, future=True)
+                try:
+                    with RestoredSession() as restored_session:
+                        tenant_result = audit_tenant_integrity(restored_session)
+                        audit_result = audit_chain_integrity(restored_session)
+                    result["tenant_integrity"] = tenant_result
+                    result["audit_chain"] = audit_result
+                    result["checks"]["tenant_integrity"] = bool(tenant_result.get("ok"))
+                    result["checks"]["audit_chain"] = bool(audit_result.get("ok"))
+                    if not tenant_result.get("ok"):
+                        result["issues"].append(
+                            f"Integridad multiempresa: {tenant_result.get('critical_issue_count', 0)} inconsistencias críticas."
+                        )
+                    if not audit_result.get("ok"):
+                        result["issues"].append(
+                            f"Cadena de auditoría: {audit_result.get('failure_count', 0)} inconsistencias."
+                        )
+                finally:
+                    restored_engine.dispose()
             elif backend == "postgresql" or destination.suffix == ".pgdump":
                 executable = shutil.which("pg_restore")
                 if not executable:
@@ -410,6 +557,15 @@ def rehearse_backup_restore(path: Path) -> dict[str, object]:
                     result["integrity_result"] = "pg_restore --list"
                     result["checks"]["database"] = completed.returncode == 0
                     result["checks"]["required_tables"] = completed.returncode == 0
+                    # Full tenant/audit validation requires restoring the dump into
+                    # an isolated PostgreSQL service and is therefore not inferred.
+                    result["checks"]["tenant_integrity"] = False
+                    result["checks"]["audit_chain"] = False
+                    if completed.returncode == 0:
+                        result["status"] = "Parcial"
+                        result["issues"].append(
+                            "El dump PostgreSQL es legible, pero falta restaurarlo en un servicio aislado para certificar aislamiento y auditoría."
+                        )
                     if completed.returncode != 0:
                         result["issues"].append(completed.stderr.strip() or "pg_restore no pudo leer el dump.")
             else:
@@ -427,8 +583,9 @@ def rehearse_backup_restore(path: Path) -> dict[str, object]:
     return result
 
 
-def restore_drill_snapshot(max_age_days: int = 90) -> dict[str, object]:
+def restore_drill_snapshot(max_age_days: int | None = None) -> dict[str, object]:
     """Return continuity readiness based on persisted restore drills."""
+    max_age_days = settings.restore_drill_max_age_days if max_age_days is None else max_age_days
     from sqlalchemy import select
     from .database import RestoreDrill, SessionLocal
 

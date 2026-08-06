@@ -2,7 +2,7 @@
 {% block title %}Metodología · Calcula tu Huella{% endblock %}
 {% block page_label %}Cálculo / Gobierno metodológico{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">Administración / Metodología</p><h1>Biblioteca metodológica</h1><p>Gestiona factores, unidades, conversiones, gases y potenciales de calentamiento global.</p></div><span class="release-chip">Motor 0.4.0</span></div>
+<div class="page-head"><div><p class="breadcrumb">Administración / Metodología</p><h1>Biblioteca metodológica</h1><p>Gestiona factores, unidades, conversiones, gases y potenciales de calentamiento global.</p></div><span class="release-chip">Motor 1.1.0</span></div>
 
 <div class="calculation-notice"><span>IMPORTANTE</span><p><strong>Los registros marcados como “demo” sirven para probar el software.</strong><small>No deben presentarse como factores oficiales sin revisión documental y aprobación profesional.</small></p></div>
 
@@ -27,7 +27,7 @@
     <label>Gas<select name="gas_id">{% for gas in gases %}<option value="{{ gas.id }}">{{ gas.formula or gas.code }} · {{ gas.name }}</option>{% endfor %}</select></label>
     <label>Valor<input name="value" type="number" step="any" min="0" required></label>
     <label>Unidad de entrada<select name="input_unit">{% for unit in allowed_units %}<option>{{ unit }}</option>{% endfor %}</select></label>
-    <label>Unidad de salida<input name="output_unit" value="kg gas" required></label>
+    <label>Unidad de salida<input name="output_unit" value="kg gas" required><small>Usa masa explícita: g, kg o t seguida del gas, por ejemplo kg CO2e o g CH4.</small></label>
     <label>Versión<input name="version" value="1.0" required></label>
     <label>Organización fuente<input name="source_organization" required></label>
     <label>Año<input name="publication_year" type="number" min="1990" max="2100" value="2025" required></label>

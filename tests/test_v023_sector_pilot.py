@@ -25,8 +25,7 @@ from app.sector_library import pilot_summary
 
 @pytest.fixture(autouse=True)
 def fresh_database_v023():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -89,7 +88,7 @@ def test_v023_reference_suite_has_twelve_passing_cases():
         assert len(cases) >= 12
         run = run_reference_suite(session, "prueba-v023")
         session.commit()
-        assert run.engine_version == "0.45.0"
+        assert run.engine_version == "1.1.0"
         assert run.total_cases >= 12
         assert run.passed_cases == run.total_cases
         assert run.failed_cases == 0

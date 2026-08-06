@@ -25,7 +25,7 @@ _STEP_META: dict[str, dict[str, str]] = {
         "why": "Antes de cargar datos deben aprobarse las reglas que determinan qué se calcula y cómo.",
     },
     "DAT-01": {
-        "href": "/informacion",
+        "href": "/captura-guiada",
         "action": "Cargar datos piloto",
         "outcome": "Primer conjunto de consumos y evidencias asociado a una fuente de emisión.",
         "why": "Una carga piloto permite validar unidades, responsables y soportes antes de escalar el levantamiento.",
@@ -37,10 +37,10 @@ _STEP_META: dict[str, dict[str, str]] = {
         "why": "La revisión temprana evita replicar errores de unidad, factor o fórmula en todo el inventario.",
     },
     "REP-01": {
-        "href": "/reportes",
-        "action": "Generar primer informe",
-        "outcome": "Informe ejecutivo inicial para validar lectura, alcance y decisiones siguientes.",
-        "why": "El primer entregable confirma que los resultados pueden comunicarse de forma clara y trazable.",
+        "href": "/entrega-profesional",
+        "action": "Preparar primera entrega",
+        "outcome": "Puertas de control revisadas y primer paquete documental listo para validación.",
+        "why": "La entrega profesional verifica que metodología, datos, evidencias, cálculo y revisión estén conectados antes de comunicar resultados.",
     },
 }
 

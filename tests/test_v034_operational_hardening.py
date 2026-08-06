@@ -14,8 +14,7 @@ from app.operations import create_backup, diagnostic_snapshot, rehearse_backup_r
 
 @pytest.fixture(autouse=True)
 def fresh_database_v034():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -30,7 +29,7 @@ def login_admin(client: TestClient) -> None:
 
 def test_v034_health_schema_and_inventory_version_are_current():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
     assert "restore_drills" in inspect(ENGINE).get_table_names()
     with SessionLocal() as session:
         versions = {item.version for item in session.execute(select(__import__('app.database', fromlist=['Inventory']).Inventory)).scalars()}

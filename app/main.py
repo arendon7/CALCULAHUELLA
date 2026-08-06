@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import hmac
 import json
+import math
 import os
 import re
 import secrets
@@ -47,8 +48,6 @@ from .database import (
     OrganizationMembership,
     ScheduledAutomation,
     AutomationRun,
-    IntegrationConnection,
-    IntegrationEvent,
     PlatformSetting,
     MethodologyRelease,
     InventoryMethodologySnapshot,
@@ -61,6 +60,7 @@ from .database import (
     UsageCounter,
     CustomerOnboardingItem,
     SupportTicket,
+    SupportMessage,
     BillingInvoice,
     CommercialLead,
     CommercialProposal,
@@ -98,6 +98,7 @@ from .database import (
     SourceFactorAssignment,
     Supplier,
     SupplierCampaign,
+    Scope3CategoryAssessment,
     SupplierDataRequest,
     SupplierResponse,
     UnitConversion,
@@ -112,14 +113,18 @@ from .database import (
 )
 from .config import settings
 from .accounting import is_gross_source
-from .access_control import ROLE_CAPABILITIES
+from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
-from .product_experience import journey_detail, navigation_for, normalize_view_mode, role_profile
+from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
 from .onboarding_experience import onboarding_summary
+from .guided_onboarding import load_profile as load_guided_profile, decision_plan as guided_decision_plan
 from .consolidation import consolidation_summary, build_consolidation_workbook, summary_json
 from .architecture import domain_architecture_summary
 from .methodology_web import register_methodology_core_routes
+from .factor_library_web import register_factor_library_routes
 from .methodology_closure_web import register_methodology_closure_routes
+from .land_removals_web import register_land_removals_routes
+from .product_project_assurance_web import register_product_project_assurance_routes
 from .colombia_library_web import register_colombia_library_routes
 from .pilot_web import register_pilot_routes
 from .pilot_execution_web import register_pilot_execution_routes
@@ -127,38 +132,55 @@ from .data_quality_web import register_data_quality_routes
 from .period_close_web import register_period_close_routes
 from .operational_imports_web import register_operational_import_routes
 from .operations_web import register_operations_routes
+from .integrations_web import register_integration_routes
 from .users_web import register_user_routes
 from .inventories_web import register_inventory_routes
 from .reports_web import register_report_routes
+from .delivery_web import register_delivery_routes
+from .delivery_readiness import professional_delivery_summary
 from .organizations_web import register_organization_routes
 from .information_web import register_information_routes
+from .capture_web import register_capture_routes
 from .review_web import register_review_routes
 from .demo_web import register_demo_routes
 from .product_intelligence_web import register_product_intelligence_routes
+from .guided_onboarding_web import register_guided_onboarding_routes
+from .service_operations_web import register_service_operations_routes
+from .experience_web import register_experience_routes
+from .legal_web import register_legal_routes
 from .period_close import assert_periods_editable
 from .pilot_execution import guided_workspace
 from .storage import storage, StorageError
 from .notifications import create_notification, notify_roles, get_or_create_preference, process_pending_notifications
-from .automations import AUTOMATION_TYPES, CADENCES, ROLE_OPTIONS, calculate_next_run, execute_automation, process_due_automations, hash_api_key
-from .security import (CSRFMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware, login_throttle, password_needs_upgrade, validate_upload_bytes, verify_password)
+from .automations import AUTOMATION_TYPES, CADENCES, ROLE_OPTIONS, calculate_next_run, execute_automation, process_due_automations
+from .security import (CSRFMiddleware, RequestBodyLimitMiddleware, RequestContextMiddleware, SecurityHeadersMiddleware, login_throttle, password_needs_upgrade, validate_upload_bytes, verify_password)
 from .operations import diagnostic_snapshot
 from .observability import OperationalMetricsMiddleware
-from .calculations import convert_value, recalculate_inventory, recalculate_source, source_calculation_summary
+from .calculations import convert_value, normalize_factor_output, recalculate_inventory, recalculate_source, source_calculation_summary
 from .analytics import full_analysis, indicator_metrics, reduction_summary
 from .reporting import create_report_artifact
 from .scenarios import get_scenario, portfolio_macc, scenario_summary
+from .reduction_portfolio import build_portfolio_workbook, portfolio_json, portfolio_summary
 from .verification import create_verification_package
 from .customer_success import account_metrics, refresh_account_health, sync_renewal_opportunity
+from .support_workflow import (
+    OPEN_STATUSES, CLOSED_STATUSES, add_support_message, ensure_reference, response_deadline,
+    route_assignment, status_class, support_summary, ticket_context, ticket_overdue, ticket_waiting_days,
+)
 from .impact_intelligence import impact_metrics, refresh_impact_snapshot, compare_benchmarks, portfolio_comparison
 from .climate_risk import assessment_summary, calculate_risk_scores, risk_level, synchronize_control_effectiveness, refresh_assessment_status
 from .climate_disclosure import scenario_comparison, disclosure_summary, board_summary, build_board_pdf
 from .supply_chain import (
+    approved_duplicate_responses,
     calculate_supplier_response,
     campaign_summary,
+    ensure_scope3_assessments,
     inventory_supply_chain_summary,
     quality_level as supplier_quality_level,
     sync_supplier_source,
+    validate_supplier_response,
 )
+from .scope3_catalog import canonical_category_label, category_from_value
 
 BASE_DIR = Path(__file__).resolve().parent
 app = FastAPI(title=settings.app_name, version=settings.version, docs_url=None if settings.is_production else "/docs", redoc_url=None)
@@ -175,6 +197,7 @@ app.add_middleware(
 )
 app.add_middleware(CSRFMiddleware)
 app.add_middleware(RequestContextMiddleware)
+app.add_middleware(RequestBodyLimitMiddleware)
 app.mount("/static", StaticFiles(directory=BASE_DIR / "static"), name="static")
 templates = Jinja2Templates(directory=BASE_DIR / "templates")
 
@@ -328,6 +351,7 @@ def common_context(request: Request, session: Session, user: dict[str, object], 
         "unread_notifications": unread_notifications,
         "navigation": navigation_for(user, view_mode),
         "role_profile": role_profile(str(user.get("role", "Cliente"))),
+        "can_open_route": can_open_route,
         **extra,
     }
 
@@ -667,9 +691,59 @@ async def forbidden_handler(request: Request, exc: HTTPException):
         )
 
 @app.get("/", response_class=HTMLResponse)
-def home(request: Request):
+def home(request: Request, session: Session = Depends(get_db)):
     user = current_user(request)
-    return templates.TemplateResponse(request=request, name="public_home.html", context={"user": user, "app_settings": settings})
+    plans = list(session.scalars(select(ServicePlan).where(ServicePlan.active.is_(True)).order_by(ServicePlan.monthly_fee)))
+    return templates.TemplateResponse(
+        request=request, name="public_home.html",
+        context={
+            "user": user, "app_settings": settings, "plans": plans,
+            "contact_sent": request.query_params.get("contacto") == "recibido",
+        },
+    )
+
+@app.post("/contacto")
+def public_contact_request(
+    request: Request,
+    company_name: str = Form(...),
+    contact_name: str = Form(...),
+    email: str = Form(...),
+    phone: str = Form(""),
+    sector: str = Form(""),
+    interest: str = Form("Quiero entender por dónde comenzar"),
+    message: str = Form(...),
+    accept_privacy: str | None = Form(None),
+    accept_commercial: str | None = Form(None),
+    session: Session = Depends(get_db),
+):
+    normalized_email = email.strip().lower()
+    if "@" not in normalized_email or len(company_name.strip()) < 2 or len(contact_name.strip()) < 2 or len(message.strip()) < 12:
+        raise HTTPException(400, "Completa empresa, contacto, correo válido y una descripción suficiente.")
+    if accept_privacy != "yes":
+        raise HTTPException(400, "Debes autorizar el tratamiento de datos para responder la solicitud.")
+    plan_map = {
+        "Huella Esencial": "ESENCIAL",
+        "Gestión de Carbono": "EMPRESARIAL",
+        "Gestión Avanzada y Verificación": "CORPORATIVO",
+    }
+    lead = CommercialLead(
+        public_token=secrets.token_urlsafe(24), company_name=company_name.strip(),
+        contact_name=contact_name.strip(), email=normalized_email, phone=phone.strip(),
+        sector=sector.strip() or "Por definir", city="", employees_band="Por definir",
+        facilities_count=1, has_previous_inventory=False, desired_scopes="Por definir",
+        objective=interest.strip(), urgency="Normal",
+        notes=(
+            f"Solicitud desde landing V1.0\n"
+            f"Autorización de privacidad: sí · versión {settings.legal_effective_date}\n"
+            f"Comunicaciones comerciales opcionales: {'sí' if accept_commercial == 'yes' else 'no'}\n\n"
+            f"{message.strip()}"
+        ),
+        complexity_score=0,
+        recommended_plan_code=plan_map.get(interest.strip(), ""), status="Nuevo", source="Landing pública V1.0",
+    )
+    session.add(lead)
+    session.commit()
+    return RedirectResponse("/?contacto=recibido#contacto", status_code=303)
 
 @app.get("/login", response_class=HTMLResponse)
 def login_page(request: Request):
@@ -776,18 +850,43 @@ def dashboard(request: Request, session: Session = Depends(get_db), user: dict =
         .order_by(DataRequest.due_date)
     ))
     workspace = guided_workspace(session, user, inventory)
+    delivery = professional_delivery_summary(session, inventory)
+    dashboard_action = delivery["next_action"]
+    if str(user["role"]) == "Cliente":
+        if tasks:
+            dashboard_action = {
+                "name": "Atender solicitudes de información",
+                "detail": f"Tienes {len(tasks)} requerimiento(s) activo(s). Completa los datos o soportes solicitados antes de la revisión técnica.",
+                "owner": "Responsable de información",
+                "acceptance": "Solicitudes respondidas y evidencias vinculadas al periodo correcto.",
+                "href": "/informacion#solicitudes",
+                "action": "Abrir pendientes",
+            }
+        else:
+            dashboard_action = {
+                "name": "Completar datos y evidencias",
+                "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
+                "owner": "Responsable de información",
+                "acceptance": "Fuentes del periodo completas y soportes vinculados.",
+                "href": "/captura-guiada",
+                "action": "Continuar captura",
+            }
     onboarding_rows = list(session.scalars(select(CustomerOnboardingItem).where(
         CustomerOnboardingItem.organization_id == int(user["organization_id"])
     ).order_by(CustomerOnboardingItem.display_order)))
     onboarding_state = onboarding_summary(onboarding_rows, inventory_id=inventory.id)
+    guided_profile = load_guided_profile(session, inventory.organization)
+    guided_setup = guided_decision_plan(guided_profile, inventory.organization, inventory=inventory)
     session.commit()
     return templates.TemplateResponse(
         request=request,
         name="dashboard.html",
         context=common_context(
             request, session, user, "dashboard", inventory=inventory, inventories=inventories,
-            tasks=tasks, sources=inventory.sources, workspace=workspace,
-            journey=journey_detail(workspace, str(user["role"])), onboarding=onboarding_state, **metrics,
+            tasks=tasks, sources=inventory.sources, workspace=workspace, delivery=delivery,
+            dashboard_action=dashboard_action,
+            journey=journey_detail(workspace, str(user["role"])), onboarding=onboarding_state,
+            guided_setup=guided_setup, demo_story=demo_story_for(inventory.organization.trade_name), **metrics,
         ),
     )
 
@@ -951,8 +1050,13 @@ def factor_create(
     if input_unit not in ALLOWED_UNITS:
         raise HTTPException(400, "Unidad no autorizada")
     gas = session.get(Gas, gas_id)
-    if not gas or value < 0:
+    if not gas or not math.isfinite(value) or value < 0:
         raise HTTPException(400, "Gas o valor inválido")
+    if not math.isfinite(uncertainty_percentage) or uncertainty_percentage < 0:
+        raise HTTPException(400, "La incertidumbre debe ser un número finito mayor o igual a cero")
+    normalized_output, output_error = normalize_factor_output(1.0, output_unit, gas.code)
+    if normalized_output is None:
+        raise HTTPException(400, output_error)
     factor = session.scalar(select(EmissionFactor).where(EmissionFactor.name == name.strip()))
     if not factor:
         factor = EmissionFactor(name=name.strip(), activity_type=activity_type.strip(), country="Colombia", sector="Multisectorial", status="Activo", is_demo=False)
@@ -999,6 +1103,16 @@ def factor_status_update(
         raise HTTPException(404, "Factor no encontrado")
     if status not in {"Pendiente de revisión", "Aprobado", "Retirado"}:
         raise HTTPException(400, "Estado inválido")
+    if status == "Aprobado":
+        normalized_output, output_error = normalize_factor_output(
+            1.0,
+            factor_version.output_unit,
+            factor_version.gas.code,
+        )
+        if normalized_output is None:
+            raise HTTPException(409, f"El factor no puede aprobarse: {output_error}")
+        if not math.isfinite(factor_version.value) or factor_version.value < 0:
+            raise HTTPException(409, "El factor no puede aprobarse porque su valor no es válido")
     factor_version.status = status
     factor_version.approved_by = str(user["name"]) if status == "Aprobado" else factor_version.approved_by
     factor_version.approved_at = datetime.now(UTC) if status == "Aprobado" else factor_version.approved_at
@@ -1018,7 +1132,7 @@ def conversion_create(
     user: dict = Depends(require_user),
 ):
     ensure_capability(user, "view_methodology")
-    if from_unit == to_unit or multiplier <= 0:
+    if from_unit == to_unit or not math.isfinite(multiplier) or multiplier <= 0:
         raise HTTPException(400, "Conversión inválida")
     source_definition = session.scalar(select(UnitDefinition).where(UnitDefinition.code == from_unit))
     target_definition = session.scalar(select(UnitDefinition).where(UnitDefinition.code == to_unit))
@@ -1225,11 +1339,33 @@ def update_reduction_action(
 @app.get("/reduccion", response_class=HTMLResponse)
 def reduction_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
     inventory = get_inventory(session, user)
-    summary = reduction_summary(session, inventory.id)
+    legacy_summary = reduction_summary(session, inventory.id)
+    portfolio = portfolio_summary(session, inventory)
     return templates.TemplateResponse(
         request=request,
         name="reduction.html",
-        context=common_context(request, session, user, "reduction", inventory=inventory, sources=inventory.sources, targets=inventory.targets, **summary),
+        context=common_context(
+            request, session, user, "reduction", inventory=inventory, sources=inventory.sources,
+            targets=inventory.targets, portfolio=portfolio, **legacy_summary,
+        ),
+    )
+
+
+@app.get("/api/reduccion/resumen")
+def reduction_portfolio_api(session: Session = Depends(get_db), user: dict = Depends(require_user)):
+    inventory = get_inventory(session, user)
+    return portfolio_json(portfolio_summary(session, inventory))
+
+
+@app.get("/reduccion/exportar.xlsx")
+def export_reduction_portfolio(session: Session = Depends(get_db), user: dict = Depends(require_user)):
+    inventory = get_inventory(session, user)
+    payload = build_portfolio_workbook(inventory, portfolio_summary(session, inventory))
+    safe_year = inventory.start_date.year
+    return Response(
+        payload,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f"attachment; filename=portafolio_reduccion_{safe_year}.xlsx"},
     )
 
 @app.get("/cadena-valor", response_class=HTMLResponse)
@@ -1266,6 +1402,86 @@ def supply_chain_page(request: Request, session: Session = Depends(get_db), user
         ),
     )
 
+@app.get("/api/cadena-valor/resumen")
+def supply_chain_summary_api(session: Session = Depends(get_db), user: dict = Depends(require_user)):
+    if not (user["can_manage_supply_chain"] or user["can_review"] or user["can_approve"]):
+        raise HTTPException(403, "Tu rol no tiene acceso a la cadena de valor")
+    inventory = get_inventory(session, user)
+    summary = inventory_supply_chain_summary(session, inventory)
+    session.commit()
+    return {
+        "inventory_id": inventory.id,
+        "campaign_count": summary["campaign_count"],
+        "request_count": summary["request_count"],
+        "response_count": summary["response_count"],
+        "approved_count": summary["approved_count"],
+        "emissions_tco2e": summary["emissions"],
+        "screening_coverage": summary["screening_coverage"],
+        "assessed_category_count": summary["assessed_category_count"],
+        "material_category_count": summary["material_category_count"],
+        "active_category_count": summary["active_category_count"],
+        "approved_category_count": summary["approved_category_count"],
+        "quality_score": summary["quality_score"],
+        "duplicate_count": summary["duplicate_count"],
+        "direction_emissions": summary["direction_emissions"],
+        "categories": summary["categories"],
+        "warnings": summary["warnings"],
+    }
+
+@app.post("/cadena-valor/categorias/{category_code}/evaluar")
+def assess_scope3_category(
+    category_code: str,
+    request: Request,
+    status: str = Form(...),
+    relevance_score: float = Form(0),
+    rationale: str = Form(""),
+    owner: str = Form("Responsable ambiental"),
+    data_strategy: str = Form("Por definir"),
+    session: Session = Depends(get_db),
+    user: dict = Depends(require_user),
+):
+    ensure_capability(user, "manage_supply_chain")
+    inventory = get_inventory(session, user)
+    ensure_inventory_editable(inventory)
+    category = category_from_value(category_code)
+    if not category:
+        raise HTTPException(404, "Categoría de Alcance 3 no encontrada")
+    allowed_statuses = {"Pendiente", "Material", "No material", "No aplica"}
+    if status not in allowed_statuses:
+        raise HTTPException(400, "Estado de evaluación no permitido")
+    clean_rationale = rationale.strip()
+    if status in {"Material", "No material", "No aplica"} and not clean_rationale:
+        raise HTTPException(400, "La conclusión de materialidad debe incluir una justificación.")
+    ensure_scope3_assessments(session, inventory.id)
+    assessment = session.scalar(
+        select(Scope3CategoryAssessment).where(
+            Scope3CategoryAssessment.inventory_id == inventory.id,
+            Scope3CategoryAssessment.category_code == category.code,
+        )
+    )
+    if not assessment:
+        raise HTTPException(404, "Evaluación de categoría no disponible")
+    assessment.status = status
+    assessment.relevance_score = min(5.0, max(0.0, relevance_score))
+    assessment.rationale = clean_rationale
+    assessment.owner = owner.strip() or "Responsable ambiental"
+    assessment.data_strategy = data_strategy.strip() or "Por definir"
+    assessment.updated_by = str(user["email"])
+    assessment.updated_at = datetime.now(UTC)
+    add_audit(
+        session,
+        int(user["organization_id"]),
+        str(user["email"]),
+        "EVALUAR",
+        "Categoría Scope 3",
+        f"{category.code} · {category.name}",
+        f"{status}; relevancia {assessment.relevance_score:.1f}/5",
+    )
+    session.commit()
+    set_flash(request, f"{category.code} actualizada como {status.lower()}.")
+    return RedirectResponse("/cadena-valor", status_code=303)
+
+
 @app.post("/cadena-valor/proveedores/nuevo")
 def create_supplier(
     request: Request, name: str = Form(...), tax_id: str = Form(""), sector: str = Form(""), country: str = Form("Colombia"),
@@ -1294,11 +1510,26 @@ def create_supplier_campaign(
     ensure_capability(user, "manage_supply_chain")
     inventory = get_inventory(session, user, inventory_id)
     ensure_inventory_editable(inventory)
+    canonical_category = canonical_category_label(category)
     campaign = SupplierCampaign(
-        inventory_id=inventory.id, name=name.strip(), category=category.strip(), due_date=parse_date(due_date),
+        inventory_id=inventory.id, name=name.strip(), category=canonical_category, due_date=parse_date(due_date),
         status="Borrador", methodology=methodology.strip(), description=description.strip(), created_by=str(user["email"]),
     )
     session.add(campaign)
+    ensure_scope3_assessments(session, inventory.id)
+    category_profile = category_from_value(campaign.category)
+    if category_profile:
+        assessment = session.scalar(select(Scope3CategoryAssessment).where(
+            Scope3CategoryAssessment.inventory_id == inventory.id,
+            Scope3CategoryAssessment.category_code == category_profile.code,
+        ))
+        if assessment:
+            assessment.status = "Material"
+            assessment.relevance_score = max(assessment.relevance_score, 4)
+            assessment.rationale = assessment.rationale or "Categoría priorizada mediante campaña de levantamiento."
+            assessment.data_strategy = "Campaña de proveedores"
+            assessment.updated_by = str(user["email"])
+            assessment.updated_at = datetime.now(UTC)
     add_audit(session, int(user["organization_id"]), str(user["email"]), "CREAR", "Campaña de proveedores", campaign.name, campaign.category)
     session.commit()
     set_flash(request, "Campaña creada. Ahora agrega solicitudes a proveedores.")
@@ -1396,6 +1627,21 @@ async def submit_supplier_response(
         expires = expires.replace(tzinfo=UTC)
     if expires and expires < datetime.now(UTC):
         raise HTTPException(410, "El enlace de respuesta venció")
+    existing_evidence = bool(data_request.response and data_request.response.evidence_stored_name)
+    validation = validate_supplier_response(
+        data_request,
+        method=method,
+        activity_value=max(0, activity_value),
+        activity_unit=activity_unit.strip() or data_request.unit,
+        emission_factor=max(0, emission_factor),
+        factor_unit=factor_unit.strip(),
+        reported_emissions_tco2e=max(0, reported_emissions_tco2e),
+        methodology=methodology.strip(),
+        boundary=boundary.strip(),
+        has_evidence=existing_evidence or bool(evidence and evidence.filename),
+    )
+    if validation["errors"]:
+        raise HTTPException(400, " ".join(validation["errors"]))
     file_name = ""
     stored_name = ""
     sha256 = ""
@@ -1447,7 +1693,8 @@ async def submit_supplier_response(
     data_request.status = "Respondida"
     data_request.responded_at = datetime.now(UTC)
     session.commit()
-    request.session["supplier_flash"] = {"message": "Respuesta recibida. La empresa revisará la metodología y el soporte.", "level": "success"}
+    warning_suffix = "" if not validation["warnings"] else f" Observaciones automáticas: {len(validation['warnings'])}."
+    request.session["supplier_flash"] = {"message": "Respuesta recibida. La empresa revisará la metodología y el soporte." + warning_suffix, "level": "success"}
     return RedirectResponse(f"/proveedor/responder/{token}", status_code=303)
 
 @app.post("/cadena-valor/respuestas/{response_id}/revisar")
@@ -1465,6 +1712,29 @@ def review_supplier_response(
     )
     if not response:
         raise HTTPException(404, "Respuesta no encontrada")
+    if decision == "Aprobado":
+        validation = validate_supplier_response(
+            response.request,
+            method=response.method,
+            activity_value=response.activity_value,
+            activity_unit=response.activity_unit,
+            emission_factor=response.emission_factor,
+            factor_unit=response.factor_unit,
+            reported_emissions_tco2e=response.reported_emissions_tco2e,
+            methodology=response.methodology,
+            boundary=response.boundary,
+            has_evidence=bool(response.evidence_stored_name),
+        )
+        blockers = list(validation["errors"])
+        if not response.methodology.strip():
+            blockers.append("La metodología debe documentarse antes de aprobar.")
+        if not response.boundary.strip():
+            blockers.append("Los límites del cálculo deben documentarse antes de aprobar.")
+        duplicates = approved_duplicate_responses(session, response)
+        if duplicates:
+            blockers.append("Existe otra respuesta aprobada para la misma categoría, proveedor y producto o servicio.")
+        if blockers:
+            raise HTTPException(409, " ".join(blockers))
     response.review_status = decision
     response.reviewer_comments = reviewer_comments.strip()
     response.reviewed_by = str(user["email"])
@@ -1503,16 +1773,43 @@ def supplier_campaign_template(request: Request, session: Session = Depends(get_
     wb = Workbook()
     ws = wb.active
     ws.title = "Solicitudes proveedores"
-    ws.append(["Proveedor", "NIT", "Producto o servicio", "Cantidad", "Unidad", "Gasto COP", "Método solicitado", "Estado", "Fecha límite", "Enlace seguro"])
+    ws.append([
+        "Código categoría", "Categoría Scope 3", "Dirección", "Proveedor", "NIT", "Producto o servicio",
+        "Cantidad", "Unidad", "Gasto COP", "Método solicitado", "Estado", "Fecha límite", "Método respondido",
+        "Calidad A-D", "Revisión", "Emisiones tCO2e", "Metodología", "Límite", "Enlace seguro",
+    ])
     requests = session.scalars(
         select(SupplierDataRequest)
         .join(SupplierCampaign).where(SupplierCampaign.inventory_id == inventory.id)
-        .options(selectinload(SupplierDataRequest.supplier))
+        .options(
+            selectinload(SupplierDataRequest.supplier),
+            selectinload(SupplierDataRequest.campaign),
+            selectinload(SupplierDataRequest.response),
+        )
         .order_by(SupplierDataRequest.id)
     )
     base = str(request.base_url).rstrip("/") + "/proveedor/responder/"
     for item in requests:
-        ws.append([item.supplier.name, item.supplier.tax_id, item.product_service, item.quantity, item.unit, item.spend_cop, item.requested_method, item.status, item.due_date, base + item.access_token])
+        category = category_from_value(item.campaign.category)
+        response = item.response
+        ws.append([
+            category.code if category else "", category.name if category else item.campaign.category,
+            category.direction if category else "", item.supplier.name, item.supplier.tax_id, item.product_service,
+            item.quantity, item.unit, item.spend_cop, item.requested_method, item.status, item.due_date,
+            response.method if response else "", response.quality_level if response else "",
+            response.review_status if response else "", response.calculated_emissions_tco2e if response else 0,
+            response.methodology if response else "", response.boundary if response else "", base + item.access_token,
+        ])
+    summary = inventory_supply_chain_summary(session, inventory)
+    categories_ws = wb.create_sheet("Screening 15 categorías")
+    categories_ws.append(["Código", "Categoría", "Dirección", "Evaluación", "Relevancia 0-5", "Justificación", "Responsable", "Estrategia de datos", "Estado de datos", "Campañas", "Solicitudes", "Respuestas", "Aprobadas", "Emisiones tCO2e", "Límite mínimo", "Métodos recomendados"])
+    for category in summary["categories"]:
+        categories_ws.append([
+            category["code"], category["name"], category["direction"], category["assessment_status"],
+            category["relevance_score"], category["rationale"], category["owner"], category["data_strategy"],
+            category["data_status"], category["campaign_count"], category["request_count"], category["response_count"],
+            category["approved_count"], category["emissions"], category["minimum_boundary"], ", ".join(category["recommended_methods"]),
+        ])
     stream = BytesIO()
     wb.save(stream)
     return Response(stream.getvalue(), media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", headers={"Content-Disposition": "attachment; filename=cadena_valor_proveedores.xlsx"})
@@ -1862,6 +2159,7 @@ def portfolio_page(request: Request, session: Session = Depends(get_db), user: d
             "organization": org_item,
             "inventories": inventories,
             "latest_inventory": sorted(inventories, key=lambda item: (item.start_date, item.id), reverse=True)[0] if inventories else None,
+            "demo_story": demo_story_for(org_item.trade_name) if org_item else None,
         })
     return templates.TemplateResponse(
         request=request,
@@ -2013,202 +2311,6 @@ def automations_process_due(request: Request, session: Session = Depends(get_db)
     result = process_due_automations(session)
     set_flash(request, f"Programación revisada: {result['executed']} ejecuciones y {result['errors']} errores.")
     return RedirectResponse("/automatizaciones", status_code=303)
-
-@app.get("/integraciones", response_class=HTMLResponse)
-def integrations_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_integrations")
-    integrations = list(session.scalars(
-        select(IntegrationConnection)
-        .where(IntegrationConnection.organization_id == int(user["organization_id"]))
-        .options(selectinload(IntegrationConnection.events))
-        .order_by(IntegrationConnection.created_at.desc())
-    ))
-    recent_events = list(session.scalars(
-        select(IntegrationEvent)
-        .join(IntegrationConnection)
-        .where(IntegrationConnection.organization_id == int(user["organization_id"]))
-        .options(selectinload(IntegrationEvent.integration))
-        .order_by(IntegrationEvent.created_at.desc()).limit(50)
-    ))
-    new_api_key = request.session.pop("new_api_key", None)
-    sources = list(session.scalars(
-        select(EmissionSource).join(Inventory).where(Inventory.organization_id == int(user["organization_id"])).order_by(EmissionSource.name)
-    ))
-    return templates.TemplateResponse(
-        request=request,
-        name="integrations.html",
-        context=common_context(
-            request, session, user, "integrations", integrations=integrations,
-            recent_events=recent_events, new_api_key=new_api_key, sources=sources,
-        ),
-    )
-
-@app.post("/integraciones/nueva")
-def integration_create(
-    request: Request,
-    name: str = Form(...),
-    provider: str = Form("API REST"),
-    integration_type: str = Form("Entrada de datos"),
-    endpoint_url: str = Form(""),
-    session: Session = Depends(get_db),
-    user: dict = Depends(require_user),
-):
-    ensure_capability(user, "manage_integrations")
-    raw_key = "cth_" + secrets.token_urlsafe(28)
-    is_api = provider == "API REST"
-    integration = IntegrationConnection(
-        organization_id=int(user["organization_id"]), name=name.strip(), provider=provider,
-        integration_type=integration_type, endpoint_url=endpoint_url.strip(),
-        status="Verificada" if is_api else "Configurada",
-        api_key_hash=hash_api_key(raw_key) if is_api else "",
-        api_key_prefix=raw_key[:12] if is_api else "",
-        config_json=json.dumps({"scope": "activity_data"}) if is_api else "{}",
-        last_test_at=datetime.now(UTC) if is_api else None,
-        last_test_detail="Clave API generada y lista para recibir datos." if is_api else "Pendiente de credenciales y prueba externa.",
-        active=True, created_by=str(user["email"]),
-    )
-    session.add(integration)
-    session.flush()
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "CREAR", "Integración", integration.name, provider)
-    session.commit()
-    if is_api:
-        request.session["new_api_key"] = raw_key
-    set_flash(request, "Integración creada." + (" Copia la clave API: solo se mostrará una vez." if is_api else ""))
-    return RedirectResponse("/integraciones", status_code=303)
-
-@app.post("/integraciones/{integration_id}/rotar-clave")
-def integration_rotate_key(integration_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_integrations")
-    integration = session.scalar(select(IntegrationConnection).where(
-        IntegrationConnection.id == integration_id,
-        IntegrationConnection.organization_id == int(user["organization_id"]),
-    ))
-    if not integration:
-        raise HTTPException(404, "Integración no encontrada")
-    raw_key = "cth_" + secrets.token_urlsafe(28)
-    integration.api_key_hash = hash_api_key(raw_key)
-    integration.api_key_prefix = raw_key[:12]
-    integration.status = "Verificada"
-    integration.last_test_at = datetime.now(UTC)
-    integration.last_test_detail = "Clave API rotada correctamente."
-    request.session["new_api_key"] = raw_key
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "ROTAR", "Clave API", integration.name)
-    session.commit()
-    set_flash(request, "Clave rotada. Copia la nueva clave: solo se mostrará una vez.")
-    return RedirectResponse("/integraciones", status_code=303)
-
-@app.post("/integraciones/{integration_id}/estado")
-def integration_toggle(integration_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_integrations")
-    integration = session.scalar(select(IntegrationConnection).where(
-        IntegrationConnection.id == integration_id,
-        IntegrationConnection.organization_id == int(user["organization_id"]),
-    ))
-    if not integration:
-        raise HTTPException(404, "Integración no encontrada")
-    integration.active = not integration.active
-    integration.status = "Verificada" if integration.active and integration.api_key_hash else ("Configurada" if integration.active else "Inactiva")
-    session.commit()
-    set_flash(request, f"Integración {'activada' if integration.active else 'desactivada'}.")
-    return RedirectResponse("/integraciones", status_code=303)
-
-class ActivityDataAPIInput(BaseModel):
-    source_id: int
-    period_start: date
-    period_end: date
-    value: float = Field(gt=0)
-    unit: str
-    data_origin: str = "Integración API"
-    external_reference: str = ""
-    notes: str = ""
-
-def integration_from_key(session: Session, api_key: str) -> IntegrationConnection:
-    digest = hash_api_key(api_key)
-    integration = session.scalar(select(IntegrationConnection).where(
-        IntegrationConnection.api_key_hash == digest,
-        IntegrationConnection.active.is_(True),
-    ))
-    if not integration:
-        raise HTTPException(401, "Clave API inválida o inactiva")
-    return integration
-
-@app.post("/api/v1/activity-data")
-def api_activity_data_create(
-    payload: ActivityDataAPIInput,
-    x_api_key: str = Header(..., alias="X-API-Key"),
-    session: Session = Depends(get_db),
-):
-    integration = integration_from_key(session, x_api_key)
-    if payload.external_reference:
-        previous_event = session.scalar(select(IntegrationEvent).where(
-            IntegrationEvent.integration_id == integration.id,
-            IntegrationEvent.external_reference == payload.external_reference,
-            IntegrationEvent.status == "Recibido",
-        ).order_by(IntegrationEvent.id.desc()))
-        if previous_event:
-            return {
-                "ok": True,
-                "duplicate": True,
-                "activity_data_id": previous_event.activity_data_id,
-                "external_reference": payload.external_reference,
-            }
-    source = session.scalar(
-        select(EmissionSource).join(Inventory).where(
-            EmissionSource.id == payload.source_id,
-            Inventory.organization_id == integration.organization_id,
-        ).options(selectinload(EmissionSource.inventory))
-    )
-    if not source:
-        session.add(IntegrationEvent(
-            integration_id=integration.id, status="Rechazado", event_type="Dato de actividad",
-            detail=f"Fuente {payload.source_id} no pertenece a la organización.", external_reference=payload.external_reference,
-        ))
-        session.commit()
-        raise HTTPException(404, "Fuente no encontrada para esta organización")
-    ensure_inventory_editable(source.inventory)
-    if payload.period_end < payload.period_start:
-        raise HTTPException(400, "El periodo final no puede ser anterior al inicial")
-    if payload.unit not in ALLOWED_UNITS:
-        raise HTTPException(400, "Unidad no autorizada")
-    record = ActivityData(
-        source_id=source.id, period_start=payload.period_start, period_end=payload.period_end,
-        value=payload.value, unit=payload.unit, data_origin=payload.data_origin,
-        quality_level="B", is_estimated=False, notes=payload.notes,
-        status="Cargado", created_by=f"integracion:{integration.name}",
-    )
-    session.add(record)
-    session.flush()
-    recalculate_source(session, source)
-    refresh_progress(session, source.inventory)
-    event = IntegrationEvent(
-        integration_id=integration.id, activity_data_id=record.id, direction="Entrada", event_type="Dato de actividad", status="Recibido",
-        detail=f"Registro {record.id} creado para {source.name}: {payload.value} {payload.unit}.",
-        external_reference=payload.external_reference,
-    )
-    session.add(event)
-    integration.last_test_at = datetime.now(UTC)
-    integration.last_test_detail = "Última recepción API completada correctamente."
-    add_audit(session, integration.organization_id, f"api:{integration.api_key_prefix}", "CREAR", "Dato de actividad", source.name, event.detail)
-    session.commit()
-    return {
-        "ok": True,
-        "activity_data_id": record.id,
-        "source_id": source.id,
-        "source": source.name,
-        "inventory_id": source.inventory_id,
-        "progress": source.progress,
-    }
-
-@app.get("/api/v1/sources")
-def api_sources_list(x_api_key: str = Header(..., alias="X-API-Key"), session: Session = Depends(get_db)):
-    integration = integration_from_key(session, x_api_key)
-    sources = list(session.scalars(
-        select(EmissionSource).join(Inventory).where(Inventory.organization_id == integration.organization_id).order_by(EmissionSource.name)
-    ))
-    return {"organization_id": integration.organization_id, "sources": [
-        {"id": item.id, "name": item.name, "scope": item.scope, "category": item.category, "preferred_unit": item.preferred_unit}
-        for item in sources
-    ]}
 
 def _compliance_score(rows: list[ComplianceAssessment]) -> int:
     applicable = [row for row in rows if row.status != "No aplica"]
@@ -2543,19 +2645,90 @@ def update_onboarding_item(
     return RedirectResponse("/onboarding", status_code=303)
 
 @app.get("/soporte", response_class=HTMLResponse)
-def support_center(request: Request, session: Session = Depends(get_db)):
+def support_center(
+    request: Request,
+    status: str = "",
+    category: str = "",
+    q: str = "",
+    inventory_id: int | None = None,
+    source_id: int | None = None,
+    activity_data_id: int | None = None,
+    session: Session = Depends(get_db),
+):
     user = require_user(request)
-    tickets = list(session.scalars(select(SupportTicket).where(
-        SupportTicket.organization_id == int(user["organization_id"])
-    ).order_by(SupportTicket.created_at.desc())))
-    stats = {
-        "open": sum(1 for item in tickets if item.status in {"Abierto", "En gestión", "Esperando cliente"}),
-        "critical": sum(1 for item in tickets if item.priority in {"Alta", "Crítica"} and item.status != "Cerrado"),
-        "closed": sum(1 for item in tickets if item.status == "Cerrado"),
-    }
-    return templates.TemplateResponse(request, "support.html", common_context(
-        request, session, user, "support", tickets=tickets, stats=stats,
+    organization_id = int(user["organization_id"])
+    query = (
+        select(SupportTicket)
+        .where(SupportTicket.organization_id == organization_id)
+        .options(
+            selectinload(SupportTicket.messages),
+            selectinload(SupportTicket.inventory),
+            selectinload(SupportTicket.source),
+            selectinload(SupportTicket.activity_data),
+        )
+        .order_by(SupportTicket.updated_at.desc(), SupportTicket.created_at.desc())
+    )
+    all_tickets = list(session.scalars(query))
+    tickets = all_tickets
+    if status:
+        tickets = [item for item in tickets if item.status == status]
+    if category:
+        tickets = [item for item in tickets if item.category == category]
+    normalized_q = q.strip().casefold()
+    if normalized_q:
+        tickets = [
+            item for item in tickets
+            if normalized_q in " ".join((item.public_reference, item.subject, item.description, item.assigned_to)).casefold()
+        ]
+    inventories = list(session.scalars(select(Inventory).where(Inventory.organization_id == organization_id).order_by(Inventory.created_at.desc())))
+    sources = list(session.scalars(
+        select(EmissionSource).join(Inventory).where(Inventory.organization_id == organization_id).order_by(EmissionSource.name)
     ))
+    prefill_record = None
+    if activity_data_id:
+        prefill_record = session.scalar(
+            select(ActivityData).join(EmissionSource).join(Inventory).where(
+                ActivityData.id == activity_data_id, Inventory.organization_id == organization_id,
+            )
+        )
+    return templates.TemplateResponse(request, "support.html", common_context(
+        request, session, user, "support", tickets=tickets, stats=support_summary(all_tickets),
+        status_class=status_class, ticket_overdue=ticket_overdue, ticket_waiting_days=ticket_waiting_days,
+        ticket_context=ticket_context, filters={"status": status, "category": category, "q": q},
+        inventories=inventories, sources=sources, prefill={
+            "inventory_id": inventory_id or (prefill_record.source.inventory_id if prefill_record and prefill_record.source else None),
+            "source_id": source_id or (prefill_record.source_id if prefill_record else None),
+            "activity_data_id": activity_data_id or None,
+            "category": "Revisión de factor" if activity_data_id else "",
+        },
+    ))
+
+
+@app.get("/soporte/{ticket_id}", response_class=HTMLResponse)
+def support_ticket_detail(ticket_id: int, request: Request, session: Session = Depends(get_db)):
+    user = require_user(request)
+    ticket = session.scalar(
+        select(SupportTicket)
+        .where(SupportTicket.id == ticket_id, SupportTicket.organization_id == int(user["organization_id"]))
+        .options(
+            selectinload(SupportTicket.messages),
+            selectinload(SupportTicket.inventory),
+            selectinload(SupportTicket.source),
+            selectinload(SupportTicket.activity_data),
+        )
+    )
+    if not ticket:
+        raise HTTPException(404, "Caso no encontrado")
+    visible_messages = [
+        message for message in ticket.messages
+        if message.visible_to_client or user["role"] != "Cliente"
+    ]
+    return templates.TemplateResponse(request, "support_detail.html", common_context(
+        request, session, user, "support", ticket=ticket, messages=visible_messages,
+        context_items=ticket_context(ticket), overdue=ticket_overdue(ticket),
+        waiting_days=ticket_waiting_days(ticket), status_class=status_class(ticket.status),
+    ))
+
 
 @app.post("/soporte/nuevo")
 def create_support_ticket(
@@ -2563,23 +2736,119 @@ def create_support_ticket(
     subject: str = Form(...),
     description: str = Form(...),
     category: str = Form("Soporte funcional"),
+    request_type: str = Form("Consulta"),
     priority: str = Form("Normal"),
+    desired_outcome: str = Form(""),
+    due_date: str = Form(""),
+    inventory_id: int | None = Form(None),
+    source_id: int | None = Form(None),
+    activity_data_id: int | None = Form(None),
     session: Session = Depends(get_db),
 ):
     user = require_user(request)
     ensure_capability(user, "manage_support")
+    organization_id = int(user["organization_id"])
+    normalized_subject = subject.strip()
+    normalized_description = description.strip()
+    if len(normalized_subject) < 6 or len(normalized_description) < 12:
+        set_flash(request, "Describe el asunto y la necesidad con suficiente detalle.", "error")
+        return RedirectResponse("/soporte#nuevo-caso", status_code=303)
+    inventory = session.scalar(select(Inventory).where(Inventory.id == inventory_id, Inventory.organization_id == organization_id)) if inventory_id else None
+    source = session.scalar(select(EmissionSource).join(Inventory).where(EmissionSource.id == source_id, Inventory.organization_id == organization_id)) if source_id else None
+    record = session.scalar(select(ActivityData).join(EmissionSource).join(Inventory).where(ActivityData.id == activity_data_id, Inventory.organization_id == organization_id)) if activity_data_id else None
+    if inventory_id and not inventory:
+        raise HTTPException(400, "Inventario no válido")
+    if source_id and not source:
+        raise HTTPException(400, "Fuente no válida")
+    if activity_data_id and not record:
+        raise HTTPException(400, "Dato no válido")
+    if record and source and record.source_id != source.id:
+        raise HTTPException(400, "El dato no pertenece a la fuente seleccionada")
+    if source and inventory and source.inventory_id != inventory.id:
+        raise HTTPException(400, "La fuente no pertenece al inventario seleccionado")
+    normalized_priority = priority if priority in {"Baja", "Normal", "Alta", "Crítica"} else "Normal"
     ticket = SupportTicket(
-        organization_id=int(user["organization_id"]), created_by=str(user["email"]),
-        category=category, priority=priority if priority in {"Baja", "Normal", "Alta", "Crítica"} else "Normal",
-        subject=subject.strip(), description=description.strip(), status="Abierto",
+        organization_id=organization_id,
+        inventory_id=inventory.id if inventory else (source.inventory_id if source else None),
+        source_id=source.id if source else (record.source_id if record else None),
+        activity_data_id=record.id if record else None,
+        created_by=str(user["email"]),
+        request_type=request_type if request_type in {"Consulta", "Requerimiento", "Incidencia", "Decisión metodológica"} else "Consulta",
+        category=category,
+        priority=normalized_priority,
+        subject=normalized_subject,
+        description=normalized_description,
+        desired_outcome=desired_outcome.strip(),
+        status="Abierto",
+        assigned_to=route_assignment(category),
+        due_date=parse_date(due_date) if due_date else None,
+        response_due_at=response_deadline(normalized_priority),
+        last_message_at=datetime.now(UTC),
     )
     session.add(ticket)
     session.flush()
-    notify_roles(session, int(user["organization_id"]), {"Administrador", "Consultor"}, "Nuevo caso de soporte", f"{ticket.subject} · prioridad {ticket.priority}", link="/soporte", category="Soporte", priority=ticket.priority)
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "CREAR", "Soporte", ticket.subject, detail=ticket.description)
+    ensure_reference(ticket)
+    add_support_message(
+        session, ticket, author_email=str(user["email"]), author_role=str(user["role"]),
+        body=normalized_description, message_type="Solicitud inicial", visible_to_client=True,
+    )
+    notify_roles(
+        session, organization_id, {"Administrador", "Consultor", "Revisor"},
+        f"Nuevo requerimiento {ticket.public_reference}",
+        f"{ticket.subject} · prioridad {ticket.priority}", link=f"/soporte/{ticket.id}",
+        category="Soporte", priority=ticket.priority,
+    )
+    add_audit(session, organization_id, str(user["email"]), "CREAR", "Requerimiento", ticket.public_reference, detail=ticket.description)
     session.commit()
-    set_flash(request, f"Caso #{ticket.id} creado.")
-    return RedirectResponse("/soporte", status_code=303)
+    set_flash(request, f"Requerimiento {ticket.public_reference} creado y asignado a {ticket.assigned_to}.")
+    return RedirectResponse(f"/soporte/{ticket.id}", status_code=303)
+
+
+@app.post("/soporte/{ticket_id}/mensajes")
+def add_ticket_message(
+    ticket_id: int,
+    request: Request,
+    body: str = Form(...),
+    message_type: str = Form("Mensaje"),
+    visible_to_client: str | None = Form(None),
+    next_status: str = Form(""),
+    session: Session = Depends(get_db),
+):
+    user = require_user(request)
+    ensure_capability(user, "manage_support")
+    ticket = session.scalar(select(SupportTicket).where(
+        SupportTicket.id == ticket_id, SupportTicket.organization_id == int(user["organization_id"]),
+    ))
+    if not ticket:
+        raise HTTPException(404, "Caso no encontrado")
+    internal = visible_to_client is None and user["role"] != "Cliente"
+    if user["role"] == "Cliente":
+        internal = False
+        message_type = "Mensaje del cliente"
+    allowed_types = {"Mensaje", "Mensaje del cliente", "Respuesta técnica", "Solicitud de información", "Nota interna", "Decisión metodológica"}
+    normalized_type = message_type if message_type in allowed_types else "Mensaje"
+    if internal:
+        normalized_type = "Nota interna"
+    try:
+        add_support_message(
+            session, ticket, author_email=str(user["email"]), author_role=str(user["role"]), body=body,
+            message_type=normalized_type, visible_to_client=not internal,
+        )
+    except ValueError as exc:
+        set_flash(request, str(exc), "error")
+        return RedirectResponse(f"/soporte/{ticket.id}#conversacion", status_code=303)
+    allowed_statuses = OPEN_STATUSES | CLOSED_STATUSES
+    if next_status in allowed_statuses and user["role"] != "Cliente":
+        ticket.status = next_status
+    elif user["role"] == "Cliente" and ticket.status == "Esperando cliente":
+        ticket.status = "En gestión"
+        ticket.response_due_at = response_deadline(ticket.priority)
+    ticket.closed_at = datetime.now(UTC) if ticket.status == "Cerrado" else None
+    add_audit(session, int(user["organization_id"]), str(user["email"]), "MENSAJE", "Requerimiento", ticket.public_reference, detail=normalized_type)
+    session.commit()
+    set_flash(request, "Mensaje registrado en la conversación.")
+    return RedirectResponse(f"/soporte/{ticket.id}#conversacion", status_code=303)
+
 
 @app.post("/soporte/{ticket_id}/actualizar")
 def update_support_ticket(
@@ -2587,12 +2856,14 @@ def update_support_ticket(
     request: Request,
     status: str = Form(...),
     assigned_to: str = Form(""),
+    priority: str = Form("Normal"),
+    due_date: str = Form(""),
     resolution: str = Form(""),
     session: Session = Depends(get_db),
 ):
     user = require_user(request)
     if user["role"] == "Cliente":
-        raise HTTPException(403, "El cliente puede crear casos, pero el equipo de soporte gestiona su estado")
+        raise HTTPException(403, "El cliente puede crear y responder casos, pero el equipo gestiona su estado")
     ensure_capability(user, "manage_support")
     ticket = session.scalar(select(SupportTicket).where(
         SupportTicket.id == ticket_id,
@@ -2600,14 +2871,60 @@ def update_support_ticket(
     ))
     if not ticket:
         raise HTTPException(404, "Caso no encontrado")
-    ticket.status = status if status in {"Abierto", "En gestión", "Esperando cliente", "Resuelto", "Cerrado"} else ticket.status
+    previous_status = ticket.status
+    previous_priority = ticket.priority
+    ticket.status = status if status in OPEN_STATUSES | CLOSED_STATUSES else ticket.status
+    ticket.priority = priority if priority in {"Baja", "Normal", "Alta", "Crítica"} else ticket.priority
     ticket.assigned_to = assigned_to.strip() or ticket.assigned_to
-    ticket.resolution = resolution.strip()
+    ticket.due_date = parse_date(due_date) if due_date else None
+    normalized_resolution = resolution.strip()
+    if normalized_resolution and normalized_resolution != ticket.resolution:
+        ticket.resolution = normalized_resolution
+        add_support_message(
+            session, ticket, author_email=str(user["email"]), author_role=str(user["role"]),
+            body=normalized_resolution, message_type="Respuesta técnica", visible_to_client=True,
+        )
+    if previous_priority != ticket.priority and ticket.status in OPEN_STATUSES:
+        ticket.response_due_at = response_deadline(ticket.priority)
     ticket.closed_at = datetime.now(UTC) if ticket.status == "Cerrado" else None
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "ACTUALIZAR", "Soporte", ticket.subject, new_value=ticket.status)
+    if previous_status != ticket.status:
+        add_support_message(
+            session, ticket, author_email=str(user["email"]), author_role=str(user["role"]),
+            body=f"Estado actualizado de {previous_status} a {ticket.status}.",
+            message_type="Cambio de estado", visible_to_client=True,
+        )
+    add_audit(
+        session, int(user["organization_id"]), str(user["email"]), "ACTUALIZAR", "Requerimiento",
+        ticket.public_reference, previous_value=previous_status, new_value=ticket.status,
+    )
     session.commit()
-    set_flash(request, f"Caso #{ticket.id} actualizado.")
-    return RedirectResponse("/soporte", status_code=303)
+    set_flash(request, f"Requerimiento {ticket.public_reference} actualizado.")
+    return RedirectResponse(f"/soporte/{ticket.id}", status_code=303)
+
+
+@app.get("/api/soporte/resumen")
+def support_api_summary(request: Request, session: Session = Depends(get_db)):
+    user = require_user(request)
+    tickets = list(session.scalars(
+        select(SupportTicket).where(SupportTicket.organization_id == int(user["organization_id"])).order_by(SupportTicket.updated_at.desc())
+    ))
+    return {
+        "version": settings.version,
+        "summary": support_summary(tickets),
+        "recent": [
+            {
+                "id": ticket.id,
+                "reference": ticket.public_reference,
+                "subject": ticket.subject,
+                "status": ticket.status,
+                "priority": ticket.priority,
+                "assigned_to": ticket.assigned_to,
+                "overdue": ticket_overdue(ticket),
+            }
+            for ticket in tickets[:10]
+        ],
+    }
+
 
 @app.get("/administracion-saas", response_class=HTMLResponse)
 def saas_admin(request: Request, session: Session = Depends(get_db)):
@@ -4234,6 +4551,11 @@ register_information_routes(
     format_bytes, ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_SIZE, ALLOWED_UNITS,
     DATA_ORIGINS, _parse_excel_period,
 )
+register_capture_routes(
+    app, templates, common_context, require_user, set_flash,
+    parse_date, get_inventory, ensure_inventory_editable, quality_from, safe_filename,
+    ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_SIZE, ALLOWED_UNITS, DATA_ORIGINS,
+)
 register_review_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash,
     parse_date, get_inventory, get_source_for_user, ensure_inventory_editable,
@@ -4242,6 +4564,9 @@ register_review_routes(
 
 register_user_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
+)
+register_service_operations_routes(
+    app, templates, common_context, require_user, ensure_capability
 )
 register_inventory_routes(
     app,
@@ -4261,11 +4586,30 @@ register_inventory_routes(
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
 )
+register_delivery_routes(
+    app, templates, common_context, require_user, get_inventory
+)
+register_experience_routes(
+    app, templates, common_context, require_user, get_inventory
+)
+register_legal_routes(
+    app, templates, current_user
+)
 
 register_methodology_core_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
 )
+register_factor_library_routes(
+    app, templates, common_context, require_user, ensure_capability
+)
 register_methodology_closure_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory, ensure_inventory_editable
+)
+register_land_removals_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory, ensure_inventory_editable
+)
+
+register_product_project_assurance_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory, ensure_inventory_editable
 )
 
@@ -4290,6 +4634,10 @@ register_period_close_routes(
 register_operational_import_routes(
     app, templates, common_context, require_user, set_flash, INSTANCE_DIR, MAX_UPLOAD_SIZE
 )
+register_integration_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash,
+    ensure_inventory_editable, ALLOWED_UNITS,
+)
 register_operations_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
 )
@@ -4298,6 +4646,9 @@ register_demo_routes(
 )
 register_product_intelligence_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, settings
+)
+register_guided_onboarding_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash
 )
 
 @app.get("/modulos", response_class=HTMLResponse)

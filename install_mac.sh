@@ -14,7 +14,7 @@ export SEED_DEMO="${SEED_DEMO:-true}"
 
 mkdir -p "$DATA_DIR" "$DATA_DIR/logs" "$DATA_DIR/backups" "$DATA_DIR/uploads" "$DATA_DIR/reports" "$DATA_DIR/certifications" "$DATA_DIR/import_staging" "$DATA_DIR/mail_outbox"
 
-echo "Calcula tu Huella V0.45.5 · instalación para macOS"
+echo "Calcula tu Huella V1.0.0 · instalación para macOS"
 echo "Arquitectura: $(uname -m)"
 echo "Código: $ROOT"
 echo "Datos persistentes: $DATA_DIR"
@@ -117,7 +117,7 @@ fi
 "$PY" - <<'PYCODE'
 from app.database import init_db
 init_db()
-print("Base de datos V0.45.5 preparada con Alembic.")
+print("Base de datos V1.0.0 preparada con Alembic.")
 PYCODE
 "$PY" scripts/check_ready.py
 

@@ -1,12 +1,12 @@
 from __future__ import annotations
 
+import math
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
-from starlette.middleware.base import BaseHTTPMiddleware
-from starlette.requests import Request
+from .config import settings
 
 
 @dataclass
@@ -16,14 +16,22 @@ class MetricsRegistry:
     latencies: deque[float] = field(default_factory=lambda: deque(maxlen=2000))
     active_requests: int = 0
     errors_5xx: int = 0
+    slow_requests: int = 0
+    collapsed_series: int = 0
 
     def observe(self, method: str, path: str, status: int, duration: float) -> None:
         normalized = self._normalize_path(path)
+        key = (method, normalized, status)
         with self.lock:
-            self.requests_total[(method, normalized, status)] += 1
+            if key not in self.requests_total and len(self.requests_total) >= settings.metrics_max_series:
+                key = (method, "/__other__", status)
+                self.collapsed_series += 1
+            self.requests_total[key] += 1
             self.latencies.append(duration)
             if status >= 500:
                 self.errors_5xx += 1
+            if duration >= settings.slow_request_seconds:
+                self.slow_requests += 1
 
     @staticmethod
     def _normalize_path(path: str) -> str:
@@ -35,19 +43,19 @@ class MetricsRegistry:
                 pieces.append(piece)
         return "/".join(pieces) or "/"
 
+    @staticmethod
+    def _latency_summary(values: list[float]) -> tuple[float, float]:
+        count = len(values)
+        if not count:
+            return 0.0, 0.0
+        average = sum(values) / count
+        # Nearest-rank p95, avoiding the former off-by-one behavior on short samples.
+        p95_index = max(0, min(count - 1, math.ceil(count * 0.95) - 1))
+        return average, values[p95_index]
+
     def snapshot(self) -> dict[str, object]:
         with self.lock:
-            values = sorted(self.latencies)
-            count = len(values)
-            average = sum(values) / count if count else 0.0
-            p95 = values[min(count - 1, int(count * 0.95))] if count else 0.0
-            return {
-                "request_count": sum(self.requests_total.values()),
-                "active_requests": self.active_requests,
-                "errors_5xx": self.errors_5xx,
-                "latency_average_seconds": round(average, 6),
-                "latency_p95_seconds": round(p95, 6),
-            }
+            return self.snapshot_unlocked()
 
     def prometheus(self, version: str, environment: str) -> str:
         with self.lock:
@@ -69,6 +77,12 @@ class MetricsRegistry:
                 "# HELP cth_http_errors_5xx_total Errores HTTP 5xx.",
                 "# TYPE cth_http_errors_5xx_total counter",
                 f"cth_http_errors_5xx_total {snapshot['errors_5xx']}",
+                "# HELP cth_http_slow_requests_total Solicitudes que excedieron el umbral operativo.",
+                "# TYPE cth_http_slow_requests_total counter",
+                f"cth_http_slow_requests_total {snapshot['slow_requests']}",
+                "# HELP cth_http_collapsed_series_total Series de alta cardinalidad consolidadas.",
+                "# TYPE cth_http_collapsed_series_total counter",
+                f"cth_http_collapsed_series_total {snapshot['collapsed_series']}",
                 "# HELP cth_http_latency_average_seconds Latencia promedio reciente.",
                 "# TYPE cth_http_latency_average_seconds gauge",
                 f"cth_http_latency_average_seconds {snapshot['latency_average_seconds']}",
@@ -80,13 +94,14 @@ class MetricsRegistry:
 
     def snapshot_unlocked(self) -> dict[str, object]:
         values = sorted(self.latencies)
-        count = len(values)
-        average = sum(values) / count if count else 0.0
-        p95 = values[min(count - 1, int(count * 0.95))] if count else 0.0
+        average, p95 = self._latency_summary(values)
         return {
             "request_count": sum(self.requests_total.values()),
             "active_requests": self.active_requests,
             "errors_5xx": self.errors_5xx,
+            "slow_requests": self.slow_requests,
+            "collapsed_series": self.collapsed_series,
+            "series_count": len(self.requests_total),
             "latency_average_seconds": round(average, 6),
             "latency_p95_seconds": round(p95, 6),
         }
@@ -95,18 +110,31 @@ class MetricsRegistry:
 metrics = MetricsRegistry()
 
 
-class OperationalMetricsMiddleware(BaseHTTPMiddleware):
-    async def dispatch(self, request: Request, call_next):
+class OperationalMetricsMiddleware:
+    """Pure ASGI metrics middleware with lower overhead than BaseHTTPMiddleware."""
+
+    def __init__(self, app) -> None:
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") != "http":
+            await self.app(scope, receive, send)
+            return
         started = time.perf_counter()
+        status = 500
         with metrics.lock:
             metrics.active_requests += 1
-        status = 500
+
+        async def send_with_status(message):
+            nonlocal status
+            if message.get("type") == "http.response.start":
+                status = int(message.get("status", 500))
+            await send(message)
+
         try:
-            response = await call_next(request)
-            status = response.status_code
-            return response
+            await self.app(scope, receive, send_with_status)
         finally:
             duration = time.perf_counter() - started
             with metrics.lock:
                 metrics.active_requests = max(0, metrics.active_requests - 1)
-            metrics.observe(request.method, request.url.path, status, duration)
+            metrics.observe(str(scope.get("method", "GET")), str(scope.get("path", "/")), status, duration)

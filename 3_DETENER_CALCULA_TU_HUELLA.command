@@ -7,7 +7,7 @@ source "$ROOT/scripts/easy_mac_common.sh"
 export CTH_RUNTIME_DIR="$RUNTIME_DIR"
 cth_easy_prepare "$ROOT"
 clear 2>/dev/null || true
-echo "Calcula tu Huella V0.45 · detener aplicación"
+echo "Calcula tu Huella V1.0.0 · detener aplicación"
 echo
 PID="$(cat "$RUNTIME_DIR/app.pid" 2>/dev/null || true)"
 PORT="$(cat "$RUNTIME_DIR/app.port" 2>/dev/null || true)"

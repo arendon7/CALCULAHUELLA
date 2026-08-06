@@ -23,5 +23,5 @@ export INSTANCE_DIR="$DATA_DIR" DATABASE_URL="sqlite:///$DB_PATH" APP_ENV=local 
 "$PY" - <<'PYCODE'
 from app.database import init_db
 init_db()
-print("Datos demostrativos V0.45 restaurados; el respaldo previo fue conservado.")
+print("Datos demostrativos V1.0.0 restaurados; el respaldo previo fue conservado.")
 PYCODE

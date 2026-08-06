@@ -14,8 +14,7 @@ from app.security import login_throttle, validate_upload_bytes
 
 @pytest.fixture(autouse=True)
 def fresh_database_v024():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -23,7 +22,7 @@ def test_v024_health_and_request_id():
     with TestClient(app) as client:
         response = client.get("/api/health", headers={"X-Request-ID": "test-request-024"})
         assert response.status_code == 200
-        assert response.json()["version"] == "0.45.5"
+        assert response.json()["version"] == "1.0.0"
         assert response.headers["x-request-id"] == "test-request-024"
 
 

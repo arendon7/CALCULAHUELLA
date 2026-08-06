@@ -1,0 +1,165 @@
+{% extends "base.html" %}
+{% block title %}Asistente inicial · Calcula tu Huella{% endblock %}
+{% block page_label %}Configuración inicial / Asistente de decisión{% endblock %}
+{% block content %}
+<div class="page-head guided-setup-head">
+  <div>
+    <p class="breadcrumb">Configuración inicial / Ruta recomendada</p>
+    <h1>Define el inventario antes de pedir datos</h1>
+    <p>El asistente conecta el propósito de la empresa, su operación, la cobertura esperada y la disponibilidad de información para proponer una ruta manejable.</p>
+  </div>
+  <div class="guided-head-actions">
+    <a class="btn btn-outline" href="/onboarding">Ver puesta en marcha</a>
+    <a class="btn btn-outline" href="/onboarding/guiado/checklist.xlsx">Descargar lista inicial</a>
+  </div>
+</div>
+
+<section class="guided-decision-strip" aria-label="Flujo de decisión del inventario">
+  {% for item in ['Propósito','Perfil','Metodología','Inventario','Fuentes','Datos','Factores','Cálculo','Informe','Reducción'] %}
+  <div><span>{{ loop.index }}</span><strong>{{ item }}</strong>{% if not loop.last %}<i>→</i>{% endif %}</div>
+  {% endfor %}
+</section>
+
+<section class="guided-setup-summary card">
+  <div>
+    <span class="eyebrow">ESTADO DEL DIAGNÓSTICO</span>
+    <h2>{{ plan.completion }}% completo</h2>
+    <p>{% if plan.ready_to_apply %}La recomendación tiene información suficiente para aplicarse de forma controlada.{% else %}Completa los campos esenciales para generar una recomendación aplicable.{% endif %}</p>
+  </div>
+  <div class="guided-score" style="--guided-score:{{ plan.completion }}%"><strong>{{ plan.completion }}%</strong><small>perfil inicial</small></div>
+  <div class="guided-summary-next">
+    <small>PRÓXIMA DECISIÓN</small>
+    <strong>{{ plan.next_step.title }}</strong>
+    <span>{{ plan.next_step.result }}</span>
+  </div>
+</section>
+
+<form method="post" action="/onboarding/guiado/guardar" class="guided-setup-wizard" data-guided-setup>
+  <aside class="guided-setup-nav card" aria-label="Pasos del asistente">
+    {% for item in [
+      ('Propósito','Qué debe resolver el inventario'),
+      ('Operación','Cómo funciona la empresa'),
+      ('Cobertura','Qué profundidad se necesita'),
+      ('Información','Qué datos y soportes existen'),
+      ('Gobierno','Quién responde y cuándo')
+    ] %}
+    <button type="button" data-guided-indicator><span>{{ loop.index }}</span><div><strong>{{ item[0] }}</strong><small>{{ item[1] }}</small></div></button>
+    {% endfor %}
+    <div class="guided-setup-progress"><i data-guided-progress></i></div>
+    <p><strong data-guided-counter>Paso 1 de 5</strong><span data-guided-title>Propósito</span></p>
+  </aside>
+
+  <div class="guided-setup-content">
+    <section class="card guided-setup-step" data-guided-step>
+      <div class="section-title"><span>1</span><div><h2>¿Para qué inicia la organización este proceso?</h2><p>El propósito determina la cobertura, el nivel de evidencia y el tipo de entrega que tendrá sentido.</p></div></div>
+      <fieldset class="guided-choice-fieldset">
+        <legend>Objetivo principal</legend>
+        <div class="guided-choice-grid two">
+          {% for option in objectives %}
+          <label class="guided-choice"><input type="radio" name="objective" value="{{ option.code }}" {% if profile.objective == option.code %}checked{% endif %} required><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="form-grid two">
+        <label>Motivación o requerimiento concreto<input name="reporting_driver" value="{{ profile.reporting_driver }}" required maxlength="220"><small>Ejemplo: estrategia interna, solicitud de cliente, licitación, reporte, meta o financiación.</small></label>
+        <label>¿Cómo se reconocerá un resultado útil?<textarea name="success_definition" required maxlength="500">{{ profile.success_definition }}</textarea><small>Define una condición verificable, no solo “conocer la huella”.</small></label>
+      </div>
+      <div class="guided-advice"><b>Decisión técnica</b><p>El inventario debe responder a un uso declarado. La metodología no se elige únicamente por disponibilidad de datos.</p></div>
+    </section>
+
+    <section class="card guided-setup-step" data-guided-step hidden>
+      <div class="section-title"><span>2</span><div><h2>¿Qué tipo de operación se va a representar?</h2><p>Empresas de servicios, plantas, actividades agropecuarias y gestores de residuos tienen fuentes, unidades y límites diferentes.</p></div></div>
+      <fieldset class="guided-choice-fieldset">
+        <legend>Perfil predominante</legend>
+        <div class="guided-choice-grid">
+          {% for option in sectors %}
+          <label class="guided-choice"><input type="radio" name="sector_family" value="{{ option.code }}" {% if profile.sector_family == option.code %}checked{% endif %} required><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <label>Descripción operativa<textarea name="operating_description" required maxlength="1200" placeholder="Describe sedes, procesos, productos o servicios, activos, vehículos, uso de energía, materiales, residuos y actividades tercerizadas.">{{ profile.operating_description }}</textarea><small>Esta descripción será la base para validar fuentes y categorías, no un texto comercial.</small></label>
+      <div class="guided-context-box"><small>ORGANIZACIÓN ACTIVA</small><strong>{{ org.name }}</strong><span>{{ org.sector }} · {{ org.city }}, {{ org.country }}</span></div>
+    </section>
+
+    <section class="card guided-setup-step" data-guided-step hidden>
+      <div class="section-title"><span>3</span><div><h2>¿Qué cobertura y nivel de revisión necesita?</h2><p>La ambición debe ser proporcional al propósito, la madurez de datos y el uso esperado de los resultados.</p></div></div>
+      <fieldset class="guided-choice-fieldset">
+        <legend>Cobertura inicial</legend>
+        <div class="guided-choice-grid three">
+          {% for option in scope_ambitions %}
+          <label class="guided-choice"><input type="radio" name="scope_ambition" value="{{ option.code }}" {% if profile.scope_ambition == option.code %}checked{% endif %} required><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>
+          {% endfor %}
+        </div>
+      </fieldset>
+      <div class="form-grid two">
+        <label>Frecuencia de gestión<select name="reporting_frequency">{% for value in frequencies %}<option {% if profile.reporting_frequency == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+        <label>Nivel de aseguramiento esperado<select name="assurance_ambition">{% for value in assurance_options %}<option {% if profile.assurance_ambition == value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+      </div>
+      <div class="guided-advice warning"><b>Alcance 3 priorizado</b><p>No significa incluir todas las categorías. Primero se evalúan relevancia, influencia, materialidad, objetivo y disponibilidad de información.</p></div>
+    </section>
+
+    <section class="card guided-setup-step" data-guided-step hidden>
+      <div class="section-title"><span>4</span><div><h2>¿Qué tan preparada está la información?</h2><p>La ruta debe reconocer la diferencia entre tener un dato, poder explicarlo y contar con evidencia suficiente.</p></div></div>
+      <div class="form-grid two readiness-grid">
+        <fieldset class="guided-choice-fieldset compact"><legend>Disponibilidad de datos</legend>{% for option in readiness_options %}<label class="guided-choice line"><input type="radio" name="data_readiness" value="{{ option.code }}" {% if profile.data_readiness == option.code %}checked{% endif %} required><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>{% endfor %}</fieldset>
+        <fieldset class="guided-choice-fieldset compact"><legend>Preparación de evidencias</legend>{% for option in readiness_options %}<label class="guided-choice line"><input type="radio" name="evidence_readiness" value="{{ option.code }}" {% if profile.evidence_readiness == option.code %}checked{% endif %} required><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>{% endfor %}</fieldset>
+      </div>
+      <fieldset class="guided-choice-fieldset"><legend>Sistemas y fuentes de información disponibles</legend><div class="guided-system-grid">{% for option in data_system_options %}<label><input type="checkbox" name="data_systems" value="{{ option.code }}" {% if option.code in profile.data_systems %}checked{% endif %}><span><strong>{{ option.label }}</strong><small>{{ option.description }}</small></span></label>{% endfor %}</div></fieldset>
+      <div class="guided-advice"><b>Regla de calidad</b><p>Un dato sin periodo, unidad, responsable y soporte no está listo para cálculo, aunque el valor numérico exista.</p></div>
+    </section>
+
+    <section class="card guided-setup-step" data-guided-step hidden>
+      <div class="section-title"><span>5</span><div><h2>¿Quién gobierna el inventario y cuál será el periodo?</h2><p>La responsabilidad operativa y el patrocinio ejecutivo deben quedar definidos antes de escalar solicitudes.</p></div></div>
+      <div class="form-grid two">
+        <label>Responsable del inventario<input name="inventory_owner" value="{{ profile.inventory_owner }}" required maxlength="160"></label>
+        <label>Patrocinador o decisor ejecutivo<input name="executive_sponsor" value="{{ profile.executive_sponsor }}" required maxlength="160"></label>
+        <label>Fecha inicial<input type="date" name="period_start" value="{{ profile.period_start }}" required></label>
+        <label>Fecha final<input type="date" name="period_end" value="{{ profile.period_end }}" required></label>
+        <label class="span-2">Observaciones y restricciones<textarea name="notes" maxlength="1200" placeholder="Fechas límite, sedes fuera de alcance, disponibilidad parcial, requisitos de clientes u otras condiciones.">{{ profile.notes }}</textarea></label>
+      </div>
+      <div class="guided-review-box"><span>ANTES DE APLICAR</span><div><strong>Guardar no modifica el inventario.</strong><p>Primero verás la recomendación. Solo la acción “Aplicar al inventario” actualizará metodología, límites y fuentes iniciales, sin borrar datos existentes.</p></div></div>
+    </section>
+
+    <div class="guided-wizard-actions">
+      <button type="button" class="btn btn-outline" data-guided-back hidden>Anterior</button>
+      <span></span>
+      <button type="button" class="btn btn-primary" data-guided-next>Continuar</button>
+      <button type="submit" class="btn btn-primary" data-guided-submit hidden>Guardar y generar recomendación</button>
+    </div>
+  </div>
+</form>
+
+<section id="recomendacion" class="guided-recommendation">
+  <div class="section-heading">
+    <div><span class="eyebrow">RUTA RECOMENDADA</span><h2>Una propuesta explicable, no una configuración automática</h2><p>La recomendación se basa en las respuestas guardadas y debe ser confirmada por el equipo responsable.</p></div>
+    <span class="status-badge {{ 'success' if plan.ready_to_apply else 'warning' }}">{{ 'Lista para aplicar' if plan.ready_to_apply else 'Perfil incompleto' }}</span>
+  </div>
+
+  <div class="guided-recommendation-grid">
+    <article class="card"><small>PROPÓSITO</small><h3>{{ plan.objective.label }}</h3><p>{{ plan.deliverable.title }}</p><span>{{ plan.deliverable.review_level }}</span></article>
+    <article class="card"><small>PERFIL SECTORIAL</small><h3>{{ plan.sector.label }}</h3><p>{{ plan.starter_pack.name }}</p><span>{{ plan.starter_pack.source_count }} fuentes iniciales sugeridas</span></article>
+    <article class="card"><small>METODOLOGÍA</small><h3>{{ plan.methodology.methodology }}</h3><p>{{ plan.methodology.gwp_version }}</p><span>Materialidad inicial: {{ plan.methodology.materiality_threshold }}%</span></article>
+    <article class="card"><small>COBERTURA</small><h3>{{ plan.scope.label }}</h3><ul>{% for item in plan.scopes %}<li>{{ item }}</li>{% endfor %}</ul></article>
+  </div>
+
+  <div class="guided-route-map card">
+    {% for item in plan.route %}
+    {% if can_open_route(user, item.route) %}<a href="{{ item.route }}" class="guided-route-item {{ item.status|lower|replace(' ','-') }}"><span>{{ item.number }}</span><div><strong>{{ item.title }}</strong><small>{{ item.result }}</small></div><em>{{ item.status }}</em></a>{% else %}<div class="guided-route-item {{ item.status|lower|replace(' ','-') }}"><span>{{ item.number }}</span><div><strong>{{ item.title }}</strong><small>{{ item.result }} · gestionado por otro rol</small></div><em>{{ item.status }}</em></div>{% endif %}
+    {% endfor %}
+  </div>
+
+  <div class="guided-methodology-notes">
+    <article class="card"><h3>Controles sectoriales</h3><ul>{% for item in plan.sector_notes %}<li>{{ item }}</li>{% endfor %}</ul></article>
+    <article class="card"><h3>Fuentes de información declaradas</h3>{% if plan.data_system_labels %}<div class="tag-list">{% for item in plan.data_system_labels %}<span>{{ item }}</span>{% endfor %}</div>{% else %}<p>No se han declarado sistemas de información.</p>{% endif %}<p class="method-note">La lista descargable convierte estas decisiones en fuentes, unidades, responsables y evidencias esperadas.</p></article>
+  </div>
+
+  {% if user.can_manage_inventory %}
+  <form method="post" action="/onboarding/guiado/aplicar" class="guided-apply card">
+    <div><span class="eyebrow">APLICACIÓN CONTROLADA</span><h3>{{ 'Actualizar el inventario activo' if inventory else 'Crear el primer inventario' }}</h3><p>{% if inventory %}Se actualizarán objetivo y configuración metodológica y se agregarán únicamente fuentes faltantes. No se borrarán registros, evidencias ni factores.{% else %}Se creará el inventario con el periodo, la metodología y las fuentes iniciales recomendadas.{% endif %}</p></div>
+    {% if inventory %}<input type="hidden" name="inventory_id" value="{{ inventory.id }}">{% endif %}
+    <fieldset><legend>Operaciones incluidas</legend>{% for facility in facilities %}<label><input type="checkbox" name="facility_ids" value="{{ facility.id }}" {% if facility.id in selected_facilities %}checked{% endif %}><span>{{ facility.name }} · {{ facility.city }}</span></label>{% else %}<p>No hay sedes configuradas. El inventario se mantendrá a nivel corporativo.</p>{% endfor %}</fieldset>
+    <button class="btn btn-primary" type="submit" {% if not plan.ready_to_apply %}disabled aria-disabled="true"{% endif %}>{{ 'Aplicar al inventario' if inventory else 'Crear inventario recomendado' }}</button>
+  </form>
+  {% endif %}
+</section>
+{% endblock %}

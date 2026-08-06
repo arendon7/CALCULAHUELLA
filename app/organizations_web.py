@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 from .database import get_db
 from .repositories.organizations import get_organization
 from .services.organizations import create_facility, update_facility, update_organization
+from .service_operations import ensure_capacity
 
 
 def register_organization_routes(
@@ -75,6 +76,7 @@ def register_organization_routes(
         user: dict = Depends(require_user),
     ):
         ensure_capability(user, "manage_org")
+        ensure_capacity(session, int(user["organization_id"]), "facilities", 1)
         facility = create_facility(
             session,
             int(user["organization_id"]),

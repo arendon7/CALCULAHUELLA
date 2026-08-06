@@ -32,6 +32,12 @@ from .database import (
     ComplianceRequirement,
     DocumentControlRecord,
     InventoryMethodologySnapshot,
+    ProductFootprintStudy,
+    ProductLifeCycleStage,
+    MitigationProject,
+    MitigationMonitoringPeriod,
+    AssuranceEngagement,
+    AssuranceFinding,
     INSTANCE_DIR,
 )
 
@@ -80,6 +86,12 @@ def create_verification_package(session: Session, inventory: Inventory, generate
     methodology_snapshots = list(session.scalars(
         select(InventoryMethodologySnapshot).where(InventoryMethodologySnapshot.inventory_id == inventory.id)
     ))
+    product_studies = list(session.scalars(select(ProductFootprintStudy).where(ProductFootprintStudy.inventory_id == inventory.id)))
+    product_stages = list(session.scalars(select(ProductLifeCycleStage).join(ProductFootprintStudy).where(ProductFootprintStudy.inventory_id == inventory.id)))
+    mitigation_projects = list(session.scalars(select(MitigationProject).where(MitigationProject.inventory_id == inventory.id)))
+    mitigation_periods = list(session.scalars(select(MitigationMonitoringPeriod).join(MitigationProject).where(MitigationProject.inventory_id == inventory.id)))
+    assurance_engagements = list(session.scalars(select(AssuranceEngagement).where(AssuranceEngagement.inventory_id == inventory.id)))
+    assurance_findings = list(session.scalars(select(AssuranceFinding).join(AssuranceEngagement).where(AssuranceEngagement.inventory_id == inventory.id)))
 
     _write_csv(work / "01_fuentes.csv", ["ID", "Fuente", "Alcance", "Categoría", "Sede", "Incluida", "Progreso", "Emisiones tCO2e"], [
         [item.id, item.name, item.scope, item.category, item.facility.name if item.facility else "Corporativo", item.included, item.progress, item.emissions]
@@ -135,6 +147,30 @@ def create_verification_package(session: Session, inventory: Inventory, generate
         [item.snapshot_name, item.status, item.methodology_name, item.methodology_version, item.gwp_version, item.consolidation_approach, item.materiality_threshold, item.approved_by, item.approved_at or ""]
         for item in methodology_snapshots
     ])
+    _write_csv(work / "14_huellas_producto.csv", ["ID", "Producto", "Unidad declarada", "Flujo referencia", "Límite", "Metodología", "PCR", "Asignación", "Calidad", "Estado"], [
+        [item.id, item.product_name, item.declared_unit, item.reference_flow, item.boundary, item.methodology, item.pcr_reference, item.allocation_method, item.data_quality_rating, item.status]
+        for item in product_studies
+    ])
+    _write_csv(work / "15_etapas_producto.csv", ["Estudio ID", "Etapa", "Tipo", "Actividad", "Valor", "Unidad", "Factor", "Unidad salida", "tCO2e", "Fuente", "Evidencia", "Excluida"], [
+        [item.study_id, f"{item.stage_code} · {item.stage_name}", item.accounting_type, item.activity_name, item.activity_value, item.activity_unit, item.factor_value, item.factor_output_unit, item.calculated_tco2e, item.data_source, item.evidence_reference, item.excluded]
+        for item in product_stages
+    ])
+    _write_csv(work / "16_proyectos_mitigacion.csv", ["ID", "Proyecto", "Tipo", "Metodología", "Inicio", "Fin", "Línea base", "Proyecto", "Fugas", "Remociones", "Reducción estimada", "Estado"], [
+        [item.id, item.name, item.project_type, item.methodology, item.start_date, item.end_date, item.estimated_baseline_tco2e, item.estimated_project_tco2e, item.estimated_leakage_tco2e, item.estimated_removals_tco2e, item.estimated_reduction_tco2e, item.status]
+        for item in mitigation_projects
+    ])
+    _write_csv(work / "17_monitoreo_mitigacion.csv", ["Proyecto ID", "Inicio", "Fin", "Línea base", "Proyecto", "Fugas", "Remociones", "Reducción", "Incertidumbre", "Evidencia", "Estado"], [
+        [item.project_id, item.period_start, item.period_end, item.baseline_tco2e, item.project_tco2e, item.leakage_tco2e, item.removals_tco2e, item.reduction_tco2e, item.uncertainty_percentage, item.evidence_reference, item.status]
+        for item in mitigation_periods
+    ])
+    _write_csv(work / "18_encargos_aseguramiento.csv", ["ID", "Sujeto", "Referencia", "Tipo", "Estándar", "Nivel", "Materialidad", "Organismo", "Verificador", "Estado", "Opinión", "Fecha declaración"], [
+        [item.id, item.subject_type, item.subject_reference, item.engagement_type, item.standard, item.assurance_level, item.materiality_percent, item.verifier_organization, item.lead_verifier, item.status, item.opinion, item.statement_date or ""]
+        for item in assurance_engagements
+    ])
+    _write_csv(work / "19_hallazgos_aseguramiento.csv", ["Encargo ID", "Área", "Título", "Descripción", "Severidad", "Estado", "Evidencia", "Respuesta", "Conclusión"], [
+        [item.engagement_id, item.area, item.title, item.description, item.severity, item.status, item.evidence_reference, item.management_response, item.verifier_conclusion]
+        for item in assurance_findings
+    ])
 
     copied = []
     for document in documents:
@@ -173,6 +209,9 @@ def create_verification_package(session: Session, inventory: Inventory, generate
             "solicitudes_proveedores": len(supplier_requests), "respuestas_proveedores": len(supplier_responses),
             "controles_cumplimiento": len(compliance), "documentos_controlados": len(controlled_documents),
             "snapshots_metodologicos": len(methodology_snapshots),
+            "huellas_producto": len(product_studies), "etapas_producto": len(product_stages),
+            "proyectos_mitigacion": len(mitigation_projects), "periodos_monitoreo": len(mitigation_periods),
+            "encargos_aseguramiento": len(assurance_engagements), "hallazgos_aseguramiento": len(assurance_findings),
         },
         "archivos_copiados": copied,
     }

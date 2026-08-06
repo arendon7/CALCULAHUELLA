@@ -1,0 +1,75 @@
+{
+  "iteration": 12,
+  "focus": "UX, recorridos por rol y simplificación visual",
+  "date": "2026-08-05",
+  "navigation": {
+    "essential_items_by_role": {
+      "Cliente": 6,
+      "Consultor": 8,
+      "Revisor": 7,
+      "Verificador": 7,
+      "Administrador": 8
+    },
+    "mobile_primary_actions": 4,
+    "mobile_more_button": true,
+    "complete_view_preserved": true,
+    "role_specific_next_action": true
+  },
+  "task_surfaces": {
+    "information_panels": 3,
+    "source_panels": 5,
+    "journey_stages": 6,
+    "default_activity_rows": 12,
+    "demo_activity_rows_available": 44,
+    "keyboard_task_navigation": true,
+    "deep_links_by_hash": true
+  },
+  "demo_portfolio": {
+    "organizations": 5,
+    "sectors": 5,
+    "facilities": 14,
+    "inventories": 6,
+    "sources": 37,
+    "activity_records": 290,
+    "calculations": 338,
+    "evidence": 19,
+    "requests": 17,
+    "observations": 15,
+    "guided_profiles_complete": 5,
+    "companies": [
+      "Greenatics",
+      "Industrias Andinas",
+      "Café Sierra Verde",
+      "Ruta Norte Logística",
+      "Hotel Bosque Azul"
+    ]
+  },
+  "visual_review": {
+    "screenshots": 25,
+    "desktop_roles": 5,
+    "mobile_roles": 2,
+    "surfaces": [
+      "dashboard",
+      "inventory journey",
+      "information and evidence",
+      "demo portfolio"
+    ]
+  },
+  "tests": {
+    "macos": {"passed": 404, "failed": 0, "skipped": 0},
+    "windows": {"passed": 401, "failed": 0, "skipped": 3},
+    "windows_skip_reason": "Pruebas exclusivas del instalador y ciclo de vida macOS"
+  },
+  "code_validation": {
+    "python_files": 166,
+    "html_templates": 80,
+    "mac_windows_app_identical": true,
+    "mac_windows_tests_identical": true,
+    "javascript_syntax_valid": true
+  },
+  "methodology_changed": false,
+  "factor_values_changed": false,
+  "calculation_formulas_changed": false,
+  "calculation_core_hash_unchanged": true,
+  "land_removals_core_hash_unchanged": true
+}

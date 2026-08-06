@@ -87,7 +87,7 @@ def register_pilot_execution_routes(app, templates, common_context, require_user
         return Response(
             content=content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": 'attachment; filename="piloto_greenatics_v0_45_datos_y_contraste.xlsx"'},
+            headers={"Content-Disposition": 'attachment; filename="piloto_greenatics_v0_46_1_datos_y_contraste.xlsx"'},
         )
 
     @app.post("/piloto-greenatics/ejecucion/importar")
@@ -99,8 +99,9 @@ def register_pilot_execution_routes(app, templates, common_context, require_user
     ):
         if not ({"provide_data", "manage_inventory"} & set(user["capabilities"])):
             raise HTTPException(403, "Tu rol no puede importar datos del piloto")
-        content = await file.read()
-        if len(content) > settings.max_upload_mb * 1024 * 1024:
+        limit = settings.max_upload_mb * 1024 * 1024
+        content = await file.read(limit + 1)
+        if len(content) > limit:
             raise HTTPException(413, "El archivo supera el tamaño máximo permitido")
         ok, message, _ = validate_upload_bytes(file.filename or "datos.xlsx", content, file.content_type or "", {".xlsx"})
         if not ok:
@@ -126,8 +127,9 @@ def register_pilot_execution_routes(app, templates, common_context, require_user
     ):
         if not ({"manage_inventory", "review", "approve"} & set(user["capabilities"])):
             raise HTTPException(403, "Tu rol no puede importar el contraste")
-        content = await file.read()
-        if len(content) > settings.max_upload_mb * 1024 * 1024:
+        limit = settings.max_upload_mb * 1024 * 1024
+        content = await file.read(limit + 1)
+        if len(content) > limit:
             raise HTTPException(413, "El archivo supera el tamaño máximo permitido")
         ok, message, _ = validate_upload_bytes(file.filename or "contraste.xlsx", content, file.content_type or "", {".xlsx"})
         if not ok:

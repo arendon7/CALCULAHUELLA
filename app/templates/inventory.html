@@ -2,7 +2,7 @@
 {% block title %}{{ inventory.name }} · Calcula tu Huella{% endblock %}
 {% block page_label %}Inventarios / {{ inventory.name }}{% endblock %}
 {% block content %}
-<div class="page-head inventory-head"><div><p class="breadcrumb">Inventarios / {{ inventory.name }}</p><h1>{{ inventory.name }} <span class="status-chip active">{{ inventory.status }}</span></h1><p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ inventory.methodology }}</p></div><div class="head-actions">{% if user.can_manage_inventory %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">⚙ Configurar</a>{% endif %}<a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/fuentes">Gestionar fuentes</a></div></div>
+<div class="page-head inventory-head"><div><p class="breadcrumb">Inventarios / {{ inventory.name }}</p><h1>{{ inventory.name }} <span class="status-chip active">{{ inventory.status }}</span></h1><p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ inventory.methodology }}</p></div><div class="head-actions">{% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">⚙ Configurar</a>{% elif inventory.locked %}<a class="btn btn-outline" href="/control">Ver control de versión</a>{% endif %}<a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/fuentes">Gestionar fuentes</a></div></div>
 
 <div class="kpi-grid five">
   <article class="mini-card"><small>PROGRESO GENERAL</small><strong>{{ inventory.progress }}%</strong><div class="progress"><i style="width:{{inventory.progress}}%"></i></div></article>

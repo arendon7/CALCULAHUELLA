@@ -4,9 +4,9 @@
 {% block content %}
 <section class="page-heading consolidation-heading">
   <div>
-    <span class="eyebrow">CONSOLIDACIÓN, AUDITORÍA Y ARQUITECTURA · V0.45</span>
-    <h1>Preparación controlada de V1.0</h1>
-    <p>Separa el núcleo climático, los módulos avanzados y la administración interna; controla deuda, puertas de salida, permisos y recorridos reales.</p>
+    <span class="eyebrow">CONSOLIDACIÓN, AUDITORÍA Y ARQUITECTURA</span>
+    <h1>V1.0 final y puerta de producción</h1>
+    <p>Confirma el cierre funcional, la aceptación metodológica y jurídica interna, y separa el despliegue controlado de la producción pública.</p>
   </div>
   <div class="page-actions">
     <a class="button secondary" href="/modulos">Mapa del producto</a>
@@ -15,7 +15,7 @@
 </section>
 
 <section class="kpi-grid five consolidation-kpis">
-  <article class="kpi-card featured"><div class="kpi-icon green">V1</div><div><small>PREPARACIÓN CONTROLADA</small><strong>{{ summary.readiness_score }} %</strong><p>No equivale a certificación ni autorización de lanzamiento.</p></div></article>
+  <article class="kpi-card featured"><div class="kpi-icon green">V1</div><div><small>CIERRE FUNCIONAL</small><strong>{{ summary.readiness_score }} %</strong><p>El porcentaje refleja gobierno interno; la producción pública conserva controles externos.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">▦</div><div><small>MÓDULOS REGISTRADOS</small><strong>{{ summary.module_count }}</strong><p>Tres capas de producto.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">!</div><div><small>HALLAZGOS ABIERTOS</small><strong>{{ summary.open_findings }}</strong><p>{{ summary.critical_open }} críticos.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">◆</div><div><small>PUERTAS APROBADAS</small><strong>{{ summary.approved_gates }}/{{ summary.gate_count }}</strong><p>Condiciones mínimas de salida.</p></div></article>
@@ -27,9 +27,40 @@
   <p>No se agregan nuevos dominios funcionales. Cada cambio debe reducir deuda, mejorar confiabilidad metodológica, validar un recorrido o cerrar una condición de salida.</p>
 </section>
 
+<section class="card" id="candidata-v1">
+  <div class="card-head">
+    <div><small>V1.0.0 FINAL · ALCANCE CONGELADO</small><h3>Puerta de liberación verificable</h3></div>
+    <span class="consolidation-status {{ 'status-aprobado' if summary.release_candidate.controlled_release_ready else ('status-en-revision' if summary.release_candidate.package_ready else 'status-bloqueado') }}">{{ summary.release_candidate.status }}</span>
+  </div>
+  <p class="helper-text">La V1.0 final puede utilizarse en despliegues controlados con acompañamiento. La producción pública exige además infraestructura real, pruebas físicas de Windows e intervención de seguridad independiente.</p>
+  <div class="architecture-metrics">
+    <div><small>Paquete interno</small><strong>{{ 'APROBADO' if summary.release_candidate.package_ready else 'PENDIENTE' }}</strong></div>
+    <div><small>Aceptación interna</small><strong>{{ 'APROBADO' if summary.release_candidate.internal_ready else 'PENDIENTE' }}</strong></div>
+    <div><small>Despliegue controlado</small><strong>{{ 'APROBADO' if summary.release_candidate.controlled_release_ready else 'PENDIENTE' }}</strong></div>
+    <div><small>Producción pública</small><strong>{{ 'APROBADO' if summary.release_candidate.production_ready else 'PENDIENTE' }}</strong></div>
+    <div><small>Controles superados</small><strong>{{ summary.release_candidate.passed }}/{{ summary.release_candidate.total }}</strong></div>
+  </div>
+  <div class="four-column release-candidate-columns">
+    {% for title, checks in [('Paquete interno', summary.release_candidate.package_checks), ('Gobierno', summary.release_candidate.governance_checks), ('Aceptación interna', summary.release_candidate.internal_checks), ('Producción pública', summary.release_candidate.external_checks)] %}
+    <article class="panel compact">
+      <h4>{{ title }}</h4>
+      <div class="check-list">
+        {% for check in checks %}
+        <div class="check-row"><span class="check-icon {{ 'ok' if check.ok else 'warn' }}">{{ '✓' if check.ok else '!' }}</span><div><strong>{{ check.label }}</strong><small>{{ check.detail }}</small></div></div>
+        {% endfor %}
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="page-actions">
+    <a class="button secondary" href="/consolidacion/exportar.xlsx">Descargar matriz de aceptación</a>
+    <a class="button secondary" href="/api/consolidacion/resumen" target="_blank" rel="noopener">Ver evidencia JSON</a>
+  </div>
+</section>
+
 <section class="card" id="arquitectura-dominios">
   <div class="card-head">
-    <div><small>MODULARIZACIÓN V0.45</small><h3>Propiedad explícita de rutas y persistencia por dominios</h3></div>
+    <div><small>MODULARIZACIÓN CONTROLADA</small><h3>Propiedad explícita de rutas y persistencia por dominios</h3></div>
     <span class="counter">{{ domain_architecture.owned_route_count }} rutas extraídas</span>
   </div>
   <div class="architecture-metrics">
@@ -58,7 +89,7 @@
   <p class="alert error">Rutas duplicadas: {{ domain_architecture.duplicate_paths|join(', ') }}</p>
   {% endif %}
   <div class="card-head architecture-subhead">
-    <div><small>PERSISTENCIA V0.45</small><h3>Modelos, repositorios y servicios por dominio</h3></div>
+    <div><small>PERSISTENCIA POR DOMINIOS</small><h3>Modelos, repositorios y servicios por dominio</h3></div>
     <span class="counter">{{ domain_architecture.persistence.model_class_count }} modelos</span>
   </div>
   <div class="architecture-metrics">
@@ -88,7 +119,7 @@
       <header><span>{{ loop.index }}</span><div><strong>{{ layer.name }}</strong><small>{{ layer.modules|length }} módulos</small></div></header>
       <div class="layer-modules">
         {% for module in layer.modules %}
-        <a href="{{ module.route }}"><b>{{ module.name }}</b><small>{{ module.audience }} · {{ module.version }}</small></a>
+        {% if can_open_route(user, module.route) %}<a href="{{ module.route }}"><b>{{ module.name }}</b><small>{{ module.audience }} · {{ module.version }}</small></a>{% else %}<div class="permission-note"><b>{{ module.name }}</b><small>{{ module.audience }} · gestionado por otro rol</small></div>{% endif %}
         {% endfor %}
       </div>
     </article>
@@ -167,7 +198,7 @@
     <article class="journey-card">
       <header><div><span>{{ journey.code }}</span><h4>{{ journey.name }}</h4><small>Rol: {{ journey.role }}</small></div><span class="consolidation-status status-{{ journey.validation.status|lower|replace(' ','-') if journey.validation else 'no-probado' }}">{{ journey.validation.status if journey.validation else 'No probado' }}</span></header>
       <p>{{ journey.objective }}</p>
-      <ol>{% for step, route in journey.steps %}<li><a href="{{ route }}">{{ step }}</a><small>{{ route }}</small></li>{% endfor %}</ol>
+      <ol>{% for step, route in journey.steps %}<li>{% if can_open_route(user, route) %}<a href="{{ route }}">{{ step }}</a>{% else %}<span>{{ step }}</span>{% endif %}<small>{{ route }}</small></li>{% endfor %}</ol>
       {% if journey.validation and user.can_manage_consolidation %}
       <form method="post" action="/consolidacion/recorridos/{{ journey.validation.id }}" class="journey-form">
         <select name="status">{% for option in ['No probado','En prueba','Con bloqueos','Aprobado'] %}<option {% if option==journey.validation.status %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>

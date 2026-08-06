@@ -14,6 +14,8 @@ from .database import DeploymentRehearsal, OperationalIncident, ReleaseCertifica
 from .deployment_readiness import readiness_summary, run_deployment_rehearsal, upsert_external_alert
 from .observability import metrics
 from .release_certification import latest_certification, resolve_certification_artifact, run_release_certification
+from .production_readiness import production_profile, sanitized_environment_template
+from .security import secure_secret_matches
 from .operations import (
     create_backup,
     diagnostic_snapshot,
@@ -67,6 +69,7 @@ def register_operations_routes(
             .limit(30)
         ))
         readiness = readiness_summary(session, organization_id)
+        production = production_profile(snapshot, readiness, backups)
         return templates.TemplateResponse(
             request=request,
             name="operations.html",
@@ -84,6 +87,7 @@ def register_operations_routes(
                 readiness=readiness,
                 metrics_snapshot=metrics.snapshot(),
                 app_settings=settings,
+                production_profile=production,
             ),
         )
 
@@ -107,10 +111,17 @@ def register_operations_routes(
             "RESPALDAR",
             "Sistema",
             str(result["name"]),
-            detail=f"SHA-256 {result['sha256']}",
+            detail=f"SHA-256 {result['sha256']} · firmado={result.get('signed')} · réplica={result.get('offsite_key') or 'no'}",
         )
         session.commit()
-        set_flash(request, f"Respaldo generado: {result['name']}")
+        message = f"Respaldo generado: {result['name']}"
+        if result.get("signed"):
+            message += " · manifiesto firmado"
+        if result.get("offsite_key"):
+            message += " · réplica externa confirmada"
+        elif result.get("offsite_error"):
+            message += f" · réplica pendiente: {result['offsite_error']}"
+        set_flash(request, message)
         return RedirectResponse("/operacion", status_code=303)
 
     @app.get("/operacion/respaldos/{name}")
@@ -379,10 +390,14 @@ def register_operations_routes(
         ensure_capability(user, "manage_operations")
         summary = readiness_summary(session, int(user["organization_id"]))
         latest = summary["latest"]
+        snapshot = diagnostic_snapshot()
+        backups = list_backups()
+        profile = production_profile(snapshot, summary, backups)
         return {
             "ready": summary["ready"],
             "blockers": summary["blockers"],
             "checks": summary["checks"],
+            "production_profile": profile,
             "open_incidents": len(summary["open_incidents"]),
             "latest": None if latest is None else {
                 "id": latest.id,
@@ -394,6 +409,16 @@ def register_operations_routes(
         }
 
 
+    @app.get("/operacion/configuracion/plantilla", response_class=PlainTextResponse)
+    def operations_environment_template(user: dict = Depends(require_user)):
+        ensure_capability(user, "manage_operations")
+        return PlainTextResponse(
+            sanitized_environment_template(),
+            media_type="text/plain; charset=utf-8",
+            headers={"Content-Disposition": 'attachment; filename="calculatuhuella.env.production.template"'},
+        )
+
+
     @app.post("/api/operacion/alertas")
     def operations_alert_webhook(
         payload: dict = Body(...),
@@ -402,7 +427,7 @@ def register_operations_routes(
         session: Session = Depends(get_db),
     ):
         supplied = x_alert_secret or authorization.removeprefix("Bearer ").strip()
-        if not settings.alert_webhook_secret or supplied != settings.alert_webhook_secret:
+        if not secure_secret_matches(supplied, settings.alert_webhook_secret):
             raise HTTPException(401, "Secreto de alertas inválido")
         alerts = payload.get("alerts") if isinstance(payload.get("alerts"), list) else []
         first_alert = alerts[0] if alerts else {}
@@ -429,7 +454,7 @@ def register_operations_routes(
     def prometheus_metrics(request: Request):
         token = settings.metrics_token
         supplied = request.headers.get("authorization", "")
-        if token and supplied != f"Bearer {token}":
+        if token and not secure_secret_matches(supplied.removeprefix("Bearer ").strip(), token):
             raise HTTPException(401, "Token de métricas inválido")
         if settings.is_production and not token:
             raise HTTPException(503, "METRICS_TOKEN no configurado")

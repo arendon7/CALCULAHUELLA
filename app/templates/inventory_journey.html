@@ -4,60 +4,51 @@
 {% block content %}
 <div class="page-head journey-page-head">
   <div>
-    <p class="breadcrumb">Inicio / Recorrido del inventario</p>
-    <h1>Un solo proceso, cinco etapas</h1>
-    <p>Consulta qué está terminado, qué bloquea el avance y cuál es la siguiente decisión del inventario {{ inventory.name }}.</p>
+    <p class="breadcrumb">Inicio / Recorrido</p>
+    <h1>Tu ruta para completar el inventario</h1>
+    <p>Seis etapas ordenadas. Abre únicamente la que necesitas y conserva el contexto de lo que ocurre después.</p>
   </div>
   <div class="head-actions">
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Configurar inventario</a>
-    {% if journey.actions %}<a class="btn btn-primary" href="{{ journey.actions[0].href }}">Continuar trabajo</a>{% endif %}
+    <span class="period-chip">{{ inventory.name }} · {{ journey.score }}%</span>
+    {% if journey.actions %}<a class="btn btn-primary" href="{{ journey.actions[0].href }}">Continuar tarea prioritaria</a>{% endif %}
   </div>
 </div>
 
-<section class="journey-hero card">
-  <div>
-    <span class="eyebrow">VISTA DE {{ user.role|upper }}</span>
-    <h2>{{ journey.profile.name }}</h2>
-    <p>{{ journey.profile.mission }}</p>
-  </div>
-  <div class="journey-score">
-    <strong>{{ journey.score }}%</strong>
-    <span>{{ journey.completed }} de {{ journey.total }} etapas completas</span>
-    <div class="progress"><i style="width:{{ journey.score }}%"></i></div>
-  </div>
-</section>
-
-<section class="journey-timeline">
-  {% for step in journey.steps %}
-  <article class="journey-stage card {% if step.done %}done{% elif step.current %}current{% endif %}">
-    <div class="journey-stage-number">{{ '✓' if step.done else step.number }}</div>
-    <div class="journey-stage-body">
-      <div class="journey-stage-head">
-        <div><small>ETAPA {{ step.number }}</small><h2>{{ step.name }}</h2></div>
-        <span class="status-badge {% if step.done %}active{% elif step.current %}warning{% else %}neutral{% endif %}">{{ 'Completada' if step.done else 'En curso' if step.current else 'Pendiente' }}</span>
-      </div>
-      <p>{{ step.description }}</p>
-      <div class="journey-stage-meta">
-        <span><b>Responsable:</b> {{ step.owner }}</span>
-        <span><b>Estado:</b> {{ step.detail }}</span>
-      </div>
-      <a class="journey-stage-link" href="{{ step.href }}">{{ 'Revisar etapa' if step.done else 'Abrir y continuar' }} →</a>
-    </div>
-  </article>
-  {% endfor %}
+<section class="journey-role-strip card">
+  <div><span class="eyebrow">VISTA DE {{ user.role|upper }}</span><strong>{{ journey.profile.name }}</strong><p>{{ journey.profile.focus }}</p></div>
+  <div class="journey-role-progress"><strong>{{ journey.score }}%</strong><span>{{ journey.completed }} de {{ journey.total }} etapas</span><div class="progress"><i style="width:{{ journey.score }}%"></i></div></div>
 </section>
 
 {% if journey.actions %}
-<section class="card journey-priorities">
-  <div class="card-head"><div><small>PRIORIDADES DEL ROL</small><h3>Qué requiere atención ahora</h3></div><span class="counter">{{ journey.actions|length }}</span></div>
-  <div class="journey-action-grid">
-    {% for action in journey.actions %}<a href="{{ action.href }}" class="journey-action-card"><span class="status-badge {% if action.priority == 'Alta' %}warning{% endif %}">{{ action.priority }}</span><strong>{{ action.title }}</strong><small>{{ action.detail }}</small><b>→</b></a>{% endfor %}
-  </div>
+<section class="journey-next-action card">
+  <div><small>LO MÁS IMPORTANTE AHORA</small><h2>{{ journey.actions[0].title }}</h2><p>{{ journey.actions[0].detail }}</p></div>
+  <div><span class="status-badge {% if journey.actions[0].priority == 'Alta' %}warning{% endif %}">{{ journey.actions[0].priority }}</span><a class="btn btn-primary" href="{{ journey.actions[0].href }}">Abrir tarea →</a></div>
 </section>
 {% endif %}
 
-<section class="card journey-rule">
-  <strong>Regla de experiencia de producto</strong>
-  <p>Los módulos avanzados siguen disponibles en la vista completa, pero el inventario se opera desde este recorrido. Ninguna capacidad adicional debe ocultar el siguiente paso del proceso principal.</p>
+<section class="journey-stage-list" aria-label="Etapas del inventario">
+  {% for step in journey.steps %}
+  <details class="journey-stage-row card {% if step.done %}done{% elif step.current %}current{% endif %}" {% if step.current %}open{% endif %} data-exclusive-details="journey-stage">
+    <summary>
+      <span class="journey-stage-number">{{ '✓' if step.done else step.number }}</span>
+      <span class="journey-stage-summary"><small>ETAPA {{ step.number }}</small><strong>{{ step.name }}</strong><em>{{ step.detail }}</em></span>
+      <span class="status-badge {% if step.done %}active{% elif step.current %}warning{% else %}neutral{% endif %}">{{ 'Completada' if step.done else 'En curso' if step.current else 'Pendiente' }}</span>
+    </summary>
+    <div class="journey-stage-detail">
+      <p>{{ step.description }}</p>
+      <div><span><b>Responsable</b>{{ step.owner }}</span><span><b>Resultado esperado</b>{{ step.detail }}</span></div>
+      {% if can_open_route(user, step.href) %}<a class="btn {{ 'btn-primary' if step.current else 'btn-outline' }}" href="{{ step.href }}">{{ 'Continuar esta etapa' if step.current else 'Abrir etapa' }} →</a>{% else %}<span class="permission-note">Esta etapa corresponde a otro rol.</span>{% endif %}
+    </div>
+  </details>
+  {% endfor %}
 </section>
+
+{% if journey.actions|length > 1 %}
+<details class="card journey-secondary-actions">
+  <summary><span><small>OTRAS PRIORIDADES</small><strong>Ver {{ journey.actions|length - 1 }} tareas adicionales</strong></span></summary>
+  <div class="journey-action-grid">
+    {% for action in journey.actions[1:] %}<a href="{{ action.href }}" class="journey-action-card"><span class="status-badge {% if action.priority == 'Alta' %}warning{% endif %}">{{ action.priority }}</span><strong>{{ action.title }}</strong><small>{{ action.detail }}</small><b>→</b></a>{% endfor %}
+  </div>
+</details>
+{% endif %}
 {% endblock %}

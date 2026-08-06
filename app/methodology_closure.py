@@ -101,7 +101,11 @@ def save_policy(session: Session, inventory: Inventory, payload: dict[str, Any],
 
 
 def calculation_uncertainty(activity_uncertainty: float, factor_uncertainty: float) -> float:
-    return math.sqrt(max(activity_uncertainty, 0.0) ** 2 + max(factor_uncertainty, 0.0) ** 2)
+    activity = float(activity_uncertainty)
+    factor = float(factor_uncertainty)
+    if not math.isfinite(activity) or not math.isfinite(factor) or activity < 0 or factor < 0:
+        raise ValueError("Las incertidumbres deben ser números finitos mayores o iguales a cero.")
+    return math.sqrt(activity ** 2 + factor ** 2)
 
 
 def uncertainty_summary(session: Session, inventory: Inventory) -> dict[str, Any]:
@@ -130,6 +134,13 @@ def uncertainty_summary(session: Session, inventory: Inventory) -> dict[str, Any
         if float(row.activity_data.uncertainty_percentage or 0) <= 0
         or float(row.factor_version.uncertainty_percentage or 0) <= 0
     )
+    large_uncertainty_calculations = sum(
+        1 for row in gross_rows
+        if max(
+            float(row.activity_data.uncertainty_percentage or 0),
+            float(row.factor_version.uncertainty_percentage or 0),
+        ) > 30
+    )
     calculated_source_ids = {row.activity_data.source_id for row in gross_rows}
     uncovered_sources = [
         source for source in gross_sources
@@ -155,6 +166,12 @@ def uncertainty_summary(session: Session, inventory: Inventory) -> dict[str, Any
         "coverage_percentage": round(emission_coverage, 1),
         "emission_coverage_percentage": round(emission_coverage, 1),
         "calculation_coverage_percentage": round(calculation_coverage, 1),
+        "large_uncertainty_calculations": large_uncertainty_calculations,
+        "approach1_suitable": large_uncertainty_calculations == 0,
+        "method_note": (
+            "Approach 1 supone entradas aproximadamente independientes, simétricas y, como guía, menores o iguales a 30 %. "
+            "Los límites mostrados son un rango orientativo, no una certificación estadística."
+        ),
         "complete": missing == 0 and emission_coverage >= 99.9,
     }
 
@@ -182,6 +199,11 @@ def methodological_readiness(session: Session, inventory: Inventory, policy: dic
         ("Tratamiento contable", treatments_ok, "Clasificar cada fuente como emisión bruta, biogénica, remoción, evitada o compensación."),
         ("Alcance 2", not scope2["unclassified"], "Clasificar las fuentes de alcance 2 como location-based o market-based."),
         ("Incertidumbre", uncertainty["complete"], "Documentar incertidumbre del dato, del factor y de toda fuente bruta con emisiones."),
+        (
+            "Adecuación del método de incertidumbre",
+            uncertainty["approach1_suitable"] or "approach 2" in str(policy.get("uncertainty_method", "")).lower(),
+            "Cuando las entradas superen 30 % o sean asimétricas/correlacionadas, justificar una variante o usar Approach 2/Monte Carlo.",
+        ),
         ("Casos patrón", bool(validation and validation.status == "Aprobado"), "Ejecutar y aprobar la batería metodológica independiente."),
         ("Política de año base", float(policy.get("base_year_recalculation_threshold") or 0) > 0, "Definir un umbral cuantitativo de recalculo."),
     ]

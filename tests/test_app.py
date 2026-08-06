@@ -84,8 +84,7 @@ from app.climate_disclosure import scenario_comparison, disclosure_summary, boar
 
 @pytest.fixture(autouse=True)
 def fresh_database():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -138,7 +137,7 @@ def test_health():
     with TestClient(app) as client:
         response = client.get("/api/health")
         assert response.status_code == 200
-        assert response.json()["version"] == "0.45.5"
+        assert response.json()["version"] == "1.0.0"
 
 
 def test_core_pages_load():
@@ -148,7 +147,7 @@ def test_core_pages_load():
             "/dashboard", "/recorrido-inventario", "/inventarios", "/inventarios/1", "/inventarios/1/editar",
             "/inventarios/1/fuentes", "/fuentes/1", "/organizacion", "/informacion",
             "/informacion/importar", "/cargas-operativas", "/calculos", "/metodologia", "/metodologia/nucleo", "/piloto-greenatics", "/analisis", "/reduccion",
-            "/control", "/reportes", "/modulos", "/sectorizacion", "/escenarios", "/verificacion", "/cadena-valor", "/notificaciones",
+            "/control", "/entrega-profesional", "/reportes", "/modulos", "/sectorizacion", "/escenarios", "/verificacion", "/cadena-valor", "/notificaciones",
             "/direccion-ejecutiva", "/cumplimiento", "/gobierno-metodologico", "/centro-documental", "/consolidacion",
             "/cuenta-servicio", "/onboarding", "/soporte", "/comercial", "/operacion-comercial", "/exito-cliente", "/inteligencia-impacto",
         ]
@@ -257,7 +256,7 @@ def test_formula_snapshot_and_factor_traceability():
         assert calculation is not None
         assert "GWP" in calculation.formula_snapshot
         assert calculation.factor_version_id is not None
-        assert calculation.engine_version == "0.45.0"
+        assert calculation.engine_version == "1.1.0"
 
 
 def test_observation_response_and_closure_workflow():
@@ -688,7 +687,7 @@ def test_admin_can_generate_and_download_backup():
         login(client, "admin@calculatuhuella.local")
         page = client.get("/operacion")
         assert page.status_code == 200
-        assert "Operación, seguridad y respaldos" in page.text
+        assert "Preparación productiva, seguridad y continuidad" in page.text
         response = client.post("/operacion/respaldos", data={"label": "prueba"}, follow_redirects=False)
         assert response.status_code == 303
         archive = next(BACKUP_DIR.glob("*prueba.zip"))
@@ -970,8 +969,17 @@ def test_service_account_has_seeded_subscription_and_plans():
 
 def test_onboarding_item_can_be_completed():
     with SessionLocal() as session:
-        item = session.scalar(select(CustomerOnboardingItem).where(CustomerOnboardingItem.status != "Completado").order_by(CustomerOnboardingItem.id))
+        consultor = session.scalar(select(AppUser).where(AppUser.email == "consultor@calculatuhuella.local"))
+        assert consultor is not None
+        item = session.scalar(
+            select(CustomerOnboardingItem)
+            .where(CustomerOnboardingItem.organization_id == consultor.organization_id)
+            .order_by(CustomerOnboardingItem.id)
+        )
         assert item is not None
+        item.status = "Pendiente"
+        item.completed_at = None
+        session.commit()
         item_id = item.id
     with TestClient(app) as client:
         login(client, "consultor@calculatuhuella.local")

@@ -13,6 +13,7 @@ from sqlalchemy.orm import Session
 from .access_control import ROLE_ORDER, permission_matrix
 from .database import ConsolidationFinding, JourneyValidation, ReleaseGate
 from .product_registry import PRODUCT_MODULES, ROLE_JOURNEYS, product_layers
+from .release_candidate import release_candidate_summary
 
 OPEN_FINDING_STATUSES = {"Abierto", "En curso", "Bloqueado"}
 READY_GATE_STATUSES = {"Aprobado", "Completado"}
@@ -84,6 +85,14 @@ def consolidation_summary(session: Session, organization_id: int, project_dir: P
     journey_score = round(len(validated_journeys) / max(len(ROLE_JOURNEYS), 1) * 100)
     debt_penalty = min(50, len(critical_open) * 10 + max(0, len(open_findings) - len(critical_open)) * 2)
     readiness_score = max(0, round(gate_score * 0.65 + journey_score * 0.35 - debt_penalty))
+    candidate = release_candidate_summary(
+        project_dir,
+        critical_open=len(critical_open),
+        approved_gates=len(approved_gates),
+        gate_count=len(gates),
+        validated_journeys=len(validated_journeys),
+        journey_count=len(ROLE_JOURNEYS),
+    )
 
     return {
         "metrics": codebase_metrics(project_dir),
@@ -103,6 +112,7 @@ def consolidation_summary(session: Session, organization_id: int, project_dir: P
         "readiness_score": readiness_score,
         "finding_counts": dict(Counter(item.status for item in findings)),
         "gate_counts": dict(Counter(item.status for item in gates)),
+        "release_candidate": candidate,
     }
 
 
@@ -125,6 +135,19 @@ def build_consolidation_workbook(summary: dict[str, object]) -> bytes:
     findings_ws.append(["Código", "Área", "Título", "Prioridad", "Estado", "Responsable", "Versión objetivo", "Detalle", "Evidencia"])
     for item in summary["findings"]:
         findings_ws.append([item.code, item.area, item.title, item.priority, item.status, item.owner, item.target_version, item.detail, item.evidence])
+
+    candidate_ws = wb.create_sheet("Liberación V1")
+    candidate_ws.append(["Versión", summary["release_candidate"]["version"]])
+    candidate_ws.append(["Estado", summary["release_candidate"]["status"]])
+    candidate_ws.append(["Paquete interno", "Aprobado" if summary["release_candidate"]["package_ready"] else "Pendiente"])
+    candidate_ws.append(["Gobierno de release", "Aprobado" if summary["release_candidate"]["governance_ready"] else "Pendiente"])
+    candidate_ws.append(["Aceptación interna", "Aprobado" if summary["release_candidate"]["internal_ready"] else "Pendiente"])
+    candidate_ws.append(["Despliegue controlado", "Aprobado" if summary["release_candidate"]["controlled_release_ready"] else "Pendiente"])
+    candidate_ws.append(["Producción pública", "Aprobado" if summary["release_candidate"]["production_ready"] else "Pendiente"])
+    candidate_ws.append([])
+    candidate_ws.append(["Código", "Grupo", "Control", "Estado", "Detalle"])
+    for item in summary["release_candidate"]["checks"]:
+        candidate_ws.append([item["code"], item["group"], item["label"], "Aprobado" if item["ok"] else "Pendiente", item["detail"]])
 
     gates_ws = wb.create_sheet("Puertas V1")
     gates_ws.append(["Código", "Categoría", "Puerta", "Estado", "Responsable", "Evidencia", "Notas"])
@@ -172,5 +195,6 @@ def summary_json(summary: dict[str, object]) -> str:
         "validated_journeys": summary["validated_journeys"],
         "journey_count": summary["journey_count"],
         "metrics": summary["metrics"],
+        "release_candidate": summary["release_candidate"],
     }
     return json.dumps(serializable, ensure_ascii=False, default=str)

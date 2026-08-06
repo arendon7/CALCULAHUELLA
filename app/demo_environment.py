@@ -11,11 +11,13 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
 from .config import INSTANCE_DIR, settings
+from .product_experience import demo_story_for
 from .database import (
     ActivityData,
     ActivityIndicator,
     AppUser,
     DataRequest,
+    CustomerOnboardingItem,
     DemoEnvironmentCertification,
     EmissionCalculation,
     EmissionFactor,
@@ -43,7 +45,7 @@ from .database import (
     refresh_progress,
 )
 
-DEMO_ORGANIZATIONS = ("Industrias Andinas", "Greenatics")
+DEMO_ORGANIZATIONS = ("Industrias Andinas", "Greenatics", "Café Sierra Verde", "Ruta Norte Logística", "Hotel Bosque Azul")
 DEMO_CERT_DIR = INSTANCE_DIR / "certifications" / "demo"
 DEMO_CERT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -225,10 +227,11 @@ def _ensure_activity_series(
     evidence: EvidenceDocument | None = None,
     estimated_from_month: int = 9,
     origin: str = "Registro operativo",
+    year: int = 2026,
 ) -> None:
     existing_months = set(session.scalars(select(ActivityData.period_start).where(ActivityData.source_id == source.id)))
     for month, value in enumerate(values, 1):
-        period = date(2026, month, 1)
+        period = date(year, month, 1)
         if period in existing_months:
             continue
         estimated = month >= estimated_from_month
@@ -620,22 +623,335 @@ def _enrich_andinas(session: Session) -> Organization:
     return organization
 
 
+
+ADDITIONAL_DEMO_SPECS: tuple[dict[str, Any], ...] = (
+    {
+        "trade_name": "Café Sierra Verde",
+        "name": "Café Sierra Verde Demo S.A.S.",
+        "tax_id": "901.700.201-DEMO",
+        "sector": "Agroindustria",
+        "ciiu": "A0123",
+        "city": "Jardín",
+        "employees": 74,
+        "revenue": 7_900_000_000,
+        "contact": "Lucía Gómez",
+        "email": "sostenibilidad@cafesierraverde.demo",
+        "inventory": "Inventario cafetero 2026 · Demo",
+        "objective": "Medir finca, beneficio, energía y logística para priorizar reducción y responder a compradores internacionales.",
+        "status": "En recolección",
+        "stage": "Recolección",
+        "facilities": [
+            ("Finca La Esperanza", "Unidad productiva agrícola", "Jardín", 32),
+            ("Beneficiadero central", "Planta de beneficio", "Jardín", 28),
+            ("Bodega Medellín", "Centro de distribución", "Medellín", 14),
+        ],
+        "sources": [
+            {"name": "Electricidad del beneficiadero", "facility": "Beneficiadero central", "scope": 2, "category": "Energía adquirida", "responsible": "Jefatura de beneficio", "unit": "kWh", "factor": ["Electricidad SIN Colombia · inventarios 2024"], "values": [6120, 5980, 6340, 6510, 6720, 6890, 7010, 6950], "estimated_from": 9},
+            {"name": "Diésel de maquinaria agrícola", "facility": "Finca La Esperanza", "scope": 1, "category": "Combustión móvil", "responsible": "Operaciones agrícolas", "unit": "gal", "factor": ["Diésel B10 Colombia · CO2 FECOC transcrito"], "values": [96, 88, 101, 112, 109, 118, 121, 116], "estimated_from": 9},
+            {"name": "Fertilizante nitrogenado", "facility": "Finca La Esperanza", "scope": 1, "category": "Suelos gestionados", "responsible": "Agronomía", "unit": "kg", "factor": ["Fertilizante sintético en clima húmedo · EF1"], "values": [860, 0, 740, 0, 920, 0, 680, 0], "estimated_from": 9},
+            {"name": "Residuos orgánicos del beneficio", "facility": "Beneficiadero central", "scope": 3, "category": "Residuos operacionales", "responsible": "Gestión ambiental", "unit": "t", "factor": ["Residuos gestionados · demo"], "values": [3.2, 2.8, 4.1, 5.4, 6.2, 5.9, 4.8, 3.7], "estimated_from": 9},
+            {"name": "Transporte de café a puerto", "facility": None, "scope": 3, "category": "Transporte y distribución", "responsible": "Logística", "unit": "t·km", "factor": ["Transporte de carga · demo"], "values": [16800, 15400, 17200, 18100, 19400, 20200, 18700, 17600], "estimated_from": 7},
+        ],
+        "requests": [
+            ("Completar guías de transporte septiembre–diciembre", "Transporte de café a puerto", "Logística", "Pendiente"),
+            ("Conciliar compras de fertilizante por lote", "Fertilizante nitrogenado", "Agronomía", "En revisión"),
+            ("Validar facturas del beneficiadero", "Electricidad del beneficiadero", "Jefatura de beneficio", "Completada"),
+        ],
+        "observations": [
+            ("Transporte con meses estimados", "Transporte de café a puerto", "Mayor", "Abierta"),
+            ("Trazabilidad de fertilizante por lote", "Fertilizante nitrogenado", "Menor", "En corrección"),
+            ("Muestra eléctrica conciliada", "Electricidad del beneficiadero", "Informativa", "Cerrada"),
+        ],
+        "reductions": [
+            ("Secado solar y eficiencia del beneficiadero", "Electricidad del beneficiadero", 8.6, 58_000_000, 19_000_000, "En evaluación"),
+            ("Optimizar rutas de exportación", "Transporte de café a puerto", 11.4, 18_000_000, 27_000_000, "Diseño"),
+        ],
+    },
+    {
+        "trade_name": "Ruta Norte Logística",
+        "name": "Ruta Norte Logística Demo S.A.S.",
+        "tax_id": "901.700.202-DEMO",
+        "sector": "Transporte y logística",
+        "ciiu": "H4923",
+        "city": "Bello",
+        "employees": 128,
+        "revenue": 15_400_000_000,
+        "contact": "Mateo Restrepo",
+        "email": "operaciones@rutanorte.demo",
+        "inventory": "Inventario logístico 2025 · Demo",
+        "objective": "Consolidar flota propia, centros logísticos y transporte subcontratado para revisión técnica.",
+        "status": "En revisión",
+        "stage": "Revisión",
+        "facilities": [
+            ("Centro logístico Bello", "Centro de distribución", "Bello", 66),
+            ("Patio de flota Itagüí", "Patio de operación", "Itagüí", 44),
+            ("Bodega Cartagena", "Centro logístico", "Cartagena", 18),
+        ],
+        "sources": [
+            {"name": "Diésel de flota propia", "facility": "Patio de flota Itagüí", "scope": 1, "category": "Combustión móvil", "responsible": "Jefatura de flota", "unit": "gal", "factor": ["Diésel B10 Colombia · CO2 FECOC transcrito"], "values": [3280, 3140, 3360, 3410, 3550, 3620, 3490, 3710, 3650, 3780, 3690, 3820], "estimated_from": 13},
+            {"name": "Gasolina de vehículos de apoyo", "facility": "Centro logístico Bello", "scope": 1, "category": "Combustión móvil", "responsible": "Servicios generales", "unit": "gal", "factor": ["Gasolina E10 Colombia · CO2 FECOC transcrito"], "values": [210, 198, 226, 219, 232, 241, 235, 247, 239, 251, 246, 254], "estimated_from": 13},
+            {"name": "Electricidad de centros logísticos", "facility": "Centro logístico Bello", "scope": 2, "category": "Energía adquirida", "responsible": "Administración", "unit": "kWh", "factor": ["Electricidad SIN Colombia · inventarios 2024"], "values": [14200, 13800, 14550, 14920, 15100, 15440, 15800, 16120, 15980, 16450, 16700, 17020], "estimated_from": 13},
+            {"name": "Refrigerantes de cadena de frío", "facility": "Bodega Cartagena", "scope": 1, "category": "Emisiones fugitivas", "responsible": "Mantenimiento", "unit": "kg", "factor": ["Refrigerante · demo"], "frequency": "Anual", "values": [14.2], "estimated_from": 2},
+            {"name": "Transporte subcontratado", "facility": None, "scope": 3, "category": "Transporte y distribución", "responsible": "Planeación", "unit": "t·km", "factor": ["Transporte de carga · demo"], "values": [88000, 84500, 91200, 93400, 95800, 97100, 94600, 99500, 100200, 103100, 101800, 105400], "estimated_from": 12},
+        ],
+        "requests": [
+            ("Explicar variación de diésel en agosto", "Diésel de flota propia", "Jefatura de flota", "En revisión"),
+            ("Adjuntar mantenimiento de refrigeración", "Refrigerantes de cadena de frío", "Mantenimiento", "Completada"),
+            ("Confirmar muestra de transportadores", "Transporte subcontratado", "Planeación", "Completada"),
+        ],
+        "observations": [
+            ("Conciliar kilómetros y combustible", "Diésel de flota propia", "Mayor", "En corrección"),
+            ("Muestra de contratistas suficiente", "Transporte subcontratado", "Menor", "Cerrada"),
+            ("Balance anual de refrigerante", "Refrigerantes de cadena de frío", "Informativa", "Cerrada"),
+        ],
+        "reductions": [
+            ("Telemetría y conducción eficiente", "Diésel de flota propia", 14.7, 95_000_000, 74_000_000, "Piloto"),
+            ("Renovación gradual de refrigeración", "Refrigerantes de cadena de frío", 5.2, 120_000_000, 22_000_000, "Diseño"),
+        ],
+    },
+    {
+        "trade_name": "Hotel Bosque Azul",
+        "name": "Hotel Bosque Azul Demo S.A.S.",
+        "tax_id": "901.700.203-DEMO",
+        "sector": "Servicios y hotelería",
+        "ciiu": "I5511",
+        "city": "Santa Marta",
+        "employees": 96,
+        "revenue": 12_600_000_000,
+        "contact": "Valentina Ruiz",
+        "email": "sostenibilidad@bosqueazul.demo",
+        "inventory": "Inventario hotelero 2025 · Demo",
+        "objective": "Presentar un inventario compacto y completo para comité directivo y clientes corporativos.",
+        "status": "Aprobado",
+        "stage": "Entrega",
+        "locked": True,
+        "facilities": [
+            ("Hotel principal", "Hotel", "Santa Marta", 82),
+            ("Centro administrativo", "Oficina", "Santa Marta", 14),
+        ],
+        "sources": [
+            {"name": "Electricidad del hotel", "facility": "Hotel principal", "scope": 2, "category": "Energía adquirida", "responsible": "Mantenimiento", "unit": "kWh", "factor": ["Electricidad SIN Colombia · inventarios 2024"], "values": [48600, 47200, 50100, 51800, 53600, 55200, 56800, 56100, 54400, 52700, 50900, 49300], "estimated_from": 13},
+            {"name": "GLP de cocina y lavandería", "facility": "Hotel principal", "scope": 1, "category": "Combustión fija", "responsible": "Alimentos y mantenimiento", "unit": "gal", "factor": ["GLP · equivalencia regulatoria Colombia"], "values": [740, 710, 765, 782, 810, 836, 845, 832, 798, 776, 754, 731], "estimated_from": 13},
+            {"name": "Refrigerantes y aire acondicionado", "facility": "Hotel principal", "scope": 1, "category": "Emisiones fugitivas", "responsible": "Mantenimiento", "unit": "kg", "factor": ["Refrigerante · demo"], "frequency": "Anual", "values": [9.8], "estimated_from": 2},
+            {"name": "Residuos de huéspedes y cocina", "facility": "Hotel principal", "scope": 3, "category": "Residuos operacionales", "responsible": "Servicios generales", "unit": "t", "factor": ["Residuos gestionados · demo"], "values": [8.1, 7.6, 8.7, 9.2, 9.8, 10.4, 10.8, 10.5, 9.7, 9.1, 8.5, 8.0], "estimated_from": 13},
+            {"name": "Traslados terrestres contratados", "facility": None, "scope": 3, "category": "Transporte y distribución", "responsible": "Experiencia del huésped", "unit": "t·km", "factor": ["Transporte de carga · demo"], "values": [3600, 3420, 3890, 4010, 4180, 4360, 4510, 4420, 4210, 3980, 3770, 3650], "estimated_from": 13},
+        ],
+        "requests": [
+            ("Aprobar presentación para comité", None, "Gerencia general", "Completada"),
+            ("Archivar certificado del gestor de residuos", "Residuos de huéspedes y cocina", "Servicios generales", "Completada"),
+            ("Confirmar balance de refrigerante", "Refrigerantes y aire acondicionado", "Mantenimiento", "Completada"),
+        ],
+        "observations": [
+            ("Consistencia energía-ocupación verificada", "Electricidad del hotel", "Informativa", "Cerrada"),
+            ("Soporte anual de refrigerantes validado", "Refrigerantes y aire acondicionado", "Menor", "Cerrada"),
+            ("Certificados de residuos completos", "Residuos de huéspedes y cocina", "Informativa", "Cerrada"),
+        ],
+        "reductions": [
+            ("Sistema solar y gestión energética", "Electricidad del hotel", 21.5, 680_000_000, 164_000_000, "Aprobada"),
+            ("Separación y aprovechamiento de orgánicos", "Residuos de huéspedes y cocina", 7.9, 34_000_000, 18_000_000, "En implementación"),
+        ],
+    },
+)
+
+
+def _ensure_additional_demo_company(session: Session, spec: dict[str, Any]) -> Organization:
+    organization = session.scalar(select(Organization).where(Organization.trade_name == spec["trade_name"]))
+    if not organization:
+        organization = Organization(
+            name=spec["name"], trade_name=spec["trade_name"], tax_id=spec["tax_id"],
+            sector=spec["sector"], ciiu_code=spec["ciiu"], country="Colombia", department="Antioquia",
+            city=spec["city"], employees=spec["employees"], annual_revenue=spec["revenue"],
+            contact_name=spec["contact"], contact_email=spec["email"], status="Activa",
+        )
+        session.add(organization)
+        session.flush()
+    _ensure_setting(session, organization.id, "demo_dataset", "true", "Organización con datos sintéticos Iteración 11")
+    _ensure_setting(session, organization.id, "demo_disclaimer", "Todos los datos son de ejemplo", "Aviso obligatorio del entorno demo")
+    _ensure_memberships(session, organization.id)
+
+    facilities_by_name = {item.name: item for item in session.scalars(select(Facility).where(Facility.organization_id == organization.id))}
+    for name, facility_type, city, employees in spec["facilities"]:
+        if name not in facilities_by_name:
+            facility = Facility(
+                organization_id=organization.id, name=name, facility_type=facility_type,
+                city=city, address="Ubicación demostrativa", employees=employees, operational_control=True,
+            )
+            session.add(facility)
+            session.flush()
+            facilities_by_name[name] = facility
+
+    inventory = session.scalar(select(Inventory).where(
+        Inventory.organization_id == organization.id, Inventory.name == spec["inventory"],
+    ))
+    if not inventory:
+        inventory = Inventory(
+            organization_id=organization.id, name=spec["inventory"], start_date=date(2025, 1, 1), end_date=date(2025, 12, 31),
+            objective=spec["objective"], base_year=2025, methodology="GHG Protocol + ISO 14064-1",
+            methodology_version="GHG Protocol Corporate Standard · ISO 14064-1:2018", gwp_version="IPCC AR6 · 100 años",
+            consolidation_approach="Control operacional", materiality_threshold=5, status=spec["status"],
+            progress=0, current_stage=spec["stage"], notes="ENTORNO DEMOSTRATIVO. Datos sintéticos para explicar el recorrido sectorial.",
+            version="1.0-demo", locked=False,
+        )
+        session.add(inventory)
+        session.flush()
+
+    linked = set(session.scalars(select(InventoryFacility.facility_id).where(InventoryFacility.inventory_id == inventory.id)))
+    for facility in facilities_by_name.values():
+        if facility.id not in linked:
+            session.add(InventoryFacility(inventory_id=inventory.id, facility_id=facility.id, included=True, inclusion_percentage=100))
+
+    sources_by_name = {item.name: item for item in session.scalars(select(EmissionSource).where(EmissionSource.inventory_id == inventory.id))}
+    for source_spec in spec["sources"]:
+        source = sources_by_name.get(source_spec["name"])
+        facility = facilities_by_name.get(source_spec.get("facility"))
+        if not source:
+            source = EmissionSource(
+                inventory_id=inventory.id, facility_id=facility.id if facility else None, name=source_spec["name"],
+                scope=source_spec["scope"], category=source_spec["category"], responsible=source_spec["responsible"],
+                materiality="Alta" if source_spec["scope"] in {1, 2} else "Media", data_frequency=source_spec.get("frequency", "Mensual"),
+                preferred_unit=source_spec["unit"], scope2_method="location-based" if source_spec["scope"] == 2 else "No aplica", icon="activity",
+            )
+            session.add(source)
+            session.flush()
+            sources_by_name[source.name] = source
+        _ensure_factor_assignments(session, source, source_spec["factor"])
+        rows = [["Periodo", "Valor", "Unidad"]] + [[f"2025-{month:02d}", value, source_spec["unit"]] for month, value in enumerate(source_spec["values"], 1)]
+        filename = f"demo_{organization.id}_{source.id}_{source.name.lower().replace(' ', '_')[:45]}.csv"
+        evidence = _ensure_evidence_csv(session, inventory, source, filename, "Registro operativo", "2025", rows)
+        _ensure_activity_series(
+            session, source, source_spec["values"], source_spec["unit"], evidence=evidence,
+            estimated_from_month=source_spec.get("estimated_from", 13), origin="Registro operativo sintético", year=2025,
+        )
+
+    for title, source_name, owner, status in spec["requests"]:
+        _ensure_request(
+            session, inventory, sources_by_name.get(source_name) if source_name else None, title, owner,
+            date(2026, 9, 30), status, "Solicitud sintética para demostrar responsables, vencimientos y cierre.",
+        )
+    for title, source_name, severity, status in spec["observations"]:
+        _ensure_observation(
+            session, inventory, sources_by_name.get(source_name) if source_name else None, title,
+            "Hallazgo demostrativo con evidencia y respuesta trazables.", severity, status,
+            sources_by_name[source_name].responsible if source_name else "Equipo ambiental",
+        )
+    for title, source_name, reduction, investment, savings, status in spec["reductions"]:
+        exists = session.scalar(select(ReductionAction).where(ReductionAction.inventory_id == inventory.id, ReductionAction.title == title))
+        if not exists:
+            session.add(ReductionAction(
+                inventory_id=inventory.id, source_id=sources_by_name[source_name].id if source_name else None,
+                title=title, description="Acción sintética para comparar reducción, inversión, ahorro y avance.",
+                expected_reduction=reduction, investment_cost=investment, annual_savings=savings, priority="Alta",
+                responsible="Equipo de sostenibilidad", target_date=date(2027, 12, 31), status=status,
+                progress_percent=75 if status in {"Aprobada", "En implementación"} else 35, created_by="consultor@calculatuhuella.local",
+            ))
+
+    users = {user.role: user for user in session.scalars(select(AppUser).where(AppUser.email.like("%@calculatuhuella.local")))}
+    if users.get("Administrador"):
+        story = demo_story_for(spec["trade_name"]) or {}
+        _ensure_notification(
+            session, organization.id, users["Administrador"], f"{spec['trade_name']} lista para recorrer",
+            str(story.get("summary", "Caso sectorial demostrativo con datos, cálculos y controles.")), "/dashboard", "Demo", "Alta",
+        )
+    if users.get("Cliente"):
+        _ensure_notification(session, organization.id, users["Cliente"], "Revisa tus tareas del caso demo", "Consulta solicitudes, evidencias y observaciones del proceso sectorial.", "/informacion", "Solicitud", "Normal")
+    _ensure_support_ticket(session, organization.id, "¿Qué debo revisar primero en este caso?", "Consulta de orientación para recorrer el caso sectorial sin abrir todos los módulos.", status="Cerrado", resolution="Usa el Centro de trabajo y sigue la acción prioritaria del caso.")
+    _ensure_support_ticket(session, organization.id, "Validación metodológica del caso sectorial", "Caso abierto de ejemplo para mostrar acompañamiento técnico y trazabilidad.", category="Metodología", priority="Normal", status="Abierto")
+
+    session.flush()
+    refresh_progress(session, inventory)
+    from .calculations import recalculate_inventory
+    recalculate_inventory(session, inventory)
+    inventory.status = spec["status"]
+    inventory.current_stage = spec["stage"]
+    if spec.get("locked"):
+        inventory.progress = 100
+        inventory.locked = True
+        inventory.approved_by = "comite-demo@calculatuhuella.local"
+        inventory.approved_at = datetime.now(UTC)
+        inventory.closed_by = "comite-demo@calculatuhuella.local"
+        inventory.closed_at = datetime.now(UTC)
+    add_audit(session, organization.id, "sistema-demo-iter11", "PREPARAR", "Caso demostrativo", spec["trade_name"], f"{spec['sector']} · {spec['stage']}")
+    return organization
+
+
+def _ensure_demo_readiness(session: Session, organization: Organization) -> None:
+    """Keep each synthetic case coherent: populated data must not look unconfigured."""
+    inventory = session.scalar(
+        select(Inventory)
+        .where(Inventory.organization_id == organization.id)
+        .order_by(Inventory.start_date.desc(), Inventory.id.desc())
+        .limit(1)
+    )
+    if not inventory:
+        return
+
+    from .guided_onboarding import default_profile, save_profile
+
+    profile = default_profile(organization, today=inventory.end_date)
+    phase = str((demo_story_for(organization.trade_name) or {}).get("phase", "")).casefold()
+    profile.update({
+        "objective": "verification" if "aprobado" in phase or "revisión" in phase else "management",
+        "reporting_driver": "Demostración sectorial y gestión interna",
+        "success_definition": "Recorrer un expediente sectorial coherente con datos, evidencia, cálculo y decisiones visibles.",
+        "operating_description": f"Caso sintético de {organization.sector} con procesos, sedes y fuentes representativas para demostración.",
+        "scope_ambition": "advanced" if organization.trade_name in {"Industrias Andinas", "Ruta Norte Logística"} else "prioritized",
+        "reporting_frequency": "Mensual",
+        "assurance_ambition": "Preparación para verificación limitada" if "revisión" in phase or "aprobado" in phase else "Revisión técnica dirigida",
+        "data_readiness": "high" if inventory.status == "Aprobado" else "medium",
+        "evidence_readiness": "high" if inventory.status == "Aprobado" else "medium",
+        "data_systems": ["spreadsheets", "meters", "documents"],
+        "inventory_owner": organization.contact_name or "Responsable ambiental demo",
+        "executive_sponsor": "Gerencia demostrativa",
+        "period_start": inventory.start_date.isoformat(),
+        "period_end": inventory.end_date.isoformat(),
+        "notes": "Perfil sintético preparado para la demostración multiempresa de la Iteración 12.",
+    })
+    save_profile(session, organization, profile, actor_email="sistema-demo-iter12")
+
+    onboarding_specs = (
+        ("ORG-01", "Organización", "Completar información legal y operativa", "Cliente", 10),
+        ("USR-01", "Accesos", "Invitar responsables y definir roles", "Administrador", 20),
+        ("MET-01", "Metodología", "Aprobar metodología y límites", "Consultor", 30),
+        ("DAT-01", "Información", "Cargar el primer conjunto de datos", "Cliente", 40),
+        ("CAL-01", "Cálculo", "Validar el primer cálculo trazable", "Consultor", 50),
+        ("REP-01", "Entrega", "Preparar la primera entrega", "Consultor", 60),
+    )
+    for code, category, title, owner, order in onboarding_specs:
+        row = session.scalar(select(CustomerOnboardingItem).where(
+            CustomerOnboardingItem.organization_id == organization.id,
+            CustomerOnboardingItem.code == code,
+        ))
+        if not row:
+            row = CustomerOnboardingItem(
+                organization_id=organization.id, code=code, category=category, title=title,
+                description=f"Actividad completada para el caso demostrativo {organization.trade_name}.",
+                owner=owner, display_order=order,
+            )
+            session.add(row)
+        row.status = "Completado"
+        row.updated_by = "sistema-demo-iter12"
+        row.completed_at = row.completed_at or datetime.now(UTC)
+
+
 def ensure_demo_environment(session: Session) -> dict[str, object]:
     if not settings.seed_demo:
         raise ValueError("El entorno demostrativo está desactivado. Configura SEED_DEMO=true solo fuera de producción.")
     andinas = _enrich_andinas(session)
     greenatics = _ensure_greenatics(session)
+    additional = [_ensure_additional_demo_company(session, spec) for spec in ADDITIONAL_DEMO_SPECS]
     from .services.product_intelligence import ensure_demo_product_intelligence
     ensure_demo_product_intelligence(session)
+    for organization in (andinas, greenatics, *additional):
+        _ensure_demo_readiness(session, organization)
     session.flush()
     return {
-        "organizations": [andinas.id, greenatics.id],
+        "organizations": [andinas.id, greenatics.id, *[item.id for item in additional]],
         "summary": demo_environment_summary(session),
     }
 
 
 def _org_summary(session: Session, organization: Organization) -> dict[str, object]:
-    inventories = list(session.scalars(select(Inventory).where(Inventory.organization_id == organization.id)))
+    inventories = list(session.scalars(select(Inventory).where(Inventory.organization_id == organization.id).order_by(Inventory.start_date.desc(), Inventory.id.desc())))
     inventory_ids = [item.id for item in inventories]
     source_ids: list[int] = []
     if inventory_ids:
@@ -672,6 +988,9 @@ def _org_summary(session: Session, organization: Organization) -> dict[str, obje
         "assessment_status": assessment.status if assessment else "Pendiente",
         "implementation_plans": int(plan_count),
         "total_emissions": round(sum(float(source.emissions or 0) for source in session.scalars(select(EmissionSource).where(EmissionSource.inventory_id.in_(inventory_ids)))) if inventory_ids else 0, 3),
+        "latest_inventory_status": inventories[0].status if inventories else "Sin inventario",
+        "current_stage": inventories[0].current_stage if inventories else "Sin iniciar",
+        "demo_story": demo_story_for(organization.trade_name),
     }
 
 
@@ -702,24 +1021,22 @@ def certify_demo_environment(
     session.flush()
     summary = demo_environment_summary(session)
     by_name = {row["trade_name"]: row for row in summary["organizations"]}
-    greenatics = by_name.get("Greenatics", {})
-    andinas = by_name.get("Industrias Andinas", {})
-    greenatics_org = session.scalar(select(Organization).where(Organization.trade_name == "Greenatics").options(selectinload(Organization.facilities)))
-    andinas_org = session.scalar(select(Organization).where(Organization.trade_name == "Industrias Andinas").options(selectinload(Organization.facilities)))
-    greenatics_sites = {item.name for item in greenatics_org.facilities} if greenatics_org else set()
-    andinas_sites = {item.name for item in andinas_org.facilities} if andinas_org else set()
+    rows = list(by_name.values())
+    stages = {str(row.get("current_stage", "")) for row in rows}
+    sectors = {str(row.get("sector", "")) for row in rows}
     checks = [
-        {"code": "two_companies", "label": "Greenatics y Andinas disponibles", "ok": summary["organization_count"] == 2, "critical": True, "detail": f"{summary['organization_count']} organizaciones demo"},
-        {"code": "greenatics_sites", "label": "Sedes Greenatics", "ok": {"Planta Yarumal", "Planta Támesis"}.issubset(greenatics_sites), "critical": True, "detail": ", ".join(sorted(greenatics_sites))},
-        {"code": "andinas_sites", "label": "Sedes Andinas", "ok": {"Planta Medellín", "Bodega Rionegro"}.issubset(andinas_sites), "critical": True, "detail": ", ".join(sorted(andinas_sites))},
-        {"code": "activity", "label": "Datos de actividad", "ok": int(greenatics.get("activity_records", 0)) >= 60 and int(andinas.get("activity_records", 0)) >= 20, "critical": True, "detail": f"Greenatics {greenatics.get('activity_records', 0)} / Andinas {andinas.get('activity_records', 0)}"},
-        {"code": "calculations", "label": "Cálculos reproducibles", "ok": int(greenatics.get("calculations", 0)) > 0 and int(andinas.get("calculations", 0)) > 0, "critical": True, "detail": f"Greenatics {greenatics.get('calculations', 0)} / Andinas {andinas.get('calculations', 0)}"},
-        {"code": "workflow", "label": "Solicitudes, mensajes y revisión", "ok": all(int(row.get("requests", 0)) >= 3 and int(row.get("notifications", 0)) >= 2 and int(row.get("observations", 0)) >= 2 for row in (greenatics, andinas)), "critical": True, "detail": "Cada empresa debe mostrar solicitudes, notificaciones y observaciones."},
-        {"code": "evidence", "label": "Evidencias descargables", "ok": int(greenatics.get("evidence", 0)) >= 2 and int(andinas.get("evidence", 0)) >= 2, "critical": True, "detail": f"Greenatics {greenatics.get('evidence', 0)} / Andinas {andinas.get('evidence', 0)}"},
-        {"code": "support", "label": "Casos de soporte", "ok": int(greenatics.get("support_tickets", 0)) >= 2 and int(andinas.get("support_tickets", 0)) >= 2, "critical": False, "detail": "Incluye casos abiertos y resueltos."},
-        {"code": "profiles", "label": "Perfil integral de empresa", "ok": all(int(row.get("profile_completion", 0)) >= 80 for row in (greenatics, andinas)), "critical": True, "detail": f"Greenatics {greenatics.get('profile_completion', 0)}% / Andinas {andinas.get('profile_completion', 0)}%"},
-        {"code": "diagnostics", "label": "Diagnóstico de madurez y complejidad", "ok": all(row.get("assessment_status") == "Aprobado" for row in (greenatics, andinas)), "critical": True, "detail": f"Greenatics {greenatics.get('maturity_level', '')} / Andinas {andinas.get('maturity_level', '')}"},
-        {"code": "implementation_plans", "label": "Plan de implementación por fases", "ok": all(int(row.get("implementation_plans", 0)) >= 1 for row in (greenatics, andinas)), "critical": True, "detail": f"Greenatics {greenatics.get('implementation_plans', 0)} / Andinas {andinas.get('implementation_plans', 0)}"},
+        {"code": "five_companies", "label": "Cinco casos sectoriales disponibles", "ok": summary["organization_count"] == len(DEMO_ORGANIZATIONS), "critical": True, "detail": f"{summary['organization_count']} de {len(DEMO_ORGANIZATIONS)} organizaciones demo"},
+        {"code": "sector_diversity", "label": "Diversidad sectorial", "ok": len(sectors) >= 5, "critical": True, "detail": ", ".join(sorted(sectors))},
+        {"code": "workflow_stages", "label": "Etapas distintas del proceso", "ok": len(stages) >= 3, "critical": True, "detail": ", ".join(sorted(stages))},
+        {"code": "activity", "label": "Datos de actividad en todas las empresas", "ok": all(int(row.get("activity_records", 0)) >= 12 for row in rows), "critical": True, "detail": " · ".join(f"{row['trade_name']}: {row.get('activity_records', 0)}" for row in rows)},
+        {"code": "calculations", "label": "Cálculos reproducibles", "ok": all(int(row.get("calculations", 0)) > 0 for row in rows), "critical": True, "detail": " · ".join(f"{row['trade_name']}: {row.get('calculations', 0)}" for row in rows)},
+        {"code": "workflow", "label": "Solicitudes, mensajes y revisión", "ok": all(int(row.get("requests", 0)) >= 2 and int(row.get("notifications", 0)) >= 1 and int(row.get("observations", 0)) >= 1 for row in rows), "critical": True, "detail": "Cada caso incluye tareas, notificaciones y hallazgos."},
+        {"code": "evidence", "label": "Evidencias descargables", "ok": all(int(row.get("evidence", 0)) >= 1 for row in rows), "critical": True, "detail": " · ".join(f"{row['trade_name']}: {row.get('evidence', 0)}" for row in rows)},
+        {"code": "support", "label": "Casos de soporte", "ok": all(int(row.get("support_tickets", 0)) >= 2 for row in rows), "critical": False, "detail": "Cada empresa incluye casos abiertos y resueltos."},
+        {"code": "profiles", "label": "Perfil integral de empresa", "ok": all(int(row.get("profile_completion", 0)) >= 80 for row in rows), "critical": True, "detail": " · ".join(f"{row['trade_name']}: {row.get('profile_completion', 0)}%" for row in rows)},
+        {"code": "diagnostics", "label": "Diagnóstico de madurez y complejidad", "ok": all(row.get("assessment_status") == "Aprobado" for row in rows), "critical": True, "detail": "Todos los diagnósticos demo están aprobados."},
+        {"code": "implementation_plans", "label": "Plan de implementación por fases", "ok": all(int(row.get("implementation_plans", 0)) >= 1 for row in rows), "critical": True, "detail": "Cada empresa contiene una ruta de implementación."},
+        {"code": "closed_case", "label": "Caso completo para cierre", "ok": by_name.get("Hotel Bosque Azul", {}).get("latest_inventory_status") == "Aprobado", "critical": True, "detail": "Hotel Bosque Azul demuestra un expediente aprobado."},
         {"code": "demo_mode", "label": "Marcación demostrativa", "ok": settings.seed_demo and not settings.is_production, "critical": True, "detail": f"SEED_DEMO={settings.seed_demo}; APP_ENV={settings.environment}"},
     ]
     blockers = [item for item in checks if item["critical"] and not item["ok"]]

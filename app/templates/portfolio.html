@@ -22,6 +22,7 @@
           <strong>{{ item.organization.name }}</strong>
           <span>{{ item.organization.sector }} · {{ item.organization.city }} · Rol: {{ item.membership.role }}</span>
           {% if item.latest_inventory %}<small>{{ item.latest_inventory.name }} · {{ item.latest_inventory.status }} · {{ item.latest_inventory.progress }} %</small>{% else %}<small>Sin inventarios todavía</small>{% endif %}
+          {% if item.demo_story %}<small><b>{{ item.demo_story.phase }}:</b> {{ item.demo_story.headline }}</small>{% endif %}
         </div>
         {% if item.organization.id == org.id %}
         <span class="status-badge success">Activa</span>

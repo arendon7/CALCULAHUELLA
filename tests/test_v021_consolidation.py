@@ -21,8 +21,7 @@ from app.product_registry import PRODUCT_MODULES, ROLE_JOURNEYS
 
 @pytest.fixture(autouse=True)
 def fresh_database_v021():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -40,6 +39,7 @@ def test_v021_defaults_are_seeded_for_consolidation():
         assert len(gates) == 9
         assert len(journeys) == len(ROLE_JOURNEYS)
         assert any(item.priority == "Crítica" for item in findings)
+        assert all(item.status == "Resuelto" for item in findings)
 
 
 def test_v021_consolidation_page_and_api_load():
@@ -47,12 +47,14 @@ def test_v021_consolidation_page_and_api_load():
         login(client)
         response = client.get("/consolidacion")
         assert response.status_code == 200
-        assert "Preparación controlada de V1.0" in response.text
+        assert "V1.0 final" in response.text
         api = client.get("/api/consolidacion/resumen")
         assert api.status_code == 200
         payload = api.json()
         assert payload["module_count"] == len(PRODUCT_MODULES)
-        assert payload["critical_open"] >= 1
+        assert payload["critical_open"] == 0
+        assert payload["release_candidate"]["controlled_release_ready"] is True
+        assert payload["release_candidate"]["production_ready"] is False
         assert payload["metrics"]["routes"] >= 190
 
 

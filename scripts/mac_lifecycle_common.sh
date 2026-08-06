@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Ciclo de vida macOS V0.45. Compatible con Bash 3.2.
+# Ciclo de vida macOS V1.0. Compatible con Bash 3.2.
 
-CTH_RELEASE_VERSION="0.45.5"
-CTH_RELEASE_SLUG="v0_45"
+CTH_RELEASE_VERSION="1.0.0"
+CTH_RELEASE_SLUG="v1_0_0"
 
 cth_abs_path() {
   local path="$1"
@@ -268,7 +268,7 @@ cth_cleanup_legacy_versions() {
     rm -f "$CTH_INSTALL_ROOT/.legacy_dirs.$$"
   fi
 
-  # Solo archivos ZIP con nombre inequívoco de versiones anteriores. La entrega actual V0.45 se conserva.
+  # Solo archivos ZIP con nombre inequívoco de versiones anteriores. La entrega actual V1.0.0 se conserva.
   local old_ifs="$IFS" search_root archive name
   IFS=':'
   for search_root in $CTH_LEGACY_SEARCH_ROOTS; do

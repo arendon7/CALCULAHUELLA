@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from fastapi import Depends, Form, HTTPException, Request
-from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from .analytics import full_analysis
 from .database import get_db
+from .delivery_readiness import professional_delivery_summary
 from .repositories.reports import get_report_artifact, list_report_artifacts
+from .report_consulting import consulting_report_summary
 from .services.reports import approve_report as approve_report_record
 from .services.reports import generate_report as generate_report_record
 from .storage import storage
@@ -26,12 +28,45 @@ def register_report_routes(
         inventory = get_inventory(session, user)
         analysis = full_analysis(session, inventory)
         artifacts = list_report_artifacts(session, inventory.id)
+        delivery = professional_delivery_summary(session, inventory, analysis=analysis)
         return templates.TemplateResponse(
             request=request,
             name="reports.html",
-            context=common_context(request, session, user, "reports", inventory=inventory, artifacts=artifacts, **analysis),
+            context=common_context(request, session, user, "reports", inventory=inventory, artifacts=artifacts, delivery=delivery, **analysis),
         )
 
+
+    @app.get("/reportes/consultoria", response_class=HTMLResponse)
+    def consulting_workshop(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        analysis = full_analysis(session, inventory)
+        delivery = professional_delivery_summary(session, inventory, analysis=analysis)
+        consulting = consulting_report_summary(session, inventory, analysis=analysis, delivery=delivery)
+        return templates.TemplateResponse(
+            request=request,
+            name="report_consulting.html",
+            context=common_context(
+                request, session, user, "reports", inventory=inventory, delivery=delivery, consulting=consulting, **analysis
+            ),
+        )
+
+    @app.get("/api/reportes/consultoria")
+    def consulting_workshop_api(session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        summary = consulting_report_summary(session, inventory)
+        return JSONResponse({
+            "version": summary["version"],
+            "inventory_id": inventory.id,
+            "report_score": summary["report_score"],
+            "status": summary["status"],
+            "comparison": summary["comparison"],
+            "intensities": summary["intensities"],
+            "chapters": summary["chapters"],
+            "findings": summary["findings"],
+            "limitations": summary["limitations"],
+            "recommendations": summary["recommendations"],
+            "claims": summary["claims"],
+        })
 
     @app.post("/reportes/generar")
     def generate_report(
@@ -67,6 +102,7 @@ def register_report_routes(
             media_types = {
                 ".pdf": "application/pdf",
                 ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
                 ".zip": "application/zip",
             }
             return FileResponse(local_path, filename=artifact.file_name, media_type=media_types.get(local_path.suffix.lower(), "application/octet-stream"))

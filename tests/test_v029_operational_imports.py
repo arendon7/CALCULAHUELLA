@@ -31,8 +31,7 @@ from app.operational_imports import (
 
 @pytest.fixture(autouse=True)
 def fresh_database_v029():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -100,7 +99,7 @@ def _mapping():
 
 def test_v029_health_page_and_product_module():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         _login(client)
         page = client.get("/cargas-operativas")
         assert page.status_code == 200

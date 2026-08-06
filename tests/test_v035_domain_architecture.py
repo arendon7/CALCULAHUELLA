@@ -13,8 +13,7 @@ from app.main import app
 
 @pytest.fixture(autouse=True)
 def fresh_database_v035():
-    Base.metadata.drop_all(ENGINE)
-    init_db()
+    # La base semilla aislada se restaura desde tests/conftest.py.
     yield
 
 
@@ -29,7 +28,7 @@ def login(client: TestClient, email: str = "admin@calculatuhuella.local") -> Non
 
 def test_v035_health_and_domain_route_parity():
     with TestClient(app) as client:
-        assert client.get("/api/health").json()["version"] == "0.45.5"
+        assert client.get("/api/health").json()["version"] == "1.0.0"
         login(client)
         response = client.get("/api/arquitectura/resumen")
         assert response.status_code == 200
@@ -45,10 +44,11 @@ def test_v035_routes_are_owned_by_explicit_domain_modules():
     project_dir = Path(__file__).resolve().parents[1]
     summary = domain_architecture_summary(app, project_dir)
     expected = {
-        "users": 4,
-        "inventories": 13,
-        "reports": 4,
-        "operations": 14,
+        "users": 8,
+        "inventories": 17,
+        "reports": 6,
+        "operations": 15,
+        "service_operations": 2,
     }
     actual = {item["code"]: item["route_count"] for item in summary["domains"]}
     assert {key: actual[key] for key in expected} == expected
@@ -95,7 +95,7 @@ def test_v035_new_inventory_records_current_application_version():
     with SessionLocal() as session:
         inventory = session.scalar(select(Inventory).where(Inventory.name == "Inventario modular 2027"))
         assert inventory is not None
-        assert inventory.version == "0.45"
+        assert inventory.version == "1.0"
 
 
 def test_v035_mac_cleanup_preserves_current_release_zip(tmp_path: Path):
@@ -105,7 +105,7 @@ def test_v035_mac_cleanup_preserves_current_release_zip(tmp_path: Path):
     home = tmp_path / "home"
     downloads = home / "Downloads"
     downloads.mkdir(parents=True)
-    current_zip = downloads / "calcula_tu_huella_v0_45_completa_mac.zip"
+    current_zip = downloads / "calcula_tu_huella_v1_0_0_preparacion_productiva_dual_mac_windows.zip"
     old_zip = downloads / "calcula_tu_huella_v0_34_completa_mac.zip"
     current_zip.write_bytes(b"current")
     old_zip.write_bytes(b"old")
