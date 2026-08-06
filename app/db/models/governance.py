@@ -77,7 +77,9 @@ class MethodologySourceDocument(Base):
     source_url: Mapped[str] = mapped_column(String(500), default="")
     citation: Mapped[str] = mapped_column(Text, default="")
     checksum_sha256: Mapped[str] = mapped_column(String(64), default="")
-    status: Mapped[str] = mapped_column(String(40), default="Vigente")
+    # Los estados documentales incluyen calificaciones completas de vigencia,
+    # parametrización y revisión; 40 caracteres truncaba valores válidos.
+    status: Mapped[str] = mapped_column(String(160), default="Vigente")
     accessed_at: Mapped[date | None] = mapped_column(Date, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
