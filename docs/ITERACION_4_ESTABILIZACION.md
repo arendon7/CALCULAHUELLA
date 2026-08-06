@@ -26,10 +26,19 @@ cancelación, cierre o reapertura.
 - Los avisos por rol excluyen al usuario que ejecutó la transición.
 - Se mantiene una sola notificación por destinatario y transición.
 
-## Validación de CI
+## Validación ejecutada
 
-El workflow de estabilización se activa en cada push a
-`integration/workflow-v1.5.0` y ejecuta:
+- Sintaxis Python de la capa, instalación y pruebas: aprobada.
+- Sintaxis YAML del workflow: aprobada.
+- Política de precedencia: seis casos críticos aprobados.
+- Prueba aislada del adaptador: seis grupos aprobados.
+- Instalación idempotente: aprobada.
+- Exclusión del actor y deduplicación por usuario: aprobadas.
+
+## Validación de CI preparada
+
+El workflow de estabilización se activa por `push`, `pull_request` y ejecución
+manual, y contempla:
 
 1. Compilación Python.
 2. Verificación canónica.
@@ -39,6 +48,12 @@ El workflow de estabilización se activa en cada push a
 6. Suite smoke.
 7. Suite integral en procesos aislados.
 8. Publicación de evidencia como artefacto.
+
+## Limitación de ejecución
+
+Los commits realizados por el conector no generaron ejecuciones de GitHub
+Actions. La compuerta está preparada, pero las migraciones y suites del árbol
+completo no se presentan como aprobadas hasta que exista una ejecución real.
 
 ## Compuertas
 
