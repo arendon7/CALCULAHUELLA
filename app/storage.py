@@ -32,6 +32,7 @@ class StorageService:
         if self.backend == "s3":
             try:
                 import boto3
+                from botocore.config import Config
             except ImportError as exc:  # pragma: no cover - solo producción S3
                 raise StorageError("Instala boto3 para usar STORAGE_BACKEND=s3") from exc
             self._client = boto3.client(
@@ -40,6 +41,10 @@ class StorageService:
                 region_name=settings.s3_region or None,
                 aws_access_key_id=settings.s3_access_key or None,
                 aws_secret_access_key=settings.s3_secret_key or None,
+                config=Config(
+                    signature_version="s3v4",
+                    s3={"addressing_style": "path"},
+                ),
             )
 
     @staticmethod
