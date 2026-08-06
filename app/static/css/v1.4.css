@@ -1,0 +1,57 @@
+/* Calcula tu Huella — V1.4.0 integración controlada
+   Capa visual reversible sobre la V1.0 canónica. */
+
+:root{
+  --v14-forest:#0B3B2E;
+  --v14-forest-2:#12533F;
+  --v14-teal:#2D6F73;
+  --v14-sage:#A7C1A0;
+  --v14-cream:#F7F5EF;
+  --v14-slate:#1F2933;
+  --v14-muted:#65726B;
+  --v14-line:#DCE3DE;
+  --v14-soft:#EDF4EE;
+  --v14-shadow:0 16px 42px rgba(11,59,46,.10);
+  --v14-radius:18px;
+}
+
+body.app-shell{background:linear-gradient(180deg,#F7FAF8 0,#F4F7F5 100%);color:var(--v14-slate)}
+body.app-shell .sidebar{background:linear-gradient(180deg,#092F25 0%,#0B3B2E 64%,#0A3429 100%);border-right:1px solid rgba(255,255,255,.08);box-shadow:12px 0 42px rgba(7,38,30,.12)}
+body.app-shell .sidebar .brand{padding:24px 22px 17px}
+body.app-shell .sidebar .brand img{filter:brightness(0) invert(1);opacity:.98;max-height:62px}
+body.app-shell .workspace-identity{margin:0 14px 18px;padding:15px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.07);border-radius:15px}
+body.app-shell .workspace-identity small{color:#BFD4C8;letter-spacing:.10em}
+body.app-shell .workspace-identity strong{color:#fff}
+body.app-shell .workspace-identity span{color:#D6E6DC}
+body.app-shell .nav-label{color:#AFC9BA;letter-spacing:.11em}
+body.app-shell .nav-item{border-radius:12px;color:#D7E5DC;transition:background .18s ease,color .18s ease,transform .18s ease}
+body.app-shell .nav-item:hover,body.app-shell .nav-item:focus-visible{background:rgba(255,255,255,.10);color:#fff;transform:translateX(2px)}
+body.app-shell .nav-item.active{background:#fff;color:var(--v14-forest);box-shadow:0 8px 22px rgba(0,0,0,.15)}
+body.app-shell .view-mode-form{border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.06);border-radius:14px}
+body.app-shell .main-area{min-width:0}
+body.app-shell .topbar{background:rgba(255,255,255,.91);backdrop-filter:blur(18px);border-bottom:1px solid rgba(220,227,222,.88);box-shadow:0 4px 24px rgba(11,59,46,.035)}
+body.app-shell .topbar-title{color:var(--v14-forest);font-weight:780}
+body.app-shell .version-pill,body.app-shell .org-name,body.app-shell .icon-button{border-color:var(--v14-line);background:#fff;border-radius:12px}
+body.app-shell .page-content{width:min(1600px,calc(100% - 42px));margin-inline:auto;padding-top:32px;padding-bottom:70px}
+body.app-shell h1,body.app-shell h2,body.app-shell h3{color:var(--v14-forest);letter-spacing:-.025em}
+body.app-shell .role-dashboard-head,body.app-shell .role-next-action,body.app-shell .panel,body.app-shell .card,body.app-shell .metric-card,body.app-shell .summary-card,body.app-shell .journey-card,body.app-shell .quality-gate,body.app-shell .table-card,body.app-shell details{border-radius:var(--v14-radius);border-color:var(--v14-line);box-shadow:0 8px 28px rgba(11,59,46,.055)}
+body.app-shell .role-dashboard-head{background:linear-gradient(135deg,#fff 0%,#F2F7F3 100%)}
+body.app-shell .role-next-action{border-left:5px solid #CA9A6C;background:#fff;box-shadow:var(--v14-shadow)}
+body.app-shell .button.primary,body.app-shell button.primary,body.app-shell .primary-action{background:var(--v14-forest);border-color:var(--v14-forest);color:#fff}
+body.app-shell .button.primary:hover,body.app-shell button.primary:hover,body.app-shell .primary-action:hover{background:var(--v14-forest-2)}
+body.app-shell input,body.app-shell select,body.app-shell textarea{border-color:#C9D6CE;border-radius:11px;background:#fff}
+body.app-shell input:focus,body.app-shell select:focus,body.app-shell textarea:focus{border-color:var(--v14-teal);box-shadow:0 0 0 3px rgba(45,111,115,.14)}
+body.app-shell table{border-collapse:separate;border-spacing:0}
+body.app-shell thead th{background:#F2F6F3;color:var(--v14-forest);font-size:.76rem;letter-spacing:.035em;text-transform:uppercase}
+body.app-shell .flash{border-radius:14px}
+body.app-shell .mobile-taskbar{background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border-top-color:var(--v14-line)}
+body.app-shell .mobile-taskbar a.active{color:var(--v14-forest)}
+
+@media(max-width:1100px){body.app-shell .page-content{width:min(100% - 28px,1500px)}}
+@media(max-width:760px){
+  body.app-shell .page-content{width:calc(100% - 24px);padding-top:20px;padding-bottom:96px}
+  body.app-shell .topbar{padding-inline:12px}
+  body.app-shell .role-dashboard-head,body.app-shell .role-next-action,body.app-shell .panel,body.app-shell .card{border-radius:15px}
+  body.app-shell .sidebar{box-shadow:20px 0 50px rgba(0,0,0,.24)}
+}
+@media(prefers-reduced-motion:reduce){body.app-shell *{scroll-behavior:auto!important;transition-duration:.01ms!important;animation-duration:.01ms!important}}
