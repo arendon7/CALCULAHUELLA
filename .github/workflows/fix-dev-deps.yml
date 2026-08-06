@@ -1,0 +1,69 @@
+name: Corregir dependencias y manifiesto
+
+on:
+  push:
+    branches:
+      - migration/canonical-v1.0.0
+    paths:
+      - .github/workflows/fix-dev-deps.yml
+
+permissions:
+  contents: write
+
+jobs:
+  corregir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Declarar dependencias y actualizar hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import hashlib
+
+          req_path = Path('requirements-dev.txt')
+          req_lines = req_path.read_text(encoding='utf-8').splitlines()
+          for dependency in ('beautifulsoup4==4.14.3', 'pypdf==5.9.0'):
+              if dependency not in req_lines:
+                  req_lines.append(dependency)
+          req_path.write_text('\n'.join(req_lines) + '\n', encoding='utf-8')
+
+          manifest_path = Path('MANIFIESTO_SHA256_CANONICO.txt')
+          replacements = {
+              '.github/workflows/ci.yml': Path('.github/workflows/ci.yml'),
+              'requirements-dev.txt': req_path,
+          }
+          hashes = {
+              name: hashlib.sha256(path.read_bytes()).hexdigest()
+              for name, path in replacements.items()
+          }
+          output = []
+          found = set()
+          for line in manifest_path.read_text(encoding='utf-8').splitlines():
+              if not line.strip():
+                  continue
+              _, rel = line.split('  ', 1)
+              if rel in hashes:
+                  output.append(f'{hashes[rel]}  {rel}')
+                  found.add(rel)
+              else:
+                  output.append(line)
+          missing = set(hashes) - found
+          if missing:
+              raise SystemExit(f'Entradas ausentes en manifiesto: {sorted(missing)}')
+          manifest_path.write_text('\n'.join(output) + '\n', encoding='utf-8')
+          PY
+          python tools/verify_canonical.py
+      - name: Publicar corrección
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add requirements-dev.txt MANIFIESTO_SHA256_CANONICO.txt
+          git commit -m "fix: declarar dependencias completas de pruebas"
+          git push origin HEAD:migration/canonical-v1.0.0
