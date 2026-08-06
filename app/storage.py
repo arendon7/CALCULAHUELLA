@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import os
 import shutil
 from pathlib import Path
 
@@ -35,6 +36,8 @@ class StorageService:
                 from botocore.config import Config
             except ImportError as exc:  # pragma: no cover - solo producción S3
                 raise StorageError("Instala boto3 para usar STORAGE_BACKEND=s3") from exc
+            connect_timeout = float(os.getenv("S3_CONNECT_TIMEOUT_SECONDS", "5"))
+            read_timeout = float(os.getenv("S3_READ_TIMEOUT_SECONDS", "10"))
             self._client = boto3.client(
                 "s3",
                 endpoint_url=settings.s3_endpoint_url or None,
@@ -43,6 +46,10 @@ class StorageService:
                 aws_secret_access_key=settings.s3_secret_key or None,
                 config=Config(
                     signature_version="s3v4",
+                    connect_timeout=connect_timeout,
+                    read_timeout=read_timeout,
+                    retries={"max_attempts": 1, "mode": "standard"},
+                    tcp_keepalive=True,
                     s3={"addressing_style": "path"},
                 ),
             )
