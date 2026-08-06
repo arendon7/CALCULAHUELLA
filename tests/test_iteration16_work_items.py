@@ -8,6 +8,7 @@ from app.access_control import ROLE_CAPABILITIES
 from app.database import (
     AppUser,
     DataRequest,
+    Inventory,
     OrganizationMembership,
     SessionLocal,
     WorkItem,
@@ -15,11 +16,8 @@ from app.database import (
 )
 from app.main import app
 from app.product_experience import navigation_for
-from app.workflow_service import (
-    create_work_item,
-    sync_data_requests,
-    transition_work_item,
-)
+from app.workflow_bridge import sync_data_requests, transition_work_item
+from app.workflow_service import create_work_item
 
 pytestmark = pytest.mark.smoke
 
@@ -86,6 +84,40 @@ def test_iteration16_data_request_sync_is_idempotent() -> None:
         assert work_count == request_count
         assert second == {"total": request_count, "changed": 0}
 
+
+
+def test_iteration16_synced_request_remains_visible_and_updates_its_source() -> None:
+    with SessionLocal() as session:
+        admin = _user_context(session, "Administrador")
+        organization_id = int(admin["organization_id"])
+        client = _user_context(session, "Cliente", organization_id)
+        request_record = session.scalar(
+            select(DataRequest)
+            .join(Inventory, Inventory.id == DataRequest.inventory_id)
+            .where(
+                Inventory.organization_id == organization_id,
+                DataRequest.status == "Pendiente",
+                ~DataRequest.requested_to.contains("@"),
+            )
+            .order_by(DataRequest.id)
+        )
+        assert request_record is not None
+        sync_data_requests(session, organization_id, str(admin["email"]))
+        item = session.scalar(
+            select(WorkItem).where(
+                WorkItem.organization_id == organization_id,
+                WorkItem.source_entity_type == "DataRequest",
+                WorkItem.source_entity_id == request_record.id,
+            )
+        )
+        assert item is not None
+        assert item.assignee_role == "Cliente"
+        transition_work_item(
+            session, item, client, action="accept_assignment", expected_version=item.version
+        )
+        session.commit()
+        session.refresh(request_record)
+        assert request_record.status == "En preparación"
 
 def test_iteration16_work_item_completes_the_full_handoff_chain() -> None:
     with SessionLocal() as session:

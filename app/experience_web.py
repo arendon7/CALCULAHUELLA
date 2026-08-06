@@ -11,6 +11,7 @@ from . import product_experience
 from .database import Inventory, WorkItem, get_db
 from .delivery_readiness import professional_delivery_summary
 from .workflow_domain import CANONICAL_STAGES, STATUSES, WORK_ITEM_TYPES
+from .workflow_bridge import sync_data_requests, transition_work_item
 from .workflow_service import (
     ACTION_LABELS,
     ACTIONS_REQUIRING_REASON,
@@ -18,8 +19,6 @@ from .workflow_service import (
     actions_for_item,
     create_work_item,
     status_label,
-    sync_data_requests,
-    transition_work_item,
     visible_work_items,
     work_item_summary,
 )
@@ -112,7 +111,7 @@ def _work_navigation_item() -> dict[str, object]:
 
 
 def _install_work_navigation() -> None:
-    """Promote Mi trabajo while preserving the dashboard route as a secondary view."""
+    """Promote Mi trabajo without deleting the existing dashboard or full navigation."""
     for role, sections in tuple(product_experience.ROLE_ESSENTIAL_SECTIONS.items()):
         if not sections:
             continue
@@ -129,8 +128,7 @@ def _install_work_navigation() -> None:
         first = dict(core_sections[0])
         items = list(first.get("items", ()))
         if not any(item.get("active") == "work_items" for item in items):
-            remaining = [item for item in items if item.get("active") != "dashboard"]
-            first["items"] = (_work_navigation_item(), *remaining)
+            first["items"] = (_work_navigation_item(), *items)
             core_sections[0] = first
             product_experience.CORE_SECTIONS = tuple(core_sections)
 
@@ -179,7 +177,7 @@ def register_experience_routes(app, templates, common_context, require_user, get
         request: Request,
         status: str = "",
         stage: str = "",
-        scope: str = "mine",
+        scope: str = "all",
         session: Session = Depends(get_db),
         user: dict = Depends(require_user),
     ):
