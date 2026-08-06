@@ -19,7 +19,15 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - run: python tools/verify_canonical.py --skip-manifest
+      - name: Verificar estructura canónica limpia
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/calculahuella-canonical-check
+          mkdir -p /tmp/calculahuella-canonical-check
+          rsync -a --exclude='.git/' ./ /tmp/calculahuella-canonical-check/
+          cd /tmp/calculahuella-canonical-check
+          python tools/verify_canonical.py --skip-manifest
       - run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
       - run: python -m alembic upgrade head
         env:
