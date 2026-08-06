@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: calculatuhuella
+      POSTGRES_USER: calculatuhuella
+      POSTGRES_PASSWORD: calculatuhuella_local
+    volumes:
+      - postgres_local_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U calculatuhuella -d calculatuhuella"]
+      interval: 5s
+      timeout: 5s
+      retries: 15
+
+  app:
+    build: .
+    ports:
+      - "8765:8765"
+    environment:
+      APP_ENV: local
+      SESSION_SECRET: local-docker-development-secret-change-before-sharing
+      SESSION_HTTPS_ONLY: "false"
+      DATABASE_URL: postgresql+psycopg://calculatuhuella:calculatuhuella_local@postgres:5432/calculatuhuella
+      PUBLIC_BASE_URL: http://127.0.0.1:8765
+      TRUSTED_HOSTS: localhost,127.0.0.1
+      SEED_DEMO: "true"
+      OPEN_BROWSER: "0"
+      HOST: 0.0.0.0
+      PORT: "8765"
+      STORAGE_BACKEND: local
+      EMAIL_BACKEND: file
+      PAYMENT_BACKEND: demo
+      SCHEDULER_ENABLED: "false"
+      DEPLOYMENT_STRICT: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - app_local_data:/app/instance
+    command: ["sh", "-c", "alembic upgrade head && python run.py"]
+
+volumes:
+  postgres_local_data:
+  app_local_data:

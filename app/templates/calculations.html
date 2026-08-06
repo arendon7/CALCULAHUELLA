@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Motor de cálculo · Calcula tu Huella{% endblock %}
+{% block page_label %}Cálculo / Motor y resultados{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Cálculo</p><h1>Motor de cálculo</h1><p>Resultados construidos desde datos persistentes, conversiones, factores versionados y GWP.</p></div>{% if user.can_view_methodology %}<form method="post" action="/inventarios/{{ inventory.id }}/recalcular"><button class="btn btn-primary">↻ Recalcular inventario</button></form>{% endif %}</div>
+
+<div class="calculation-notice notice-success"><span>ACTIVO</span><p><strong>El motor matemático ya es funcional.</strong><small>Los factores precargados son demostrativos y deben sustituirse o validarse antes de un reporte oficial.</small></p></div>
+
+<div class="source-summary-grid calculation-kpis">
+  <article class="mini-card"><small>FUENTES</small><strong>{{ source_rows|length }}</strong><p>Incluidas en el inventario</p></article>
+  <article class="mini-card"><small>COMPONENTES CALCULADOS</small><strong>{{ total_calculations }}</strong><p>Dato × factor × GWP</p></article>
+  <article class="mini-card"><small>ALERTAS</small><strong>{{ total_alerts }}</strong><p>Revisión temporal o metodológica</p></article>
+  <article class="mini-card"><small>ERRORES</small><strong>{{ total_errors }}</strong><p>Conversiones o GWP faltantes</p></article>
+</div>
+
+<section class="card">
+  <div class="card-head"><div><small>RESULTADOS POR FUENTE</small><h3>Consolidación del inventario</h3></div><span class="counter">{{ source_rows|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Fuente</th><th>Dato</th><th>Factores</th><th>Componentes</th><th>Alertas</th><th>Resultado</th><th>Acción</th></tr></thead><tbody>
+  {% for row in source_rows %}<tr>
+    <td><a class="table-link" href="/fuentes/{{ row.source.id }}">{{ row.source.name }}</a><small class="table-sub">Alcance {{ row.source.scope }} · {{ row.source.category }}</small></td>
+    <td>{{ row.source.activity_records|length }} registros</td>
+    <td><strong>{{ row.assignments }}</strong></td>
+    <td>{{ row.summary.calculations|length }}</td>
+    <td>{% if row.summary.errors %}<span class="calc-state state-error">{{ row.summary.errors }} errores</span>{% elif row.summary.alerts %}<span class="calc-state state-alert">{{ row.summary.alerts }} alertas</span>{% else %}<span class="calc-state state-ok">Sin alertas</span>{% endif %}</td>
+    <td><strong>{{ row.source.emissions|number_es(3) }} tCO₂e</strong></td>
+    <td><a class="btn btn-outline btn-small" href="/fuentes/{{ row.source.id }}">Trazabilidad</a></td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="card engine-rules">
+  <div class="card-head"><div><small>REGLAS ACTIVAS</small><h3>Cómo calcula esta versión</h3></div></div>
+  <div class="rule-grid"><article><span>1</span><div><strong>Normaliza la unidad</strong><p>Busca una ruta de conversión aprobada, incluso encadenada, y bloquea dimensiones incompatibles.</p></div></article><article><span>2</span><div><strong>Aplica componentes</strong><p>Normaliza la salida del factor a kg y permite componentes separados para CO₂, CH₄ y N₂O; no los mezcla con CO₂e agregado.</p></div></article><article><span>3</span><div><strong>Convierte a CO₂e</strong><p>Exige que el inventario identifique AR4, AR5 o AR6, aplica GWP100 y congela la fórmula completa.</p></div></article><article><span>4</span><div><strong>Consolida</strong><p>Suma registros y actualiza automáticamente las emisiones por fuente.</p></div></article></div>
+</section>
+{% endblock %}

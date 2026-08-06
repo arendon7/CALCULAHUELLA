@@ -1,0 +1,97 @@
+{% extends "base.html" %}
+{% block title %}Puesta en marcha · Calcula tu Huella{% endblock %}
+{% block page_label %}Puesta en marcha{% endblock %}
+{% block content %}
+<div class="page-head onboarding-page-head">
+  <div>
+    <p class="breadcrumb">Inicio / Puesta en marcha</p>
+    <h1>Prepara el primer inventario sin perder el orden</h1>
+    <p>Primero define el propósito, el perfil sectorial y la profundidad necesaria; después completa las actividades operativas de implementación.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-outline" href="/recorrido-inventario">Ver recorrido operativo</a>
+    <a class="btn btn-primary" href="/onboarding/guiado">Abrir asistente inicial</a>
+  </div>
+</div>
+
+<section class="onboarding-command card">
+  <div class="onboarding-command-copy">
+    <span class="eyebrow">{{ onboarding.state|upper }}</span>
+    <h2>{{ onboarding.headline }}</h2>
+    <p>{{ onboarding.message }}</p>
+    {% if onboarding.next_step %}
+    <div class="onboarding-next-action">
+      <span>{{ onboarding.next_step.number }}</span>
+      <div><small>SIGUIENTE ACTIVIDAD</small><strong>{{ onboarding.next_step.row.title }}</strong><p>{{ onboarding.next_step.outcome }}</p></div>
+      {% if can_open_route(user, onboarding.next_step.href) %}<a href="{{ onboarding.next_step.href }}">Abrir →</a>{% else %}<span class="permission-note">Asignada a otro rol</span>{% endif %}
+    </div>
+    {% else %}
+    <div class="onboarding-next-action completed">
+      <span>✓</span>
+      <div><small>IMPLEMENTACIÓN COMPLETA</small><strong>Tu espacio está listo para operar</strong><p>Continúa con el recorrido del inventario y controla el avance por etapas.</p></div>
+      <a href="/recorrido-inventario">Continuar →</a>
+    </div>
+    {% endif %}
+  </div>
+  <div class="onboarding-score-card">
+    <div class="onboarding-score-ring" style="--onboarding-progress:{{ onboarding.score }}%"><strong>{{ onboarding.score }}%</strong><small>completado</small></div>
+    <div class="onboarding-score-stats">
+      <span><b>{{ onboarding.completed }}</b> listas</span>
+      <span><b>{{ onboarding.remaining }}</b> pendientes</span>
+      <span><b>{{ onboarding.blocked }}</b> bloqueadas</span>
+    </div>
+  </div>
+</section>
+
+<section class="guided-onboarding-entry card">
+  <div><span class="eyebrow">ANTES DE PEDIR INFORMACIÓN</span><h2>Convierte el diagnóstico en una ruta sectorial</h2><p>El nuevo asistente define propósito, perfil operativo, cobertura, preparación de datos, responsables y periodo. Luego propone metodología, fuentes y lista inicial de soportes sin modificar el inventario hasta tu aprobación.</p></div>
+  <div class="guided-onboarding-entry-route"><span>Diagnóstico</span><i>→</i><span>Metodología</span><i>→</i><span>Datos requeridos</span></div>
+  <a class="btn btn-primary" href="/onboarding/guiado">Iniciar diagnóstico guiado</a>
+</section>
+
+<section class="onboarding-outcomes" aria-label="Resultados de la puesta en marcha">
+  <article><span>1</span><div><strong>Alcance aprobado</strong><p>Entidad, sedes, periodo y metodología claramente definidos.</p></div></article>
+  <article><span>2</span><div><strong>Equipo responsable</strong><p>Permisos y responsabilidades asignados para cada dato y decisión.</p></div></article>
+  <article><span>3</span><div><strong>Primer ciclo probado</strong><p>Dato, cálculo e informe inicial validados antes de escalar.</p></div></article>
+</section>
+
+<section class="onboarding-roadmap">
+  <div class="section-heading compact">
+    <div><span class="eyebrow">RUTA DE IMPLEMENTACIÓN</span><h2>Seis actividades, un resultado operativo</h2><p>Abre cada actividad para consultar su propósito, resultado esperado y gestión administrativa.</p></div>
+    <span class="status-badge {{ 'success' if onboarding.ready else 'warning' }}">{{ onboarding.completed }}/{{ onboarding.total }} completas</span>
+  </div>
+  <div class="onboarding-stage-list">
+    {% for step in onboarding.steps %}
+    <article class="onboarding-stage card {% if step.done %}done{% elif step.blocked %}blocked{% elif step.current %}current{% endif %}">
+      <div class="onboarding-stage-marker">{{ '✓' if step.done else step.number }}</div>
+      <div class="onboarding-stage-main">
+        <div class="onboarding-stage-head">
+          <div><small>{{ step.row.category|upper }} · {{ step.row.code }}</small><h3>{{ step.row.title }}</h3></div>
+          <span class="status-badge {{ 'success' if step.done else 'warning' if step.current or step.blocked else 'neutral' }}">{{ step.row.status }}</span>
+        </div>
+        <p>{{ step.row.description }}</p>
+        <div class="onboarding-stage-result"><b>Resultado esperado</b><span>{{ step.outcome }}</span></div>
+        <div class="onboarding-stage-actions">
+          {% if can_open_route(user, step.href) %}<a class="btn btn-primary small" href="{{ step.href }}">{{ step.action }}</a>{% else %}<span class="permission-note">Gestionado por otro rol</span>{% endif %}
+          <details>
+            <summary>Ver propósito y gestión</summary>
+            <div class="onboarding-stage-details">
+              <p><strong>Por qué importa:</strong> {{ step.why }}</p>
+              <p><strong>Responsable actual:</strong> {{ step.row.owner }}{% if step.row.due_date %} · <strong>Fecha:</strong> {{ step.row.due_date.strftime('%d/%m/%Y') }}{% endif %}</p>
+              {% if user.can_manage_org or user.can_manage_inventory %}
+              <form action="/onboarding/{{ step.row.id }}/actualizar" method="post" class="onboarding-form">
+                <label>Estado<select name="status"><option {% if step.row.status=='Pendiente' %}selected{% endif %}>Pendiente</option><option {% if step.row.status=='En progreso' %}selected{% endif %}>En progreso</option><option {% if step.row.status=='Completado' %}selected{% endif %}>Completado</option><option {% if step.row.status=='Bloqueado' %}selected{% endif %}>Bloqueado</option></select></label>
+                <label>Responsable<input name="owner" value="{{ step.row.owner }}"></label>
+                <label>Fecha objetivo<input type="date" name="due_date" value="{{ step.row.due_date or '' }}"></label>
+                <button class="btn btn-outline small" type="submit">Guardar gestión</button>
+              </form>
+              {% endif %}
+            </div>
+          </details>
+        </div>
+      </div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+{% endblock %}

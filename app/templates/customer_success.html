@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}Éxito del cliente · Calcula tu Huella{% endblock %}
+{% block page_label %}Éxito del cliente y renovación{% endblock %}
+{% block content %}
+<section class="page-heading customer-success-heading">
+  <div>
+    <span class="eyebrow">ADOPCIÓN, VALOR Y RENOVACIÓN</span>
+    <h1>Salud y éxito de la cuenta</h1>
+    <p>Conecta uso de la plataforma, entrega del servicio, soporte, relación ejecutiva y estado comercial para anticipar riesgos y preparar la renovación.</p>
+  </div>
+  <div class="health-hero-score health-{{ snapshot.risk_level|lower|replace('í','i')|replace('ó','o') }}">
+    <strong>{{ snapshot.overall_score }}</strong><span>/ 100</span><small>{{ snapshot.risk_level }}</small>
+  </div>
+</section>
+
+<section class="metrics-grid health-metrics">
+  <article class="metric-card"><small>Adopción</small><strong>{{ snapshot.adoption_score }}</strong><span>onboarding, usuarios e inventarios</span><div class="progress"><span style="width:{{ snapshot.adoption_score }}%"></span></div></article>
+  <article class="metric-card"><small>Entrega</small><strong>{{ snapshot.delivery_score }}</strong><span>órdenes e hitos de valor</span><div class="progress"><span style="width:{{ snapshot.delivery_score }}%"></span></div></article>
+  <article class="metric-card"><small>Soporte</small><strong>{{ snapshot.support_score }}</strong><span>{{ metrics.open_tickets }} casos abiertos</span><div class="progress"><span style="width:{{ snapshot.support_score }}%"></span></div></article>
+  <article class="metric-card"><small>Comercial</small><strong>{{ snapshot.commercial_score }}</strong><span>{{ metrics.overdue_invoices }} cobros vencidos</span><div class="progress"><span style="width:{{ snapshot.commercial_score }}%"></span></div></article>
+  <article class="metric-card"><small>Relacionamiento</small><strong>{{ snapshot.engagement_score }}</strong><span>revisiones y compromisos</span><div class="progress"><span style="width:{{ snapshot.engagement_score }}%"></span></div></article>
+</section>
+
+<section class="health-recommendation card">
+  <div><span class="eyebrow">RECOMENDACIÓN AUTOMÁTICA</span><p>{{ snapshot.recommendation }}</p></div>
+  {% if user.can_manage_customer_success %}<form action="/exito-cliente/salud/recalcular" method="post"><button class="button primary">Recalcular salud</button></form>{% endif %}
+</section>
+
+<div class="two-column-grid customer-success-grid">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">PLAN DE ÉXITO</span><h2>Contexto y objetivos de la cuenta</h2></div><span class="status-badge">{{ profile.lifecycle_stage if profile else 'Sin configurar' }}</span></div>
+    <div class="success-profile-summary">
+      <article><small>Responsable</small><strong>{{ profile.owner if profile else 'Equipo de éxito del cliente' }}</strong></article>
+      <article><small>Patrocinador ejecutivo</small><strong>{{ profile.executive_sponsor if profile and profile.executive_sponsor else 'Pendiente' }}</strong></article>
+      <article><small>Próxima revisión</small><strong>{{ profile.next_business_review if profile and profile.next_business_review else 'Sin programar' }}</strong></article>
+      <article><small>Satisfacción</small><strong>{{ profile.satisfaction_score if profile and profile.satisfaction_score is not none else '—' }}{% if profile and profile.satisfaction_score is not none %}/5{% endif %}</strong></article>
+    </div>
+    {% if profile %}<div class="callout"><strong>Objetivo principal</strong><br>{{ profile.primary_objective or 'No documentado.' }}</div><p class="success-plan-copy">{{ profile.success_plan or 'No existe un plan de éxito documentado.' }}</p>{% endif %}
+    {% if user.can_manage_customer_success %}
+    <details class="form-drawer"><summary>Editar perfil y plan</summary>
+      <form action="/exito-cliente/perfil" method="post" class="stacked-form">
+        <div class="form-grid">
+          <label>Etapa<select name="lifecycle_stage">{% for value in ['Implementación','Adopción','Valor','Renovación','Expansión','En riesgo'] %}<option {% if profile and profile.lifecycle_stage==value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+          <label>Responsable<input name="owner" value="{{ profile.owner if profile else 'Equipo de éxito del cliente' }}"></label>
+          <label>Patrocinador ejecutivo<input name="executive_sponsor" value="{{ profile.executive_sponsor if profile else '' }}"></label>
+          <label>Correo del patrocinador<input type="email" name="sponsor_email" value="{{ profile.sponsor_email if profile else '' }}"></label>
+          <label>Última revisión ejecutiva<input type="date" name="last_business_review" value="{{ profile.last_business_review if profile and profile.last_business_review else '' }}"></label>
+          <label>Próxima revisión ejecutiva<input type="date" name="next_business_review" value="{{ profile.next_business_review if profile and profile.next_business_review else '' }}"></label>
+          <label>Satisfacción 1–5<input type="number" min="1" max="5" step="0.1" name="satisfaction_score" value="{{ profile.satisfaction_score if profile and profile.satisfaction_score is not none else '' }}"></label>
+          <label>NPS relacional 0–10<input type="number" min="0" max="10" name="nps_score" value="{{ profile.nps_score if profile and profile.nps_score is not none else '' }}"></label>
+        </div>
+        <label>Objetivo principal<textarea name="primary_objective" rows="3">{{ profile.primary_objective if profile else '' }}</textarea></label>
+        <label>Plan de éxito<textarea name="success_plan" rows="4">{{ profile.success_plan if profile else '' }}</textarea></label>
+        <div class="form-grid">
+          <label>Riesgo manual<select name="risk_override"><option value="">Automático</option>{% for value in ['Sano','Atención','Riesgo','Crítico'] %}<option {% if profile and profile.risk_override==value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label>
+          <label>Razón del ajuste<input name="risk_reason" value="{{ profile.risk_reason if profile else '' }}"></label>
+        </div>
+        <button class="button primary">Guardar plan de éxito</button>
+      </form>
+    </details>{% endif %}
+  </section>
+
+  <section class="panel renewal-panel">
+    <div class="panel-heading"><div><span class="eyebrow">RENOVACIÓN INTELIGENTE</span><h2>Pronóstico y estrategia</h2></div>{% if renewal %}<span class="status-badge {{ 'success' if renewal.probability>=80 else 'warning' if renewal.probability>=60 else 'danger' }}">{{ renewal.probability }} %</span>{% endif %}</div>
+    {% if renewal %}
+      <div class="renewal-overview">
+        <article><small>Contrato</small><strong>{{ renewal.contract.reference if renewal.contract else 'Sin referencia' }}</strong></article>
+        <article><small>Fecha objetivo</small><strong>{{ renewal.renewal_date or '—' }}</strong></article>
+        <article><small>Valor pronosticado</small><strong>${{ renewal.forecast_amount|number_es(0) }}</strong></article>
+        <article><small>Estado</small><strong>{{ renewal.status }}</strong></article>
+      </div>
+      <div class="callout"><strong>Próxima acción</strong><br>{{ renewal.next_action or 'Definir siguiente acción.' }}{% if renewal.next_action_date %}<br><small>Fecha: {{ renewal.next_action_date }}</small>{% endif %}</div>
+      {% if renewal.blockers %}<div class="risk-box"><strong>Bloqueadores</strong><p>{{ renewal.blockers }}</p></div>{% endif %}
+      {% if user.can_manage_customer_success %}<details class="form-drawer"><summary>Actualizar estrategia de renovación</summary><form action="/exito-cliente/renovacion/{{ renewal.id }}/actualizar" method="post" class="stacked-form">
+        <div class="form-grid"><label>Estado<select name="status">{% for value in ['Por preparar','Bien encaminada','En riesgo','Propuesta enviada','Renovada','No renovada'] %}<option {% if renewal.status==value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select></label><label>Probabilidad<input type="number" min="0" max="100" name="probability" value="{{ renewal.probability }}"></label></div>
+        <label>Estrategia<textarea name="strategy" rows="3">{{ renewal.strategy }}</textarea></label><label>Bloqueadores<textarea name="blockers" rows="3">{{ renewal.blockers }}</textarea></label><label>Próxima acción<textarea name="next_action" rows="2">{{ renewal.next_action }}</textarea></label><label>Fecha de la próxima acción<input type="date" name="next_action_date" value="{{ renewal.next_action_date or '' }}"></label><label>Notas de decisión<textarea name="decision_notes" rows="2">{{ renewal.decision_notes }}</textarea></label><button class="button primary">Guardar renovación</button>
+      </form></details>{% endif %}
+    {% else %}<div class="empty-state"><strong>Sin contrato vigente</strong><span>La renovación se creará automáticamente cuando exista un contrato activo.</span></div>{% endif %}
+  </section>
+</div>
+
+<section class="adoption-facts card">
+  <div><small>Onboarding</small><strong>{{ metrics.onboarding_done }}/{{ metrics.onboarding_total }}</strong><span>completado</span></div>
+  <div><small>Usuarios activos</small><strong>{{ metrics.users_engaged }}/{{ metrics.users_total }}</strong><span>con inicio de sesión</span></div>
+  <div><small>Avance de inventarios</small><strong>{{ metrics.inventory_progress|number_es(0) }} %</strong><span>{{ metrics.inventories_closed }} cerrados</span></div>
+  <div><small>Órdenes aceptadas</small><strong>{{ metrics.orders_accepted }}/{{ metrics.orders_total }}</strong><span>entregables</span></div>
+  <div><small>Hitos logrados</small><strong>{{ metrics.milestones_completed }}/{{ metrics.milestones_total }}</strong><span>valor documentado</span></div>
+</section>
+
+<div class="two-column-grid customer-success-grid">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">VALOR ENTREGADO</span><h2>Hitos y resultados</h2></div><span class="status-badge success">{{ metrics.milestones_completed }} completados</span></div>
+    {% if milestones %}<div class="settings-list milestone-list">{% for item in milestones %}<article><div><strong>{{ item.title }}</strong><span>{{ item.category }} · {{ item.owner }}</span><small>Meta {{ item.expected_value|number_es(1) }} {{ item.unit }} · logrado {{ item.realized_value|number_es(1) }} {{ item.unit }}{% if item.target_date %} · {{ item.target_date }}{% endif %}</small><small>{{ item.evidence_note }}</small></div><div><span class="status-badge {{ 'success' if item.status=='Completado' else 'warning' if item.status=='En progreso' else '' }}">{{ item.status }}</span>{% if user.can_manage_customer_success %}<details class="table-details"><summary>Actualizar</summary><form action="/exito-cliente/hitos/{{ item.id }}/estado" method="post" class="stacked-form"><select name="status">{% for value in ['Planeado','En progreso','Completado','Cancelado'] %}<option {% if item.status==value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><input type="number" step="0.01" min="0" name="realized_value" value="{{ item.realized_value }}"><textarea name="evidence_note" rows="2">{{ item.evidence_note }}</textarea><button class="button secondary small">Guardar</button></form></details>{% endif %}</div></article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sin hitos</strong><span>Documenta los resultados que el cliente reconoce como valor.</span></div>{% endif %}
+    {% if user.can_manage_customer_success %}<details class="form-drawer"><summary>Crear hito de valor</summary><form action="/exito-cliente/hitos/nuevo" method="post" class="stacked-form"><label>Título<input name="title" required></label><div class="form-grid"><label>Categoría<input name="category" value="Resultado climático"></label><label>Responsable<input name="owner" value="Equipo de éxito del cliente"></label><label>Inventario<select name="inventory_id"><option value="">Sin inventario</option>{% for inv in inventories %}<option value="{{ inv.id }}">{{ inv.name }}</option>{% endfor %}</select></label><label>Fecha objetivo<input type="date" name="target_date"></label><label>Valor esperado<input type="number" step="0.01" min="0" name="expected_value" value="0"></label><label>Valor realizado<input type="number" step="0.01" min="0" name="realized_value" value="0"></label><label>Unidad<input name="unit"></label><label>Estado<select name="status"><option>Planeado</option><option>En progreso</option><option>Completado</option></select></label></div><label>Evidencia o explicación<textarea name="evidence_note" rows="3"></textarea></label><button class="button primary">Crear hito</button></form></details>{% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">PLAN DE ACCIÓN</span><h2>Compromisos compartidos</h2></div><span class="status-badge {{ 'warning' if metrics.overdue_commitments else 'success' }}">{{ metrics.overdue_commitments }} vencidos</span></div>
+    {% if commitments %}<div class="settings-list commitment-list">{% for item in commitments %}<article><div><strong>{{ item.title }}</strong><span>{{ item.owner }} · {{ item.priority }}{% if item.due_date %} · vence {{ item.due_date }}{% endif %}</span><small>{{ item.description }}</small></div><div><span class="status-badge {{ 'success' if item.status=='Completado' else 'warning' if item.status in ['En progreso','Bloqueado'] else '' }}">{{ item.status }}</span>{% if user.can_manage_customer_success %}<form action="/exito-cliente/compromisos/{{ item.id }}/estado" method="post" class="inline-form"><select name="status">{% for value in ['Pendiente','En progreso','Completado','Bloqueado','Cancelado'] %}<option {% if item.status==value %}selected{% endif %}>{{ value }}</option>{% endfor %}</select><button class="button secondary small">Guardar</button></form>{% endif %}</div></article>{% endfor %}</div>{% else %}<div class="empty-state"><strong>Sin compromisos</strong><span>Registra acuerdos concretos con propietario y fecha.</span></div>{% endif %}
+    {% if user.can_manage_customer_success %}<details class="form-drawer"><summary>Crear compromiso</summary><form action="/exito-cliente/compromisos/nuevo" method="post" class="stacked-form"><label>Título<input name="title" required></label><label>Descripción<textarea name="description" rows="3"></textarea></label><div class="form-grid"><label>Responsable<input name="owner"></label><label>Fecha límite<input type="date" name="due_date"></label><label>Prioridad<select name="priority"><option>Baja</option><option selected>Media</option><option>Alta</option><option>Crítica</option></select></label><label>Origen<input name="source" value="Plan de éxito"></label></div><button class="button primary">Crear compromiso</button></form></details>{% endif %}
+  </section>
+</div>
+
+<div class="two-column-grid customer-success-grid">
+  <section class="panel"><div class="panel-heading"><div><span class="eyebrow">TENDENCIA</span><h2>Historial de salud</h2></div></div>{% if history %}<div class="health-history">{% for item in history %}<article><span>{{ item.calculated_at.strftime('%d/%m/%Y %H:%M') }}</span><div class="progress"><span style="width:{{ item.overall_score }}%"></span></div><strong>{{ item.overall_score }}</strong><small>{{ item.risk_level }}</small></article>{% endfor %}</div>{% endif %}</section>
+  {% if portfolio %}<section class="panel"><div class="panel-heading"><div><span class="eyebrow">PORTAFOLIO</span><h2>Cuentas accesibles</h2></div></div><div class="settings-list">{% for item in portfolio %}<article><div><strong>{{ item.organization.name }}</strong><span>{{ item.organization.role }}</span></div><div><b>{{ item.snapshot.overall_score }}/100</b><span class="status-badge">{{ item.snapshot.risk_level }}</span></div></article>{% endfor %}</div></section>{% endif %}
+</div>
+{% endblock %}

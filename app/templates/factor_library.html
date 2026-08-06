@@ -1,0 +1,137 @@
+{% extends "base.html" %}
+{% block title %}Biblioteca profesional de factores · Calcula tu Huella{% endblock %}
+{% block page_label %}Metodología / Biblioteca de factores{% endblock %}
+{% block content %}
+<div class="page-head factor-library-head">
+  <div>
+    <p class="breadcrumb">Metodología / Selección explicable</p>
+    <h1>Biblioteca profesional de factores</h1>
+    <p>Busca, filtra y compara versiones con su fuente, vigencia, unidad, gas, incertidumbre, calidad documental y restricciones antes de formular una decisión.</p>
+  </div>
+  <span class="release-chip">V1.0 · gobierno de factores</span>
+</div>
+
+<div class="calculation-notice">
+  <span>CRITERIO</span>
+  <p><strong>La biblioteca aplica una jerarquía explícita, pero no automatiza la aprobación.</strong><small>Primero se prioriza evidencia específica verificada y oficial nacional; después fuentes sectoriales e internacionales. Los documentos preliminares permanecen en vigilancia y no se promueven automáticamente a cálculo.</small></p>
+</div>
+
+{% if record %}
+<section class="card factor-context-card">
+  <div>
+    <small>CONTEXTO ACTIVO</small>
+    <h2>{{ source.name }}</h2>
+    <p>{{ record.value|number_es(4) }} {{ record.unit }} · {{ record.period_start.strftime('%d/%m/%Y') }} a {{ record.period_end.strftime('%d/%m/%Y') }} · Alcance {{ source.scope }}</p>
+  </div>
+  <div class="context-actions">
+    <a class="btn btn-outline btn-small" href="/fuentes/{{ source.id }}?activity_data_id={{ record.id }}#conversacion-tecnica">Volver a la conversación</a>
+    <a class="tiny-link" href="/metodologia/biblioteca-factores">Quitar contexto</a>
+  </div>
+</section>
+{% endif %}
+
+<section class="factor-library-metrics" aria-label="Resumen de la biblioteca">
+  <article><small>Versiones</small><strong>{{ summary.metrics.total }}</strong><span>{{ summary.metrics.visible }} visibles con los filtros</span></article>
+  <article><small>Oficiales nacionales</small><strong>{{ summary.metrics.official_national }}</strong><span>nivel 2 de jerarquía</span></article>
+  <article><small>Formales</small><strong>{{ summary.metrics.formal }}</strong><span>aprobadas documentalmente</span></article>
+  <article><small>Listas</small><strong>{{ summary.metrics.ready }}</strong><span>para evaluación profesional</span></article>
+  <article class="{% if summary.metrics.preliminary_sources %}metric-alert{% endif %}"><small>Fuentes preliminares</small><strong>{{ summary.metrics.preliminary_sources }}</strong><span>registradas sin promoción automática</span></article>
+  <article class="{% if summary.metrics.temporally_stale %}metric-alert{% endif %}"><small>Desactualizadas</small><strong>{{ summary.metrics.temporally_stale }}</strong><span>frente al año de referencia</span></article>
+  <article class="{% if summary.metrics.overdue %}metric-alert{% endif %}"><small>Revisión vencida</small><strong>{{ summary.metrics.overdue }}</strong><span>fichas que requieren actualización</span></article>
+  <article><small>Mismo periodo</small><strong>{{ summary.metrics.same_period }}</strong><span>coincidencia temporal exacta</span></article>
+</section>
+
+<section class="card factor-filter-card">
+  <div class="card-head"><div><small>BÚSQUEDA Y FILTROS</small><h2>Acota el universo antes de comparar</h2></div><span>{{ summary["items"]|length }} resultado(s)</span></div>
+  <form method="get" action="/metodologia/biblioteca-factores" class="factor-filter-form">
+    {% if source %}<input type="hidden" name="source_id" value="{{ source.id }}">{% endif %}
+    {% if record %}<input type="hidden" name="activity_data_id" value="{{ record.id }}">{% endif %}
+    <label class="factor-search-wide">Buscar
+      <input name="q" value="{{ summary.query.q }}" placeholder="Actividad, factor, documento, emisor, tecnología…">
+    </label>
+    <label>Sector
+      <select name="sector"><option value="">Todos</option>{% for option in summary.filters.sectors %}<option value="{{ option }}" {% if summary.query.sector == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Geografía
+      <select name="country"><option value="">Todas</option>{% for option in summary.filters.countries %}<option value="{{ option }}" {% if summary.query.country == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Gas
+      <select name="gas"><option value="">Todos</option>{% for option in summary.filters.gases %}<option value="{{ option }}" {% if summary.query.gas == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Unidad de entrada
+      <select name="unit"><option value="">Todas</option>{% for option in summary.filters.units %}<option value="{{ option }}" {% if summary.query.unit == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Aptitud de uso
+      <select name="reporting_use"><option value="">Todas</option>{% for option in summary.filters.uses %}<option value="{{ option }}" {% if summary.query.reporting_use == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Calidad documental
+      <select name="quality"><option value="">Todas</option>{% for option in summary.filters.qualities %}<option value="{{ option }}" {% if summary.query.quality == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Preparación
+      <select name="readiness"><option value="">Todas</option>{% for option in summary.filters.readiness %}<option value="{{ option }}" {% if summary.query.readiness == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Jerarquía metodológica
+      <select name="hierarchy"><option value="">Todas</option>{% for option in summary.filters.hierarchy %}<option value="{{ option.tier }}" {% if summary.query.hierarchy == option.tier %}selected{% endif %}>{{ option.tier }} · {{ option.label }}</option>{% endfor %}</select>
+    </label>
+    <label>Alineación temporal
+      <select name="temporal_status"><option value="">Todas</option>{% for option in summary.filters.temporal %}<option value="{{ option }}" {% if summary.query.temporal_status == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <label>Año del dato fuente
+      <select name="data_year"><option value="">Todos</option>{% for option in summary.filters.years %}<option value="{{ option }}" {% if summary.query.data_year == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select>
+    </label>
+    <div class="factor-filter-actions"><button class="btn btn-primary">Aplicar filtros</button><a class="btn btn-outline" href="/metodologia/biblioteca-factores{% if context_query %}?{{ context_query }}{% endif %}">Limpiar</a></div>
+  </form>
+</section>
+
+<form method="get" action="/metodologia/biblioteca-factores/comparar/seleccion" class="factor-comparison-form">
+  {% if source %}<input type="hidden" name="source_id" value="{{ source.id }}">{% endif %}
+  {% if record %}<input type="hidden" name="activity_data_id" value="{{ record.id }}">{% endif %}
+  <div class="factor-library-grid">
+  {% for item in summary["items"] %}
+    {% set version = item.version %}{% set factor = item.factor %}{% set doc = item.documentation %}{% set advice = item.advice %}
+    <article class="factor-library-card readiness-{{ item.decision_readiness|lower|replace(' ','-') }}">
+      <header>
+        <label class="factor-compare-check"><input type="checkbox" name="ids" value="{{ version.id }}"><span>Comparar</span></label>
+        <span class="status-badge {% if item.decision_readiness == 'Listo para evaluación' %}success{% elif item.decision_readiness == 'Solo demostración' %}danger{% else %}warning{% endif %}">{{ item.decision_readiness }}</span>
+      </header>
+      <div class="factor-card-title">
+        <small>{{ factor.activity_type }} · {{ factor.sector }}</small>
+        <h3>{{ factor.name }}</h3>
+        <p>{{ item.gas.formula or item.gas.code }} · versión {{ version.version }}</p>
+      </div>
+      <div class="factor-value-block">
+        <strong>{{ version.value|number_es(8) }}</strong>
+        <span>{{ version.output_unit }} / {{ version.input_unit }}</span>
+      </div>
+      {% if advice %}
+      <div class="factor-fit-summary">
+        <div><small>Compatibilidad con el dato</small><strong>{{ advice.score }}%</strong></div>
+        <span class="status-chip {% if advice.recommendation == 'Recomendado' %}complete{% else %}pending{% endif %}">{{ advice.recommendation }}</span>
+      </div>
+      <div class="factor-mini-score" aria-label="Desglose de compatibilidad">
+        <span><b>{{ advice.breakdown.units }}</b>Unidad</span><span><b>{{ advice.breakdown.activity }}</b>Actividad</span><span><b>{{ advice.breakdown.geography }}</b>Geografía</span><span><b>{{ advice.breakdown.time }}</b>Tiempo</span><span><b>{{ advice.breakdown.documentation }}</b>Soporte</span>
+      </div>
+      {% endif %}
+      <dl class="factor-passport-mini">
+        <div><dt>Geografía</dt><dd>{{ version.geographic_scope }}</dd></div>
+        <div><dt>Año</dt><dd>{{ version.publication_year }}{% if doc and doc.data_year %} · dato {{ doc.data_year }}{% endif %}</dd></div>
+        <div><dt>Jerarquía</dt><dd>{{ item.hierarchy_tier }} · {{ item.hierarchy_label }}</dd></div>
+        <div><dt>Alineación</dt><dd>{{ item.temporal_alignment }}{% if item.year_gap is not none %} · brecha {{ item.year_gap }} año(s){% endif %}</dd></div>
+        <div><dt>Tipo</dt><dd>{{ doc.factor_kind if doc else 'Sin clasificar' }}</dd></div>
+        <div><dt>Uso</dt><dd>{{ doc.reporting_use if doc else 'Sin clasificar' }} · calidad {{ doc.quality_grade if doc else 'N/A' }}</dd></div>
+        <div><dt>Fuente</dt><dd>{{ item.source_label }} · {{ item.source_status }}</dd></div>
+        <div><dt>Ficha</dt><dd>{{ item.document_completeness }}% completa</dd></div>
+      </dl>
+      {% if item.warnings %}<div class="factor-card-warnings">{% for warning in item.warnings[:2] %}<span>{{ warning }}</span>{% endfor %}</div>{% endif %}
+      <footer>
+        <a class="btn btn-outline btn-small" href="/metodologia/biblioteca-factores/{{ version.id }}{% if context_query %}?{{ context_query }}{% endif %}">Ver pasaporte</a>
+        {% if doc and doc.source_document and doc.source_document.source_url %}<span class="method-tag">{{ doc.source_document.code }}</span>{% endif %}
+      </footer>
+    </article>
+  {% else %}
+    <div class="empty-state factor-library-empty"><strong>No hay factores que coincidan con los filtros.</strong><p>Amplía la búsqueda o elimina filtros. La ausencia de candidatos no debe resolverse forzando un factor incompatible.</p></div>
+  {% endfor %}
+  </div>
+  {% if summary["items"] %}<div class="factor-compare-bar"><div><strong>Comparación controlada</strong><span>Selecciona entre 2 y 6 versiones. La comparación detectará incompatibilidades estructurales.</span></div><button class="btn btn-primary">Comparar seleccionados</button></div>{% endif %}
+</form>
+{% endblock %}

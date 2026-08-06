@@ -1,0 +1,23 @@
+{% extends "public_base.html" %}
+{% block title %}Invitación · Calcula tu Huella{% endblock %}
+{% block content %}
+<section class="result-shell invitation-shell">
+  {% if valid %}
+  <span class="eyebrow">INVITACIÓN SEGURA</span>
+  <h1>Únete a {{ invitation.organization.trade_name or invitation.organization.name }}</h1>
+  <p>Te invitaron a participar como <strong>{{ invitation.role }}</strong>. El acceso queda limitado a esta organización y sujeto a sus permisos.</p>
+  <div class="callout"><strong>Correo autorizado:</strong> {{ invitation.email }}<br><strong>Vigencia:</strong> hasta {{ invitation.expires_at.strftime('%Y-%m-%d %H:%M') }}</div>
+  <form action="/invitacion/{{ token }}/aceptar" method="post" class="public-contact-form invitation-form">
+    <label>Nombre completo<input name="name" value="{{ invitation.invited_name }}" autocomplete="name"></label>
+    <label>Contraseña inicial<input name="password" type="password" minlength="8" autocomplete="new-password"><small>Solo se utiliza si todavía no existe una cuenta con este correo.</small></label>
+    <button class="button primary large">Aceptar invitación</button>
+  </form>
+  <p class="method-note">No compartas este enlace. Después de aceptarlo quedará invalidado. Si el plan cambia o pierde capacidad antes de la aceptación, el acceso se detendrá sin crear una cuenta parcial.</p>
+  {% else %}
+  <span class="eyebrow">INVITACIÓN NO DISPONIBLE</span>
+  <h1>Este acceso ya no puede utilizarse</h1>
+  <p>La invitación venció, fue cancelada o ya fue aceptada. Solicita un nuevo enlace al administrador de la organización.</p>
+  <a class="button secondary" href="/">Volver al inicio</a>
+  {% endif %}
+</section>
+{% endblock %}

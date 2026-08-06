@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Núcleo metodológico · Calcula tu Huella{% endblock %}
+{% block page_label %}Cálculo / Núcleo metodológico{% endblock %}
+{% block content %}
+<div class="page-head methodology-core-head">
+  <div>
+    <p class="breadcrumb">Metodología / Validación reproducible</p>
+    <h1>Núcleo metodológico</h1>
+    <p>Separa fuentes oficiales, factores formales, datos demostrativos, reglas de selección y casos patrón del motor.</p>
+  </div>
+  <div class="methodology-actions">
+    <a class="btn btn-outline" href="/metodologia/nucleo/exportar.xlsx">Exportar control</a>
+    {% if user.can_manage_methodology_governance %}
+    <form method="post" action="/metodologia/nucleo/validar"><button class="btn btn-primary">Ejecutar casos patrón</button></form>
+    {% endif %}
+  </div>
+</div>
+
+<section class="methodology-core-status">
+  <div class="method-score"><span>{{ summary.metrics.score }}%</span><div><strong>Preparación metodológica</strong><small>Indicador interno; no equivale a certificación ni verificación.</small></div></div>
+  <div class="method-metric"><b>{{ summary.metrics.official_sources }}</b><span>fuentes documentales</span></div>
+  <div class="method-metric"><b>{{ summary.metrics.formal_factors }}</b><span>factores formales</span></div>
+  <div class="method-metric warning"><b>{{ summary.metrics.demo_factors }}</b><span>factores demo</span></div>
+  <div class="method-metric"><b>{{ summary.metrics.reference_cases }}</b><span>casos patrón</span></div>
+  <div class="method-metric {% if summary.metrics.failed_cases %}danger{% else %}success{% endif %}"><b>{{ summary.metrics.passed_cases }}/{{ summary.metrics.reference_cases }}</b><span>última validación</span></div>
+</section>
+
+<div class="calculation-notice methodology-boundary">
+  <span>LÍMITE DE USO</span>
+  <p><strong>La biblioteca disponible incluye factores documentados para varios casos sectoriales, pero no constituye por sí sola una biblioteca universal ni reemplaza la selección profesional para cada dato.</strong><small>Los factores UPME e IPCC incorporados conservan fuente, tabla, unidad, restricciones e incertidumbre. Los factores demostrativos permanecen bloqueados para uso formal.</small></p>
+</div>
+
+<section class="card" id="fuentes">
+  <div class="card-head"><div><small>REGISTRO MAESTRO</small><h3>Fuentes metodológicas</h3></div><span class="counter">{{ summary.sources|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Código</th><th>Documento</th><th>Emisor</th><th>Fecha / jurisdicción</th><th>Estado</th><th>Referencia</th></tr></thead><tbody>
+  {% for item in summary.sources %}<tr>
+    <td><strong>{{ item.code }}</strong></td>
+    <td>{{ item.title }}<small class="table-sub">{{ item.document_type }}</small></td>
+    <td>{{ item.issuing_body }}</td>
+    <td>{{ item.publication_date or 'Sin fecha' }}<small class="table-sub">{{ item.jurisdiction }}</small></td>
+    <td><span class="status-badge {% if item.status == 'Demostrativo' %}danger{% elif 'revisión' in item.status|lower %}warning{% else %}success{% endif %}">{{ item.status }}</span></td>
+    <td>{% if item.source_url %}<a class="tiny-button" href="{{ item.source_url }}" target="_blank" rel="noopener">Abrir fuente</a>{% else %}<span class="muted">Interna</span>{% endif %}<small class="table-sub">{{ item.citation }}</small></td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="card" id="factores">
+  <div class="card-head"><div><small>TRAZABILIDAD POR VERSIÓN</small><h3>Factores y aptitud de uso</h3></div><span class="counter">{{ summary.factor_rows|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Factor</th><th>Valor</th><th>Clasificación</th><th>Fuente / referencia</th><th>Revisión</th><th>Uso</th></tr></thead><tbody>
+  {% for row in summary.factor_rows %}{% set doc = row.documentation %}<tr class="{% if row.formal %}formal-factor-row{% elif doc and doc.reporting_use == 'Demostrativo' %}demo-factor-row{% endif %}">
+    <td><strong>{{ row.factor.name }}</strong><small class="table-sub">{{ row.version.version }} · {{ row.gas.formula or row.gas.code }} · {{ row.factor.activity_type }}</small></td>
+    <td><strong>{{ row.version.value|number_es(9) }}</strong><small class="table-sub">{{ row.version.output_unit }} / {{ row.version.input_unit }}</small></td>
+    <td>{% if doc %}<span class="method-tag">{{ doc.factor_kind }}</span><small class="table-sub">Calidad {{ doc.quality_grade }} · dato {{ doc.data_year or 'N/D' }}</small>{% else %}<span class="status-badge danger">Sin documentación</span>{% endif %}</td>
+    <td>{% if doc and doc.source_document %}<strong>{{ doc.source_document.code }}</strong><small class="table-sub">{{ doc.page_reference }} · {{ doc.table_reference }}</small><small class="table-sub">{{ doc.conversion_expression }}</small>{% else %}<span class="muted">Pendiente de fuente primaria</span>{% endif %}</td>
+    <td>{% if doc %}<span class="status-badge {% if doc.review_status.startswith('Aprobado') %}success{% elif doc.review_status == 'Demostrativo' %}danger{% else %}warning{% endif %}">{{ doc.review_status }}</span><small class="table-sub">{{ doc.reviewer or 'Sin revisor' }}</small>{% endif %}</td>
+    <td>{% if doc %}
+      {% if user.can_review %}<form method="post" action="/metodologia/nucleo/factores/{{ doc.id }}/revisar" class="factor-review-form">
+        <select name="review_status">{% for state in ['Pendiente','En revisión','Aprobado documentalmente','Rechazado','Demostrativo'] %}<option {% if doc.review_status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select>
+        <select name="quality_grade">{% for grade in ['A','B','C','D','N/A'] %}<option {% if doc.quality_grade == grade %}selected{% endif %}>{{ grade }}</option>{% endfor %}</select>
+        <select name="reporting_use">{% for use in ['Formal','Piloto','Demostrativo','Retirado'] %}<option {% if doc.reporting_use == use %}selected{% endif %}>{{ use }}</option>{% endfor %}</select>
+        <input name="restriction_notes" value="{{ doc.restriction_notes }}" aria-label="Restricciones">
+        <button class="tiny-button">Guardar</button>
+      </form>{% else %}<span class="status-badge {% if doc.reporting_use == 'Formal' %}success{% elif doc.reporting_use == 'Demostrativo' %}danger{% else %}warning{% endif %}">{{ doc.reporting_use }}</span>{% endif %}
+    {% endif %}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<div class="methodology-two-col">
+<section class="card" id="gwp">
+  <div class="card-head"><div><small>IPCC AR4 / AR5 / AR6</small><h3>GWP100 versionados</h3></div><span class="counter">{{ summary.gwps|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Gas</th><th>Evaluación</th><th>Valor</th><th>Fuente</th></tr></thead><tbody>
+  {% for item in summary.gwps %}<tr><td><strong>{{ item.gas.formula or item.gas.code }}</strong><small class="table-sub">{{ item.gas.name }}</small></td><td>{{ item.assessment }} · {{ item.horizon_years }} años</td><td><strong>{{ item.value|number_es(3) }}</strong></td><td>{{ item.source }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  <p class="method-footnote">El metano se diferencia entre no fósil/combustión y fósil fugitivo o de proceso para AR5 y AR6.</p>
+</section>
+
+<section class="card" id="reglas">
+  <div class="card-head"><div><small>DECISIÓN REPRODUCIBLE</small><h3>Reglas de selección</h3></div><span class="counter">{{ summary.rules|length }}</span></div>
+  <div class="selection-rule-list">{% for rule in summary.rules %}<article>
+    <span class="rule-priority">{{ rule.priority }}</span><div><strong>{{ rule.code }} · {{ rule.name }}</strong><p>{{ rule.rationale }}</p><small>{{ rule.preferred_factor_kind }} · calidad mínima {{ rule.minimum_quality_grade }} · uso {{ rule.allowed_reporting_use }}{% if rule.requires_year_match %} · brecha ≤ {{ rule.max_year_gap }} año(s){% endif %}</small></div>
+    {% if user.can_manage_methodology_governance %}<form method="post" action="/metodologia/nucleo/reglas/{{ rule.id }}/estado"><select name="status">{% for state in ['Activa','En revisión','Inactiva'] %}<option {% if rule.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select><button class="tiny-button">Guardar</button></form>{% else %}<span class="status-badge">{{ rule.status }}</span>{% endif %}
+  </article>{% endfor %}</div>
+</section>
+</div>
+
+<section class="card" id="casos">
+  <div class="card-head"><div><small>VALIDACIÓN INDEPENDIENTE</small><h3>Casos patrón del motor</h3></div>{% if summary.last_run %}<span class="status-badge {% if summary.last_run.status == 'Aprobado' %}success{% else %}danger{% endif %}">{{ summary.last_run.status }} · {{ summary.last_run.run_code }}</span>{% else %}<span class="status-badge warning">Sin ejecutar</span>{% endif %}</div>
+  <div class="reference-case-grid">
+  {% for case in summary.cases %}{% set latest = namespace(result=None) %}{% if summary.last_run %}{% for result in summary.last_run.results %}{% if result.case_id == case.id %}{% set latest.result = result %}{% endif %}{% endfor %}{% endif %}
+    <article class="reference-case {% if latest.result and latest.result.passed %}passed{% elif latest.result %}failed{% endif %}">
+      <div><span>{{ case.code }}</span><strong>{{ case.title }}</strong><small>{{ case.category }}</small></div>
+      <p>{{ case.activity_value|number_es(8) }} {{ case.activity_unit }} → {{ case.expected_normalized_value|number_es(8) }} {{ case.factor_input_unit }} × {{ case.factor_value|number_es(8) }} × GWP {{ case.gwp_value|number_es(3) }}</p>
+      <footer><b>{{ case.expected_co2e_kg|number_es(8) }} kgCO₂e</b><small>{{ case.expected_status }} · tolerancia {{ case.tolerance }}</small>{% if latest.result %}<span>{{ 'Aprobado' if latest.result.passed else 'Fallido' }}</span>{% endif %}</footer>
+    </article>
+  {% endfor %}
+  </div>
+  {% if summary.last_run %}<div class="validation-run-summary"><span>Motor {{ summary.last_run.engine_version }}</span><span>Ejecutado por {{ summary.last_run.executed_by }}</span><span>{{ summary.last_run.executed_at }}</span><strong>{{ summary.last_run.passed_cases }}/{{ summary.last_run.total_cases }} aprobados</strong></div>{% endif %}
+</section>
+
+<section class="card methodology-next">
+  <div><small>DEUDA METODOLÓGICA VISIBLE</small><h3>Lo que todavía falta para V1.0</h3></div>
+  <div class="next-checklist"><span>Combustibles Colombia</span><span>Otros refrigerantes</span><span>Aguas residuales</span><span>Transporte</span><span>Agricultura y AFOLU</span><span>Factores de gasto</span><span>Incertidumbre</span><span>Revisión independiente</span></div>
+</section>
+{% endblock %}

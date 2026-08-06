@@ -1,0 +1,131 @@
+{% extends "base.html" %}
+{% block title %}Captura guiada · Calcula tu Huella{% endblock %}
+{% block page_label %}Información / Captura guiada{% endblock %}
+{% block content %}
+<div class="page-head guided-capture-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Recolección</p>
+    <h1>Captura guiada de información</h1>
+    <p>La plataforma prioriza la fuente y el periodo pendientes, explica qué soporte esperar y permite registrar dato y evidencia en una sola operación.</p>
+  </div>
+  <div class="head-actions">
+    <details class="head-action-menu">
+      <summary class="btn btn-outline">Carga masiva</summary>
+      <div><a href="/informacion/plantilla.xlsx">Descargar plantilla sectorial</a><a href="/informacion/importar">Importar archivo Excel</a></div>
+    </details>
+    <a class="btn btn-primary" href="/informacion">Ver datos y evidencias</a>
+  </div>
+</div>
+
+<section class="capture-summary-grid">
+  <article class="mini-card"><small>COBERTURA DE PERIODOS</small><strong>{{ summary.coverage }}%</strong><p>{{ summary.complete_periods }} de {{ summary.expected_periods }} periodos esperados</p></article>
+  <article class="mini-card"><small>COBERTURA DE SOPORTES</small><strong>{{ summary.support_coverage }}%</strong><p>Registros con evidencia asociada</p></article>
+  <article class="mini-card"><small>FUENTES AL DÍA</small><strong>{{ summary.sources_ready }}/{{ summary.sources }}</strong><p>Sin periodos ni soportes pendientes</p></article>
+  <article class="mini-card"><small>PRÓXIMA DECISIÓN</small><strong>{{ summary.next_action.source.name if summary.next_action else 'Configurar fuentes' }}</strong><p>{{ summary.next_action.status if summary.next_action else 'No hay fuentes incluidas' }}</p></article>
+</section>
+
+{% if selected %}
+<section class="capture-workspace">
+  <aside class="card capture-source-rail">
+    <div class="card-head"><div><small>PLAN DE CAPTURA</small><h2>Fuentes priorizadas</h2></div><span class="counter">{{ summary.sources }}</span></div>
+    <p class="capture-rail-intro">El orden combina materialidad, periodos faltantes y ausencia de soportes. No reemplaza la revisión profesional.</p>
+    <div class="capture-source-list">
+      {% for item in summary.cards %}
+      <a href="/captura-guiada?source_id={{ item.source.id }}" class="capture-source-item {% if selected.source.id == item.source.id %}active{% endif %}">
+        <span class="capture-status-dot {{ item.tone }}"></span>
+        <div><strong>{{ item.source.name }}</strong><small>Alcance {{ item.source.scope }} · {{ item.source.data_frequency }} · {{ item.source.responsible }}</small></div>
+        <b>{{ item.coverage }}%</b>
+      </a>
+      {% endfor %}
+    </div>
+  </aside>
+
+  <div class="capture-main-column">
+    <section class="card capture-source-brief">
+      <div class="capture-brief-title">
+        <div><small>FUENTE SELECCIONADA</small><h2>{{ selected.source.name }}</h2><p>{{ selected.source.category }} · {{ selected.source.facility.name if selected.source.facility else 'Corporativo' }}</p></div>
+        <span class="status-chip {{ selected.tone }}">{{ selected.status }}</span>
+      </div>
+      <div class="capture-brief-grid">
+        <article><small>PRÓXIMO PERIODO</small><strong>{% if selected.next_start %}{{ selected.next_start.strftime('%d/%m/%Y') }}–{{ selected.next_end.strftime('%d/%m/%Y') }}{% else %}Cobertura completa{% endif %}</strong><p>{{ selected.missing_count }} periodo(s) pendiente(s)</p></article>
+        <article><small>UNIDAD ESPERADA</small><strong>{{ selected.profile.unit }}</strong><p>Confirma la unidad del soporte antes de guardar.</p></article>
+        <article><small>SOPORTE RECOMENDADO</small><strong>{{ selected.profile.evidence }}</strong><p>{{ selected.profile.note }}</p></article>
+        <article><small>RESPONSABLE</small><strong>{{ selected.source.responsible }}</strong><p>Materialidad {{ selected.source.materiality|lower }}</p></article>
+      </div>
+      <div class="capture-integrity-note"><b>Control ambiental</b><p>El dato debe corresponder al límite, periodo y operación definidos. Una copia del periodo anterior se ofrece solo como referencia y siempre queda marcada como estimada hasta que sea confirmada.</p></div>
+    </section>
+
+    {% if user.can_provide_data and selected.next_start %}
+    <section class="card capture-form-card" id="registrar">
+      <div class="card-head"><div><small>REGISTRO INTEGRADO</small><h2>Dato + evidencia</h2></div>{% if copy_record %}<span class="phase-label warning">Referencia prellenada</span>{% endif %}</div>
+      {% if copy_record %}<div class="capture-copy-warning"><strong>No se ha creado ningún dato.</strong><p>El valor viene de {{ copy_record.period_start.strftime('%m/%Y') }}. Confirma el nuevo periodo, ajusta el valor y adjunta el soporte correspondiente antes de guardar.</p></div>{% endif %}
+      <form method="post" action="/captura-guiada/registrar" enctype="multipart/form-data" class="capture-guided-form assisted-form" data-guided-capture-form data-assist-form data-guard-unsaved>
+        <input type="hidden" name="source_id" value="{{ selected.source.id }}">
+        <div class="form-assistant-intro" role="note">
+          <span aria-hidden="true">✓</span><div><strong>Completa primero cuatro decisiones</strong><p>Periodo, cantidad, unidad y soporte. Los campos técnicos opcionales están agrupados al final.</p></div>
+        </div>
+
+        <fieldset class="assisted-fieldset">
+          <legend><span>1</span><div><strong>¿Cuándo y cuánto?</strong><small>Copia exactamente el periodo y la cantidad que aparecen en el soporte.</small></div></legend>
+          <div class="form-grid two">
+            <label for="capture-period-start">Inicio del periodo<input id="capture-period-start" name="period_start" type="date" value="{{ selected.next_start.isoformat() if selected.next_start else inventory.start_date.isoformat() }}" required aria-describedby="capture-period-help"></label>
+            <label for="capture-period-end">Final del periodo<input id="capture-period-end" name="period_end" type="date" value="{{ selected.next_end.isoformat() if selected.next_end else inventory.end_date.isoformat() }}" required aria-describedby="capture-period-help"></label>
+          </div>
+          <small class="field-group-help" id="capture-period-help">El periodo no debe superponerse con un registro existente de esta misma fuente.</small>
+          <div class="form-grid two">
+            <label for="capture-value">Cantidad registrada<input id="capture-value" name="value" type="number" inputmode="decimal" step="any" min="0" value="{{ prefill.value }}" required aria-describedby="capture-value-help"></label>
+            <label for="capture-unit">Unidad<select id="capture-unit" name="unit" required aria-describedby="capture-value-help">{% for unit in allowed_units %}<option {% if unit == prefill.unit %}selected{% endif %}>{{ unit }}</option>{% endfor %}</select></label>
+          </div>
+          <small class="field-group-help" id="capture-value-help">Unidad esperada para esta fuente: <strong>{{ selected.profile.unit }}</strong>. Cámbiala únicamente cuando el soporte utilice otra unidad.</small>
+        </fieldset>
+
+        <fieldset class="assisted-fieldset">
+          <legend><span>2</span><div><strong>¿De dónde salió el dato?</strong><small>Indica el origen y asocia el documento que permite comprobarlo.</small></div></legend>
+          <label for="capture-origin">Origen del dato<select id="capture-origin" name="data_origin" required aria-describedby="capture-origin-help">{% for origin in data_origins %}<option {% if origin == prefill.origin %}selected{% endif %}>{{ origin }}</option>{% endfor %}</select><small id="capture-origin-help">Ejemplo: factura, medición directa, registro operativo o estimación documentada.</small></label>
+          <div class="capture-evidence-choice" aria-describedby="capture-evidence-help">
+            <label for="capture-evidence-file">Adjuntar soporte nuevo<input id="capture-evidence-file" type="file" name="evidence_file" accept=".pdf,.xlsx,.xls,.csv,.jpg,.jpeg,.png"><small>PDF, Excel, CSV o imagen. Máximo 10 MB.</small></label>
+            <span aria-hidden="true">o</span>
+            <label for="capture-evidence-existing">Usar evidencia ya cargada<select id="capture-evidence-existing" name="evidence_id"><option value="">Sin asociar todavía</option>{% for doc in documents if not doc.source_id or doc.source_id == selected.source.id %}<option value="{{ doc.id }}">{{ doc.name }} · {{ doc.period_label or 'sin periodo' }}</option>{% endfor %}</select></label>
+          </div>
+          <small class="field-group-help" id="capture-evidence-help">Selecciona solo una opción. El archivo nuevo reemplaza la selección de evidencia existente y viceversa.</small>
+        </fieldset>
+
+        <details class="advanced-form-section">
+          <summary><div><strong>Información técnica opcional</strong><small>Estimación, incertidumbre y observaciones</small></div><span aria-hidden="true">⌄</span></summary>
+          <div class="advanced-form-body">
+            <label for="capture-document-type">Tipo de soporte<select id="capture-document-type" name="document_type"><option {% if selected.profile.origin == 'Factura' %}selected{% endif %}>Factura</option><option>Registro operativo</option><option>Certificado</option><option>Medición</option><option>Imagen</option><option>Otro</option></select></label>
+            <label class="check-line" for="capture-estimated"><input id="capture-estimated" type="checkbox" name="is_estimated" {% if prefill.is_estimated %}checked{% endif %}> El valor es estimado o provisional</label>
+            <div class="plain-language-note"><strong>¿Qué significa estimado?</strong><p>El valor no proviene de una medición completa. Debe explicarse cómo se obtuvo y reemplazarse cuando exista un dato mejor.</p></div>
+            <div class="form-grid two">
+              <label for="capture-uncertainty">Variación posible (%)<input id="capture-uncertainty" name="uncertainty_percentage" type="number" inputmode="decimal" min="0" step="0.1" value="{{ prefill.uncertainty }}" aria-describedby="capture-uncertainty-help"></label>
+              <label for="capture-uncertainty-basis">Cómo se estimó esa variación<input id="capture-uncertainty-basis" name="uncertainty_basis" value="{{ prefill.uncertainty_basis }}" placeholder="Medición, muestreo, extrapolación..." aria-describedby="capture-uncertainty-help"></label>
+            </div>
+            <small class="field-group-help" id="capture-uncertainty-help">La incertidumbre expresa cuánto podría variar el dato. Déjala vacía si todavía no existe una estimación defendible.</small>
+            <label for="capture-notes">Observaciones<textarea id="capture-notes" name="notes" placeholder="Supuestos, alcance, conciliaciones o cambios frente al periodo anterior">{{ prefill.notes }}</textarea></label>
+          </div>
+        </details>
+
+        <div class="capture-live-summary" data-capture-preview role="status" aria-live="polite" aria-atomic="true">
+          <small>RESUMEN ANTES DE GUARDAR</small><strong>Completa la cantidad para revisar el registro.</strong><p>La aprobación metodológica seguirá siendo humana.</p>
+        </div>
+        <div class="capture-submit-row"><div><strong>Antes de guardar</strong><small>Confirma que periodo, cantidad, unidad y soporte describen la misma operación. El sistema recalculará la fuente.</small></div><button class="btn btn-primary">Guardar dato y soporte</button></div>
+      </form>
+    </section>
+    {% elif user.can_provide_data %}
+    <section class="card capture-complete-card"><div><small>SERIE COMPLETA</small><h2>No hay periodos pendientes para esta fuente</h2><p>Revisa los soportes y estados existentes. Para corregir un dato, abre la fuente o el historial; la captura guiada evita crear periodos duplicados.</p></div><div class="head-actions"><a class="btn btn-outline" href="/fuentes/{{ selected.source.id }}">Revisar fuente</a><a class="btn btn-primary" href="/informacion#evidencias">Gestionar soportes</a></div></section>
+    {% endif %}
+
+    <section class="card capture-history-card">
+      <div class="card-head"><div><small>REFERENCIAS DISPONIBLES</small><h2>Periodos anteriores</h2></div><span class="counter">{{ selected.records|length }}</span></div>
+      {% if selected.records %}
+      <div class="responsive-table"><table><thead><tr><th>Periodo</th><th>Valor</th><th>Calidad</th><th>Soporte</th><th>Acción</th></tr></thead><tbody>
+        {% for item in selected.records|reverse %}<tr><td>{{ item.period_start.strftime('%m/%Y') }}</td><td><strong>{{ item.value|number_es(2) }}</strong> {{ item.unit }}{% if item.is_estimated %}<small class="table-sub">Estimado</small>{% endif %}</td><td><span class="quality-badge quality-{{ item.quality_level|lower }}">{{ item.quality_level }}</span></td><td>{{ item.evidence.name if item.evidence else 'Sin soporte' }}</td><td><a class="btn btn-outline btn-small" href="/captura-guiada?source_id={{ selected.source.id }}&amp;copy_record_id={{ item.id }}#registrar">Usar como referencia</a></td></tr>{% endfor %}
+      </tbody></table></div>
+      {% else %}<div class="inline-empty"><strong>Sin periodos anteriores</strong><p>Registra el primer dato con su evidencia para iniciar la serie.</p></div>{% endif %}
+    </section>
+  </div>
+</section>
+{% else %}
+<section class="card guided-empty"><span>▦</span><div><strong>No hay fuentes incluidas</strong><p>Completa el mapa de fuentes antes de iniciar la captura.</p><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/fuentes">Configurar fuentes</a></div></section>
+{% endif %}
+{% endblock %}

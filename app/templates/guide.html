@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Guía de trabajo · Calcula tu Huella{% endblock %}
+{% block page_label %}Guía y conceptos{% endblock %}
+{% block content %}
+<section class="page-heading guide-heading">
+  <div><span class="eyebrow">ORIENTACIÓN CONTEXTUAL</span><h1>Entiende el proceso antes de ejecutar tareas</h1><p>Consulta el propósito de cada etapa, interpreta los estados y usa conceptos metodológicos con el mismo significado en toda la plataforma.</p></div>
+  <div class="guide-current-state"><small>ESTADO DEL INVENTARIO</small><strong>{{ delivery.status }}</strong><span>{{ delivery.score }}% de preparación · {{ delivery.publication.level }}</span></div>
+</section>
+
+{% if delivery.next_action %}
+<section class="guide-next-action publication-{{ delivery.publication.tone }}">
+  <div><span>PRÓXIMA DECISIÓN RECOMENDADA</span><h2>{{ delivery.next_action.name }}</h2><p>{{ delivery.next_action.detail }}</p></div>
+  {% if can_open_route(user, delivery.next_action.href) %}<a class="btn btn-primary" href="{{ delivery.next_action.href }}">{{ delivery.next_action.action }} →</a>{% else %}<span class="permission-note">Siguiente control asignado a otro rol</span>{% endif %}
+</section>
+{% endif %}
+
+<section class="guide-section">
+  <div class="section-heading"><span>EL RECORRIDO COMPLETO</span><h2>Seis preguntas que ordenan el inventario</h2><p>La plataforma puede tener muchas herramientas, pero el proceso principal siempre conserva esta secuencia.</p></div>
+  <div class="guide-stage-grid">
+    {% for stage in stages %}<article class="guide-stage-card"><span>{{ stage.number }}</span><h3>{{ stage.name }}</h3><strong>{{ stage.question }}</strong><p>{{ stage.output }}</p>{% if can_open_route(user, stage.href) %}<a href="{{ stage.href }}">Abrir etapa →</a>{% else %}<small class="permission-note">Etapa gestionada por otro rol</small>{% endif %}</article>{% endfor %}
+  </div>
+</section>
+
+<section class="guide-two-column">
+  <article class="panel guide-interpretation"><div class="panel-heading"><div><span class="eyebrow">CÓMO LEER LOS ESTADOS</span><h2>Un color no sustituye el criterio</h2></div></div>
+    <div class="guide-status-list">
+      <div><span class="status-badge active">Listo</span><p>El control cumple el criterio definido para esta versión del inventario.</p></div>
+      <div><span class="status-badge warning">En progreso</span><p>Existe trabajo válido, pero falta cerrar información, revisión o aprobación.</p></div>
+      <div><span class="status-badge neutral">Bloqueado</span><p>El siguiente resultado no debe emitirse hasta resolver el control crítico.</p></div>
+    </div>
+    <div class="callout"><strong>Regla de publicación</strong><br>{{ delivery.publication.message }}</div>
+  </article>
+  <article class="panel guide-boundaries"><div class="panel-heading"><div><span class="eyebrow">QUÉ HACE Y QUÉ NO HACE</span><h2>Límites explícitos del producto</h2></div></div>
+    <ul class="guide-boundary-list">
+      <li><b>Sí:</b> organiza datos, metodología, cálculos, evidencias, revisión y reducción.</li>
+      <li><b>Sí:</b> orienta la selección de factores y conserva la decisión técnica.</li>
+      <li><b>No:</b> convierte automáticamente datos incompletos en resultados verificables.</li>
+      <li><b>No:</b> reemplaza la aprobación profesional ni la verificación independiente.</li>
+      <li><b>No:</b> descuenta emisiones evitadas, remociones o compensaciones del inventario sin reglas específicas.</li>
+    </ul>
+  </article>
+</section>
+
+<section class="guide-section glossary-section" id="glosario">
+  <div class="section-heading"><span>GLOSARIO ESENCIAL</span><h2>Conceptos usados de forma consistente</h2><p>Estas definiciones son operativas. La metodología aprobada del inventario prevalece cuando establezca requisitos más específicos.</p></div>
+  <div class="glossary-grid">{% for term, definition in glossary %}<article><h3>{{ term }}</h3><p>{{ definition }}</p></article>{% endfor %}</div>
+</section>
+{% endblock %}

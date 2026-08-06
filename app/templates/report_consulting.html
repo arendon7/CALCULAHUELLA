@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% block title %}Taller de informe · Calcula tu Huella{% endblock %}
+{% block page_label %}Informes / Narrativa consultiva{% endblock %}
+{% block content %}
+<div class="page-head consulting-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Taller de informe</p>
+    <h1>Convierte resultados en una historia útil para decidir</h1>
+    <p>Revisa comparabilidad, intensidades, hallazgos, limitaciones y recomendaciones antes de generar un documento editable o una versión controlada.</p>
+  </div>
+  <span class="phase-label">V0.55 · informes de consultoría</span>
+</div>
+
+<section class="consulting-hero card">
+  <div>
+    <small>PREPARACIÓN EDITORIAL</small>
+    <div class="consulting-score"><strong>{{ consulting.report_score }}%</strong><span>{{ consulting.status }}</span></div>
+    <p>{{ consulting.purpose }}</p>
+  </div>
+  <div class="consulting-hero-actions">
+    <a class="btn btn-outline" href="/reportes">Volver a entregables</a>
+    {% if user.can_manage_inventory or user.can_review %}
+    <form action="/reportes/generar" method="post">
+      <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
+      <input type="hidden" name="report_type" value="editable">
+      <button class="btn btn-primary">Generar Word editable</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+<div class="consulting-layout">
+  <section class="card">
+    <div class="card-head"><div><small>CONTROL POR CAPÍTULO</small><h3>Qué está listo y qué falta</h3></div><span class="counter">{{ consulting.chapters|length }}</span></div>
+    <div class="chapter-list">
+      {% for item in consulting.chapters %}
+      <article class="chapter-item">
+        <div class="chapter-status {{ item.status|lower|replace(' ','-') }}">{{ item.status }}</div>
+        <div><strong>{{ item.name }}</strong><p>{{ item.action }}</p></div>
+        <div class="chapter-progress"><b>{{ item.score }}%</b><div class="progress"><i style="width:{{ item.score }}%"></i></div></div>
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="card consulting-publication">
+    <small>CONTROL DE USO</small>
+    <h3>{{ delivery.publication.level }}</h3>
+    <p>{{ delivery.publication.message }}</p>
+    <div class="consulting-mini-kpis">
+      <span><b>{{ total|number_es }}</b><small>tCO₂e</small></span>
+      <span><b>{{ quality.score }}%</b><small>calidad</small></span>
+      <span><b>{{ consulting.top_three_share }}%</b><small>top 3</small></span>
+    </div>
+    <p class="report-notice-inline">{{ delivery.publication.notice }}</p>
+  </aside>
+</div>
+
+<section class="card">
+  <div class="card-head"><div><small>COMPARABILIDAD</small><h3>Periodo actual frente al anterior</h3></div><span class="status-chip {{ 'complete' if consulting.comparison.available else 'progressing' }}">{{ 'Comparable' if consulting.comparison.available else 'Sin base comparable' }}</span></div>
+  <div class="comparison-grid">
+    <div><small>HUELLA ACTUAL</small><strong>{{ consulting.comparison.current_total|number_es }} tCO₂e</strong><p>{{ inventory.start_date.year }}</p></div>
+    <div><small>HUELLA ANTERIOR</small><strong>{% if consulting.comparison.available %}{{ consulting.comparison.previous_total|number_es }} tCO₂e{% else %}N/D{% endif %}</strong><p>{{ consulting.comparison.previous_year or 'Sin periodo' }}</p></div>
+    <div><small>VARIACIÓN ABSOLUTA</small><strong>{% if consulting.comparison.absolute_change is not none %}{{ '%+.1f'|format(consulting.comparison.absolute_change) }}%{% else %}N/D{% endif %}</strong><p>{{ consulting.comparison.absolute_direction }}</p></div>
+    <div><small>INTENSIDAD PRODUCTIVA</small><strong>{% if consulting.comparison.production_intensity_change is not none %}{{ '%+.1f'|format(consulting.comparison.production_intensity_change) }}%{% else %}N/D{% endif %}</strong><p>{{ consulting.comparison.production_intensity_direction }}</p></div>
+  </div>
+  <div class="consulting-caution"><strong>Cautela de lectura</strong><p>{{ consulting.comparison.warning }}</p></div>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>INTENSIDADES</small><h3>Resultado relacionado con la escala de operación</h3></div><a href="/analisis">Ver análisis →</a></div>
+  <div class="intensity-grid">
+    {% for item in consulting.intensities %}
+    <article class="intensity-card {{ 'available' if item.available else 'missing' }}">
+      <small>{{ item.interpretation|upper }}</small><h3>{{ item.name }}</h3>
+      <strong>{% if item.available %}{{ item.value|number_es(6) }}{% else %}N/D{% endif %}</strong>
+      <p>{{ item.unit }}</p>
+      <span>{% if item.change is not none %}{{ '%+.1f'|format(item.change) }}% · {{ item.direction }}{% else %}Sin comparación{% endif %}</span>
+      {% if not item.available %}<a href="/informacion">Registrar indicador →</a>{% endif %}
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>HALLAZGOS EXPLICABLES</small><h3>Qué significa el inventario</h3></div><span class="counter">{{ consulting.findings|length }}</span></div>
+  <div class="consulting-findings">
+    {% for item in consulting.findings %}
+    <article>
+      <span class="priority-pill priority-{{ item.level|lower }}">{{ item.level }}</span>
+      <div><small>{{ item.topic }}</small><h3>{{ item.finding }}</h3><p><b>Evidencia:</b> {{ item.evidence }}</p><p><b>Implicación:</b> {{ item.implication }}</p></div>
+      <div class="finding-action"><small>RECOMENDACIÓN</small><p>{{ item.recommendation }}</p></div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+<div class="consulting-layout consulting-bottom">
+  <section class="card">
+    <div class="card-head"><div><small>PLAN RECOMENDADO</small><h3>Acciones derivadas del análisis</h3></div></div>
+    <div class="responsive-table"><table><thead><tr><th>Prioridad</th><th>Tema</th><th>Acción</th><th>Responsable sugerido</th><th>Criterio de cierre</th></tr></thead><tbody>
+      {% for item in consulting.recommendations %}<tr><td><span class="priority-pill priority-{{ item.priority|lower }}">{{ item.priority }}</span></td><td>{{ item.topic }}</td><td>{{ item.action }}</td><td>{{ item.owner }}</td><td>{{ item.acceptance }}</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <aside class="card">
+    <div class="card-head"><div><small>LIMITACIONES</small><h3>Lo que debe acompañar el resultado</h3></div></div>
+    <div class="limitation-list">{% for item in consulting.limitations %}<article><strong>{{ item.category }}</strong><p>{{ item.detail }}</p></article>{% endfor %}</div>
+  </aside>
+</div>
+
+<section class="card claims-card">
+  <div class="card-head"><div><small>GUARDAS DE COMUNICACIÓN</small><h3>Afirmaciones permitidas y no permitidas</h3></div></div>
+  <div class="claims-grid">{% for item in consulting.claims %}<article class="{{ 'claim-allowed' if item.allowed else 'claim-blocked' }}"><span>{{ 'Permitida' if item.allowed else 'No permitida' }}</span><h3>{{ item.label }}</h3><p>{{ item.guidance }}</p></article>{% endfor %}</div>
+</section>
+{% endblock %}

@@ -1,0 +1,42 @@
+{
+  "product": "Calcula tu Huella",
+  "application_version": "1.0.0",
+  "release_id": "v1.0.0-canonica.20260805",
+  "canonical_date": "2026-08-05",
+  "source_release": "iteracion_14_formularios_lenguaje_claro",
+  "repository_target": "arendon7/CALCULAHUELLA",
+  "default_branch": "main",
+  "architecture": "FastAPI + Jinja2 + SQLAlchemy + Alembic",
+  "pages_scope": "static_preview_only",
+  "backend_required_for_full_application": true,
+  "certification_inherited": {
+    "mac_passed": 414,
+    "windows_passed": 411,
+    "windows_skipped_macos_only": 3,
+    "methodology_changed_by_canonicalization": false
+  },
+  "canonicalization": {
+    "single_source_tree": true,
+    "duplicate_mac_windows_application_removed": true,
+    "runtime_databases_included": false,
+    "secrets_included": false,
+    "github_actions_included": true,
+    "pages_preview_included": true
+  },
+  "file_count": 504,
+  "python_files": 228,
+  "templates": 80,
+  "tests": 55,
+  "migration_head": "20260805_0036",
+  "canonical_validation": {
+    "validated_at": "2026-08-05T23:42:01-05:00",
+    "manifest": "passed",
+    "python_compile": "passed",
+    "javascript_syntax": "passed",
+    "migration_from_empty": "passed",
+    "migration_head": "20260805_0036",
+    "database_tables": 121,
+    "smoke_tests_passed": 9,
+    "static_pages_preview": "passed"
+  }
+}

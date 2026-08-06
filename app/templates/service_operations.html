@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Operación del servicio · Calcula tu Huella{% endblock %}
+{% block page_label %}Operación del servicio{% endblock %}
+{% block content %}
+<section class="page-heading service-operations-heading">
+  <div><span class="eyebrow">CUENTA, CAPACIDAD Y CONTINUIDAD</span><h1>Centro de operación del servicio</h1><p>Reúne en una sola vista el estado del plan, la capacidad consumida, los accesos pendientes y las acciones administrativas que pueden afectar la continuidad.</p></div>
+  {% if summary.subscription %}<span class="status-badge {{ 'success' if summary.operational else 'warning' }}">{{ summary.subscription.status }} · {{ summary.plan.name }}</span>{% else %}<span class="status-badge warning">Sin plan asignado</span>{% endif %}
+</section>
+
+<section class="decision-banner {{ 'warning-banner' if summary.alerts else '' }}">
+  <div><small>PRÓXIMA DECISIÓN</small><h2>{{ summary.actions[0].title }}</h2><p>{{ summary.actions[0].detail }}</p></div>
+  <a class="button primary" href="{{ summary.actions[0].route }}">Gestionar ahora</a>
+</section>
+
+<section class="metrics-grid service-operations-metrics">
+  {% for code,item in summary.metrics.items() %}
+  <article class="metric-card capacity-card {{ item.status }}">
+    <small>{{ item.label }}</small><strong>{{ item.value|number_es(2 if code=='storage' else 0) }}</strong><span>de {{ item.limit|number_es(0) if item.limit else 'sin límite configurado' }}</span>
+    {% if item.limit %}<div class="progress"><span class="{% if item.status=='blocked' %}danger-progress{% endif %}" style="width:{{ item.percentage }}%"></span></div><b>{{ item.percentage }}% utilizado</b>{% endif %}
+  </article>
+  {% endfor %}
+</section>
+
+<div class="two-column-grid service-operation-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">ACCIONES PRIORIZADAS</span><h2>Qué requiere atención</h2></div><span class="counter">{{ summary.actions|length }}</span></div>
+    <div class="settings-list action-register">
+      {% for action in summary.actions %}<article><div><strong>{{ action.title }}</strong><span>{{ action.detail }}</span></div><a class="button secondary small" href="{{ action.route }}">Abrir</a></article>{% endfor %}
+    </div>
+  </section>
+  <aside class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">CONTINUIDAD</span><h2>Señales operativas</h2></div></div>
+    <div class="service-signal-grid">
+      <article><small>Requerimientos abiertos</small><strong>{{ summary.open_tickets }}</strong><a href="/soporte">Ver conversaciones</a></article>
+      <article><small>Invitaciones pendientes</small><strong>{{ summary.pending_invitations|length }}</strong><a href="/usuarios">Gestionar accesos</a></article>
+      <article><small>Cobros vencidos</small><strong>{{ summary.overdue_invoices|length }}</strong><a href="/cuenta-servicio">Ver cuenta</a></article>
+      <article><small>Estado de ampliaciones</small><strong>{{ 'Habilitadas' if summary.operational else 'Bloqueadas' }}</strong><span>Usuarios, sedes e inventarios</span></article>
+    </div>
+    <div class="callout"><strong>Regla de control</strong><br>Al alcanzar el límite contratado, la plataforma conserva la información y la consulta, pero bloquea únicamente la creación de nuevos recursos hasta liberar capacidad o cambiar de plan.</div>
+  </aside>
+</div>
+
+{% if summary.alerts %}
+<section class="panel"><div class="panel-heading"><div><span class="eyebrow">ALERTAS</span><h2>Riesgos para la continuidad</h2></div></div><div class="settings-list">{% for alert in summary.alerts %}<article><div><strong>{{ alert.title }}</strong><span>{{ alert.detail }}</span></div><span class="status-badge {{ 'warning' if alert.level=='warning' else 'danger' }}">{{ alert.level|upper }}</span></article>{% endfor %}</div></section>
+{% endif %}
+{% endblock %}

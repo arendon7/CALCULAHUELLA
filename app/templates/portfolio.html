@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}Portafolio multiempresa · Calcula tu Huella{% endblock %}
+{% block page_label %}Portafolio multiempresa{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">OPERACIÓN MULTIORGANIZACIÓN</span><h1>Empresas y contextos de trabajo</h1><p>Cambia de organización sin cerrar sesión y conserva permisos, inventarios y auditoría separados.</p></div>
+  <span class="status-badge success">{{ portfolio|length }} organización{{ 'es' if portfolio|length != 1 else '' }}</span>
+</section>
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Organización activa</small><strong>{{ org.trade_name or org.name }}</strong><span>{{ user.role }}</span></article>
+  <article class="metric-card"><small>Accesos disponibles</small><strong>{{ portfolio|length }}</strong><span>membresías activas</span></article>
+  <article class="metric-card"><small>Inventarios</small><strong>{{ portfolio|map(attribute='inventories')|map('length')|sum }}</strong><span>en todo el portafolio</span></article>
+  <article class="metric-card"><small>Separación de datos</small><strong>Activa</strong><span>contexto por organización</span></article>
+</section>
+<div class="two-column-grid operation-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">PORTAFOLIO</span><h2>Organizaciones disponibles</h2></div></div>
+    <div class="settings-list">
+      {% for item in portfolio %}
+      <article>
+        <div>
+          <strong>{{ item.organization.name }}</strong>
+          <span>{{ item.organization.sector }} · {{ item.organization.city }} · Rol: {{ item.membership.role }}</span>
+          {% if item.latest_inventory %}<small>{{ item.latest_inventory.name }} · {{ item.latest_inventory.status }} · {{ item.latest_inventory.progress }} %</small>{% else %}<small>Sin inventarios todavía</small>{% endif %}
+          {% if item.demo_story %}<small><b>{{ item.demo_story.phase }}:</b> {{ item.demo_story.headline }}</small>{% endif %}
+        </div>
+        {% if item.organization.id == org.id %}
+        <span class="status-badge success">Activa</span>
+        {% else %}
+        <form action="/portafolio/cambiar/{{ item.organization.id }}" method="post"><button class="button secondary small" type="submit">Abrir empresa</button></form>
+        {% endif %}
+      </article>
+      {% endfor %}
+    </div>
+  </section>
+  {% if user.can_manage_org %}
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">NUEVA EMPRESA</span><h2>Agregar organización</h2></div></div>
+    <form action="/portafolio/nueva" method="post" class="stacked-form">
+      <label>Razón social<input name="name" required></label>
+      <label>Nombre comercial<input name="trade_name"></label>
+      <label>NIT<input name="tax_id" required></label>
+      <label>Sector<select name="sector"><option>Manufactura</option><option>Transporte y logística</option><option>Servicios y oficinas</option><option>Agroindustria</option><option>Gestión de residuos</option><option>Otro</option></select></label>
+      <label>Ciudad<input name="city" value="Medellín"></label>
+      <button class="button primary" type="submit">Crear y abrir organización</button>
+    </form>
+  </section>
+  {% endif %}
+</div>
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">REGLA DE SEGURIDAD</span><h2>Contexto activo</h2></div></div>
+  <div class="readiness-box"><strong>Cada consulta se filtra por la organización activa.</strong><ol><li>Los inventarios y documentos no se mezclan.</li><li>El rol puede cambiar entre organizaciones.</li><li>Cada cambio de contexto queda registrado en auditoría.</li></ol></div>
+</section>
+{% endblock %}

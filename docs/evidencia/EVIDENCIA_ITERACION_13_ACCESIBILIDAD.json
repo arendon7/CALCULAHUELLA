@@ -1,0 +1,95 @@
+{
+  "iteration": 13,
+  "name": "Accesibilidad, microcopias y ayuda guiada",
+  "date_local": "2026-08-05",
+  "base_iteration": 12,
+  "status": "approved_for_controlled_demo_and_pilot",
+  "scope": {
+    "engine_modified": false,
+    "application_python_files_compared": 112,
+    "application_python_files_changed": 0,
+    "modified_product_files": [
+      "app/templates/base.html",
+      "app/templates/dashboard.html",
+      "app/templates/information.html",
+      "app/templates/guided_capture.html",
+      "app/static/css/app.css",
+      "app/static/js/app.js",
+      "scripts/run_test_tier.py"
+    ],
+    "new_test_files": [
+      "tests/test_iteration13_accessibility_help.py"
+    ]
+  },
+  "features": {
+    "document_language": "es-CO",
+    "skip_links": 2,
+    "first_login_tour_steps": 4,
+    "role_adapted_help": true,
+    "keyboard_focus_management": true,
+    "mobile_focus_return": true,
+    "form_error_summary": true,
+    "live_regions": true,
+    "reduced_motion_support": true,
+    "forced_colors_support": true,
+    "secondary_actions_grouped": true
+  },
+  "validation": {
+    "mac": {
+      "passed": 409,
+      "skipped": 0,
+      "result": "approved"
+    },
+    "windows_package_on_linux_certification_environment": {
+      "passed": 406,
+      "skipped": 3,
+      "skip_reason": "Pruebas exclusivas del instalador y ciclo de vida macOS",
+      "result": "approved"
+    },
+    "iteration_13_specific_tests_per_platform": 5,
+    "playwright_browser_walkthrough": "approved",
+    "javascript_syntax": "approved",
+    "css_structure": "approved",
+    "visual_review": "approved",
+    "mac_windows_application_code_equal": true,
+    "smoke_runner_per_platform": {
+      "passed": 9,
+      "deselected": 400,
+      "result": "approved"
+    }
+  },
+  "visual_evidence": [
+    "EVIDENCIA_VISUAL_ITERACION_13/desktop_primer_ingreso.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/desktop_ayuda_contextual.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/desktop_datos_acciones_agrupadas.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/desktop_error_formulario.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/mobile_menu_accesible.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/mobile_ayuda_contextual.png",
+    "EVIDENCIA_VISUAL_ITERACION_13/browser_validation.txt"
+  ],
+  "methodological_integrity": {
+    "emission_factors_changed": false,
+    "gwp_changed": false,
+    "units_changed": false,
+    "calculation_formulas_changed": false,
+    "inventory_data_changed": false
+  },
+  "conformance_statement": {
+    "reference": "WCAG 2.2 and WAI-ARIA Authoring Practices",
+    "formal_wcag_certification_claimed": false,
+    "external_pending": [
+      "VoiceOver physical test",
+      "NVDA physical test",
+      "TalkBack physical test",
+      "manual 200% and 400% zoom evaluation",
+      "independent accessibility audit",
+      "sessions with untrained real users"
+    ]
+  },
+  "package_inventory": {
+    "python_files": 452,
+    "json_files": 46,
+    "templates_per_platform": 80,
+    "visual_evidence_items": 7
+  }
+}

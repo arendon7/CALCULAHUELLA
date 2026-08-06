@@ -1,0 +1,36 @@
+{% extends "public_base.html" %}
+{% block title %}{{ document.title }} · Calcula tu Huella{% endblock %}
+{% block content %}
+<section class="legal-hero">
+  <div>
+    <span class="public-kicker">MARCO CONTRACTUAL Y DE CONFIANZA</span>
+    <h1>{{ document.title }}</h1>
+    <p>{{ document.summary }}</p>
+    <small>Versión vigente desde {{ provider.effective_date }} · Proveedor: {{ provider.name }}</small>
+  </div>
+</section>
+<section class="public-section legal-layout">
+  <aside class="legal-nav" aria-label="Documentos legales">
+    <strong>Documentos</strong>
+    <a class="{% if active_slug == 'terminos' %}active{% endif %}" href="/legal/terminos">Términos</a>
+    <a class="{% if active_slug == 'privacidad' %}active{% endif %}" href="/legal/privacidad">Privacidad</a>
+    <a class="{% if active_slug == 'dpa' %}active{% endif %}" href="/legal/dpa">Tratamiento de datos</a>
+    <a class="{% if active_slug == 'sla' %}active{% endif %}" href="/legal/sla">Nivel de servicio</a>
+    <a class="{% if active_slug == 'metodologia' %}active{% endif %}" href="/legal/metodologia">Alcance metodológico</a>
+  </aside>
+  <article class="legal-document">
+    {% for heading, paragraphs in document.sections %}
+    <section>
+      <h2>{{ heading }}</h2>
+      {% for paragraph in paragraphs %}<p>{{ paragraph }}</p>{% endfor %}
+    </section>
+    {% endfor %}
+    <div class="legal-contact-box">
+      <strong>Identidad y canales contractuales</strong>
+      <p>{{ provider.name }} · NIT: {{ provider.nit }} · Dirección: {{ provider.address }}</p>
+      <p>Jurídico: {{ provider.legal_email }} · Privacidad: {{ provider.privacy_email }}</p>
+      <small>Los datos pendientes deben configurarse antes de habilitar producción comercial.</small>
+    </div>
+  </article>
+</section>
+{% endblock %}

@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Operación comercial · Calcula tu Huella{% endblock %}
+{% block page_label %}Contratos, servicio y cartera{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">OPERACIÓN POSTVENTA</span><h1>Contratos, órdenes y cartera</h1><p>Conecta la propuesta aceptada con el contrato, la ejecución del servicio, los cobros y la renovación, conservando trazabilidad administrativa.</p></div>
+  <a class="button secondary" href="/comercial">Volver al embudo</a>
+</section>
+
+<section class="metrics-grid">
+  <article class="metric-card"><small>Contratos vigentes</small><strong>{{ summary.active_contracts }}</strong><span>acuerdos activos</span></article>
+  <article class="metric-card"><small>Órdenes abiertas</small><strong>{{ summary.open_orders }}</strong><span>por ejecutar o aceptar</span></article>
+  <article class="metric-card"><small>Cartera pendiente</small><strong>${{ summary.outstanding_amount|number_es(0) }}</strong><span>COP</span></article>
+  <article class="metric-card"><small>Cartera vencida</small><strong>${{ summary.overdue_amount|number_es(0) }}</strong><span>COP</span></article>
+  <article class="metric-card"><small>Renovaciones próximas</small><strong>{{ summary.renewals }}</strong><span>en 120 días</span></article>
+</section>
+
+{% if renewals or overdue %}
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">ATENCIÓN REQUERIDA</span><h2>Próximos hitos comerciales</h2></div></div>
+  <div class="settings-list">
+    {% for contract in renewals %}<article><div><strong>{{ contract.reference }} · {{ contract.organization.trade_name or contract.organization.name }}</strong><span>Vence {{ contract.end_date }} · aviso {{ contract.notice_days }} días</span></div><span class="status-badge warning">Renovación</span></article>{% endfor %}
+    {% for invoice in overdue %}<article><div><strong>{{ invoice.reference }} · {{ org_map.get(invoice.organization_id).trade_name if org_map.get(invoice.organization_id) else 'Organización' }}</strong><span>Venció {{ invoice.due_date }} · ${{ invoice.amount|number_es(0) }}</span></div><span class="status-badge danger">Vencida</span></article>{% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<div class="two-column-grid service-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">CONTRATOS</span><h2>Registro contractual</h2></div><details class="form-drawer"><summary>Nuevo contrato</summary>
+      <form action="/operacion-comercial/contratos/nuevo" method="post" class="stacked-form">
+        <label>Organización<select name="organization_id" required>{% for org_item in organizations %}<option value="{{ org_item.id }}">{{ org_item.trade_name or org_item.name }}</option>{% endfor %}</select></label>
+        <label>Propuesta aceptada opcional<select name="proposal_id"><option value="">Sin propuesta asociada</option>{% for proposal in proposals %}<option value="{{ proposal.id }}">{{ proposal.reference }} · {{ proposal.company_name }}</option>{% endfor %}</select></label>
+        <div class="form-grid"><label>Referencia<input name="reference" placeholder="Automática"></label><label>Título<input name="title" required></label></div>
+        <div class="form-grid"><label>Inicio<input type="date" name="start_date" required></label><label>Fin<input type="date" name="end_date"></label></div>
+        <div class="form-grid"><label>Valor contractual<input type="number" name="contract_value" min="0" step="1"></label><label>Ciclo<select name="billing_cycle"><option>Anual</option><option>Mensual</option><option>Único</option></select></label></div>
+        <div class="form-grid"><label>Renovación<select name="renewal_type"><option>Anual</option><option>Mensual</option><option>Por acuerdo</option><option>No renovable</option></select></label><label>Días de preaviso<input type="number" name="notice_days" value="30" min="0"></label></div>
+        <label class="check-line"><input type="checkbox" name="auto_renew" value="1"> Renovación automática sujeta a preaviso</label>
+        <label>Responsable<input name="owner" value="Equipo comercial"></label>
+        <label>Condiciones congeladas<textarea name="terms_snapshot" rows="5" placeholder="Alcance, obligaciones, exclusiones, SLA y condiciones económicas"></textarea></label>
+        <button class="button primary">Crear contrato</button>
+      </form>
+    </details></div>
+    <div class="responsive-table"><table><thead><tr><th>Contrato</th><th>Organización</th><th>Vigencia</th><th>Valor</th><th>Estado</th><th>Acciones</th></tr></thead><tbody>
+      {% for contract in contracts %}<tr>
+        <td><strong>{{ contract.reference }}</strong><small>{{ contract.title }} · v{{ contract.version }}</small>{% if contract.signature_hash %}<small>Hash {{ contract.signature_hash[:12] }}…</small>{% endif %}</td>
+        <td>{{ contract.organization.trade_name or contract.organization.name }}</td><td>{{ contract.start_date }} a {{ contract.end_date or 'indefinido' }}</td><td>${{ contract.contract_value|number_es(0) }}</td>
+        <td><span class="status-badge {{ 'success' if contract.status=='Vigente' else 'warning' if contract.status in ['Borrador','Suspendido'] else '' }}">{{ contract.status }}</span></td>
+        <td><details class="table-details"><summary>Gestionar</summary>
+          {% if not contract.signature_hash %}<form action="/operacion-comercial/contratos/{{ contract.id }}/firmar" method="post" class="stacked-form"><input name="signed_by" placeholder="Firmante" required><input type="email" name="signed_email" placeholder="Correo del firmante" required><button class="button primary small">Registrar firma</button></form>{% endif %}
+          <form action="/operacion-comercial/contratos/{{ contract.id }}/estado" method="post" class="inline-form"><select name="status"><option>Borrador</option><option {% if contract.status=='Vigente' %}selected{% endif %}>Vigente</option><option {% if contract.status=='Suspendido' %}selected{% endif %}>Suspendido</option><option {% if contract.status=='Terminado' %}selected{% endif %}>Terminado</option><option {% if contract.status=='Renovado' %}selected{% endif %}>Renovado</option></select><button class="button secondary small">Estado</button></form>
+          {% if contract.status in ['Vigente','Terminado'] %}<form action="/operacion-comercial/contratos/{{ contract.id }}/renovar" method="post" class="stacked-form"><input type="date" name="start_date" required><input type="date" name="end_date" required><input type="number" name="contract_value" min="0" value="{{ contract.contract_value|round|int }}" required><button class="button secondary small">Crear renovación</button></form>{% endif %}
+        </details></td>
+      </tr>{% else %}<tr><td colspan="6">No hay contratos registrados.</td></tr>{% endfor %}
+    </tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">ÓRDENES DE SERVICIO</span><h2>Ejecución y aceptación</h2></div><details class="form-drawer"><summary>Nueva orden</summary>
+      <form action="/operacion-comercial/ordenes/nueva" method="post" class="stacked-form">
+        <label>Organización<select name="organization_id" required>{% for org_item in organizations %}<option value="{{ org_item.id }}">{{ org_item.trade_name or org_item.name }}</option>{% endfor %}</select></label>
+        <label>Contrato<select name="contract_id"><option value="">Sin contrato asociado</option>{% for contract in contracts %}<option value="{{ contract.id }}">{{ contract.reference }} · {{ contract.organization.trade_name or contract.organization.name }}</option>{% endfor %}</select></label>
+        <div class="form-grid"><label>Referencia<input name="reference" placeholder="Automática"></label><label>Tipo<input name="service_type" value="Implementación"></label></div>
+        <label>Título<input name="title" required></label><label>Descripción<textarea name="description" rows="3"></textarea></label>
+        <div class="form-grid"><label>Inicio previsto<input type="date" name="planned_start"></label><label>Fin previsto<input type="date" name="planned_end"></label></div>
+        <label>Responsable<input name="owner" value="Equipo de implementación"></label><label>Criterios de aceptación<textarea name="acceptance_criteria" rows="3"></textarea></label><label>Notas<textarea name="notes" rows="2"></textarea></label>
+        <button class="button primary">Crear orden</button>
+      </form>
+    </details></div>
+    <div class="settings-list">{% for order in orders %}<article><div><strong>{{ order.reference }} · {{ order.title }}</strong><span>{{ order.organization.trade_name or order.organization.name }} · {{ order.planned_start or 'sin fecha' }} a {{ order.planned_end or 'sin fecha' }}</span><small>{{ order.owner }}{% if order.contract %} · {{ order.contract.reference }}{% endif %}</small></div><div><span class="status-badge {{ 'success' if order.status=='Aceptada' else 'warning' }}">{{ order.status }}</span><details class="table-details"><summary>Actualizar</summary><form action="/operacion-comercial/ordenes/{{ order.id }}/estado" method="post" class="stacked-form"><select name="status"><option>Planeada</option><option {% if order.status=='En ejecución' %}selected{% endif %}>En ejecución</option><option {% if order.status=='Bloqueada' %}selected{% endif %}>Bloqueada</option><option {% if order.status=='Entregada' %}selected{% endif %}>Entregada</option><option {% if order.status=='Aceptada' %}selected{% endif %}>Aceptada</option><option {% if order.status=='Cancelada' %}selected{% endif %}>Cancelada</option></select><textarea name="notes" rows="2">{{ order.notes }}</textarea><button class="button secondary small">Guardar</button></form></details></div></article>{% else %}<div class="empty-state"><strong>Sin órdenes</strong><span>Crea una orden para iniciar la prestación del servicio.</span></div>{% endfor %}</div>
+  </section>
+</div>
+
+<div class="two-column-grid service-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">COBROS RECURRENTES</span><h2>Estado de cuenta operativo</h2></div><details class="form-drawer"><summary>Generar cobro</summary>
+      <form action="/operacion-comercial/cobros/recurrente" method="post" class="stacked-form">
+        <label>Suscripción<select name="subscription_id" required>{% for item in subscriptions %}<option value="{{ item.id }}">{{ item.organization.trade_name or item.organization.name }} · {{ item.plan.name }} · {{ item.billing_cycle }}</option>{% endfor %}</select></label>
+        <div class="form-grid"><label>Periodo inicial<input type="date" name="period_start" required></label><label>Periodo final<input type="date" name="period_end" required></label></div>
+        <div class="form-grid"><label>Vencimiento<input type="date" name="due_date" required></label><label>Referencia<input name="reference" placeholder="Automática"></label></div>
+        <label>Notas<textarea name="notes" rows="3"></textarea></label><button class="button primary">Generar registro</button>
+      </form>
+    </details></div>
+    <div class="responsive-table"><table><thead><tr><th>Referencia</th><th>Organización</th><th>Vence</th><th>Valor</th><th>Estado</th><th>Cartera</th></tr></thead><tbody>{% for invoice in invoices %}<tr><td><strong>{{ invoice.reference }}</strong><small>{{ invoice.period_start }} a {{ invoice.period_end }}</small></td><td>{{ org_map.get(invoice.organization_id).trade_name if org_map.get(invoice.organization_id) else 'Organización' }}</td><td>{{ invoice.due_date or '—' }}</td><td>${{ invoice.amount|number_es(0) }}</td><td><span class="status-badge {{ 'success' if invoice.status=='Pagada' else 'danger' if invoice.status=='Vencida' else 'warning' }}">{{ invoice.status }}</span></td><td><details class="table-details"><summary>Programar</summary><form action="/operacion-comercial/cartera/nueva" method="post" class="stacked-form"><input type="hidden" name="invoice_id" value="{{ invoice.id }}"><select name="action_type"><option>Recordatorio</option><option>Confirmación de recepción</option><option>Acuerdo de pago</option><option>Escalamiento</option></select><select name="channel"><option>Correo</option><option>Teléfono</option><option>WhatsApp</option><option>Reunión</option></select><input name="recipient" placeholder="Destinatario"><input type="date" name="due_at"><textarea name="notes" rows="2" placeholder="Actividad y compromiso esperado"></textarea><button class="button secondary small">Crear gestión</button></form></details></td></tr>{% else %}<tr><td colspan="6">No hay cobros registrados.</td></tr>{% endfor %}</tbody></table></div>
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">GESTIÓN DE CARTERA</span><h2>Seguimientos y compromisos</h2></div></div>
+    <div class="settings-list">{% for action in actions %}<article><div><strong>{{ action.invoice.reference }} · {{ action.action_type }}</strong><span>{{ action.organization.trade_name or action.organization.name }} · {{ action.channel }} · {{ action.recipient or 'sin destinatario' }}</span><small>{{ action.notes }}{% if action.result %}<br>Resultado: {{ action.result }}{% endif %}</small></div><div><span class="status-badge {{ 'success' if action.status=='Completada' else 'warning' }}">{{ action.status }}</span>{% if action.status!='Completada' %}<details class="table-details"><summary>Completar</summary><form action="/operacion-comercial/cartera/{{ action.id }}/completar" method="post" class="stacked-form"><textarea name="result" rows="2" required placeholder="Resultado y compromiso"></textarea><select name="invoice_status"><option value="">Conservar estado del cobro</option><option>Pendiente</option><option>Pagada</option><option>Vencida</option><option>Anulada</option></select><button class="button primary small">Completar</button></form></details>{% endif %}</div></article>{% else %}<div class="empty-state"><strong>Sin gestiones</strong><span>Programa recordatorios desde un cobro.</span></div>{% endfor %}</div>
+  </section>
+</div>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">DOCUMENTOS DE COBRO</span><h2>Integración tributaria controlada</h2></div></div>
+  <div class="responsive-table"><table><thead><tr><th>Registro</th><th>Cobro</th><th>Proveedor</th><th>Número externo</th><th>Estado</th><th>Actualización</th></tr></thead><tbody>{% for document in documents %}<tr><td><strong>{{ document.internal_reference }}</strong><small>{{ document.document_type }}</small></td><td>{{ document.invoice.reference }}</td><td>{{ document.provider }}</td><td>{{ document.external_number or '—' }}</td><td><span class="status-badge {{ 'success' if document.status=='Emitido externamente' else 'warning' }}">{{ document.status }}</span></td><td><details class="table-details"><summary>Editar</summary><form action="/operacion-comercial/documentos/{{ document.id }}/actualizar" method="post" class="stacked-form"><select name="status"><option>Borrador</option><option {% if document.status=='Pendiente de integración' %}selected{% endif %}>Pendiente de integración</option><option {% if document.status=='Emitido externamente' %}selected{% endif %}>Emitido externamente</option><option {% if document.status=='Rechazado' %}selected{% endif %}>Rechazado</option><option {% if document.status=='Anulado' %}selected{% endif %}>Anulado</option></select><input name="provider" value="{{ document.provider }}" placeholder="Proveedor tecnológico"><input name="external_number" value="{{ document.external_number }}" placeholder="Número externo"><input type="date" name="issued_at" value="{{ document.issued_at or '' }}"><input name="cufe" value="{{ document.cufe }}" placeholder="CUFE u otro identificador"><input name="document_url" value="{{ document.document_url }}" placeholder="URL segura del documento"><textarea name="notes" rows="2">{{ document.notes }}</textarea><button class="button secondary small">Guardar</button></form></details></td></tr>{% else %}<tr><td colspan="6">No hay documentos de cobro.</td></tr>{% endfor %}</tbody></table></div>
+  <div class="callout"><strong>Alcance del módulo</strong><br>La plataforma registra la trazabilidad contractual, de cobro y de emisión externa. No firma electrónicamente ante terceros, no procesa dinero y no emite facturación electrónica DIAN sin integrar proveedores autorizados.</div>
+</section>
+{% endblock %}

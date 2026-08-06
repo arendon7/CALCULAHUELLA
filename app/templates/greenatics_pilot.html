@@ -1,0 +1,88 @@
+{% extends "base.html" %}
+{% block title %}Piloto Greenatics · Calcula tu Huella{% endblock %}
+{% block page_label %}Metodología / Piloto Greenatics{% endblock %}
+{% block content %}
+<div class="page-head methodology-core-head">
+  <div>
+    <p class="breadcrumb">Aplicación sectorial / Greenatics</p>
+    <h1>Piloto Greenatics 2026</h1>
+    <p>Matriz de preparación para calcular un inventario real de las plantas Yarumal y Támesis y de la operación corporativa.</p>
+  </div>
+  <div class="methodology-actions">
+    <a class="btn btn-outline" href="/piloto-greenatics/exportar.xlsx">Descargar matriz Excel</a>
+    {% if execution_summary.execution %}<a class="btn btn-primary" href="/piloto-greenatics/ejecucion">Abrir ejecución · {{ execution_summary.metrics.readiness }}%</a>{% else %}<a class="btn btn-primary" href="/piloto-greenatics/ejecucion">Iniciar ejecución controlada</a>{% endif %}
+  </div>
+</div>
+
+
+{% if execution_summary.execution %}
+<section class="pilot-live-banner">
+  <div><span class="eyebrow">PILOTO EN EJECUCIÓN</span><strong>{{ execution_summary.execution.status }}</strong><small>Inventario #{{ execution_summary.inventory.id }} · {{ execution_summary.metrics.data_complete }}/{{ execution_summary.metrics.source_count }} fuentes completas · {{ execution_summary.metrics.open_issues }} incidencias abiertas.</small></div>
+  <a class="btn btn-primary" href="/piloto-greenatics/ejecucion">Continuar ejecución</a>
+</section>
+{% endif %}
+
+<section class="methodology-core-status">
+  <div class="method-score"><span>{{ summary.metrics.readiness_score }}%</span><div><strong>Preparación del piloto</strong><small>Combina disponibilidad de datos y cobertura metodológica.</small></div></div>
+  <div class="method-metric"><b>{{ summary.metrics.requirements }}</b><span>fuentes requeridas</span></div>
+  <div class="method-metric"><b>{{ summary.metrics.completed }}</b><span>datos disponibles</span></div>
+  <div class="method-metric"><b>{{ summary.metrics.validated }}</b><span>datos validados</span></div>
+  <div class="method-metric"><b>{{ summary.metrics.formal_or_indicator }}</b><span>con método definido</span></div>
+  <div class="method-metric {% if summary.metrics.high_pending %}warning{% else %}success{% endif %}"><b>{{ summary.metrics.high_pending }}</b><span>materiales pendientes</span></div>
+</section>
+
+<div class="calculation-notice methodology-boundary">
+  <span>CONTROL DE USO</span>
+  <p><strong>Este módulo prepara el piloto; no declara todavía la huella de Greenatics.</strong><small>Los resultados deberán contrastarse con una memoria independiente, revisar límites y evitar doble conteo entre tratamiento de residuos, biogás, energía y productos.</small></p>
+</div>
+
+<section class="card">
+  <div class="card-head"><div><small>ALCANCE DEL PILOTO</small><h3>{{ summary.pilot.name }}</h3></div><span class="status-badge warning">{{ summary.pilot.status }}</span></div>
+  <div class="methodology-two-col">
+    <div><strong>Límite organizacional</strong><p>{{ summary.pilot.organizational_boundary }}</p></div>
+    <div><strong>Límite operacional</strong><p>{{ summary.pilot.operational_boundary }}</p></div>
+  </div>
+  <p class="method-footnote"><strong>Enfoque:</strong> {{ summary.pilot.consolidation_approach }} · <strong>Año:</strong> {{ summary.pilot.reporting_year }} · <strong>Liderazgo:</strong> {{ summary.pilot.lead }}</p>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>BIBLIOTECA SECTORIAL</small><h3>Cobertura metodológica actual</h3></div><span class="counter">{{ summary.coverage|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Categoría</th><th>Estado</th><th>Fuente</th><th>Siguiente acción</th></tr></thead><tbody>
+  {% for item in summary.coverage %}<tr>
+    <td><strong>{{ item.category }}</strong></td>
+    <td><span class="status-badge {% if item.status == 'Formal' or item.status.startswith('Formal') %}success{% elif item.status == 'Pendiente' %}danger{% else %}warning{% endif %}">{{ item.status }}</span></td>
+    <td>{{ item.source }}</td><td>{{ item.next_action }}</td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+</section>
+
+<section class="card" id="fuentes">
+  <div class="card-head"><div><small>DATOS Y EVIDENCIAS</small><h3>Matriz de fuentes del piloto</h3></div><span class="counter">{{ summary.requirements|length }}</span></div>
+  {% for site, items in summary.by_site.items() %}
+  <h3 class="pilot-site-title">{{ site }}</h3>
+  <div class="responsive-table"><table><thead><tr><th>Código / fuente</th><th>Alcance</th><th>Dato requerido</th><th>Responsable y evidencia</th><th>Factor</th><th>Estado</th></tr></thead><tbody>
+  {% for item in items %}<tr>
+    <td><strong>{{ item.code }}</strong><small class="table-sub">{{ item.category }} · {{ item.materiality }}</small></td>
+    <td>{% if item.scope == 0 %}<span class="method-tag">Indicador</span>{% else %}<span class="method-tag">A{{ item.scope }}</span>{% endif %}</td>
+    <td>{{ item.source_name }}<small class="table-sub">{{ item.activity_unit }} · {{ item.frequency }}</small></td>
+    <td>{{ item.data_owner }}<small class="table-sub">{{ item.evidence_expected }}</small></td>
+    <td><span class="status-badge {% if item.factor_status.startswith('Formal') or item.factor_status in ['Indicador','Dato de actividad'] %}success{% elif 'Pendiente' in item.factor_status %}danger{% else %}warning{% endif %}">{{ item.factor_status }}</span><small class="table-sub">{{ item.factor_reference }}</small></td>
+    <td>{% if user.can_manage_methodology_governance or user.can_provide_data %}
+      <form method="post" action="/piloto-greenatics/fuentes/{{ item.id }}" class="factor-review-form">
+        <select name="status">{% for state in ['Pendiente','Solicitado','Disponible','Validado','No aplica'] %}<option {% if item.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select>
+        <input name="data_owner" value="{{ item.data_owner }}" aria-label="Responsable">
+        <input name="notes" value="{{ item.notes }}" placeholder="Notas" aria-label="Notas">
+        <button class="tiny-button">Guardar</button>
+      </form>
+      {% else %}<span class="status-badge">{{ item.status }}</span>{% endif %}
+    </td>
+  </tr>{% endfor %}
+  </tbody></table></div>
+  {% endfor %}
+</section>
+
+<section class="card methodology-next">
+  <div><small>SECUENCIA RECOMENDADA</small><h3>Cómo ejecutar el piloto</h3></div>
+  <div class="next-checklist"><span>Confirmar límites</span><span>Solicitar datos 2026</span><span>Validar evidencias</span><span>Cerrar factores pendientes</span><span>Calcular por planta</span><span>Contrastar en Excel</span><span>Revisar doble conteo</span><span>Aprobar informe piloto</span></div>
+</section>
+{% endblock %}

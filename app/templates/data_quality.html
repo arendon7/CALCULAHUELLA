@@ -1,0 +1,174 @@
+{% extends "base.html" %}
+{% block title %}Calidad de datos · Calcula tu Huella{% endblock %}
+{% block page_label %}Calidad de datos{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">CALIDAD Y CONTROL PREVIO</span>
+    <h1>Centro de calidad de datos</h1>
+    <p>Valida códigos, periodos, unidades, duplicados, evidencia, estimaciones y valores atípicos antes de modificar el inventario.</p>
+  </div>
+  <div class="head-actions">
+    <a class="btn btn-outline" href="/calidad-datos/reporte.xlsx">Exportar control</a>
+    {% if summary.execution %}<a class="btn btn-primary" href="/calidad-datos/plantilla.xlsx">Descargar plantilla</a>{% else %}<span class="btn btn-primary" aria-disabled="true" title="Inicia la ejecución del piloto para habilitar la plantilla">Plantilla pendiente de piloto</span>{% endif %}
+  </div>
+</section>
+
+{% if not summary.execution %}
+<section class="card empty-state">
+  <h2>Primero inicia el piloto Greenatics</h2>
+  <p>El centro de calidad se conecta con las fuentes y solicitudes creadas por la ejecución controlada.</p>
+  <a class="btn btn-primary" href="/piloto-greenatics/ejecucion">Ir a ejecución del piloto</a>
+</section>
+{% else %}
+<section class="kpi-grid five">
+  <article class="kpi-card featured"><div class="kpi-icon green">✓</div><div><small>COBERTURA</small><strong>{{ summary.metrics.coverage }} %</strong><p>periodos esperados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">▤</div><div><small>LOTES</small><strong>{{ summary.metrics.batches }}</strong><p>archivos controlados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon blue">#</div><div><small>FILAS</small><strong>{{ summary.metrics.rows }}</strong><p>registros validados</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon lime">↳</div><div><small>APLICADAS</small><strong>{{ summary.metrics.applied }}</strong><p>datos en inventario</p></div></article>
+  <article class="kpi-card"><div class="kpi-icon">!</div><div><small>HALLAZGOS ABIERTOS</small><strong>{{ summary.metrics.open_findings }}</strong><p>requieren gestión</p></div></article>
+</section>
+
+<section class="card" style="margin-bottom:16px">
+  <div class="card-head"><div><small>CARGA CONTROLADA</small><h3>Validar un archivo antes de aplicarlo</h3></div><span class="status-chip progressing">Dos etapas</span></div>
+  <div class="two-column-form">
+    <div>
+      <p class="muted">Descarga la plantilla, completa únicamente las filas disponibles y carga el XLSX. La validación no modifica el inventario.</p>
+      <ol class="compact-list">
+        <li>Validar archivo y revisar hallazgos.</li>
+        <li>Corregir errores en Excel y volver a cargar.</li>
+        <li>Aplicar el lote cuando no existan errores.</li>
+      </ol>
+    </div>
+    {% if can_manage %}
+    <form action="/calidad-datos/cargar" method="post" enctype="multipart/form-data" class="inline-form stack-form">
+      <label>Archivo XLSX oficial<input type="file" name="file" accept=".xlsx" required></label>
+      <button class="btn btn-primary" type="submit">Validar lote</button>
+    </form>
+    {% else %}
+    <div class="notice"><strong>Consulta habilitada</strong><p>Tu rol puede revisar resultados, pero no cargar ni aplicar lotes.</p></div>
+    {% endif %}
+  </div>
+</section>
+
+<div class="inventory-layout">
+  <section class="card table-card">
+    <div class="card-head"><div><small>HISTORIAL</small><h3>Lotes de datos</h3></div><span class="counter">{{ summary.batches|length }}</span></div>
+    <div class="responsive-table">
+      <table>
+        <thead><tr><th>Código</th><th>Archivo</th><th>Estado</th><th>Filas</th><th>Advertencias</th><th>Errores</th><th>Puntaje</th><th></th></tr></thead>
+        <tbody>
+        {% for batch in summary.batches %}
+          <tr>
+            <td><strong>{{ batch.code }}</strong><small>{{ batch.uploaded_at.strftime('%Y-%m-%d %H:%M') if batch.uploaded_at else '' }}</small></td>
+            <td>{{ batch.filename }}</td>
+            <td><span class="status-chip {% if batch.status == 'Aplicado' %}complete{% elif batch.error_rows %}danger{% else %}progressing{% endif %}">{{ batch.status }}</span></td>
+            <td>{{ batch.total_rows }} / {{ batch.applied_rows }} aplicadas</td>
+            <td>{{ batch.warning_rows }}</td>
+            <td>{{ batch.error_rows }}</td>
+            <td><strong>{{ batch.quality_score }} %</strong></td>
+            <td><a class="btn btn-outline" href="/calidad-datos?batch_id={{ batch.id }}">Ver</a></td>
+          </tr>
+        {% else %}
+          <tr><td colspan="8" class="empty-cell">Todavía no hay lotes cargados.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <aside class="card">
+    <div class="card-head"><div><small>REGLAS ACTIVAS</small><h3>Preflight automático</h3></div></div>
+    {% for code, title, description in summary.rules %}
+    <div class="check-row"><span class="check-icon ok">✓</span><div><strong>{{ code }} · {{ title }}</strong><small>{{ description }}</small></div></div>
+    {% endfor %}
+  </aside>
+</div>
+
+{% if summary.selected %}
+<section class="card" style="margin-top:16px">
+  <div class="card-head">
+    <div><small>DETALLE DEL LOTE</small><h3>{{ summary.selected.code }} · {{ summary.selected.filename }}</h3></div>
+    <div class="head-actions">
+      <span class="status-chip {% if summary.selected.error_rows %}danger{% elif summary.selected.status == 'Aplicado' %}complete{% else %}progressing{% endif %}">{{ summary.selected.status }}</span>
+      {% if can_manage and summary.selected.status != 'Aplicado' %}
+      <form method="post" action="/calidad-datos/lotes/{{ summary.selected.id }}/aplicar"><button class="btn btn-primary" {% if summary.selected.error_rows %}disabled title="Corrige los errores antes de aplicar"{% endif %}>Aplicar lote</button></form>
+      {% endif %}
+    </div>
+  </div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Fila</th><th>Código</th><th>Periodo</th><th>Valor</th><th>Origen</th><th>Calidad</th><th>Estado</th><th>Validación</th></tr></thead>
+      <tbody>
+      {% for row in summary.selected.rows %}
+        <tr>
+          <td>{{ row.row_number }}</td>
+          <td><strong>{{ row.requirement_code }}</strong><small>{{ row.source.name if row.source else 'Sin vincular' }}</small></td>
+          <td>{{ row.period_start or '—' }}<small>{{ row.period_end or '—' }}</small></td>
+          <td>{{ row.value if row.value is not none else '—' }} {{ row.unit }}</td>
+          <td>{{ row.data_origin }}{% if row.is_estimated %}<small>Estimado</small>{% endif %}</td>
+          <td><span class="quality-badge q{{ row.quality_level|lower }}">{{ row.quality_level }}</span></td>
+          <td><span class="status-chip {% if row.status == 'Aplicado' or row.status == 'Válido' %}complete{% elif row.status == 'Error' %}danger{% else %}progressing{% endif %}">{{ row.status }}</span></td>
+          <td class="small-text">
+            {% if row.validation_display %}{{ row.validation_display }}{% else %}<span class="muted">Sin hallazgos</span>{% endif %}
+          </td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="card" id="hallazgos" style="margin-top:16px">
+  <div class="card-head"><div><small>TRAZABILIDAD</small><h3>Hallazgos del lote</h3></div><span class="counter">{{ summary.selected.findings|length }}</span></div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Regla</th><th>Severidad</th><th>Fila</th><th>Hallazgo</th><th>Estado</th><th>Gestión</th></tr></thead>
+      <tbody>
+      {% for finding in summary.selected.findings %}
+        <tr>
+          <td><strong>{{ finding.rule_code }}</strong></td>
+          <td><span class="status-chip {% if finding.severity == 'Error' %}danger{% else %}progressing{% endif %}">{{ finding.severity }}</span></td>
+          <td>{{ finding.row.row_number if finding.row else 'General' }}</td>
+          <td>{{ finding.message }}</td>
+          <td>{{ finding.status }}{% if finding.resolution %}<small>{{ finding.resolution }}</small>{% endif %}</td>
+          <td>
+            {% if can_manage and finding.status == 'Abierto' %}
+            <form method="post" action="/calidad-datos/hallazgos/{{ finding.id }}/cerrar" class="inline-form">
+              <input name="resolution" placeholder="Resolución documentada" required>
+              <button class="btn btn-outline">Cerrar</button>
+            </form>
+            {% else %}—{% endif %}
+          </td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6" class="empty-cell">El lote no tiene hallazgos.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+
+<section class="card" style="margin-top:16px">
+  <div class="card-head"><div><small>COBERTURA POR FUENTE</small><h3>Avance de datos reales</h3></div><span class="status-chip progressing">Piloto 2026</span></div>
+  <div class="responsive-table">
+    <table>
+      <thead><tr><th>Código</th><th>Sede y fuente</th><th>Periodos</th><th>Cobertura</th><th>Calidad</th><th>Evidencia</th></tr></thead>
+      <tbody>
+      {% for item in summary.coverage %}
+        <tr>
+          <td><strong>{{ item.code }}</strong></td>
+          <td>{{ item.site }}<small>{{ item.name }}</small></td>
+          <td>{{ item.actual }} / {{ item.expected }}</td>
+          <td><div class="progress"><i style="width:{{ item.percent }}%"></i></div><small>{{ item.percent }} %</small></td>
+          <td><span class="quality-badge q{{ item.quality|lower }}">{{ item.quality }}</span></td>
+          <td>{{ item.evidence }} referencias</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+{% endif %}
+{% endblock %}

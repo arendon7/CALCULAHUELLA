@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block title %}Metodología · Calcula tu Huella{% endblock %}
+{% block page_label %}Cálculo / Gobierno metodológico{% endblock %}
+{% block content %}
+<div class="page-head"><div><p class="breadcrumb">Administración / Metodología</p><h1>Biblioteca metodológica</h1><p>Gestiona factores, unidades, conversiones, gases y potenciales de calentamiento global.</p></div><span class="release-chip">Motor 1.1.0</span></div>
+
+<div class="calculation-notice"><span>IMPORTANTE</span><p><strong>Los registros marcados como “demo” sirven para probar el software.</strong><small>No deben presentarse como factores oficiales sin revisión documental y aprobación profesional.</small></p></div>
+
+<section class="card methodology-section">
+  <div class="card-head"><div><small>FACTORES DE EMISIÓN</small><h3>Versiones disponibles</h3></div><span class="counter">{{ factors|length }}</span></div>
+  <div class="responsive-table"><table><thead><tr><th>Factor</th><th>Actividad</th><th>Versión / gas</th><th>Valor</th><th>Fuente</th><th>Estado</th></tr></thead><tbody>
+  {% for factor in factors %}{% for version in factor.versions %}<tr>
+    <td><strong>{{ factor.name }}</strong>{% if factor.is_demo %}<span class="demo-mark">Demo</span>{% endif %}</td><td>{{ factor.activity_type }}</td>
+    <td>{{ version.version }} · {{ version.gas.formula or version.gas.code }}</td><td><strong>{{ version.value|number_es(8) }}</strong><small class="table-sub">{{ version.output_unit }} / {{ version.input_unit }}</small></td>
+    <td>{{ version.source_organization }}<small class="table-sub">{{ version.publication_year }} · {{ version.geographic_scope }}</small></td>
+    <td><form method="post" action="/metodologia/factores/{{ version.id }}/estado" class="compact-status-form"><select name="status" {% if not user.can_review %}disabled{% endif %}>{% for state in ['Pendiente de revisión','Aprobado','Retirado'] %}<option {% if version.status == state %}selected{% endif %}>{{ state }}</option>{% endfor %}</select>{% if user.can_review %}<button class="tiny-button">Guardar</button>{% endif %}</form></td>
+  </tr>{% endfor %}{% endfor %}
+  </tbody></table></div>
+</section>
+
+<div class="methodology-two-col">
+<section class="card">
+  <div class="card-head"><div><small>NUEVO FACTOR</small><h3>Crear versión documentada</h3></div></div>
+  <form method="post" action="/metodologia/factores/nuevo" class="form-grid two compact-fields">
+    <label class="span-2">Nombre<input name="name" required placeholder="Ej. Electricidad SIN Colombia"></label>
+    <label>Actividad<input name="activity_type" required placeholder="Energía adquirida"></label>
+    <label>Gas<select name="gas_id">{% for gas in gases %}<option value="{{ gas.id }}">{{ gas.formula or gas.code }} · {{ gas.name }}</option>{% endfor %}</select></label>
+    <label>Valor<input name="value" type="number" step="any" min="0" required></label>
+    <label>Unidad de entrada<select name="input_unit">{% for unit in allowed_units %}<option>{{ unit }}</option>{% endfor %}</select></label>
+    <label>Unidad de salida<input name="output_unit" value="kg gas" required><small>Usa masa explícita: g, kg o t seguida del gas, por ejemplo kg CO2e o g CH4.</small></label>
+    <label>Versión<input name="version" value="1.0" required></label>
+    <label>Organización fuente<input name="source_organization" required></label>
+    <label>Año<input name="publication_year" type="number" min="1990" max="2100" value="2025" required></label>
+    <label>Ámbito geográfico<input name="geographic_scope" value="Colombia"></label>
+    <label>Tecnología<input name="technology_scope" value="Genérico"></label>
+    <label>Incertidumbre (%)<input name="uncertainty_percentage" type="number" step="any" min="0" value="0"></label>
+    <label class="span-2">Documento o referencia<input name="source_document"></label>
+    <label class="span-2">Notas<textarea name="notes"></textarea></label>
+    <button class="btn btn-primary span-2">Crear como pendiente</button>
+  </form>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>GWP</small><h3>Potenciales configurados</h3></div></div>
+  <div class="gwp-list">{% for gas in gases %}<article><div><strong>{{ gas.formula or gas.code }}</strong><small>{{ gas.name }}</small></div>{% for gwp in gas.gwp_values %}<span>{{ gwp.assessment }} · {{ gwp.horizon_years }} años: <b>{{ gwp.value|number_es(3) }}</b></span>{% else %}<span>Sin GWP</span>{% endfor %}</article>{% endfor %}</div>
+</section>
+</div>
+
+<div class="methodology-two-col">
+<section class="card"><div class="card-head"><div><small>UNIDADES</small><h3>Catálogo por dimensión</h3></div><span class="counter">{{ units|length }}</span></div><div class="unit-chip-grid">{% for unit in units %}<span><b>{{ unit.code }}</b>{{ unit.name }}<small>{{ unit.dimension }}</small></span>{% endfor %}</div></section>
+<section class="card"><div class="card-head"><div><small>CONVERSIONES</small><h3>Relaciones aprobadas</h3></div><span class="counter">{{ conversions|length }}</span></div><div class="conversion-list">{% for item in conversions %}<article><strong>{{ item.from_unit }} → {{ item.to_unit }}</strong><span>× {{ item.multiplier|number_es(9) }}</span><small>{{ item.source }}</small></article>{% endfor %}</div><form method="post" action="/metodologia/conversiones/nueva" class="inline-conversion-form"><select name="from_unit">{% for unit in units %}<option>{{ unit.code }}</option>{% endfor %}</select><span>→</span><select name="to_unit">{% for unit in units %}<option>{{ unit.code }}</option>{% endfor %}</select><input name="multiplier" type="number" step="any" min="0" placeholder="Multiplicador" required><input name="source" value="Conversión interna aprobada"><button class="btn btn-outline btn-small">Guardar</button></form></section>
+</div>
+{% endblock %}

@@ -1,0 +1,30 @@
+{% extends "public_base.html" %}
+{% block title %}Resultado del diagnóstico · Calcula tu Huella{% endblock %}
+{% block content %}
+<section class="result-shell intelligent-result">
+  <div class="result-check">✓</div><span>DIAGNÓSTICO INTELIGENTE GENERADO</span><h1>{{ lead.company_name }}</h1><p>Esta recomendación es un punto de partida técnico y comercial. El alcance definitivo requiere validación humana.</p>
+  <div class="result-grid four">
+    <article><small>Complejidad</small><strong>{{ assessment.row.complexity_level if assessment else ('Baja' if lead.complexity_score <= 5 else 'Media' if lead.complexity_score <= 12 else 'Alta') }}</strong><span>{{ lead.complexity_score }} puntos explicables</span></article>
+    <article><small>Madurez</small><strong>{{ assessment.row.maturity_level if assessment else 'Por validar' }}</strong><span>{{ assessment.row.data_maturity_score if assessment else 0 }}% datos · {{ assessment.row.governance_maturity_score if assessment else 0 }}% gobierno</span></article>
+    <article><small>Paquete recomendado</small><strong>{{ assessment.package_label if assessment else (plan.name if plan else lead.recommended_plan_code) }}</strong><span>{{ assessment.package_description if assessment else (plan.description if plan else 'Sujeto a validación técnica') }}</span></article>
+    <article><small>Implementación estimada</small><strong>{{ assessment.row.estimated_duration_months if assessment else '—' }} meses</strong><span>{{ assessment.row.estimated_effort_hours if assessment else '—' }} horas de referencia</span></article>
+  </div>
+  {% if assessment %}
+  <div class="public-result-columns">
+    <article><h2>Alcance recomendado</h2>{% for item in assessment.recommended_scopes %}<span class="result-tag">{{ item }}</span>{% endfor %}<h3>Fuentes probables</h3><ul>{% for item in assessment.probable_sources %}<li>{{ item }}</li>{% endfor %}</ul></article>
+    <article><h2>Hallazgos iniciales</h2><ul>{% for item in assessment.findings %}<li>{{ item }}</li>{% endfor %}</ul>{% if assessment.risk_flags %}<h3>Riesgos a controlar</h3><ul>{% for item in assessment.risk_flags %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}</article>
+    <article><h2>Módulos aplicables</h2><div class="result-tag-list">{% for item in assessment.applicable_modules %}<span class="result-tag muted">{{ item }}</span>{% endfor %}</div><h3>Exclusiones iniciales</h3><ul>{% for item in assessment.exclusions %}<li>{{ item }}</li>{% endfor %}</ul></article>
+  </div>
+  {% endif %}
+  <div class="result-next">
+    <h2>Tu ruta desde este resultado</h2>
+    <div class="result-route">
+      <article><span>1</span><strong>Validar el alcance</strong><p>Confirmar sedes, límites, fuentes probables y exclusiones con el equipo responsable.</p></article>
+      <article><span>2</span><strong>Preparar la información</strong><p>Asignar responsables y ubicar consumos, soportes y sistemas disponibles.</p></article>
+      <article><span>3</span><strong>Activar el inventario</strong><p>Configurar el periodo, cargar datos piloto y validar el primer cálculo trazable.</p></article>
+    </div>
+    <ol>{% if assessment %}{% for item in assessment.next_steps %}<li>{{ item }}</li>{% endfor %}{% else %}<li>Revisar las fuentes probables y la información disponible.</li><li>Validar el alcance mediante una conversación técnica.</li><li>Preparar entregables, tiempos y responsabilidades.</li>{% endif %}</ol>
+    <div class="result-actions"><button class="button secondary large" type="button" data-print-result>Imprimir o guardar PDF</button><a class="button secondary large" href="/diagnostico">Realizar otro diagnóstico</a><a class="button primary large" href="/login">Acceso a la plataforma</a></div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends "base.html" %}
+{% block title %}Integraciones · Calcula tu Huella{% endblock %}
+{% block page_label %}Integraciones empresariales{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div><span class="eyebrow">INTEROPERABILIDAD</span><h1>Integraciones y API de datos</h1><p>Conecta sistemas empresariales y recibe datos de actividad de manera estructurada, auditada y separada por organización.</p></div>
+  <span class="status-badge success">API V1 disponible</span>
+</section>
+{% if new_api_key %}<div class="success-box"><strong>Copia esta clave ahora; no volverá a mostrarse.</strong><code>{{ new_api_key }}</code></div>{% endif %}
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Conexiones</small><strong>{{ integrations|length }}</strong><span>{{ integrations|selectattr('active')|list|length }} activas</span></article>
+  <article class="metric-card"><small>Eventos recientes</small><strong>{{ recent_events|length }}</strong><span>últimos 50</span></article>
+  <article class="metric-card"><small>Endpoint</small><strong>POST</strong><span>/api/v1/activity-data</span></article>
+  <article class="metric-card"><small>Autenticación</small><strong>API Key</strong><span>cabecera X-API-Key</span></article>
+</section>
+<div class="two-column-grid operation-layout">
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">CONEXIONES</span><h2>Integraciones configuradas</h2></div></div>
+    <div class="settings-list">
+      {% for item in integrations %}
+      <article>
+        <div><strong>{{ item.name }}</strong><span>{{ item.provider }} · {{ item.integration_type }}</span><small>{{ item.last_test_detail or 'Sin prueba registrada' }}{% if item.api_key_prefix %} · Clave {{ item.api_key_prefix }}…{% endif %}</small></div>
+        <div class="button-row"><span class="status-badge {{ 'success' if item.status == 'Verificada' else 'warning' }}">{{ item.status }}</span>{% if item.provider == 'API REST' %}<form action="/integraciones/{{ item.id }}/rotar-clave" method="post"><button class="button secondary small" type="submit">Rotar clave</button></form>{% endif %}<form action="/integraciones/{{ item.id }}/estado" method="post"><button class="button secondary small" type="submit">{{ 'Desactivar' if item.active else 'Activar' }}</button></form></div>
+      </article>
+      {% else %}<div class="empty-state compact"><strong>No hay integraciones.</strong><span>Crea una conexión API o registra un sistema externo.</span></div>{% endfor %}
+    </div>
+  </section>
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">NUEVA CONEXIÓN</span><h2>Registrar integración</h2></div></div>
+    <form action="/integraciones/nueva" method="post" class="stacked-form">
+      <label>Nombre<input name="name" required placeholder="ERP corporativo"></label>
+      <label>Proveedor<select name="provider"><option>API REST</option><option>Microsoft 365 / SharePoint</option><option>Google Drive</option><option>ERP / Contabilidad</option><option>Webhook</option></select></label>
+      <label>Tipo<select name="integration_type"><option>Entrada de datos</option><option>Salida de reportes</option><option>Repositorio documental</option><option>Notificaciones</option></select></label>
+      <label>URL o referencia<input name="endpoint_url" placeholder="https://..."></label>
+      <button class="button primary" type="submit">Crear integración</button>
+    </form>
+  </section>
+</div>
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">USO DE LA API</span><h2>Ejemplo de carga</h2></div></div>
+  <pre><code>curl -X POST http://127.0.0.1:8765/api/v1/activity-data \
+  -H "X-API-Key: TU_CLAVE" \
+  -H "Content-Type: application/json" \
+  -d '{"source_id": 1, "period_start": "2025-12-01", "period_end": "2025-12-31", "value": 1200, "unit": "kWh", "external_reference": "ERP-2025-12"}'</code></pre>
+  <p class="helper-text">Consulta las fuentes permitidas mediante <code>GET /api/v1/sources</code> usando la misma cabecera.</p>
+</section>
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">TRAZABILIDAD</span><h2>Eventos recientes</h2></div></div>
+  <div class="responsive-table"><table><thead><tr><th>Fecha</th><th>Integración</th><th>Dirección</th><th>Estado</th><th>Detalle</th><th>Referencia</th></tr></thead><tbody>{% for event in recent_events %}<tr><td>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ event.integration.name }}</td><td>{{ event.direction }}</td><td><span class="status-badge {{ 'success' if event.status == 'Recibido' else 'warning' }}">{{ event.status }}</span></td><td>{{ event.detail }}</td><td>{{ event.external_reference or '—' }}</td></tr>{% else %}<tr><td colspan="6">Sin eventos todavía.</td></tr>{% endfor %}</tbody></table></div>
+</section>
+{% endblock %}

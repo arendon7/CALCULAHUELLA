@@ -1,0 +1,213 @@
+{% extends "base.html" %}
+{% block title %}Operación y seguridad · Calcula tu Huella{% endblock %}
+{% block page_label %}Operación y seguridad{% endblock %}
+{% block content %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">OPERACIÓN, CONTINUIDAD Y CERTIFICACIÓN</span>
+    <h1>Preparación productiva, seguridad y continuidad</h1>
+    <p>Organiza la salida a producción por capas: aplicación, PostgreSQL, documentos, correo, respaldos, seguridad y observabilidad. Cada bloqueo muestra la siguiente acción concreta.</p>
+  </div>
+  <span class="status-badge {{ 'success' if snapshot.production_ready else 'warning' }}">
+    {{ 'Lista para producción' if snapshot.production_ready else 'Requiere configuración' }}
+  </span>
+</section>
+
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Ambiente</small><strong>{{ snapshot.environment|upper }}</strong><span>{{ app_settings.version }}</span></article>
+  <article class="metric-card"><small>Base de datos</small><strong>{{ snapshot.database_backend }}</strong><span>{{ 'Disponible' if snapshot.database_ok else 'Con error' }}</span></article>
+  <article class="metric-card"><small>Protección CSRF</small><strong>{{ 'ACTIVA' if snapshot.csrf_enabled else 'INACTIVA' }}</strong><span>Formularios y sesión</span></article>
+  <article class="metric-card"><small>Cadena de auditoría</small><strong>{{ 'ÍNTEGRA' if snapshot.audit_integrity.ok else 'REVISAR' }}</strong><span>{{ snapshot.audit_integrity.checked }} eventos comprobados</span></article>
+  <article class="metric-card"><small>Bloqueos de acceso</small><strong>{{ snapshot.security_state.active_blocks }}</strong><span>{{ snapshot.security_state.tracked_keys }} claves controladas</span></article>
+  <article class="metric-card"><small>Registro estructurado</small><strong>{{ snapshot.structured_log.records }}</strong><span>{{ snapshot.structured_log.size|bytes }} en JSONL</span></article>
+  <article class="metric-card"><small>Ensayo de restauración</small><strong>{{ snapshot.restore_drill.status|upper }}</strong><span>{% if snapshot.restore_drill.age_days is not none %}Hace {{ snapshot.restore_drill.age_days }} días{% else %}Aún no ejecutado{% endif %}</span></article>
+</section>
+
+
+<section class="panel production-map" id="preparacion-productiva">
+  <div class="panel-heading">
+    <div><span class="eyebrow">V1.0 · MAPA PRODUCTIVO</span><h2>{{ production_profile.completed_stages }} de {{ production_profile.total_stages }} capas listas</h2><p>{{ production_profile.next_action }}</p></div>
+    <div class="production-score"><strong>{{ production_profile.score }}%</strong><span class="status-badge {{ 'success' if production_profile.ready else 'warning' }}">{{ 'LISTA' if production_profile.ready else 'EN PREPARACIÓN' }}</span></div>
+  </div>
+  <div class="production-stage-grid">
+    {% for stage in production_profile.stages %}
+    <article class="production-stage {{ 'ready' if stage.ready else 'blocked' }}">
+      <div class="stage-head"><span>{{ loop.index }}</span><div><strong>{{ stage.name }}</strong><small>{{ stage.description }}</small></div><b>{{ stage.status }}</b></div>
+      <div class="stage-checks">
+        {% for check in stage.checks %}<div><i class="{{ 'ok' if check.ok else 'fail' }}">{{ '✓' if check.ok else '!' }}</i><span><strong>{{ check.label }}</strong><small>{{ check.detail }}</small></span></div>{% endfor %}
+      </div>
+      <p><b>Siguiente acción:</b> {{ stage.next_action }}</p>
+    </article>
+    {% endfor %}
+  </div>
+  <div class="finding-actions">
+    <a class="button primary" href="/operacion/configuracion/plantilla">Descargar plantilla .env productiva</a>
+    <a class="button secondary" href="/api/operacion/preparacion" target="_blank" rel="noopener">Ver diagnóstico JSON</a>
+  </div>
+</section>
+
+<div class="two-column-grid operation-layout">
+  <section class="panel">
+    <div class="panel-heading">
+      <div><span class="eyebrow">DIAGNÓSTICO</span><h2>Estado del sistema</h2></div>
+      <a class="button secondary" href="/api/ready" target="_blank" rel="noopener">Ver JSON</a>
+    </div>
+    <div class="check-list">
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.database_ok else 'fail' }}">{{ '✓' if snapshot.database_ok else '!' }}</span><div><strong>Conexión a base de datos</strong><small>{{ snapshot.database_detail }}</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.storage_ok else 'fail' }}">{{ '✓' if snapshot.storage_ok else '!' }}</span><div><strong>Almacenamiento persistente</strong><small>{{ snapshot.storage_detail }}</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.csrf_enabled else 'fail' }}">{{ '✓' if snapshot.csrf_enabled else '!' }}</span><div><strong>Protección contra solicitudes cruzadas</strong><small>Token de doble envío activo en formularios del navegador.</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.audit_integrity.ok else 'fail' }}">{{ '✓' if snapshot.audit_integrity.ok else '!' }}</span><div><strong>Integridad de auditoría</strong><small>{{ snapshot.audit_integrity.checked }} eventos · {{ snapshot.audit_integrity.failure_count }} inconsistencias.</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.structured_log.ok else 'fail' }}">{{ '✓' if snapshot.structured_log.ok else '!' }}</span><div><strong>Trazabilidad de solicitudes</strong><small>Identificador X-Request-ID y registro JSONL sin parámetros sensibles.</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.restore_drill.ok else 'warn' }}">{{ '✓' if snapshot.restore_drill.ok else '!' }}</span><div><strong>Restauración ensayada</strong><small>{{ snapshot.restore_drill.status }}{% if snapshot.restore_drill.age_days is not none %} · {{ snapshot.restore_drill.age_days }} días desde el último ensayo aprobado{% endif %}.</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.public_base_url.startswith('https://') else 'warn' }}">{{ '✓' if snapshot.public_base_url.startswith('https://') else '!' }}</span><div><strong>URL pública</strong><small>{{ snapshot.public_base_url }}</small></div></div>
+      <div class="check-row"><span class="check-icon {{ 'ok' if snapshot.trusted_hosts and '*' not in snapshot.trusted_hosts else 'warn' }}">{{ '✓' if snapshot.trusted_hosts and '*' not in snapshot.trusted_hosts else '!' }}</span><div><strong>Hosts autorizados</strong><small>{{ snapshot.trusted_hosts|join(', ') }}</small></div></div>
+    </div>
+
+    {% if snapshot.production_issues %}
+    <div class="readiness-box">
+      <strong>Antes de publicar:</strong>
+      <ol>{% for issue in snapshot.production_issues %}<li>{{ issue }}</li>{% endfor %}</ol>
+    </div>
+    {% else %}
+    <div class="success-box"><strong>Configuración productiva completa.</strong><span>La aplicación supera las comprobaciones internas de preparación.</span></div>
+    {% endif %}
+  </section>
+
+  <section class="panel">
+    <div class="panel-heading"><div><span class="eyebrow">RESPALDOS</span><h2>Protección de información</h2></div></div>
+    <form action="/operacion/respaldos" method="post" class="inline-form backup-form">
+      <label>Etiqueta del respaldo<input name="label" value="manual" maxlength="30" required></label>
+      <button class="button primary" type="submit">Generar respaldo</button>
+    </form>
+    <p class="helper-text">Incluye una copia consistente de la base de datos, evidencias, informes y manifiesto con versión.</p>
+
+    {% if backups %}
+    <div class="backup-list">
+      {% for backup in backups %}
+      <article class="backup-row">
+        <div><strong>{{ backup.name }}</strong><small>{{ backup.created_at.strftime('%d/%m/%Y %H:%M UTC') }} · {{ backup.size|bytes }}</small><code>{{ backup.sha256[:18] }}…</code><small>{{ 'Firmado HMAC' if backup.signed else 'Sin firma' }} · {{ 'Réplica externa confirmada' if backup.offsite_exists else ('Réplica no configurada' if not backup.offsite_key else 'Réplica pendiente') }}</small></div>
+        <div class="finding-actions"><form action="/operacion/respaldos/{{ backup.name }}/verificar" method="post"><button class="button secondary small" type="submit">Verificar ZIP</button></form><form action="/operacion/respaldos/{{ backup.name }}/ensayar" method="post"><button class="button primary small" type="submit">Ensayar restauración</button></form><a class="button secondary small" href="/operacion/respaldos/{{ backup.name }}">Descargar</a></div>
+      </article>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty-state compact"><strong>No hay respaldos todavía.</strong><span>Genera el primero antes de realizar cambios importantes o migraciones.</span></div>
+    {% endif %}
+  </section>
+</div>
+
+<section class="panel" id="restauracion">
+  <div class="panel-heading">
+    <div><span class="eyebrow">CONTINUIDAD</span><h2>Historial de ensayos de restauración</h2></div>
+    <span class="status-badge {{ 'success' if snapshot.restore_drill.ok else 'warning' }}">{{ snapshot.restore_drill.status }}</span>
+  </div>
+  <p class="helper-text">Cada ensayo extrae el respaldo en un directorio temporal, abre la base en modo aislado, ejecuta controles de integridad y verifica las tablas críticas. Nunca reemplaza la base activa.</p>
+  {% if restore_drills %}
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Fecha</th><th>Respaldo</th><th>Estado</th><th>Integridad</th><th>Tablas</th><th>Duración</th><th>Responsable</th><th>Notas</th></tr></thead>
+      <tbody>
+      {% for drill in restore_drills %}
+        <tr>
+          <td>{{ drill.started_at.strftime('%d/%m/%Y %H:%M') }}</td>
+          <td><strong>{{ drill.backup_name }}</strong><small class="block-code">{{ drill.backup_sha256[:16] }}…</small></td>
+          <td><span class="status-badge {{ 'success' if drill.status == 'Aprobado' else ('warning' if drill.status == 'Parcial' else 'danger') }}">{{ drill.status }}</span></td>
+          <td>{{ drill.integrity_result }}</td>
+          <td>{{ drill.table_count }}</td>
+          <td>{{ drill.duration_ms }} ms</td>
+          <td>{{ drill.performed_by }}</td>
+          <td>{{ drill.notes or 'Sin observaciones' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% else %}
+  <div class="empty-state compact"><strong>No hay ensayos registrados.</strong><span>Genera un respaldo y ejecuta “Ensayar restauración”.</span></div>
+  {% endif %}
+</section>
+
+<section class="panel" id="despliegue-controlado">
+  <div class="panel-heading">
+    <div><span class="eyebrow">PUERTA PRODUCTIVA</span><h2>Ensayo de despliegue controlado</h2></div>
+    <span class="status-badge {{ 'success' if readiness.ready else 'warning' }}">{{ 'APROBADA' if readiness.ready else 'BLOQUEADA' }}</span>
+  </div>
+  <p class="helper-text">Evalúa base, almacenamiento, auditoría, restauración, HTTPS, métricas y secretos. El modo estricto exige dependencias externas reales y nunca convierte una simulación en aprobación productiva.</p>
+  <form action="/operacion/despliegue/ensayar" method="post" class="inline-form backup-form">
+    <label><input type="checkbox" name="strict_mode" value="on"> Modo estricto de producción</label>
+    <label>Observaciones<input name="notes" maxlength="500" placeholder="Contexto del ensayo"></label>
+    <button class="button primary" type="submit">Ejecutar ensayo</button>
+    <a class="button secondary" href="/api/operacion/preparacion" target="_blank" rel="noopener">Ver JSON</a>
+  </form>
+  <div class="check-list">
+    {% for check in readiness.checks %}
+    <div class="check-row"><span class="check-icon {{ 'ok' if check.ok else ('fail' if check.critical else 'warn') }}">{{ '✓' if check.ok else '!' }}</span><div><strong>{{ check.label }}</strong><small>{{ check.detail }}{% if not check.critical %} · advertencia no bloqueante{% endif %}</small></div></div>
+    {% endfor %}
+  </div>
+  {% if deployment_rehearsals %}
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Modo</th><th>Estado</th><th>Puntaje</th><th>Base</th><th>Almacenamiento</th><th>Responsable</th></tr></thead><tbody>
+    {% for run in deployment_rehearsals %}<tr><td>{{ run.started_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ 'Estricto' if run.strict_mode else 'Local' }}</td><td><span class="status-badge {{ 'success' if run.status == 'Aprobado' else ('danger' if run.status == 'Bloqueado' else 'warning') }}">{{ run.status }}</span></td><td>{{ run.score }}%</td><td>{{ run.database_backend }}</td><td>{{ run.storage_backend }}</td><td>{{ run.performed_by }}</td></tr>{% endfor %}
+  </tbody></table></div>
+  {% endif %}
+</section>
+
+<section class="panel" id="certificacion">
+  <div class="panel-heading">
+    <div><span class="eyebrow">CERTIFICACIÓN OPERATIVA</span><h2>Evidencia operativa de la versión</h2></div>
+    {% set latest_certificate = release_certifications[0] if release_certifications else none %}
+    <span class="status-badge {{ 'success' if latest_certificate and latest_certificate.production_approved else ('warning' if latest_certificate and latest_certificate.status == 'Validación local' else 'danger') }}">{{ latest_certificate.status if latest_certificate else 'SIN EJECUTAR' }}</span>
+  </div>
+  <p class="helper-text">Genera un respaldo, verifica su integridad, ensaya la restauración, ejecuta la puerta de despliegue y firma un paquete ZIP de evidencia. Solo el modo estricto con servicios externos reales produce una certificación productiva.</p>
+  <form action="/operacion/certificacion/ejecutar" method="post" class="inline-form backup-form">
+    <label><input type="checkbox" name="strict_mode" value="on"> Certificación productiva estricta</label>
+    <label>Observaciones<input name="notes" maxlength="500" placeholder="Versión, entorno o decisión de publicación"></label>
+    <button class="button primary" type="submit">Generar certificación</button>
+    <a class="button secondary" href="/api/operacion/certificacion" target="_blank" rel="noopener">Ver JSON</a>
+  </form>
+  {% if release_certifications %}
+  <div class="table-wrap"><table><thead><tr><th>Fecha</th><th>Versión</th><th>Alcance</th><th>Estado</th><th>Hash</th><th>Respaldo</th><th>Evidencia</th></tr></thead><tbody>
+    {% for cert in release_certifications %}
+    <tr>
+      <td>{{ cert.started_at.strftime('%d/%m/%Y %H:%M') }}</td>
+      <td>{{ cert.application_version }}</td>
+      <td>{{ cert.scope }}</td>
+      <td><span class="status-badge {{ 'success' if cert.production_approved else ('warning' if cert.status == 'Validación local' else 'danger') }}">{{ cert.status }}</span></td>
+      <td><code>{{ cert.certificate_hash[:16] }}…</code></td>
+      <td><small>{{ cert.backup_name }}</small><code class="block-code">{{ cert.backup_sha256[:16] }}…</code></td>
+      <td>{% if cert.artifact_name %}<a class="button secondary small" href="/operacion/certificaciones/{{ cert.artifact_name }}">Descargar ZIP</a>{% else %}No disponible{% endif %}</td>
+    </tr>
+    {% endfor %}
+  </tbody></table></div>
+  {% else %}
+  <div class="empty-state compact"><strong>No hay certificaciones registradas.</strong><span>Ejecuta primero una validación local y luego el modo estricto dentro del stack de ensayo.</span></div>
+  {% endif %}
+</section>
+
+<section class="panel" id="incidentes">
+  <div class="panel-heading"><div><span class="eyebrow">INCIDENTES</span><h2>Bloqueos operativos</h2></div><span class="status-badge {{ 'warning' if readiness.open_incidents else 'success' }}">{{ readiness.open_incidents|length }} abiertos</span></div>
+  {% if operational_incidents %}
+  <div class="table-wrap"><table><thead><tr><th>Incidente</th><th>Severidad</th><th>Estado</th><th>Ocurrencias</th><th>Última detección</th><th>Acciones</th></tr></thead><tbody>
+    {% for incident in operational_incidents %}<tr><td><strong>{{ incident.title }}</strong><small>{{ incident.detail }}</small></td><td>{{ incident.severity }}</td><td>{{ incident.status }}</td><td>{{ incident.occurrence_count }}</td><td>{{ incident.last_seen_at.strftime('%d/%m/%Y %H:%M') }}</td><td><div class="finding-actions">{% if incident.status == 'Abierto' %}<form action="/operacion/incidentes/{{ incident.id }}/reconocer" method="post"><button class="button secondary small">Reconocer</button></form>{% endif %}{% if incident.status != 'Resuelto' %}<form action="/operacion/incidentes/{{ incident.id }}/resolver" method="post"><button class="button primary small">Resolver</button></form>{% endif %}</div></td></tr>{% endfor %}
+  </tbody></table></div>
+  {% else %}<div class="empty-state compact"><strong>No hay incidentes registrados.</strong><span>Ejecuta un ensayo estricto para comprobar la puerta productiva.</span></div>{% endif %}
+</section>
+
+<section class="metrics-grid operation-metrics">
+  <article class="metric-card"><small>Solicitudes observadas</small><strong>{{ metrics_snapshot.request_count }}</strong><span>Métricas en memoria</span></article>
+  <article class="metric-card"><small>Errores 5xx</small><strong>{{ metrics_snapshot.errors_5xx }}</strong><span>Desde el último arranque</span></article>
+  <article class="metric-card"><small>Latencia promedio</small><strong>{{ '%.3f'|format(metrics_snapshot.latency_average_seconds) }} s</strong><span>Ventana reciente</span></article>
+  <article class="metric-card"><small>Latencia p95</small><strong>{{ '%.3f'|format(metrics_snapshot.latency_p95_seconds) }} s</strong><span>Ventana reciente</span></article>
+</section>
+
+<section class="panel deployment-panel">
+  <div class="panel-heading"><div><span class="eyebrow">DESPLIEGUE</span><h2>Ruta recomendada</h2></div></div>
+  <div class="deployment-steps">
+    <article><b>1</b><strong>Configurar secretos</strong><span>Usar la plantilla sanitizada y un gestor de secretos; nunca copiar valores reales al repositorio.</span></article>
+    <article><b>2</b><strong>Migrar a PostgreSQL</strong><span>Ejecutar Alembic sobre una base administrada o el servicio del stack.</span></article>
+    <article><b>3</b><strong>Separar documentos</strong><span>Usar S3-compatible o volumen persistente con versionado o inmutabilidad.</span></article>
+    <article><b>4</b><strong>Activar comunicaciones</strong><span>Conectar SMTP y el worker de notificaciones y automatizaciones.</span></article>
+    <article><b>5</b><strong>Asegurar continuidad</strong><span>Firmar respaldos, replicarlos fuera del servidor y ensayar restauración.</span></article>
+    <article><b>6</b><strong>Observar y certificar</strong><span>Conectar Prometheus, Alertmanager y Grafana antes de ejecutar el modo estricto.</span></article>
+  </div>
+</section>
+{% endblock %}

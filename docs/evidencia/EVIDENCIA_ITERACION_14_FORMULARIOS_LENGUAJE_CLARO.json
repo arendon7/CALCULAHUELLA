@@ -1,0 +1,159 @@
+{
+  "iteration": 14,
+  "focus": "formularios asistidos, lenguaje claro y compatibilidad reforzada con lectores de pantalla",
+  "generated_at": "2026-08-05T23:30:00-05:00",
+  "automated_tests": {
+    "mac_passed": 414,
+    "mac_failed": 0,
+    "batches": [
+      163,
+      100,
+      67,
+      84
+    ],
+    "windows_passed": 411,
+    "windows_skipped_macos_only": 3,
+    "windows_failed": 0,
+    "windows_batches": [
+      163,
+      98,
+      66,
+      84
+    ]
+  },
+  "semantic_audit": {
+    "pages_by_role_checked": 10,
+    "roles_checked": 5,
+    "controls_checked": 278,
+    "unlabelled_controls": 0,
+    "pages_with_duplicate_ids": [],
+    "page_results": [
+      {
+        "role": "cliente",
+        "path": "/dashboard",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 19,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "cliente",
+        "path": "/captura-guiada",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 32,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "consultor",
+        "path": "/dashboard",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 24,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "consultor",
+        "path": "/recorrido-inventario",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 24,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "revisor",
+        "path": "/dashboard",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 23,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "revisor",
+        "path": "/control",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 41,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "verificador",
+        "path": "/dashboard",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 23,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "verificador",
+        "path": "/verificacion",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 33,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "admin",
+        "path": "/dashboard",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 24,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      },
+      {
+        "role": "admin",
+        "path": "/portafolio",
+        "status": 200,
+        "h1_count": 1,
+        "duplicate_ids": false,
+        "controls": 35,
+        "unlabelled_controls": 0,
+        "glossary_terms": 10
+      }
+    ]
+  },
+  "visual_review": {
+    "desktop_captures": 3,
+    "mobile_captures": 2,
+    "page_errors": 0,
+    "files": [
+      "01_captura_asistida_escritorio.png",
+      "02_resumen_previo_escritorio.png",
+      "03_diccionario_lenguaje_claro.png",
+      "04_captura_asistida_movil.png",
+      "05_diccionario_movil.png"
+    ]
+  },
+  "functional_changes": [
+    "diccionario global con 10 términos y filtro",
+    "captura guiada separada en campos esenciales y técnicos opcionales",
+    "resumen dinámico antes de guardar con aria-live",
+    "configuración de fuentes agrupada y explicada en lenguaje operativo",
+    "resumen de errores con enlaces directos al campo",
+    "asociación automática de ayudas mediante aria-describedby"
+  ],
+  "methodology_impact": "sin cambios en factores, GWP, fórmulas, unidades o resultados",
+  "external_pending": [
+    "prueba física con VoiceOver en macOS/Safari",
+    "prueba física con NVDA en Windows/Chrome o Edge",
+    "sesiones moderadas con usuarios reales de los cinco roles"
+  ]
+}

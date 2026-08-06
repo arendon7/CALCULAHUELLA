@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% block title %}Pasaporte de factor · Calcula tu Huella{% endblock %}
+{% block page_label %}Metodología / Pasaporte de factor{% endblock %}
+{% block content %}
+{% set version = passport.version %}{% set factor = passport.factor %}{% set doc = passport.documentation %}{% set source_doc = passport.source_document %}{% set advice = passport.advice %}
+<div class="page-head">
+  <div><p class="breadcrumb">Biblioteca / Versión {{ version.id }}</p><h1>{{ factor.name }}</h1><p>{{ factor.activity_type }} · {{ factor.sector }} · {{ passport.gas.formula or passport.gas.code }}</p></div>
+  <span class="status-badge {% if passport.decision_readiness == 'Listo para evaluación' %}success{% elif passport.decision_readiness == 'Solo demostración' %}danger{% else %}warning{% endif %}">{{ passport.decision_readiness }}</span>
+</div>
+
+<div class="passport-actions">
+  <a class="btn btn-outline" href="/metodologia/biblioteca-factores{% if context_query %}?{{ context_query }}{% endif %}">Volver a la biblioteca</a>
+  {% if record %}<a class="btn btn-primary" href="/fuentes/{{ source.id }}?activity_data_id={{ record.id }}#conversacion-tecnica">Volver al dato</a>{% endif %}
+</div>
+
+{% if record %}<section class="card factor-context-card"><div><small>EVALUACIÓN CONTRA EL DATO</small><h2>{{ source.name }}</h2><p>{{ record.value|number_es(4) }} {{ record.unit }} · {{ record.period_start.strftime('%d/%m/%Y') }} a {{ record.period_end.strftime('%d/%m/%Y') }}</p></div>{% if advice %}<div class="passport-score"><small>Compatibilidad</small><strong>{{ advice.score }}%</strong><span>{{ advice.recommendation }}</span></div>{% endif %}</section>{% endif %}
+
+<section class="passport-hero-grid">
+  <article class="card passport-value-card"><small>VALOR Y BASE</small><strong>{{ version.value|number_es(10) }}</strong><span>{{ version.output_unit }} / {{ version.input_unit }}</span><p>Gas o componente: <b>{{ passport.gas.name }} ({{ passport.gas.code }})</b></p></article>
+  <article class="card"><small>REPRESENTATIVIDAD</small><h2>{{ version.geographic_scope }}</h2><p>{{ version.technology_scope }}</p><span class="status-chip {% if passport.geography_state == 'Compatible' %}complete{% else %}pending{% endif %}">{{ passport.geography_state }}</span></article>
+  <article class="card"><small>VIGENCIA</small><h2>{{ passport.effective_state }}</h2><p>{{ passport.effective_note }}</p><span>{{ version.effective_from or 'Sin inicio explícito' }} → {{ version.effective_to or 'Sin fin explícito' }}</span></article>
+  <article class="card"><small>DOCUMENTACIÓN</small><h2>{{ passport.document_completeness }}%</h2><p>{{ passport.source_label }}</p><span>{{ passport.review_due }}</span></article>
+</section>
+
+{% if passport.decision_blockers or passport.warnings %}<section class="card passport-alerts"><div class="card-head"><div><small>CONTROLES ANTES DE USAR</small><h2>Bloqueadores y advertencias</h2></div></div>{% for item in passport.decision_blockers %}<div class="method-boundary-note danger-note"><strong>Bloqueador</strong><span>{{ item }}</span></div>{% endfor %}{% for item in passport.warnings %}<div class="method-boundary-note"><strong>Advertencia</strong><span>{{ item }}</span></div>{% endfor %}</section>{% endif %}
+
+<section class="passport-detail-grid">
+  <article class="card">
+    <div class="card-head"><div><small>IDENTIDAD METODOLÓGICA</small><h2>Qué representa</h2></div></div>
+    <dl class="passport-definition-list">
+      <div><dt>Factor</dt><dd>{{ factor.name }}</dd></div><div><dt>Actividad</dt><dd>{{ factor.activity_type }}</dd></div><div><dt>Sector</dt><dd>{{ factor.sector }}</dd></div><div><dt>País del registro</dt><dd>{{ factor.country }}</dd></div><div><dt>Versión</dt><dd>{{ version.version }}</dd></div><div><dt>Año de publicación</dt><dd>{{ version.publication_year }}</dd></div><div><dt>Estado de versión</dt><dd>{{ version.status }}</dd></div><div><dt>Incertidumbre declarada</dt><dd>{{ version.uncertainty_percentage|number_es(2) }}%</dd></div>
+    </dl>
+  </article>
+  <article class="card">
+    <div class="card-head"><div><small>APTITUD DE USO</small><h2>Cómo puede utilizarse</h2></div></div>
+    <dl class="passport-definition-list">
+      <div><dt>Jerarquía</dt><dd>{{ passport.hierarchy_tier }} · {{ passport.hierarchy_label }}</dd></div><div><dt>Criterio</dt><dd>{{ passport.hierarchy_rationale }}</dd></div><div><dt>Alineación temporal</dt><dd>{{ passport.temporal_alignment }} · {{ passport.temporal_note }}</dd></div><div><dt>Estado de fuente</dt><dd>{{ passport.source_status }}</dd></div><div><dt>Tipo</dt><dd>{{ doc.factor_kind if doc else 'Sin clasificar' }}</dd></div><div><dt>Uso autorizado</dt><dd>{{ doc.reporting_use if doc else 'Sin clasificar' }}</dd></div><div><dt>Calidad</dt><dd>{{ doc.quality_grade if doc else 'N/A' }}</dd></div><div><dt>Estado documental</dt><dd>{{ doc.review_status if doc else 'Sin documentación' }}</dd></div><div><dt>Revisor</dt><dd>{{ doc.reviewer if doc and doc.reviewer else 'Pendiente' }}</dd></div><div><dt>Revisión realizada</dt><dd>{{ doc.reviewed_at if doc and doc.reviewed_at else 'Pendiente' }}</dd></div><div><dt>CO₂e agregado</dt><dd>{{ 'Sí' if doc and doc.aggregated_co2e else 'No' }}</dd></div><div><dt>GWP embebido</dt><dd>{{ doc.gwp_embedded if doc and doc.gwp_embedded else 'No declarado' }}</dd></div>
+    </dl>
+  </article>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>FUENTE Y REPRODUCIBILIDAD</small><h2>Cadena documental</h2></div>{% if source_doc %}<span class="method-tag">{{ source_doc.code }}</span>{% endif %}</div>
+  {% if source_doc %}
+  <div class="source-document-card">
+    <div><strong>{{ source_doc.title }}</strong><p>{{ source_doc.issuing_body }} · {{ source_doc.document_type }} · {{ source_doc.jurisdiction }}</p><small>{{ source_doc.citation }}</small></div>
+    <div><span class="status-badge {% if passport.source_preliminary %}danger{% else %}success{% endif %}">{{ source_doc.status }}</span><span>Publicado: {{ source_doc.publication_date or 'N/D' }}</span><span>Consultado: {{ source_doc.accessed_at or 'N/D' }}</span></div>
+  </div>
+  {% else %}<div class="empty-state"><strong>Sin documento metodológico vinculado.</strong><p>La versión no debe promocionarse como factor formal hasta completar esta cadena.</p></div>{% endif %}
+  <dl class="passport-definition-list wide-definition-list">
+    <div><dt>Documento registrado en la versión</dt><dd>{{ version.source_document or 'Sin referencia' }}</dd></div>
+    <div><dt>Página / tabla</dt><dd>{{ (doc.page_reference ~ ' ' ~ doc.table_reference)|trim if doc else 'Sin referencia puntual' }}</dd></div>
+    <div><dt>Valor en la fuente</dt><dd>{% if doc and doc.source_value is not none %}{{ doc.source_value|number_es(10) }} {{ doc.source_unit }}{% else %}No documentado{% endif %}</dd></div>
+    <div><dt>Expresión de conversión</dt><dd>{{ doc.conversion_expression if doc and doc.conversion_expression else 'Aplicación directa o memoria pendiente' }}</dd></div>
+    <div><dt>Restricciones</dt><dd>{{ doc.restriction_notes if doc and doc.restriction_notes else version.notes or 'Sin restricciones documentadas' }}</dd></div>
+  </dl>
+</section>
+
+{% if advice %}<section class="card">
+  <div class="card-head"><div><small>CONVERSACIÓN CON EL DATO</small><h2>Compatibilidad explicada</h2></div><span class="counter">{{ advice.score }}%</span></div>
+  <div class="factor-score-grid passport-score-grid"><span><b>{{ advice.breakdown.units }}</b>Unidad</span><span><b>{{ advice.breakdown.activity }}</b>Actividad</span><span><b>{{ advice.breakdown.geography }}</b>Geografía</span><span><b>{{ advice.breakdown.approval }}</b>Aprobación</span><span><b>{{ advice.breakdown.time }}</b>Tiempo</span><span><b>{{ advice.breakdown.documentation }}</b>Soporte</span></div>
+  <div class="passport-reason-grid">{% for reason in advice.reasons %}<article><span>{{ loop.index }}</span><p>{{ reason }}</p></article>{% endfor %}</div>
+  <div class="method-boundary-note"><strong>Lectura correcta</strong><span>El puntaje prioriza la revisión. No autoriza por sí mismo la aplicación al cálculo.</span></div>
+</section>{% endif %}
+{% endblock %}

@@ -1,0 +1,18 @@
+groups:
+  - name: calcula-tu-huella
+    rules:
+      - alert: CalculaTuHuellaNoDisponible
+        expr: up{job="calcula-tu-huella"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Calcula tu Huella no responde"
+          description: "Prometheus no puede consultar /metrics durante más de dos minutos."
+      - alert: CalculaTuHuellaErrores5xx
+        expr: increase(cth_http_errors_5xx_total[10m]) > 5
+        labels:
+          severity: high
+        annotations:
+          summary: "Aumento de errores 5xx"
+          description: "Se registraron más de cinco errores 5xx en diez minutos."
