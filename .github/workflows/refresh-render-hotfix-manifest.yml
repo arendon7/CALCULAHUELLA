@@ -7,6 +7,8 @@ on:
       - Dockerfile
       - scripts/runtime_python.sh
       - app/storage.py
+      - app/db/models/core.py
+      - migrations/versions/20260806_0037_expand_password_hash.py
       - .github/workflows/refresh-render-hotfix-manifest.yml
 
 permissions:
@@ -32,23 +34,21 @@ jobs:
               'Dockerfile': Path('Dockerfile'),
               'scripts/runtime_python.sh': Path('scripts/runtime_python.sh'),
               'app/storage.py': Path('app/storage.py'),
+              'app/db/models/core.py': Path('app/db/models/core.py'),
+              'migrations/versions/20260806_0037_expand_password_hash.py': Path('migrations/versions/20260806_0037_expand_password_hash.py'),
           }
           hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in targets.items()}
-          output = []
-          found = set()
+          entries = {}
           for line in manifest.read_text(encoding='utf-8').splitlines():
               if not line.strip():
                   continue
-              _, rel = line.split('  ', 1)
-              if rel in hashes:
-                  output.append(f'{hashes[rel]}  {rel}')
-                  found.add(rel)
-              else:
-                  output.append(line)
-          missing = set(targets) - found
-          if missing:
-              raise SystemExit(f'Entradas ausentes: {sorted(missing)}')
-          manifest.write_text('\n'.join(output) + '\n', encoding='utf-8')
+              digest, rel = line.split('  ', 1)
+              entries[rel] = digest
+          entries.update(hashes)
+          manifest.write_text(
+              ''.join(f'{entries[rel]}  {rel}\n' for rel in sorted(entries)),
+              encoding='utf-8',
+          )
           PY
       - name: Publicar manifiesto
         shell: bash
@@ -61,5 +61,5 @@ jobs:
             echo "El manifiesto ya estaba actualizado."
             exit 0
           fi
-          git commit -m "chore: actualizar hashes del hotfix Render"
+          git commit -m "chore: actualizar manifiesto del hotfix PostgreSQL"
           git push origin HEAD:main
