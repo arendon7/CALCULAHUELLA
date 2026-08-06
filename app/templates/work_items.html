@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+{% block title %}Mi trabajo · Calcula tu Huella{% endblock %}
+{% block page_label %}Mi trabajo{% endblock %}
+{% block content %}
+<style>
+  .work-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 24px}.work-metric{background:var(--surface,#fff);border:1px solid var(--line,#dce3de);border-radius:16px;padding:16px}.work-metric small{display:block;color:var(--muted,#68746f);font-weight:700;letter-spacing:.04em}.work-metric strong{display:block;font-size:1.75rem;margin-top:6px}.work-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(290px,.8fr);gap:20px;align-items:start}.work-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}.work-toolbar label{min-width:150px;flex:1}.work-toolbar select{width:100%}.work-list{display:grid;gap:14px;margin-top:16px}.work-card{border:1px solid var(--line,#dce3de);border-radius:18px;background:var(--surface,#fff);padding:18px}.work-card-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}.work-kicker{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}.work-card h3{margin:0 0 8px}.work-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}.work-meta div{background:var(--surface-soft,#f6f8f6);border-radius:12px;padding:10px}.work-meta small{display:block;color:var(--muted,#68746f)}.work-next{border-left:3px solid var(--accent,#2d6f73);padding-left:12px;margin:12px 0}.work-actions{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--line,#dce3de)}.work-action-form{display:flex;gap:8px;flex-wrap:wrap}.work-action-form input{flex:1;min-width:210px}.work-create-form{display:grid;gap:12px}.work-create-form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.work-empty{text-align:center;padding:36px 18px;border:1px dashed var(--line,#dce3de);border-radius:18px}.work-source-link{font-weight:700}.priority-critical{color:#9d2c2c}.priority-high{color:#995c00}.overdue{color:#9d2c2c;font-weight:800}.work-help{font-size:.92rem;color:var(--muted,#68746f)}
+  @media(max-width:1050px){.work-summary{grid-template-columns:repeat(3,1fr)}.work-layout{grid-template-columns:1fr}.work-meta{grid-template-columns:repeat(2,1fr)}}
+  @media(max-width:640px){.work-summary{grid-template-columns:repeat(2,1fr)}.work-card-top{display:block}.work-meta{grid-template-columns:1fr}.work-create-form .two{grid-template-columns:1fr}.work-action-form{display:grid}.work-action-form input{min-width:0;width:100%}}
+</style>
+
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">TRABAJO CON RESPONSABLE Y CIERRE</span>
+    <h1>Mi trabajo</h1>
+    <p>Reúne solicitudes, correcciones, validaciones, revisiones y cierres en una sola bandeja. Cada tarea muestra quién actúa, qué debe entregar y qué ocurre después.</p>
+  </div>
+  <div class="page-actions">
+    <a class="btn btn-secondary" href="/dashboard">Ver resumen del inventario</a>
+    <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
+    {% if can_create %}
+    <form method="post" action="/mi-trabajo/sincronizar">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+      <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
+    </form>
+    {% endif %}
+  </div>
+</section>
+
+<section class="work-summary" aria-label="Resumen de trabajo">
+  <article class="work-metric"><small>ABIERTAS</small><strong>{{ summary.open }}</strong></article>
+  <article class="work-metric"><small>VENCIDAS</small><strong>{{ summary.overdue }}</strong></article>
+  <article class="work-metric"><small>DEVUELTAS</small><strong>{{ summary.returned }}</strong></article>
+  <article class="work-metric"><small>BLOQUEADAS</small><strong>{{ summary.blocked }}</strong></article>
+  <article class="work-metric"><small>EN CONTROL</small><strong>{{ summary.under_review }}</strong></article>
+</section>
+
+<section class="work-layout">
+  <div>
+    <article class="panel">
+      <form class="work-toolbar" method="get" action="/mi-trabajo">
+        <label>Estado
+          <select name="status">
+            <option value="">Todos</option>
+            {% for option in statuses %}<option value="{{ option.code }}" {% if selected_status == option.code %}selected{% endif %}>{{ option.label }}</option>{% endfor %}
+          </select>
+        </label>
+        <label>Etapa
+          <select name="stage">
+            <option value="">Todas</option>
+            {% for option in stages %}<option value="{{ option.code }}" {% if selected_stage == option.code %}selected{% endif %}>{{ loop.index }}. {{ option.label }}</option>{% endfor %}
+          </select>
+        </label>
+        {% if can_view_all %}
+        <label>Alcance
+          <select name="scope">
+            <option value="mine" {% if selected_scope == 'mine' %}selected{% endif %}>Mi trabajo</option>
+            <option value="all" {% if selected_scope == 'all' %}selected{% endif %}>Toda la organización</option>
+          </select>
+        </label>
+        {% endif %}
+        <button class="btn btn-secondary" type="submit">Aplicar filtros</button>
+      </form>
+      <p class="work-help">La bandeja incorporó {{ sync_result.total }} solicitud(es) existentes; {{ sync_result.changed }} cambiaron durante esta consulta.</p>
+    </article>
+
+    <div class="work-list">
+      {% for item in items %}
+      <article class="work-card" id="tarea-{{ item.id }}">
+        <div class="work-card-top">
+          <div>
+            <div class="work-kicker">
+              <span class="status-badge {% if item.status_code in ['returned','blocked'] %}warning{% elif item.status_code in ['closed'] %}active{% else %}neutral{% endif %}">{{ status_label(item.status_code) }}</span>
+              <small>{{ work_types[item.work_type] if item.work_type in work_types else item.work_type }}</small>
+              <small>Etapa {{ item.stage_code }}</small>
+            </div>
+            <h3>{{ item.title }}</h3>
+            {% if item.description %}<p>{{ item.description }}</p>{% endif %}
+          </div>
+          <strong class="priority-{{ item.priority }}">{{ item.priority|upper }}</strong>
+        </div>
+
+        <div class="work-meta">
+          <div><small>Responsable</small><strong>{{ item.assignee_email or item.assignee_role or item.assignee_area or 'Sin asignar' }}</strong></div>
+          <div><small>Fecha límite</small><strong class="{% if item.due_date and item.due_date < today %}overdue{% endif %}">{{ item.due_date.strftime('%d/%m/%Y') if item.due_date else 'Sin fecha' }}</strong></div>
+          <div><small>Solicitante</small><strong>{{ item.requester_email or item.created_by }}</strong></div>
+          <div><small>Versión</small><strong>{{ item.version }}</strong></div>
+        </div>
+
+        <div class="work-next"><small>PRÓXIMA ACCIÓN</small><p>{{ item.next_action or 'Revisar el estado y definir la acción siguiente.' }}</p></div>
+        <details>
+          <summary>Ver criterio de aceptación y trazabilidad</summary>
+          <p><strong>Criterio de aceptación:</strong> {{ item.acceptance_criteria }}</p>
+          {% if item.blocking_reason %}<p><strong>Bloqueo:</strong> {{ item.blocking_reason }}</p>{% endif %}
+          {% if item.source_route %}<a class="work-source-link" href="{{ item.source_route }}">Abrir el registro de origen →</a>{% endif %}
+          {% if item.events %}
+          <ol>
+            {% for event in item.events[-5:] %}<li>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }} · {{ event.event_code }} · {{ event.actor_email }}{% if event.comment %}: {{ event.comment }}{% endif %}</li>{% endfor %}
+          </ol>
+          {% endif %}
+        </details>
+
+        {% if actions[item.id] %}
+        <div class="work-actions">
+          {% for action in actions[item.id] %}
+          <form class="work-action-form" method="post" action="/mi-trabajo/{{ item.id }}/accion">
+            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+            <input type="hidden" name="action" value="{{ action }}">
+            <input type="hidden" name="expected_version" value="{{ item.version }}">
+            {% if action in reason_actions %}<input name="comment" required placeholder="Describe el motivo de esta decisión">{% else %}<input name="comment" placeholder="Comentario opcional para la trazabilidad">{% endif %}
+            <button class="btn {% if action in ['submit','accept_delivery','close'] %}btn-primary{% else %}btn-secondary{% endif %}" type="submit">{{ action_labels[action] }}</button>
+          </form>
+          {% endfor %}
+        </div>
+        {% else %}
+        <p class="permission-note">No tienes una acción pendiente sobre esta tarea en su estado actual.</p>
+        {% endif %}
+      </article>
+      {% else %}
+      <div class="work-empty"><h2>No hay tareas para estos filtros</h2><p>Cambia los filtros o sincroniza las solicitudes existentes.</p></div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <aside>
+    {% if can_create %}
+    <article class="panel">
+      <div class="panel-heading"><div><span class="eyebrow">NUEVA ASIGNACIÓN</span><h2>Crear trabajo controlado</h2></div></div>
+      <form class="work-create-form" method="post" action="/mi-trabajo/nueva">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
+        <label>Título<input name="title" required maxlength="180" placeholder="Ej. Entregar facturas de electricidad de marzo"></label>
+        <label>Tipo
+          <select name="work_type" required>{% for code, label in work_types.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
+        </label>
+        <label>Descripción<textarea name="description" rows="3" placeholder="Explica el contexto y lo que debe realizarse"></textarea></label>
+        <label>Inventario
+          <select name="inventory_id"><option value="">Sin inventario específico</option>{% for inventory in inventories %}<option value="{{ inventory.id }}">{{ inventory.name }} · {{ inventory.version }}</option>{% endfor %}</select>
+        </label>
+        <div class="two">
+          <label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="critical">Crítica</option><option value="low">Baja</option></select></label>
+          <label>Fecha límite<input type="date" name="due_date"></label>
+        </div>
+        <label>Correo del responsable<input type="email" name="assignee_email" placeholder="persona@organizacion.com"></label>
+        <div class="two">
+          <label>Rol responsable<input name="assignee_role" placeholder="Cliente"></label>
+          <label>Área responsable<input name="assignee_area" placeholder="Contabilidad"></label>
+        </div>
+        <label>Criterio de aceptación<textarea name="acceptance_criteria" required rows="3" placeholder="Indica cómo se verificará que la entrega está completa"></textarea></label>
+        <label>Próxima acción<input name="next_action" placeholder="Aceptar la asignación y preparar la entrega"></label>
+        <button class="btn btn-primary" type="submit">Crear y asignar tarea</button>
+      </form>
+    </article>
+    {% endif %}
+
+    <article class="panel">
+      <div class="panel-heading"><div><span class="eyebrow">REGLA DE CIERRE</span><h2>Entregar no es cerrar</h2></div></div>
+      <p>Una tarea se cierra únicamente después de validar la entrega, resolver correcciones y registrar la aceptación correspondiente.</p>
+      <a href="/guia">Consultar las ocho etapas →</a>
+    </article>
+  </aside>
+</section>
+{% endblock %}
