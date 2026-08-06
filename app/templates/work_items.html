@@ -19,7 +19,6 @@
     <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
     {% if can_create %}
     <form method="post" action="/mi-trabajo/sincronizar">
-      <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
       <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
     </form>
     {% endif %}
@@ -103,7 +102,6 @@
         <div class="work-actions">
           {% for action in actions[item.id] %}
           <form class="work-action-form" method="post" action="/mi-trabajo/{{ item.id }}/accion">
-            <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
             <input type="hidden" name="action" value="{{ action }}">
             <input type="hidden" name="expected_version" value="{{ item.version }}">
             {% if action in reason_actions %}<input name="comment" required placeholder="Describe el motivo de esta decisión">{% else %}<input name="comment" placeholder="Comentario opcional para la trazabilidad">{% endif %}
@@ -126,7 +124,6 @@
     <article class="panel">
       <div class="panel-heading"><div><span class="eyebrow">NUEVA ASIGNACIÓN</span><h2>Crear trabajo controlado</h2></div></div>
       <form class="work-create-form" method="post" action="/mi-trabajo/nueva">
-        <input type="hidden" name="csrf_token" value="{{ request.state.csrf_token }}">
         <label>Título<input name="title" required maxlength="180" placeholder="Ej. Entregar facturas de electricidad de marzo"></label>
         <label>Tipo
           <select name="work_type" required>{% for code, label in work_types.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
