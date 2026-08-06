@@ -44,7 +44,9 @@ class AppUser(Base):
     email: Mapped[str] = mapped_column(String(180), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(120))
     role: Mapped[str] = mapped_column(String(40))
-    password_hash: Mapped[str] = mapped_column(String(64))
+    # PBKDF2, bcrypt y Argon2 incluyen algoritmo, parámetros, sal y hash.
+    # 64 caracteres solo alcanzan para el digest aislado y falla en PostgreSQL.
+    password_hash: Mapped[str] = mapped_column(String(255))
     active: Mapped[bool] = mapped_column(Boolean, default=True)
     last_login: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
