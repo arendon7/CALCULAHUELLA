@@ -53,8 +53,18 @@ def test_v021_consolidation_page_and_api_load():
         payload = api.json()
         assert payload["module_count"] == len(PRODUCT_MODULES)
         assert payload["critical_open"] == 0
-        assert payload["release_candidate"]["controlled_release_ready"] is True
-        assert payload["release_candidate"]["production_ready"] is False
+
+        # La canonización V1.0 no conservó el archivo legacy
+        # release/FINAL_TEST_EVIDENCE.json. La puerta debe permanecer cerrada
+        # hasta que exista evidencia material del release actual; no es válido
+        # inferirla desde RELEASE_CANONICA.json ni desde una declaración Markdown.
+        release = payload["release_candidate"]
+        assert release["controlled_release_ready"] is False
+        assert release["production_ready"] is False
+        assert release["test_evidence"]["status"] == "missing"
+        test_gate = next(item for item in release["package_checks"] if item["code"] == "V1-TESTS")
+        assert test_gate["ok"] is False
+        assert "estado missing" in test_gate["detail"]
         assert payload["metrics"]["routes"] >= 190
 
 
