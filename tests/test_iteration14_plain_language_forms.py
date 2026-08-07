@@ -73,11 +73,14 @@ def test_iteration14_source_configuration_uses_plain_language_groups() -> None:
 
 def test_iteration14_assets_include_assistance_and_screen_reader_behaviors() -> None:
     with TestClient(app) as client:
-        css = client.get("/static/css/app.css")
+        entry = client.get("/static/css/app.css")
+        canonical = client.get("/static/css/app-canonical-v1.css")
+        overlay = client.get("/static/css/v1.4.css")
         js = client.get("/static/js/app.js")
-        assert css.status_code == 200 and js.status_code == 200
+        assert all(response.status_code == 200 for response in (entry, canonical, overlay, js))
+        effective_css = "\n".join((entry.text, canonical.text, overlay.text))
         for token in (".assisted-fieldset", ".plain-glossary", ".capture-live-summary", ".advanced-form-section"):
-            assert token in css.text
+            assert token in effective_css
         for token in (
             "initializeGlossarySearch",
             "initializeFieldDescriptions",
