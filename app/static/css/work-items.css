@@ -1,0 +1,30 @@
+.work-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 24px}
+.work-metric{background:var(--surface,#fff);border:1px solid var(--line,#dce3de);border-radius:16px;padding:16px}
+.work-metric small{display:block;color:var(--muted,#68746f);font-weight:700;letter-spacing:.04em}
+.work-metric strong{display:block;font-size:1.75rem;margin-top:6px}
+.work-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(290px,.8fr);gap:20px;align-items:start}
+.work-toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:end}
+.work-toolbar label{min-width:150px;flex:1}
+.work-toolbar select{width:100%}
+.work-list{display:grid;gap:14px;margin-top:16px}
+.work-card{border:1px solid var(--line,#dce3de);border-radius:18px;background:var(--surface,#fff);padding:18px}
+.work-card-top{display:flex;justify-content:space-between;gap:16px;align-items:flex-start}
+.work-kicker{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-bottom:8px}
+.work-card h3{margin:0 0 8px}
+.work-meta{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:14px 0}
+.work-meta div{background:var(--surface-soft,#f6f8f6);border-radius:12px;padding:10px}
+.work-meta small{display:block;color:var(--muted,#68746f)}
+.work-next{border-left:3px solid var(--accent,#2d6f73);padding-left:12px;margin:12px 0}
+.work-actions{display:grid;gap:10px;padding-top:12px;border-top:1px solid var(--line,#dce3de)}
+.work-action-form{display:flex;gap:8px;flex-wrap:wrap}
+.work-action-form input{flex:1;min-width:210px}
+.work-create-form{display:grid;gap:12px}
+.work-create-form .two{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.work-empty{text-align:center;padding:36px 18px;border:1px dashed var(--line,#dce3de);border-radius:18px}
+.work-source-link{font-weight:700}
+.priority-critical{color:#9d2c2c}
+.priority-high{color:#995c00}
+.overdue{color:#9d2c2c;font-weight:800}
+.work-help{font-size:.92rem;color:var(--muted,#68746f)}
+@media(max-width:1050px){.work-summary{grid-template-columns:repeat(3,1fr)}.work-layout{grid-template-columns:1fr}.work-meta{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){.work-summary{grid-template-columns:repeat(2,1fr)}.work-card-top{display:block}.work-meta{grid-template-columns:1fr}.work-create-form .two{grid-template-columns:1fr}.work-action-form{display:grid}.work-action-form input{min-width:0;width:100%}}
