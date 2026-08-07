@@ -35,7 +35,7 @@ def _login(page: Page) -> None:
     page.goto(f"{BASE_URL}/login", wait_until="networkidle")
     page.locator('input[name="email"]').fill("admin@calculatuhuella.local")
     page.locator('input[name="password"]').fill("Demo2026!")
-    page.locator('form').filter(has=page.locator('input[name="password"]')).locator('button[type="submit"]').click()
+    page.locator("form.login-form button").click()
     page.wait_for_load_state("networkidle")
     if "/login" in page.url:
         raise AssertionError("El inicio de sesión demo no salió de /login.")
