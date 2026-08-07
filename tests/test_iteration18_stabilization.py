@@ -277,6 +277,13 @@ def test_iteration18_mi_trabajo_has_accessible_controls_and_mobile_contract() ->
         assert "@media(max-width:640px)" in css.text
         assert "grid-template-columns:1fr" in css.text
 
+        csp = response.headers.get("content-security-policy", "")
+        assert "style-src 'self'" in csp
+        assert "style-src-elem 'self'" in csp
+        assert "style-src-attr 'unsafe-inline'" in csp
+        assert "script-src 'self'" in csp
+        assert "script-src 'unsafe-inline'" not in csp
+
         unnamed: list[str] = []
         for control in soup.select("input:not([type=hidden]), select, textarea"):
             has_label = control.find_parent("label") is not None
