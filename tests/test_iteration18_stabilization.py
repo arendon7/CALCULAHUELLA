@@ -266,13 +266,16 @@ def test_iteration18_mi_trabajo_has_accessible_controls_and_mobile_contract() ->
     with TestClient(app) as client:
         _login(client)
         response = client.get("/mi-trabajo?scope=all")
+        css = client.get("/static/css/work-items.css")
         assert response.status_code == 200
+        assert css.status_code == 200
         soup = BeautifulSoup(response.text, "html.parser")
 
         assert soup.find("h1", string="Mi trabajo") is not None
         assert soup.select_one('section[aria-label="Resumen de trabajo"]') is not None
-        assert "@media(max-width:640px)" in response.text
-        assert "grid-template-columns:1fr" in response.text
+        assert soup.find("style") is None
+        assert "@media(max-width:640px)" in css.text
+        assert "grid-template-columns:1fr" in css.text
 
         unnamed: list[str] = []
         for control in soup.select("input:not([type=hidden]), select, textarea"):
