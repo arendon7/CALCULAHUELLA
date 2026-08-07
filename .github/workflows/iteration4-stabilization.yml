@@ -113,7 +113,7 @@ jobs:
       STRUCTURED_LOGGING: "0"
       PBKDF2_ITERATIONS: "10000"
       CSRF_ENABLED: "1"
-      INSTANCE_DIR: ${{ runner.temp }}/cth-browser-${{ matrix.browser }}
+      INSTANCE_DIR: /tmp/cth-browser-${{ matrix.browser }}
       BROWSER: ${{ matrix.browser }}
       BROWSER_GATE_BASE_URL: http://127.0.0.1:8765
       BROWSER_GATE_ARTIFACT_DIR: browser-gate-artifacts
