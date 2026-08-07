@@ -8,12 +8,14 @@ def read(name: str) -> str:
 
 def test_primary_surfaces_use_user_facing_language():
     public = read("public_home.html")
+    hero = read("public/v14/hero_trust.html")
     login = read("login.html")
     dashboard = read("dashboard.html")
     source = read("source.html")
-    assert "Gestión de Carbono" in public
-    assert "Gestión Avanzada y Verificación" in public
-    assert "public-audience-strip" in public
+    assert 'public/v14/hero_trust.html' in public
+    assert 'public/v14/experience_resources_cta.html' in public
+    assert "Toda tu gestión de carbono" in hero
+    assert "Plataforma colaborativa de gestión de carbono" in hero
     assert "V0.45" not in login
     assert "V0.45" not in dashboard
     assert "<span>V0.4</span>" not in source
