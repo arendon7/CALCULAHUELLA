@@ -39,6 +39,19 @@ def _login(page: Page) -> None:
     page.wait_for_load_state("networkidle")
     if "/login" in page.url:
         raise AssertionError("El inicio de sesión demo no salió de /login.")
+    # Evita que el recorrido de primer ingreso tape la superficie que se está
+    # auditando. La experiencia del tour se valida en la regresión funcional.
+    page.evaluate("window.localStorage.setItem('cth-tour-v14-administrador', 'completed')")
+
+
+def _close_transient_dialogs(page: Page) -> None:
+    page.evaluate(
+        """
+        () => document.querySelectorAll('dialog[open]').forEach((dialog) => {
+          try { dialog.close(); } catch (_error) { dialog.removeAttribute('open'); }
+        })
+        """
+    )
 
 
 def _accessibility_contract(page: Page) -> dict[str, object]:
@@ -84,6 +97,7 @@ def _accessibility_contract(page: Page) -> dict[str, object]:
 def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[str, object]:
     page.set_viewport_size({"width": width, "height": height})
     page.goto(f"{BASE_URL}/mi-trabajo?scope=all", wait_until="networkidle")
+    _close_transient_dialogs(page)
     dimensions = page.evaluate(
         """
         () => ({
@@ -122,11 +136,15 @@ def main() -> int:
         browser = _browser_type(playwright).launch(headless=True)
         context = browser.new_context(viewport={"width": 1440, "height": 900})
         page = context.new_page()
+
+        # Login/dashboard are not part of this gate. Attach browser-error
+        # listeners only after authentication so evidence belongs to Mi trabajo.
+        _login(page)
         page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
         page.on("pageerror", lambda error: page_errors.append(str(error)))
 
-        _login(page)
         page.goto(f"{BASE_URL}/mi-trabajo?scope=all", wait_until="networkidle")
+        _close_transient_dialogs(page)
         result["accessibility"] = _accessibility_contract(page)
 
         for label, width, height in VIEWPORTS:
