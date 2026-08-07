@@ -81,6 +81,7 @@ def _run_batched_full(durations: int, timeout_seconds: int) -> int:
         else:
             operations.append((path.name, [str(relative)]))
 
+    failures: list[tuple[str, int]] = []
     for index, (label, targets) in enumerate(operations, start=1):
         print(f"\nPrueba aislada {index}/{len(operations)} · {label}", flush=True)
         arguments = ["-q", *targets]
@@ -90,7 +91,23 @@ def _run_batched_full(durations: int, timeout_seconds: int) -> int:
             arguments.append(f"--durations={durations}")
         result = _run(arguments, timeout_seconds)
         if result:
-            return result
+            failures.append((label, result))
+            print(
+                f"FALLO REGISTRADO · {label} · código {result}. Se continúa para completar el mapa de regresión.",
+                flush=True,
+            )
+
+    if failures:
+        print("\nResumen de fallos de la suite integral:", file=sys.stderr, flush=True)
+        for label, result in failures:
+            print(f"- {label}: código {result}", file=sys.stderr, flush=True)
+        print(
+            f"Suite integral completada con {len(failures)} bloque(s) fallido(s) de {len(operations)}.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
     print("\nSuite completa aprobada en procesos aislados.", flush=True)
     return 0
 
