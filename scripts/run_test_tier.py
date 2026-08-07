@@ -25,6 +25,15 @@ NODE_ISOLATION_FILES = {
     "test_v052_guided_setup.py",
 }
 
+# V1.4 intentionally replaced the historical public slogan `Mide.`. The
+# equivalent diagnostic-flow regression now lives in
+# test_iteration18_public_contract.py and asserts the approved V1.4 hero.
+FULL_DESELECT_BY_FILE = {
+    "test_app.py": (
+        "tests/test_app.py::test_public_site_and_diagnostic_flow",
+    ),
+}
+
 
 def _run(arguments: list[str], timeout_seconds: int) -> int:
     command = [sys.executable, str(ROOT / "scripts" / "pytest_isolated.py"), *arguments]
@@ -75,6 +84,8 @@ def _run_batched_full(durations: int, timeout_seconds: int) -> int:
     for index, (label, targets) in enumerate(operations, start=1):
         print(f"\nPrueba aislada {index}/{len(operations)} · {label}", flush=True)
         arguments = ["-q", *targets]
+        for target in FULL_DESELECT_BY_FILE.get(Path(targets[0].split("::", 1)[0]).name, ()):
+            arguments.append(f"--deselect={target}")
         if durations > 0:
             arguments.append(f"--durations={durations}")
         result = _run(arguments, timeout_seconds)
