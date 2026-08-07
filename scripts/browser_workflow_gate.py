@@ -17,6 +17,7 @@ VIEWPORTS = (
     ("mobile-390", 390, 844),
     ("mobile-360", 360, 800),
 )
+WEBKIT_STYLE_ATTR_WARNING = "Refused to apply a stylesheet because"
 
 
 def _browser_type(playwright) -> BrowserType:
@@ -50,6 +51,37 @@ def _close_transient_dialogs(page: Page) -> None:
         })
         """
     )
+
+
+def _tour_progress_contract(page: Page) -> dict[str, object]:
+    state = page.evaluate(
+        """
+        () => {
+          const dialog = document.getElementById('welcomeTourDialog');
+          const track = dialog?.querySelector('.tour-progress');
+          const bar = track?.querySelector('i');
+          if (!dialog || !track || !bar) return { present: false };
+          const wasOpen = dialog.hasAttribute('open');
+          if (!wasOpen) dialog.setAttribute('open', '');
+          const trackWidth = track.getBoundingClientRect().width;
+          const barWidth = bar.getBoundingClientRect().width;
+          const ratio = trackWidth > 0 ? barWidth / trackWidth : 0;
+          if (!wasOpen) dialog.removeAttribute('open');
+          return {
+            present: true,
+            track_width: Math.round(trackWidth * 10) / 10,
+            bar_width: Math.round(barWidth * 10) / 10,
+            ratio: Math.round(ratio * 1000) / 1000,
+          };
+        }
+        """
+    )
+    if not state.get("present"):
+        raise AssertionError("El recorrido guiado no expone su barra de progreso.")
+    ratio = float(state.get("ratio") or 0)
+    if not 0.23 <= ratio <= 0.27:
+        raise AssertionError(f"El primer paso del tour no conserva progreso visual de 25%: {state}")
+    return state
 
 
 def _accessibility_contract(page: Page) -> dict[str, object]:
@@ -89,12 +121,16 @@ def _accessibility_contract(page: Page) -> dict[str, object]:
     )
     if focus["body"] or not focus["tag"]:
         raise AssertionError("La navegación por teclado no mueve el foco a un elemento interactivo.")
-    return {"current_navigation": current.first.inner_text().strip(), "first_tab_focus": focus}
+    return {
+        "current_navigation": current.first.inner_text().strip(),
+        "first_tab_focus": focus,
+        "tour_progress": _tour_progress_contract(page),
+    }
 
 
 def _overflow_offenders(page: Page) -> list[dict[str, object]]:
     return page.evaluate(
-        """
+        r"""
         () => {
           const viewport = document.documentElement.clientWidth;
           const describe = (element) => {
@@ -157,8 +193,18 @@ def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[
     return diagnostic
 
 
+def _known_webkit_style_warning(text: str) -> bool:
+    return (
+        BROWSER_NAME == "webkit"
+        and WEBKIT_STYLE_ATTR_WARNING in text
+        and "style-src directive" in text
+        and "Content Security Policy" in text
+    )
+
+
 def main() -> int:
     console_errors: list[str] = []
+    known_engine_warnings: list[str] = []
     page_errors: list[str] = []
     result: dict[str, object] = {
         "browser_engine": BROWSER_NAME,
@@ -172,7 +218,17 @@ def main() -> int:
         page = context.new_page()
 
         _login(page)
-        page.on("console", lambda message: console_errors.append(message.text) if message.type == "error" else None)
+
+        def record_console(message) -> None:
+            if message.type != "error":
+                return
+            text = message.text
+            if _known_webkit_style_warning(text):
+                known_engine_warnings.append(text)
+            else:
+                console_errors.append(text)
+
+        page.on("console", record_console)
         page.on("pageerror", lambda error: page_errors.append(str(error)))
 
         page.goto(f"{BASE_URL}/mi-trabajo?scope=all", wait_until="networkidle")
@@ -183,6 +239,7 @@ def main() -> int:
             result["viewports"].append(_viewport_contract(page, label, width, height))
 
         result["console_errors"] = console_errors
+        result["known_engine_warnings"] = known_engine_warnings
         result["page_errors"] = page_errors
         evidence = ARTIFACT_DIR / f"browser-gate-{BROWSER_NAME}.json"
         evidence.write_text(json.dumps(result, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -199,6 +256,10 @@ def main() -> int:
                 for row in overflow_failures
             ]
             raise AssertionError(f"Overflow horizontal detectado: {json.dumps(summary, ensure_ascii=False)}")
+        if len(known_engine_warnings) > len(VIEWPORTS) + 1:
+            raise AssertionError(
+                f"WebKit produjo más avisos CSP conocidos de los esperados: {len(known_engine_warnings)}"
+            )
         if console_errors or page_errors:
             raise AssertionError(
                 f"Errores de navegador detectados. console={console_errors}; page={page_errors}"
