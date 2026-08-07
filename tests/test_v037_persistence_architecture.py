@@ -55,7 +55,9 @@ def test_v037_database_is_compatibility_facade_without_orm_classes():
     assert class_names == []
     assert Organization is DomainOrganization
     assert Inventory is DomainInventory
-    assert len(Base.metadata.tables) == 120
+    # V1.5 adds four transversal workflow tables without changing the
+    # historical twelve persistence modules counted by the V0.37 summary.
+    assert len(Base.metadata.tables) == 124
 
 
 def test_v037_model_modules_are_complete_and_importable():
