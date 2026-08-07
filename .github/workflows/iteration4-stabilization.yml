@@ -1,4 +1,4 @@
-name: Iteraciones 4–5 · estabilización y roles
+name: Iteraciones 4–6 · estabilización, roles y relevo
 
 on:
   push:
@@ -225,5 +225,67 @@ jobs:
         with:
           name: browser-role-gate
           path: role-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  handoff-gate:
+    name: Relevo completo · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-handoff-gate
+      HANDOFF_GATE_BASE_URL: http://127.0.0.1:8767
+      HANDOFF_GATE_ARTIFACT_DIR: handoff-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Preparar base demo aislada para relevo
+        run: |
+          mkdir -p "${INSTANCE_DIR}" handoff-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Iniciar aplicación para relevo
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8767 > handoff-gate-artifacts/server.log 2>&1 &
+          echo $! > handoff-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8767/api/health > handoff-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat handoff-gate-artifacts/server.log
+          exit 1
+
+      - name: Ensayar relevo completo entre actores
+        run: python scripts/browser_handoff_gate.py
+
+      - name: Publicar evidencia del relevo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-handoff-gate
+          path: handoff-gate-artifacts/
           if-no-files-found: warn
           retention-days: 14
