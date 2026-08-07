@@ -83,6 +83,9 @@ def test_v030_installer_test_mode_creates_stable_install_and_cleans_legacy(tmp_p
 
 @MAC_ONLY
 def test_v030_shell_entrypoints_are_valid() -> None:
+    # The V1.0 canonical package replaced the historical
+    # 6_ENSAYAR_RESTAURACION.command wrapper with restore_mac.sh. Validate the
+    # actual canonical lifecycle entrypoints instead of recreating a legacy file.
     scripts = [
         "INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command",
         "ABRIR_CALCULA_TU_HUELLA.command",
@@ -90,15 +93,17 @@ def test_v030_shell_entrypoints_are_valid() -> None:
         "2_ABRIR_CALCULA_TU_HUELLA.command",
         "3_DETENER_CALCULA_TU_HUELLA.command",
         "4_VER_ESTADO.command",
-        "6_ENSAYAR_RESTAURACION.command",
+        "restore_mac.sh",
         "install_mac.sh",
         "start_mac.sh",
         "scripts/mac_lifecycle_common.sh",
         "scripts/easy_mac_common.sh",
     ]
     for relative in scripts:
+        path = PROJECT_ROOT / relative
+        assert path.is_file(), f"Falta entrypoint canónico: {relative}"
         result = subprocess.run(
-            ["/bin/bash", "-n", str(PROJECT_ROOT / relative)],
+            ["/bin/bash", "-n", str(path)],
             capture_output=True,
             text=True,
             check=False,
