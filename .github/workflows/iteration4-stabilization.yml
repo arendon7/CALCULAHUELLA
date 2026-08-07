@@ -41,14 +41,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements-dev.txt
 
-      - name: Compilar Python y verificar paquete canónico
+      - name: Verificar paquete canónico limpio
         run: |
-          python -m compileall -q app tests scripts migrations
           rm -rf /tmp/calculahuella-canonical-check
           mkdir -p /tmp/calculahuella-canonical-check
           rsync -a --exclude='.git/' ./ /tmp/calculahuella-canonical-check/
           cd /tmp/calculahuella-canonical-check
           python tools/verify_canonical.py --skip-manifest
+
+      - name: Compilar Python sin ensuciar el árbol
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-pycache"
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-pycache" python -m compileall -q app tests scripts migrations
 
       - name: Ejecutar pruebas de estabilización y flujo
         run: |
