@@ -116,7 +116,11 @@ def _role_contract(browser, role: str, spec: dict[str, object]) -> dict[str, obj
     if rendered_role != role:
         raise AssertionError(f"Perfil activo incorrecto: esperado {role}, recibido {rendered_role}.")
 
-    labels = [text.strip() for text in page.locator(".nav-item").all_inner_texts() if text.strip()]
+    labels = [
+        text.splitlines()[-1].strip()
+        for text in page.locator(".nav-item").all_inner_texts()
+        if text.strip()
+    ]
     expected_labels = list(spec["navigation"])
     if labels != expected_labels:
         raise AssertionError(f"{role}: navegación esencial inesperada. actual={labels}; esperada={expected_labels}")
