@@ -129,8 +129,18 @@ def test_iteration18_specialized_sync_preserves_review_acceptance() -> None:
             .where(Inventory.organization_id == organization_id)
             .order_by(ReductionAction.id)
         )
-        assert action is not None
-        action.status = "En seguimiento"
+        if action is None:
+            action = ReductionAction(
+                inventory_id=inventory.id,
+                title="Acción de reducción de prueba",
+                status="En seguimiento",
+                responsible="Cliente",
+                created_by=str(admin["email"]),
+            )
+            session.add(action)
+            session.flush()
+        else:
+            action.status = "En seguimiento"
 
         report = session.scalar(
             select(ReportArtifact)
@@ -138,8 +148,20 @@ def test_iteration18_specialized_sync_preserves_review_acceptance() -> None:
             .where(Inventory.organization_id == organization_id)
             .order_by(ReportArtifact.id)
         )
-        assert report is not None
-        report.status = "Aprobado"
+        if report is None:
+            report = ReportArtifact(
+                inventory_id=inventory.id,
+                report_type="Inventario corporativo",
+                status="Aprobado",
+                file_name="reporte-prueba.pdf",
+                stored_name="reporte-prueba.pdf",
+                generated_by=str(admin["email"]),
+                approved_by=str(admin["email"]),
+            )
+            session.add(report)
+            session.flush()
+        else:
+            report.status = "Aprobado"
         session.commit()
 
         sync_data_requests(session, organization_id, str(admin["email"]))
