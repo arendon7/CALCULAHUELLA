@@ -1,16 +1,19 @@
 from __future__ import annotations
 
-"""Runtime stabilization for the transversal workflow.
+"""Runtime stabilization for the transversal workflow and browser shell.
 
 This compatibility layer is deliberately isolated so it can be removed once the
-specialized modules expose the complete canonical state model. It prevents
-coarse source states from moving WorkItem backwards and avoids notifying the
-actor about their own transition.
+specialized modules expose the complete canonical state model and the canonical
+security middleware carries the CSP Level 3 split directly. It prevents coarse
+source states from moving WorkItem backwards, avoids notifying the actor about
+their own transition, and preserves strict CSP while allowing the application's
+existing JavaScript to update style attributes such as progress widths.
 """
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from . import security as security_module
 from . import workflow_bridge as bridge
 from . import workflow_integrations as integrations
 from .database import AppUser, OrganizationMembership, WorkItem, WorkItemEvent
@@ -318,6 +321,36 @@ def _notify_transition(
         )
 
 
+def _install_csp_style_attr_compatibility() -> None:
+    """Split style elements and style attributes without weakening script CSP."""
+    original_call = security_module.SecurityHeadersMiddleware.__call__
+    if getattr(original_call, "_cth_style_attr_compatible", False):
+        return
+
+    async def compatible_call(self, scope, receive, send):
+        async def send_with_compatible_csp(message):
+            if message.get("type") == "http.response.start":
+                headers = list(message.get("headers", []))
+                rewritten = []
+                for key, value in headers:
+                    if key.lower() == b"content-security-policy":
+                        csp = value.decode("latin-1")
+                        if "style-src-attr" not in csp:
+                            csp = csp.replace(
+                                "style-src 'self';",
+                                "style-src 'self'; style-src-elem 'self'; style-src-attr 'unsafe-inline';",
+                            )
+                        value = csp.encode("latin-1")
+                    rewritten.append((key, value))
+                message["headers"] = rewritten
+            await send(message)
+
+        await original_call(self, scope, receive, send_with_compatible_csp)
+
+    compatible_call._cth_style_attr_compatible = True
+    security_module.SecurityHeadersMiddleware.__call__ = compatible_call
+
+
 def install_workflow_stabilization() -> None:
     global _INSTALLED
     if _INSTALLED:
@@ -355,4 +388,5 @@ def install_workflow_stabilization() -> None:
     bridge._notify_assignee = _notify_assignee
     bridge._notify_requester = _notify_requester
     bridge._notify_transition = _notify_transition
+    _install_csp_style_attr_compatibility()
     _INSTALLED = True
