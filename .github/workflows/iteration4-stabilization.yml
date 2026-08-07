@@ -1,4 +1,4 @@
-name: Iteración 4 · estabilización integral
+name: Iteraciones 4–5 · estabilización y roles
 
 on:
   push:
@@ -54,7 +54,7 @@ jobs:
           rm -rf "${RUNNER_TEMP}/cth-pycache"
           PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-pycache" python -m compileall -q app tests scripts migrations
 
-      - name: Ejecutar pruebas de estabilización y flujo
+      - name: Ejecutar pruebas de estabilización, flujo y roles
         run: |
           pytest -q \
             tests/test_iteration15_canonical_workflow.py \
@@ -62,6 +62,7 @@ jobs:
             tests/test_iteration16_work_items.py \
             tests/test_iteration17_integrated_workflow.py \
             tests/test_iteration18_stabilization.py \
+            tests/test_iteration19_role_journeys.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía
@@ -162,5 +163,67 @@ jobs:
         with:
           name: browser-gate-${{ matrix.browser }}
           path: browser-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  role-gate:
+    name: Recorridos por rol · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-role-gate
+      ROLE_GATE_BASE_URL: http://127.0.0.1:8766
+      ROLE_GATE_ARTIFACT_DIR: role-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Preparar base demo por roles
+        run: |
+          mkdir -p "${INSTANCE_DIR}" role-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Iniciar aplicación para recorridos
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8766 > role-gate-artifacts/server.log 2>&1 &
+          echo $! > role-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8766/api/health > role-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat role-gate-artifacts/server.log
+          exit 1
+
+      - name: Validar cinco recorridos y rutas sensibles
+        run: python scripts/browser_role_gate.py
+
+      - name: Publicar evidencia por roles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-role-gate
+          path: role-gate-artifacts/
           if-no-files-found: warn
           retention-days: 14
