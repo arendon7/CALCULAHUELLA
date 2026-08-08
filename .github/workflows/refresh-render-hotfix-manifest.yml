@@ -5,10 +5,14 @@ on:
     branches: [main]
     paths:
       - Dockerfile
+      - start_prod.sh
       - scripts/runtime_python.sh
       - app/storage.py
       - app/db/models/core.py
+      - app/db/models/governance.py
       - migrations/versions/20260806_0037_expand_password_hash.py
+      - migrations/versions/20260806_0038_expand_methodology_document_status.py
+      - tests/test_seed_field_lengths.py
       - .github/workflows/refresh-render-hotfix-manifest.yml
 
 permissions:
@@ -30,13 +34,21 @@ jobs:
           import hashlib
 
           manifest = Path('MANIFIESTO_SHA256_CANONICO.txt')
-          targets = {
-              'Dockerfile': Path('Dockerfile'),
-              'scripts/runtime_python.sh': Path('scripts/runtime_python.sh'),
-              'app/storage.py': Path('app/storage.py'),
-              'app/db/models/core.py': Path('app/db/models/core.py'),
-              'migrations/versions/20260806_0037_expand_password_hash.py': Path('migrations/versions/20260806_0037_expand_password_hash.py'),
-          }
+          target_names = [
+              'Dockerfile',
+              'start_prod.sh',
+              'scripts/runtime_python.sh',
+              'app/storage.py',
+              'app/db/models/core.py',
+              'app/db/models/governance.py',
+              'migrations/versions/20260806_0037_expand_password_hash.py',
+              'migrations/versions/20260806_0038_expand_methodology_document_status.py',
+              'tests/test_seed_field_lengths.py',
+          ]
+          targets = {name: Path(name) for name in target_names}
+          missing = [name for name, path in targets.items() if not path.is_file()]
+          if missing:
+              raise SystemExit(f'Archivos requeridos ausentes: {missing}')
           hashes = {name: hashlib.sha256(path.read_bytes()).hexdigest() for name, path in targets.items()}
           entries = {}
           for line in manifest.read_text(encoding='utf-8').splitlines():
@@ -50,6 +62,9 @@ jobs:
               encoding='utf-8',
           )
           PY
+      - name: Verificar manifiesto completo
+        shell: bash
+        run: python tools/verify_canonical.py
       - name: Publicar manifiesto
         shell: bash
         run: |
@@ -61,5 +76,5 @@ jobs:
             echo "El manifiesto ya estaba actualizado."
             exit 0
           fi
-          git commit -m "chore: actualizar manifiesto del hotfix PostgreSQL"
+          git commit -m "chore: cerrar manifiesto del hotfix Render"
           git push origin HEAD:main
