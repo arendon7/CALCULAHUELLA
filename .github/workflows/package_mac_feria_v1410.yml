@@ -1,0 +1,55 @@
+name: Empaquetar demo Mac V1.4.10 Feria
+
+on:
+  push:
+    branches:
+      - release/mac-feria-v1.4.10
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: macos-14
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validar scripts Mac
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash -n ABRIR_CALCULA_TU_HUELLA.command
+          bash -n INSTALAR_O_ACTUALIZAR_CALCULA_TU_HUELLA.command
+          bash -n install_mac.sh
+          python3 -m compileall -q app scripts
+
+      - name: Crear snapshot completo
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$RUNNER_TEMP/Calcula_tu_Huella_Demo_Feria_Mac_V1_4_10"
+          rm -rf "$ROOT" dist
+          mkdir -p "$ROOT" dist
+          rsync -a ./ "$ROOT/" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.venv/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pyc' \
+            --exclude 'dist/'
+          find "$ROOT" -type f \( -name '*.command' -o -name '*.sh' \) -exec chmod +x {} \;
+          printf '%s\n' 'V1.4.10 FERIA' > "$ROOT/FERIA_VERSION.txt"
+          printf '%s\n' '${{ github.sha }}' > "$ROOT/FERIA_GITHUB_SHA.txt"
+          ditto -c -k --sequesterRsrc --keepParent "$ROOT" "dist/Calcula_tu_Huella_Demo_Feria_Mac_V1_4_10.zip"
+          shasum -a 256 "dist/Calcula_tu_Huella_Demo_Feria_Mac_V1_4_10.zip" > "dist/SHA256.txt"
+          ls -lh dist/
+
+      - name: Subir paquete
+        uses: actions/upload-artifact@v4
+        with:
+          name: calcula-tu-huella-mac-feria-v1-4-10
+          path: dist/*
+          retention-days: 14
+          if-no-files-found: error
