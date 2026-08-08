@@ -2,12 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from fastapi.testclient import TestClient
 
 from app.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
+pytestmark = pytest.mark.smoke
 
 
 def test_v149_public_diagnosis_loads_isolated_handoff_assets():
