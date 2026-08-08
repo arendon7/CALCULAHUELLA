@@ -12,7 +12,7 @@ on:
       - app/db/models/governance.py
       - migrations/versions/20260806_0037_expand_password_hash.py
       - migrations/versions/20260806_0038_expand_methodology_document_status.py
-      - tests/test_seed_field_lengths.py
+      - tests/test_postgresql_seed_lengths.py
       - .github/workflows/refresh-render-hotfix-manifest.yml
 
 permissions:
@@ -43,7 +43,7 @@ jobs:
               'app/db/models/governance.py',
               'migrations/versions/20260806_0037_expand_password_hash.py',
               'migrations/versions/20260806_0038_expand_methodology_document_status.py',
-              'tests/test_seed_field_lengths.py',
+              'tests/test_postgresql_seed_lengths.py',
           ]
           targets = {name: Path(name) for name in target_names}
           missing = [name for name, path in targets.items() if not path.is_file()]
