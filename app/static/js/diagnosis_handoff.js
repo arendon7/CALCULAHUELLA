@@ -37,6 +37,26 @@
     return true;
   }
 
+  function showPrefillNotice(form, applied) {
+    if (!form || applied < 1 || form.querySelector('[data-diagnosis-prefill]')) return;
+    const note = document.createElement('div');
+    note.className = 'diagnosis-prefill-note';
+    note.dataset.diagnosisPrefill = '';
+    note.setAttribute('role', 'status');
+    note.setAttribute('aria-live', 'polite');
+
+    const title = document.createElement('strong');
+    title.textContent = 'Continuamos desde la landing.';
+    const description = document.createElement('span');
+    description.textContent = applied === 2
+      ? 'Aplicamos sector y objetivo desde la landing. Puedes cambiarlos antes de enviar.'
+      : 'Aplicamos una respuesta desde la landing. Puedes cambiarla antes de enviar.';
+    note.append(title, description);
+
+    const progress = form.querySelector('.diagnosis-wizard-progress');
+    form.insertBefore(note, progress || form.firstChild);
+  }
+
   function applyLandingContext() {
     const form = document.querySelector('[data-diagnosis-wizard]');
     if (!form) return 0;
@@ -53,17 +73,7 @@
     Object.entries(allowed).forEach(([field, select]) => {
       if (setSelectValue(select, reusable[field])) applied += 1;
     });
-
-    const note = form.querySelector('[data-diagnosis-prefill]');
-    if (note && applied > 0) {
-      const description = note.querySelector('[data-diagnosis-prefill-text]');
-      if (description) {
-        description.textContent = applied === 2
-          ? 'Aplicamos sector y objetivo desde la landing. Puedes cambiarlos antes de enviar.'
-          : 'Aplicamos una respuesta desde la landing. Puedes cambiarla antes de enviar.';
-      }
-      note.hidden = false;
-    }
+    showPrefillNotice(form, applied);
     return applied;
   }
 
