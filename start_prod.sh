@@ -22,11 +22,16 @@ init_db()
 print("Esquema e inicialización verificados.", flush=True)
 PYCODE
 
-# En despliegues gratuitos, una verificación externa de S3 puede tardar más
-# que la ventana de detección de puerto de Render. En modo estricto se exige
-# el diagnóstico completo antes de servir; en demo se ejecuta en segundo plano
-# y Uvicorn abre el puerto inmediatamente.
-if [ "${DEPLOYMENT_STRICT:-false}" = "true" ]; then
+# Render debe abrir el puerto antes de depender de servicios externos.
+# DEPLOYMENT_STRICT conserva la puerta estricta en otros entornos.
+# En Render, la comprobación previa solo vuelve a ser bloqueante si se
+# habilita explícitamente RENDER_STRICT_STARTUP=true.
+STRICT_STARTUP="${DEPLOYMENT_STRICT:-false}"
+if [ "${RENDER:-false}" = "true" ] && [ "${RENDER_STRICT_STARTUP:-false}" != "true" ]; then
+  STRICT_STARTUP=false
+fi
+
+if [ "$STRICT_STARTUP" = "true" ]; then
   "$PY" scripts/check_ready.py
 else
   (
