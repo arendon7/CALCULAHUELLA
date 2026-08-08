@@ -40,9 +40,15 @@ jobs:
               encoding='utf-8',
           )
           PY
-      - name: Verificar manifiesto completo
+      - name: Verificar manifiesto completo en copia limpia
         shell: bash
-        run: python tools/verify_canonical.py
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/calculahuella-manifest-check
+          mkdir -p /tmp/calculahuella-manifest-check
+          rsync -a --exclude='.git/' ./ /tmp/calculahuella-manifest-check/
+          cd /tmp/calculahuella-manifest-check
+          python tools/verify_canonical.py
       - name: Publicar manifiesto
         shell: bash
         run: |
