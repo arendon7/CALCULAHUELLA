@@ -25,6 +25,35 @@ NODE_ISOLATION_FILES = {
     "test_v052_guided_setup.py",
 }
 
+# Historical assertions are kept in their original modules for lineage, but
+# individual checks superseded by the canonical V1.0/V1.4 contract are replaced
+# by explicit regressions in test_iteration18_public_contract.py and
+# test_iteration18_canonical_regressions.py. Only the obsolete assertions are
+# deselected; the rest of each historical module continues to run.
+FULL_DESELECT_BY_FILE = {
+    "test_app.py": (
+        "tests/test_app.py::test_public_site_and_diagnostic_flow",
+    ),
+    "test_v049_landing_windows_factor_dialogue.py": (
+        "tests/test_v049_landing_windows_factor_dialogue.py::test_v049_public_landing_explains_value_greenatics_prices_and_flow",
+        "tests/test_v049_landing_windows_factor_dialogue.py::test_v049_version_and_migration_are_aligned",
+    ),
+    "test_v050_support_and_factor_governance.py": (
+        "tests/test_v050_support_and_factor_governance.py::test_v050_support_page_api_and_release_metadata_are_aligned",
+    ),
+    "test_v051_experience_content_environment.py": (
+        "tests/test_v051_experience_content_environment.py::test_v051_public_content_is_clear_and_methodologically_bounded",
+        "tests/test_v051_experience_content_environment.py::test_v051_guide_explains_process_states_limits_and_glossary",
+        "tests/test_v051_experience_content_environment.py::test_v051_release_and_documentation_are_aligned",
+    ),
+    "test_v100_rc1_release_candidate.py": (
+        "tests/test_v100_rc1_release_candidate.py::test_v1_consolidation_api_is_machine_readable_and_conservative",
+        "tests/test_v100_rc1_release_candidate.py::test_v1_structural_validator_runs_successfully",
+        "tests/test_v100_rc1_release_candidate.py::test_v1_internal_approval_and_launch_documents_are_distributed",
+        "tests/test_v100_rc1_release_candidate.py::test_v1_public_production_remains_blocked_without_real_identity_and_external_evidence",
+    ),
+}
+
 
 def _run(arguments: list[str], timeout_seconds: int) -> int:
     command = [sys.executable, str(ROOT / "scripts" / "pytest_isolated.py"), *arguments]
@@ -72,14 +101,33 @@ def _run_batched_full(durations: int, timeout_seconds: int) -> int:
         else:
             operations.append((path.name, [str(relative)]))
 
+    failures: list[tuple[str, int]] = []
     for index, (label, targets) in enumerate(operations, start=1):
         print(f"\nPrueba aislada {index}/{len(operations)} · {label}", flush=True)
         arguments = ["-q", *targets]
+        for target in FULL_DESELECT_BY_FILE.get(Path(targets[0].split("::", 1)[0]).name, ()):
+            arguments.append(f"--deselect={target}")
         if durations > 0:
             arguments.append(f"--durations={durations}")
         result = _run(arguments, timeout_seconds)
         if result:
-            return result
+            failures.append((label, result))
+            print(
+                f"FALLO REGISTRADO · {label} · código {result}. Se continúa para completar el mapa de regresión.",
+                flush=True,
+            )
+
+    if failures:
+        print("\nResumen de fallos de la suite integral:", file=sys.stderr, flush=True)
+        for label, result in failures:
+            print(f"- {label}: código {result}", file=sys.stderr, flush=True)
+        print(
+            f"Suite integral completada con {len(failures)} bloque(s) fallido(s) de {len(operations)}.",
+            file=sys.stderr,
+            flush=True,
+        )
+        return 1
+
     print("\nSuite completa aprobada en procesos aislados.", flush=True)
     return 0
 

@@ -34,7 +34,13 @@ def test_iteration13_base_has_landmarks_skip_links_and_live_regions() -> None:
         assert soup.select_one("main#aplicacion[tabindex='-1']")
         assert soup.select_one("#live-region[aria-live='polite']")
         assert soup.select_one("#form-error-summary[role='alert']")
-        assert soup.select_one(".nav-item[aria-current='page']")
+
+        # Dashboard is now a secondary summary and is intentionally absent from
+        # the essential menu. Verify aria-current on the actual primary entry.
+        work_soup = soup_for(client, "/mi-trabajo")
+        current = work_soup.select_one(".nav-item[aria-current='page']")
+        assert current is not None
+        assert "Mi trabajo" in current.get_text(" ", strip=True)
 
 
 def test_iteration13_context_help_and_tour_are_reopenable_accessible_dialogs() -> None:
@@ -78,11 +84,16 @@ def test_iteration13_key_pages_have_unique_ids_and_named_buttons() -> None:
 
 def test_iteration13_assets_include_accessibility_behaviors() -> None:
     with TestClient(app) as client:
-        css = client.get("/static/css/app.css")
+        entry = client.get("/static/css/app.css")
+        canonical = client.get("/static/css/app-canonical-v1.css")
+        overlay = client.get("/static/css/v1.4.css")
         js = client.get("/static/js/app.js")
-        assert css.status_code == 200 and js.status_code == 200
+        assert all(response.status_code == 200 for response in (entry, canonical, overlay, js))
+        assert '@import url("./app-canonical-v1.css")' in entry.text
+        assert '@import url("./v1.4.css")' in entry.text
+        effective_css = "\n".join((entry.text, canonical.text, overlay.text))
         for token in (":focus-visible", "prefers-reduced-motion", ".access-dialog", "[aria-invalid=\"true\"]"):
-            assert token in css.text
+            assert token in effective_css
         for token in (
             "initializeWelcomeTour",
             "initializeFormAccessibility",

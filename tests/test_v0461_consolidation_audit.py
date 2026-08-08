@@ -22,34 +22,33 @@ def test_v0461_release_is_aligned_and_delivery_remains_available():
         assert client.get("/entrega-profesional").status_code == 200
 
 
-def test_v0461_recovers_lineage_and_optional_deployment_without_github_dependency():
-    assert (ROOT / "docs" / "BASE_CANONICA_V0455.md").exists()
-    assert (ROOT / "docs" / "AUDITORIA_VERSIONES_ANTERIORES_V0461.md").exists()
-    assert (ROOT / "deployment" / "render.example.yaml").exists()
-    assert "autoDeploy: false" in (ROOT / "deployment" / "render.example.yaml").read_text(encoding="utf-8")
-    assert not (ROOT / ".github").exists()
+def test_v0461_recovers_lineage_and_optional_deployment_with_current_github_contract():
+    assert (ROOT / "CANONICAL_RELEASE.md").exists()
+    assert (ROOT / "RELEASE_CANONICA.json").exists()
+    render = ROOT / "deployment" / "render.example.yaml"
+    assert render.exists()
+    assert "autoDeploy: false" in render.read_text(encoding="utf-8")
+    # GitHub is now part of the canonical delivery contract rather than an
+    # optional dependency that must be absent from the package.
+    assert (ROOT / ".github" / "workflows" / "ci.yml").exists()
 
 
-def test_v0461_local_audit_and_current_labels_are_present():
-    mac_command = ROOT / "16_AUDITAR_VERSION_COMPLETA.command"
-    if mac_command.is_file():
-        audit = (ROOT / "scripts" / "audit_release_local.sh").read_text(encoding="utf-8")
-        assert "suite integral reproducible" in audit.lower()
-        assert '"$PYTHON" -m pytest -q' in audit
-        assert "validate_release_candidate.py" in audit
-        assert "--record-passed" in audit
-        assert "PYTHONPATH" not in audit
-        certification = (ROOT / "14_CERTIFICAR_VERSION.command").read_text(encoding="utf-8")
-    else:
-        assert (ROOT / "6_AUDITAR_VERSION_COMPLETA.bat").is_file()
-        audit = (ROOT / "audit_release_windows.ps1").read_text(encoding="utf-8")
-        assert "suite integral reproducible" in audit.lower()
-        assert "-m pytest -q" in audit
-        assert "validate_release_candidate.py" in audit
-        assert "--record-passed" in audit
-        assert "PYTHONPATH" not in audit
-        certification = (ROOT / "5_VALIDAR_VERSION_FINAL_V1.bat").read_text(encoding="utf-8")
+def test_v0461_local_validation_and_certification_entrypoints_are_current():
+    validator = ROOT / "18_VALIDAR_VERSION_FINAL_V1.command"
+    certification = ROOT / "19_CERTIFICAR_INSTALACION.command"
+    assert validator.is_file()
+    assert certification.is_file()
+
+    validation_text = validator.read_text(encoding="utf-8")
+    certification_text = certification.read_text(encoding="utf-8")
+    assert "V1.0.0" in validation_text
+    assert "validate_release_candidate.py" in validation_text
+    assert "pytest -q" in validation_text
+    assert "platform_preflight.py" in certification_text
+    assert "run_test_tier.py smoke" in certification_text
+    assert "run_acceptance_certification.py" in certification_text
+
     modules = (ROOT / "app" / "templates" / "modules.html").read_text(encoding="utf-8")
     assert "V1.0.0 · estabilización" in modules
     assert "105 modelos ORM" not in modules
-    assert "V1.0.0" in certification
+    assert "112 modelos ORM" in modules

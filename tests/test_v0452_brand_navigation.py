@@ -18,11 +18,15 @@ def test_canonical_brand_assets_are_present_and_used():
 def test_public_experience_has_mobile_navigation_and_clear_results():
     base = read("public_base.html")
     home = read("public_home.html")
-    assert 'id="publicMenuButton"' in base
-    assert 'id="publicNav"' in base
-    assert 'id="resultados"' in home
-    assert "Mide.</span> <strong>Comprende.</strong> <em>Reduce." in home
-    assert "public-results-grid" in home
+    reports = read("public/v14/reports_decision.html")
+    assert "data-menu-button" in base
+    assert 'aria-controls="mobilePanel"' in base
+    assert 'id="mobilePanel"' in base
+    assert "data-mobile-panel" in base
+    assert 'public/v14/reports_decision.html' in home
+    assert 'id="informes"' in reports
+    assert "Un mismo inventario, diferentes formas de comunicarlo" in reports
+    assert "La medición es el punto de partida" in reports
 
 def test_release_is_v0453():
     config = (ROOT / "app" / "config.py").read_text(encoding="utf-8")

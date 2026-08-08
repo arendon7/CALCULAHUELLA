@@ -33,9 +33,8 @@ def test_navigation_defaults_to_inventory_core() -> None:
     }
     navigation = navigation_for(user, "essential")
     labels = [item["label"] for section in navigation["core"] for item in section["items"]]
-    assert "Centro de trabajo" in labels
+    assert labels[0] == "Mi trabajo"
     assert "Continuar recorrido" in labels
-    assert "Datos y evidencias" in labels
     assert "Datos y evidencias" in labels
     assert "Cierre e informes" in labels
     assert len(labels) <= 9
@@ -53,8 +52,11 @@ def test_complete_navigation_preserves_advanced_capabilities() -> None:
         },
     }
     navigation = navigation_for(user, "complete")
+    core = [item["label"] for section in navigation["core"] for item in section["items"]]
     advanced = [item["label"] for section in navigation["advanced"] for item in section["items"]]
     internal = [item["label"] for section in navigation["internal"] for item in section["items"]]
+    assert "Mi trabajo" in core
+    assert "Centro de trabajo" in core
     assert "Metodología" in advanced
     assert "Biblioteca Colombia" in advanced
     assert "Organización" in internal

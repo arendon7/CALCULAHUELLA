@@ -1,0 +1,291 @@
+name: Iteraciones 4–6 · estabilización, roles y relevo
+
+on:
+  push:
+    branches:
+      - integration/workflow-v1.5.0
+  pull_request:
+    branches:
+      - integration/uiux-v1.4.0
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: iteration4-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  stabilize:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Verificar paquete canónico limpio
+        run: |
+          rm -rf /tmp/calculahuella-canonical-check
+          mkdir -p /tmp/calculahuella-canonical-check
+          rsync -a --exclude='.git/' ./ /tmp/calculahuella-canonical-check/
+          cd /tmp/calculahuella-canonical-check
+          python tools/verify_canonical.py --skip-manifest
+
+      - name: Compilar Python sin ensuciar el árbol
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-pycache"
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-pycache" python -m compileall -q app tests scripts migrations
+
+      - name: Ejecutar pruebas de estabilización, flujo y roles
+        run: |
+          pytest -q \
+            tests/test_iteration15_canonical_workflow.py \
+            tests/test_iteration16_area_assignment.py \
+            tests/test_iteration16_work_items.py \
+            tests/test_iteration17_integrated_workflow.py \
+            tests/test_iteration18_stabilization.py \
+            tests/test_iteration19_role_journeys.py \
+            --junitxml=iteration4-targeted.xml
+
+      - name: Migración desde base vacía
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-fresh"
+          mkdir -p "${RUNNER_TEMP}/cth-fresh"
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-fresh" python -m alembic upgrade head
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-fresh" python -m alembic current
+
+      - name: Migración incremental 0036 a head
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-existing"
+          mkdir -p "${RUNNER_TEMP}/cth-existing"
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic upgrade 20260805_0036
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic upgrade head
+          INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic current
+
+      - name: Suite smoke
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 420
+
+      - name: Suite integral aislada
+        run: |
+          set -o pipefail
+          python scripts/run_test_tier.py full --durations 5 --timeout 420 2>&1 | tee iteration4-full.log
+
+      - name: Publicar evidencia de estabilización
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iteration4-stabilization-evidence
+          path: |
+            iteration4-targeted.xml
+            iteration4-full.log
+          if-no-files-found: warn
+          retention-days: 14
+
+  browser-gate:
+    name: Mi trabajo · ${{ matrix.browser }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-browser-${{ matrix.browser }}
+      BROWSER: ${{ matrix.browser }}
+      BROWSER_GATE_BASE_URL: http://127.0.0.1:8765
+      BROWSER_GATE_ARTIFACT_DIR: browser-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Playwright
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps "${BROWSER}"
+
+      - name: Preparar base demo aislada
+        run: |
+          mkdir -p "${INSTANCE_DIR}" browser-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Iniciar aplicación
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8765 > browser-gate-artifacts/server.log 2>&1 &
+          echo $! > browser-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8765/api/health > browser-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat browser-gate-artifacts/server.log
+          exit 1
+
+      - name: Validar Mi trabajo en navegador real
+        run: python scripts/browser_workflow_gate.py
+
+      - name: Publicar evidencia del motor
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-gate-${{ matrix.browser }}
+          path: browser-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  role-gate:
+    name: Recorridos por rol · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-role-gate
+      ROLE_GATE_BASE_URL: http://127.0.0.1:8766
+      ROLE_GATE_ARTIFACT_DIR: role-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Preparar base demo por roles
+        run: |
+          mkdir -p "${INSTANCE_DIR}" role-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Iniciar aplicación para recorridos
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8766 > role-gate-artifacts/server.log 2>&1 &
+          echo $! > role-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8766/api/health > role-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat role-gate-artifacts/server.log
+          exit 1
+
+      - name: Validar cinco recorridos y rutas sensibles
+        run: python scripts/browser_role_gate.py
+
+      - name: Publicar evidencia por roles
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-role-gate
+          path: role-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
+
+  handoff-gate:
+    name: Relevo completo · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-handoff-gate
+      HANDOFF_GATE_BASE_URL: http://127.0.0.1:8767
+      HANDOFF_GATE_ARTIFACT_DIR: handoff-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Preparar base demo aislada para relevo
+        run: |
+          mkdir -p "${INSTANCE_DIR}" handoff-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Iniciar aplicación para relevo
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8767 > handoff-gate-artifacts/server.log 2>&1 &
+          echo $! > handoff-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8767/api/health > handoff-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat handoff-gate-artifacts/server.log
+          exit 1
+
+      - name: Ensayar relevo completo entre actores
+        run: python scripts/browser_handoff_gate.py
+
+      - name: Publicar evidencia del relevo
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-handoff-gate
+          path: handoff-gate-artifacts/
+          if-no-files-found: warn
+          retention-days: 14

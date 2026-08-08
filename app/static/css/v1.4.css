@@ -47,6 +47,12 @@ body.app-shell .flash{border-radius:14px}
 body.app-shell .mobile-taskbar{background:rgba(255,255,255,.96);backdrop-filter:blur(18px);border-top-color:var(--v14-line)}
 body.app-shell .mobile-taskbar a.active{color:var(--v14-forest)}
 
+/* WebKit/CSP: el progreso del tour no depende del atributo style dinámico. */
+#welcomeTourDialog:has(.tour-body>[data-tour-step]:nth-child(1):not([hidden])) .tour-progress i{width:25%}
+#welcomeTourDialog:has(.tour-body>[data-tour-step]:nth-child(2):not([hidden])) .tour-progress i{width:50%}
+#welcomeTourDialog:has(.tour-body>[data-tour-step]:nth-child(3):not([hidden])) .tour-progress i{width:75%}
+#welcomeTourDialog:has(.tour-body>[data-tour-step]:nth-child(4):not([hidden])) .tour-progress i{width:100%}
+
 @media(max-width:1100px){body.app-shell .page-content{width:min(100% - 28px,1500px)}}
 @media(max-width:760px){
   body.app-shell .page-content{width:calc(100% - 24px);padding-top:20px;padding-bottom:96px}

@@ -43,7 +43,8 @@ def test_iteration11_essential_navigation_is_short_and_task_oriented() -> None:
         ]
         assert 5 <= len(essential_items) <= 9
         assert len(complete_items) > len(essential_items)
-        assert essential_items[0]["label"] == "Centro de trabajo"
+        assert essential_items[0]["label"] == "Mi trabajo"
+        assert any(item["label"] == "Centro de trabajo" for item in complete_items)
 
 
 def test_iteration11_five_demo_stories_have_distinct_purposes() -> None:

@@ -15,7 +15,7 @@
 {% endif %}
 
 <section class="guide-section">
-  <div class="section-heading"><span>EL RECORRIDO COMPLETO</span><h2>Seis preguntas que ordenan el inventario</h2><p>La plataforma puede tener muchas herramientas, pero el proceso principal siempre conserva esta secuencia.</p></div>
+  <div class="section-heading"><span>EL RECORRIDO COMPLETO</span><h2>Ocho preguntas que ordenan el ciclo</h2><p>La plataforma puede tener muchas herramientas, pero el proceso principal conserva una secuencia única desde el diagnóstico hasta la continuidad del siguiente periodo.</p></div>
   <div class="guide-stage-grid">
     {% for stage in stages %}<article class="guide-stage-card"><span>{{ stage.number }}</span><h3>{{ stage.name }}</h3><strong>{{ stage.question }}</strong><p>{{ stage.output }}</p>{% if can_open_route(user, stage.href) %}<a href="{{ stage.href }}">Abrir etapa →</a>{% else %}<small class="permission-note">Etapa gestionada por otro rol</small>{% endif %}</article>{% endfor %}
   </div>
