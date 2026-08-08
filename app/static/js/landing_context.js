@@ -3,15 +3,15 @@
   const SCHEMA = 'cth.landing_context.v1';
 
   const sectorOptions = [
-    'Servicios y oficinas',
-    'Manufactura',
-    'Agroindustria',
-    'Transporte y logística',
-    'Gestión de residuos',
-    'Construcción',
-    'Salud',
-    'Energía',
-    'Otro',
+    { value: 'Servicios y oficinas', label: 'Servicios, comercio y oficinas' },
+    { value: 'Manufactura', label: 'Industria y manufactura' },
+    { value: 'Agroindustria', label: 'Agroindustria y uso del suelo' },
+    { value: 'Transporte y logística', label: 'Transporte y logística' },
+    { value: 'Gestión de residuos', label: 'Residuos y economía circular' },
+    { value: 'Construcción', label: 'Construcción' },
+    { value: 'Salud', label: 'Salud' },
+    { value: 'Energía', label: 'Energía' },
+    { value: 'Otro', label: 'Entidad pública u otro sector' },
   ];
 
   const objectiveOptions = [
@@ -22,6 +22,13 @@
     'Reporte regulatorio o sostenibilidad',
     'Información para dirección o financiadores',
   ];
+
+  function sectorOptionMarkup(options) {
+    return [
+      '<option value="">Selecciona un sector</option>',
+      ...options.map(({ value, label }) => `<option value="${value}">${label}</option>`),
+    ].join('');
+  }
 
   function optionMarkup(values, placeholder) {
     return [
@@ -48,7 +55,7 @@
         <label>
           <span>1 · Sector</span>
           <select name="landing_sector" required aria-label="Sector de la organización">
-            ${optionMarkup(sectorOptions, 'Selecciona un sector')}
+            ${sectorOptionMarkup(sectorOptions)}
           </select>
         </label>
         <label>
