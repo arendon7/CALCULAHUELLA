@@ -1,0 +1,377 @@
+name: Paquete Mac autocontenido
+
+on:
+  push:
+    branches:
+      - integration/workflow-v1.5.0
+    paths:
+      - .github/workflows/package-mac-selfcontained.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Preparar herramientas
+        run: |
+          set -euxo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zstd zip rsync
+          python -m pip install --upgrade pip
+
+      - name: Resolver y extraer Python portable para macOS
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p .pack/runtime/arm64 .pack/runtime/x86_64 .pack/downloads
+          python - <<'PY'
+          import json, re, urllib.request
+          from pathlib import Path
+
+          repos = [
+              'astral-sh/python-build-standalone',
+              'indygreg/python-build-standalone',
+          ]
+          release = None
+          for repo in repos:
+              try:
+                  req = urllib.request.Request(
+                      f'https://api.github.com/repos/{repo}/releases/latest',
+                      headers={'User-Agent': 'CalculaTuHuella-Packager'},
+                  )
+                  with urllib.request.urlopen(req, timeout=30) as response:
+                      release = json.load(response)
+                  if release:
+                      break
+              except Exception:
+                  continue
+          if not release:
+              raise SystemExit('No fue posible consultar python-build-standalone.')
+
+          assets = release.get('assets', [])
+          wanted = {
+              'arm64': re.compile(r'^cpython-3\.12\.[0-9]+\+.*-aarch64-apple-darwin-install_only\.tar\.(?:gz|zst)$'),
+              'x86_64': re.compile(r'^cpython-3\.12\.[0-9]+\+.*-x86_64-apple-darwin-install_only\.tar\.(?:gz|zst)$'),
+          }
+          out = {}
+          for arch, rx in wanted.items():
+              matches = [a for a in assets if rx.match(a.get('name', ''))]
+              if not matches:
+                  raise SystemExit(f'No se encontró runtime macOS {arch} Python 3.12 en {release.get("tag_name")}')
+              asset = sorted(matches, key=lambda a: a['name'])[-1]
+              target = Path('.pack/downloads') / asset['name']
+              req = urllib.request.Request(asset['browser_download_url'], headers={'User-Agent': 'CalculaTuHuella-Packager'})
+              with urllib.request.urlopen(req, timeout=120) as response, target.open('wb') as fh:
+                  while True:
+                      chunk = response.read(1024 * 1024)
+                      if not chunk:
+                          break
+                      fh.write(chunk)
+              out[arch] = {'name': asset['name'], 'path': str(target), 'url': asset['browser_download_url']}
+          Path('.pack/python-assets.json').write_text(json.dumps({'release': release.get('tag_name'), 'assets': out}, indent=2), encoding='utf-8')
+          PY
+
+          for ARCH in arm64 x86_64; do
+            ARCHIVE="$(python -c "import json; print(json.load(open('.pack/python-assets.json'))['assets']['$ARCH']['path'])")"
+            TMP=".pack/extract-$ARCH"
+            mkdir -p "$TMP"
+            case "$ARCHIVE" in
+              *.tar.gz) tar -xzf "$ARCHIVE" -C "$TMP" ;;
+              *.tar.zst) tar --zstd -xf "$ARCHIVE" -C "$TMP" ;;
+              *) echo "Formato inesperado: $ARCHIVE"; exit 1 ;;
+            esac
+            PYDIR="$(find "$TMP" -maxdepth 2 -type d -name python -print -quit)"
+            test -n "$PYDIR"
+            rsync -a "$PYDIR/" ".pack/runtime/$ARCH/python/"
+          done
+
+      - name: Descargar dependencias offline para ambas arquitecturas
+        shell: bash
+        run: |
+          set -euxo pipefail
+          mkdir -p .pack/wheelhouse/arm64 .pack/wheelhouse/x86_64
+          python -m pip download \
+            --dest .pack/wheelhouse/arm64 \
+            --only-binary=:all: \
+            --platform macosx_11_0_arm64 \
+            --python-version 312 \
+            --implementation cp \
+            --abi cp312 \
+            -r requirements.txt
+          python -m pip download \
+            --dest .pack/wheelhouse/x86_64 \
+            --only-binary=:all: \
+            --platform macosx_10_13_x86_64 \
+            --python-version 312 \
+            --implementation cp \
+            --abi cp312 \
+            -r requirements.txt
+
+      - name: Construir distribución Mac autocontenida
+        shell: bash
+        run: |
+          set -euxo pipefail
+          VERSION_DIR="Calcula_Tu_Huella_Mac_Autocontenida_DEMO_FULL_$(date +%Y%m%d)"
+          ROOT=".pack/$VERSION_DIR"
+          mkdir -p "$ROOT/source" "$ROOT/runtime" "$ROOT/wheelhouse"
+
+          rsync -a ./ "$ROOT/source/" \
+            --exclude '.git/' \
+            --exclude '.pack/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pyc' \
+            --exclude '.venv/' \
+            --exclude 'instance/' \
+            --exclude '*.db' \
+            --exclude '.DS_Store'
+
+          rsync -a .pack/runtime/ "$ROOT/runtime/"
+          rsync -a .pack/wheelhouse/ "$ROOT/wheelhouse/"
+          cp .pack/python-assets.json "$ROOT/PYTHON_RUNTIME_ORIGEN.json"
+
+          cat > "$ROOT/1_INSTALAR_Y_ABRIR_DEMO.command" <<'SH'
+          #!/bin/bash
+          set -euo pipefail
+          PKG_ROOT="$(cd "$(dirname "$0")" && pwd)"
+          INSTALL_ROOT="$HOME/Library/Application Support/CalculaTuHuellaDemoFull"
+          CODE_DIR="$INSTALL_ROOT/current"
+          DATA_DIR="$INSTALL_ROOT/data"
+          RUNTIME_DIR="$INSTALL_ROOT/runtime"
+          LOG_DIR="$DATA_DIR/logs"
+          ARCH="$(uname -m)"
+          case "$ARCH" in
+            arm64) PACK_ARCH="arm64" ;;
+            x86_64) PACK_ARCH="x86_64" ;;
+            *) echo "Arquitectura macOS no soportada: $ARCH"; read -r; exit 1 ;;
+          esac
+          mkdir -p "$INSTALL_ROOT" "$DATA_DIR" "$RUNTIME_DIR" "$LOG_DIR"
+          if [ -d "$CODE_DIR" ]; then
+            STAMP="$(date +%Y%m%d_%H%M%S)"
+            mv "$CODE_DIR" "$INSTALL_ROOT/previous_$STAMP"
+          fi
+          mkdir -p "$CODE_DIR"
+          echo "Copiando código completo..."
+          /usr/bin/rsync -a "$PKG_ROOT/source/" "$CODE_DIR/"
+          echo "Copiando Python portable y dependencias offline para $PACK_ARCH..."
+          rm -rf "$RUNTIME_DIR/python" "$RUNTIME_DIR/vendor" "$RUNTIME_DIR/wheelhouse"
+          /usr/bin/rsync -a "$PKG_ROOT/runtime/$PACK_ARCH/python/" "$RUNTIME_DIR/python/"
+          /usr/bin/rsync -a "$PKG_ROOT/wheelhouse/$PACK_ARCH/" "$RUNTIME_DIR/wheelhouse/"
+          PY="$RUNTIME_DIR/python/bin/python3"
+          chmod +x "$PY" || true
+          test -x "$PY" || { echo "Python portable no es ejecutable."; read -r; exit 1; }
+          echo "Instalando dependencias desde el propio paquete (sin internet)..."
+          "$PY" -m ensurepip --upgrade >/dev/null 2>&1 || true
+          "$PY" -m pip install --no-index --find-links "$RUNTIME_DIR/wheelhouse" --target "$RUNTIME_DIR/vendor" -r "$CODE_DIR/requirements.txt"
+          export PYTHONPATH="$RUNTIME_DIR/vendor:$CODE_DIR"
+          export INSTANCE_DIR="$DATA_DIR"
+          export DATABASE_URL="sqlite:///$DATA_DIR/calculatuhuella.db"
+          export APP_ENV=local
+          export SEED_DEMO=true
+          export SCHEDULER_ENABLED=0
+          export STRUCTURED_LOGGING=0
+          export TRUSTED_HOSTS="localhost,127.0.0.1,testserver"
+          cd "$CODE_DIR"
+          echo "Aplicando migraciones..."
+          "$PY" -m alembic upgrade head
+          echo "Verificando instalación..."
+          "$PY" scripts/check_ready.py || true
+          cat > "$INSTALL_ROOT/ABRIR.command" <<EOF
+          #!/bin/bash
+          exec /bin/bash "$PKG_ROOT/2_ABRIR_DEMO.command"
+          EOF
+          chmod +x "$INSTALL_ROOT/ABRIR.command"
+          echo
+          echo "Instalación completada. Abriendo demo..."
+          exec /bin/bash "$PKG_ROOT/2_ABRIR_DEMO.command"
+          SH
+
+          cat > "$ROOT/2_ABRIR_DEMO.command" <<'SH'
+          #!/bin/bash
+          set -euo pipefail
+          INSTALL_ROOT="$HOME/Library/Application Support/CalculaTuHuellaDemoFull"
+          CODE_DIR="$INSTALL_ROOT/current"
+          DATA_DIR="$INSTALL_ROOT/data"
+          RUNTIME_DIR="$INSTALL_ROOT/runtime"
+          PY="$RUNTIME_DIR/python/bin/python3"
+          test -x "$PY" || { echo "Primero ejecuta 1_INSTALAR_Y_ABRIR_DEMO.command"; read -r; exit 1; }
+          mkdir -p "$DATA_DIR/logs" "$RUNTIME_DIR"
+          export PYTHONPATH="$RUNTIME_DIR/vendor:$CODE_DIR"
+          export INSTANCE_DIR="$DATA_DIR"
+          export DATABASE_URL="sqlite:///$DATA_DIR/calculatuhuella.db"
+          export APP_ENV=local
+          export SEED_DEMO=true
+          export SCHEDULER_ENABLED=0
+          export STRUCTURED_LOGGING=0
+          export HOST=127.0.0.1
+          export OPEN_BROWSER=0
+          export TRUSTED_HOSTS="localhost,127.0.0.1,testserver"
+          cd "$CODE_DIR"
+          PORT=""
+          for P in $(seq 8765 8775); do
+            if ! /usr/sbin/lsof -nP -iTCP:"$P" -sTCP:LISTEN >/dev/null 2>&1; then PORT="$P"; break; fi
+          done
+          test -n "$PORT" || { echo "No hay puerto libre entre 8765 y 8775."; read -r; exit 1; }
+          export PORT
+          export PUBLIC_BASE_URL="http://127.0.0.1:$PORT"
+          if [ -f "$RUNTIME_DIR/app.pid" ]; then
+            OLD_PID="$(cat "$RUNTIME_DIR/app.pid" 2>/dev/null || true)"
+            if [ -n "$OLD_PID" ] && kill -0 "$OLD_PID" >/dev/null 2>&1; then
+              OLD_PORT="$(cat "$RUNTIME_DIR/app.port" 2>/dev/null || echo 8765)"
+              if /usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$OLD_PORT/api/health" >/dev/null 2>&1; then
+                /usr/bin/open "http://127.0.0.1:$OLD_PORT/login"
+                exit 0
+              fi
+            fi
+          fi
+          "$PY" -m alembic upgrade head >>"$DATA_DIR/logs/demo.log" 2>&1
+          nohup "$PY" run.py >>"$DATA_DIR/logs/demo.log" 2>&1 </dev/null &
+          PID=$!
+          echo "$PID" > "$RUNTIME_DIR/app.pid"
+          echo "$PORT" > "$RUNTIME_DIR/app.port"
+          READY=0
+          for _ in $(seq 1 90); do
+            if /usr/bin/curl -fsS --max-time 2 "http://127.0.0.1:$PORT/api/health" >/dev/null 2>&1; then READY=1; break; fi
+            kill -0 "$PID" >/dev/null 2>&1 || break
+            sleep 1
+          done
+          if [ "$READY" -ne 1 ]; then
+            echo "La demo no inició. Últimas líneas del log:"
+            tail -n 60 "$DATA_DIR/logs/demo.log" || true
+            read -r
+            exit 1
+          fi
+          echo "Demo lista: http://127.0.0.1:$PORT/login"
+          echo "Consultor: consultor@calculatuhuella.local / Demo2026!"
+          /usr/bin/open "http://127.0.0.1:$PORT/login"
+          SH
+
+          cat > "$ROOT/3_CERRAR_DEMO.command" <<'SH'
+          #!/bin/bash
+          set -u
+          RUNTIME_DIR="$HOME/Library/Application Support/CalculaTuHuellaDemoFull/runtime"
+          if [ -f "$RUNTIME_DIR/app.pid" ]; then
+            PID="$(cat "$RUNTIME_DIR/app.pid" 2>/dev/null || true)"
+            if [ -n "$PID" ] && kill -0 "$PID" >/dev/null 2>&1; then
+              kill "$PID" >/dev/null 2>&1 || true
+              sleep 1
+            fi
+          fi
+          rm -f "$RUNTIME_DIR/app.pid" "$RUNTIME_DIR/app.port"
+          echo "Calcula tu Huella Demo cerrada."
+          SH
+
+          cat > "$ROOT/4_REINICIAR_DATOS_DEMO.command" <<'SH'
+          #!/bin/bash
+          set -euo pipefail
+          INSTALL_ROOT="$HOME/Library/Application Support/CalculaTuHuellaDemoFull"
+          DATA_DIR="$INSTALL_ROOT/data"
+          /bin/bash "$(cd "$(dirname "$0")" && pwd)/3_CERRAR_DEMO.command" || true
+          if [ -f "$DATA_DIR/calculatuhuella.db" ]; then
+            mkdir -p "$INSTALL_ROOT/backups"
+            cp "$DATA_DIR/calculatuhuella.db" "$INSTALL_ROOT/backups/calculatuhuella_antes_reset_$(date +%Y%m%d_%H%M%S).db"
+          fi
+          rm -f "$DATA_DIR/calculatuhuella.db"
+          echo "Datos demo reiniciados. Abriendo una base limpia..."
+          exec /bin/bash "$(cd "$(dirname "$0")" && pwd)/2_ABRIR_DEMO.command"
+          SH
+
+          cat > "$ROOT/5_VERIFICAR_INSTALACION.command" <<'SH'
+          #!/bin/bash
+          set -euo pipefail
+          INSTALL_ROOT="$HOME/Library/Application Support/CalculaTuHuellaDemoFull"
+          CODE_DIR="$INSTALL_ROOT/current"
+          DATA_DIR="$INSTALL_ROOT/data"
+          RUNTIME_DIR="$INSTALL_ROOT/runtime"
+          PY="$RUNTIME_DIR/python/bin/python3"
+          test -x "$PY" || { echo "Python portable: FALTA"; read -r; exit 1; }
+          test -d "$RUNTIME_DIR/vendor" || { echo "Dependencias: FALTAN"; read -r; exit 1; }
+          test -f "$CODE_DIR/run.py" || { echo "Código: FALTA"; read -r; exit 1; }
+          export PYTHONPATH="$RUNTIME_DIR/vendor:$CODE_DIR"
+          export INSTANCE_DIR="$DATA_DIR"
+          export DATABASE_URL="sqlite:///$DATA_DIR/calculatuhuella.db"
+          export APP_ENV=local SEED_DEMO=true SCHEDULER_ENABLED=0 STRUCTURED_LOGGING=0
+          cd "$CODE_DIR"
+          "$PY" -m alembic current
+          "$PY" scripts/check_ready.py
+          echo "Instalación verificada correctamente."
+          SH
+
+          cat > "$ROOT/LEEME_PRIMERO.txt" <<'TXT'
+          CALCULA TU HUELLA · DEMO FULL AUTOCONTENIDA PARA macOS
+          =====================================================
+
+          Esta distribución incluye:
+          - código completo de la rama de integración;
+          - Python 3.12 portable para Apple Silicon (arm64) e Intel (x86_64);
+          - dependencias Python en wheelhouse offline para ambas arquitecturas;
+          - migraciones completas y base demo persistente;
+          - lanzadores para instalar, abrir, cerrar, reiniciar y verificar;
+          - pruebas, documentación, plantillas, assets y scripts del repositorio.
+
+          INSTALACIÓN
+          1. Descomprime el ZIP completamente.
+          2. Abre la carpeta resultante.
+          3. Haz doble clic en: 1_INSTALAR_Y_ABRIR_DEMO.command
+          4. Si macOS bloquea el primer inicio: clic derecho > Abrir > Abrir.
+          5. El instalador detecta automáticamente Apple Silicon o Intel.
+          6. No necesita Homebrew, VS Code ni Python instalado.
+          7. No necesita internet para instalar dependencias.
+
+          ACCESOS DEMO
+          Contraseña para todos: Demo2026!
+          - Administrador: admin@calculatuhuella.local
+          - Consultor: consultor@calculatuhuella.local
+          - Cliente: cliente@calculatuhuella.local
+          - Revisor: revisor@calculatuhuella.local
+          - Verificador: verificador@calculatuhuella.local
+
+          DATOS LOCALES
+          ~/Library/Application Support/CalculaTuHuellaDemoFull/
+
+          IMPORTANTE
+          Es una demo local/controlada. No implica certificación, verificación independiente,
+          cumplimiento regulatorio garantizado ni preparación productiva irrestricta.
+          TXT
+
+          cat > "$ROOT/CREDENCIALES_DEMO.txt" <<'TXT'
+          Contraseña común: Demo2026!
+          Administrador: admin@calculatuhuella.local
+          Consultor: consultor@calculatuhuella.local
+          Cliente: cliente@calculatuhuella.local
+          Revisor: revisor@calculatuhuella.local
+          Verificador: verificador@calculatuhuella.local
+          TXT
+
+          printf 'source_commit=%s\nsource_branch=%s\nbuilt_utc=%s\n' \
+            "$GITHUB_SHA" "$GITHUB_REF_NAME" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > "$ROOT/BUILD_INFO.txt"
+
+          find "$ROOT" -name '*.command' -exec chmod +x {} +
+          find "$ROOT/runtime" -path '*/bin/python*' -exec chmod +x {} + || true
+
+          (cd "$ROOT" && find . -type f ! -name MANIFEST_SHA256.txt -print0 | sort -z | xargs -0 sha256sum > MANIFEST_SHA256.txt)
+          (cd .pack && zip -qry -y "$VERSION_DIR.zip" "$VERSION_DIR")
+          sha256sum ".pack/$VERSION_DIR.zip" > ".pack/$VERSION_DIR.zip.sha256"
+          echo "$VERSION_DIR" > .pack/package-name.txt
+
+      - name: Publicar paquete Mac autocontenido
+        uses: actions/upload-artifact@v4
+        with:
+          name: Calcula-Tu-Huella-Mac-Autocontenida-FULL
+          path: |
+            .pack/Calcula_Tu_Huella_Mac_Autocontenida_DEMO_FULL_*.zip
+            .pack/Calcula_Tu_Huella_Mac_Autocontenida_DEMO_FULL_*.zip.sha256
+            .pack/package-name.txt
+          retention-days: 14
+          if-no-files-found: error
