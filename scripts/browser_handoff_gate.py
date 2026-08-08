@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import sys as _sys
+from pathlib import Path as _BootstrapPath
+
+_PROJECT_ROOT = _BootstrapPath(__file__).resolve().parents[1]
+if str(_PROJECT_ROOT) not in _sys.path:
+    _sys.path.insert(0, str(_PROJECT_ROOT))
+
+
 import json
 import os
-import sys
 from pathlib import Path
-
-ROOT_DIR = Path(__file__).resolve().parents[1]
-if str(ROOT_DIR) not in sys.path:
-    sys.path.insert(0, str(ROOT_DIR))
 
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
 from sqlalchemy import select
