@@ -1,0 +1,24 @@
+.diagnosis-prefill-note {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 18px;
+  padding: 12px 14px;
+  border: 1px solid #b9d7c5;
+  border-radius: 12px;
+  background: #f3faf5;
+  color: #234b34;
+}
+
+.diagnosis-prefill-note[hidden] {
+  display: none;
+}
+
+.diagnosis-prefill-note strong {
+  font-size: .86rem;
+}
+
+.diagnosis-prefill-note span {
+  color: #52695a;
+  font-size: .78rem;
+  line-height: 1.4;
+}
