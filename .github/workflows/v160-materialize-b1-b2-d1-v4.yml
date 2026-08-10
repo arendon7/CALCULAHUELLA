@@ -82,3 +82,5 @@ jobs:
           git add app/main.py app/database.py tests/test_app.py tests/test_v160_public_canonical_eight_stages.py
           git commit -m "refactor(v1.6): materializar B1+B2+D1 y reconciliar contratos"
           git push origin HEAD:refactor/v1-6-0-consolidation
+
+# relaunch: canonical test patch corrected
