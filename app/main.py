@@ -143,6 +143,7 @@ from .customer_onboarding_web import register_customer_onboarding_routes
 from .platform_admin_web import register_platform_admin_routes
 from .document_center_web import register_document_center_routes
 from .readiness_web import register_readiness_routes
+from .notifications_web import register_notification_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -489,64 +490,6 @@ def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date
         raise ValueError("periodo fuera del inventario")
     return start, end
 
-@app.get("/notificaciones", response_class=HTMLResponse)
-def notifications_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    notifications = list(session.scalars(select(Notification).where(
-        Notification.organization_id == int(user["organization_id"]),
-        Notification.user_id == int(user["id"]),
-    ).order_by(Notification.created_at.desc()).limit(100)))
-    preference = get_or_create_preference(session, int(user["id"]))
-    session.commit()
-    return templates.TemplateResponse(
-        request=request,
-        name="notifications.html",
-        context=common_context(request, session, user, "notifications", notifications=notifications, preference=preference),
-    )
-
-@app.post("/notificaciones/{notification_id}/leer")
-def notification_read(notification_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    notification = session.scalar(select(Notification).where(
-        Notification.id == notification_id,
-        Notification.organization_id == int(user["organization_id"]),
-        Notification.user_id == int(user["id"]),
-    ))
-    if not notification:
-        raise HTTPException(404, "Notificación no encontrada")
-    notification.read_at = datetime.now(UTC)
-    session.commit()
-    return RedirectResponse(notification.link or "/notificaciones", status_code=303)
-
-@app.post("/notificaciones/leer-todas")
-def notifications_read_all(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    notifications = list(session.scalars(select(Notification).where(
-        Notification.organization_id == int(user["organization_id"]),
-        Notification.user_id == int(user["id"]),
-        Notification.read_at.is_(None),
-    )))
-    now = datetime.now(UTC)
-    for notification in notifications:
-        notification.read_at = now
-    session.commit()
-    set_flash(request, "Todas las notificaciones quedaron marcadas como leídas.")
-    return RedirectResponse("/notificaciones", status_code=303)
-
-@app.post("/notificaciones/preferencias")
-def notification_preferences_update(
-    request: Request,
-    email_enabled: str | None = Form(None),
-    in_app_enabled: str | None = Form(None),
-    digest_frequency: str = Form("Inmediato"),
-    session: Session = Depends(get_db),
-    user: dict = Depends(require_user),
-):
-    preference = get_or_create_preference(session, int(user["id"]))
-    preference.email_enabled = email_enabled == "on"
-    preference.in_app_enabled = in_app_enabled == "on"
-    preference.digest_frequency = digest_frequency if digest_frequency in {"Inmediato", "Diario", "Semanal"} else "Inmediato"
-    session.commit()
-    set_flash(request, "Preferencias de notificación actualizadas.")
-    return RedirectResponse("/notificaciones", status_code=303)
-
 @app.get("/portafolio", response_class=HTMLResponse)
 def portfolio_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
     ensure_capability(user, "manage_portfolio")
@@ -876,6 +819,9 @@ register_document_center_routes(
 )
 register_readiness_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, parse_date
+)
+register_notification_routes(
+    app, templates, common_context, require_user, set_flash
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
