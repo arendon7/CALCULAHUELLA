@@ -139,6 +139,7 @@ from .scenarios_web import register_scenario_routes
 from .verification_web import register_verification_routes
 from .automations_web import register_automation_routes
 from .service_account_web import register_service_account_routes
+from .customer_onboarding_web import register_customer_onboarding_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -892,47 +893,6 @@ def readiness_update(item_id: int, request: Request, status: str = Form(...), ow
     set_flash(request, "Elemento de alistamiento actualizado.")
     return RedirectResponse("/alistamiento", status_code=303)
 
-@app.get("/onboarding", response_class=HTMLResponse)
-def onboarding(request: Request, session: Session = Depends(get_db)):
-    user = require_user(request)
-    inventory = get_inventory(session, user)
-    rows = list(session.scalars(select(CustomerOnboardingItem).where(
-        CustomerOnboardingItem.organization_id == int(user["organization_id"])
-    ).order_by(CustomerOnboardingItem.display_order)))
-    onboarding_state = onboarding_summary(rows, inventory_id=inventory.id)
-    return templates.TemplateResponse(request, "onboarding.html", common_context(
-        request, session, user, "onboarding", inventory=inventory, rows=rows,
-        onboarding=onboarding_state, onboarding_score=onboarding_state["score"],
-    ))
-
-@app.post("/onboarding/{item_id}/actualizar")
-def update_onboarding_item(
-    item_id: int,
-    request: Request,
-    status: str = Form(...),
-    owner: str = Form(""),
-    due_date: str = Form(""),
-    session: Session = Depends(get_db),
-):
-    user = require_user(request)
-    if not (user["can_manage_org"] or user["can_manage_inventory"]):
-        raise HTTPException(403, "Tu rol no puede modificar el onboarding")
-    row = session.scalar(select(CustomerOnboardingItem).where(
-        CustomerOnboardingItem.id == item_id,
-        CustomerOnboardingItem.organization_id == int(user["organization_id"]),
-    ))
-    if not row:
-        raise HTTPException(404, "Actividad de onboarding no encontrada")
-    row.status = status if status in {"Pendiente", "En progreso", "Completado", "Bloqueado"} else "Pendiente"
-    row.owner = owner.strip() or row.owner
-    row.due_date = parse_date(due_date) if due_date else None
-    row.completed_at = datetime.now(UTC) if row.status == "Completado" else None
-    row.updated_by = str(user["email"])
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "ACTUALIZAR", "Onboarding", row.title, new_value=row.status)
-    session.commit()
-    set_flash(request, "Actividad de onboarding actualizada.")
-    return RedirectResponse("/onboarding", status_code=303)
-
 def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes: str, has_previous_inventory: bool, objective: str, urgency: str) -> tuple[int, str]:
     employee_points = {"1 a 20": 1, "21 a 50": 2, "51 a 200": 4, "Más de 200": 6}.get(employees_band, 2)
     score = employee_points + min(max(facilities_count, 1), 8)
@@ -1052,6 +1012,9 @@ register_automation_routes(
 )
 register_service_account_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
+)
+register_customer_onboarding_routes(
+    app, templates, common_context, require_user, set_flash, parse_date, get_inventory
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
