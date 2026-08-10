@@ -1,0 +1,237 @@
+name: Certify V1.9 final state
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/certify-v19-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  certify:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Canonical structure and workflow hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          rm -rf /tmp/calculahuella-v19-canonical
+          mkdir -p /tmp/calculahuella-v19-canonical
+          rsync -a --exclude='.git/' ./ /tmp/calculahuella-v19-canonical/
+          (cd /tmp/calculahuella-v19-canonical && python tools/verify_canonical.py --skip-manifest)
+          python - <<'PY'
+          from pathlib import Path
+
+          workflow_dir = Path('.github/workflows')
+          names = sorted(path.name for path in workflow_dir.glob('*.yml'))
+          expected = sorted([
+              'ci.yml',
+              'ci-canonical.yml',
+              'deploy.yml',
+              'version-ci.yml',
+              'certify-v19-final.yml',
+          ])
+          if names != expected:
+              raise SystemExit(f'unexpected workflow set: {names}')
+          forbidden = [name for name in names if name.startswith(('materialize-', 'diagnostic-', 'diagnostico-'))]
+          if forbidden:
+              raise SystemExit(f'temporary workflows remain: {forbidden}')
+          print('Workflow hygiene OK:', names)
+          PY
+
+      - name: HTTP authority and composition-root contract
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          from pathlib import Path
+          from app.main import app
+
+          allowed_methods = {'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'}
+          contracts = []
+          for route in app.routes:
+              path = getattr(route, 'path', None)
+              methods = getattr(route, 'methods', set()) or set()
+              if not path:
+                  continue
+              for method in methods:
+                  if method in allowed_methods:
+                      contracts.append((method, path))
+          duplicates = sorted({item for item in contracts if contracts.count(item) > 1})
+          if duplicates:
+              raise SystemExit(f'duplicate HTTP contracts: {duplicates}')
+          if len(contracts) != 344:
+              raise SystemExit(f'expected 344 HTTP contracts, found {len(contracts)}')
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          lines = len(source.splitlines())
+          if lines > 639:
+              raise SystemExit(f'main.py grew beyond V1.9 ceiling: {lines} > 639')
+          tree = ast.parse(source)
+          main_routes = set()
+          for node in ast.walk(tree):
+              if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                  continue
+              for decorator in node.decorator_list:
+                  if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+                      continue
+                  if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != 'app':
+                      continue
+                  method = decorator.func.attr.upper()
+                  if method not in allowed_methods or not decorator.args:
+                      continue
+                  arg = decorator.args[0]
+                  if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                      main_routes.add((method, arg.value))
+          expected_main = {
+              ('GET', '/modulos'),
+              ('GET', '/api/health'),
+              ('GET', '/api/ready'),
+          }
+          if main_routes != expected_main:
+              raise SystemExit(f'unexpected direct main routes: {sorted(main_routes)}')
+          print(f'HTTP contracts OK: {len(contracts)} unique; main.py={lines} lines / {len(main_routes)} routes')
+          PY
+
+      - name: Full regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          pytest -q | tee /tmp/v19-pytest.log
+
+      - name: Architecture debt gate
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/audit_architecture.py --enforce | tee /tmp/v19-architecture.log
+
+      - name: Canonical smoke tier
+        shell: bash
+        run: |
+          set -euo pipefail
+          python scripts/run_test_tier.py smoke --durations 10 --timeout 300 | tee /tmp/v19-smoke.log
+
+      - name: Alembic from empty instance
+        shell: bash
+        env:
+          APP_ENV: local
+          SEED_DEMO: "false"
+          INSTANCE_DIR: ${{ runner.temp }}/v19-empty-instance
+        run: |
+          set -euo pipefail
+          rm -rf "$INSTANCE_DIR"
+          mkdir -p "$INSTANCE_DIR"
+          python -m alembic upgrade head |& tee /tmp/v19-alembic.log
+
+      - name: Write final certification act
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import ast
+          import re
+          from pathlib import Path
+          from app.main import app
+          from app.db.models import Base
+
+          pytest_log = Path('/tmp/v19-pytest.log').read_text(encoding='utf-8', errors='replace')
+          smoke_log = Path('/tmp/v19-smoke.log').read_text(encoding='utf-8', errors='replace')
+          architecture_log = Path('/tmp/v19-architecture.log').read_text(encoding='utf-8', errors='replace')
+
+          pytest_match = re.search(r'(\d+) passed(?:, (\d+) skipped)?', pytest_log)
+          if not pytest_match:
+              raise SystemExit('could not derive full pytest counts')
+          passed = int(pytest_match.group(1))
+          skipped = int(pytest_match.group(2) or 0)
+
+          smoke_match = re.search(r'(\d+) passed, (\d+) deselected', smoke_log)
+          if not smoke_match:
+              raise SystemExit('could not derive smoke counts')
+          smoke_passed = int(smoke_match.group(1))
+          smoke_deselected = int(smoke_match.group(2))
+          if smoke_passed != 56:
+              raise SystemExit(f'unexpected smoke count: {smoke_passed}')
+
+          main_source = Path('app/main.py').read_text(encoding='utf-8')
+          main_lines = len(main_source.splitlines())
+          main_tree = ast.parse(main_source)
+          http_methods = {'GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS', 'HEAD'}
+          main_routes = set()
+          for node in ast.walk(main_tree):
+              if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+                  continue
+              for decorator in node.decorator_list:
+                  if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):
+                      continue
+                  if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != 'app':
+                      continue
+                  method = decorator.func.attr.upper()
+                  if method not in http_methods or not decorator.args:
+                      continue
+                  arg = decorator.args[0]
+                  if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                      main_routes.add((method, arg.value))
+
+          contracts = []
+          for route in app.routes:
+              path = getattr(route, 'path', None)
+              for method in (getattr(route, 'methods', set()) or set()):
+                  if path and method in http_methods:
+                      contracts.append((method, path))
+          if len(contracts) != 344 or len(set(contracts)) != 344:
+              raise SystemExit('HTTP contract count changed during certification')
+
+          arch_python_files = re.search(r'Archivos Python: (\d+)', architecture_log)
+          arch_python_lines = re.search(r'Líneas Python: (\d+)', architecture_log)
+          arch_tables = re.search(r'Tablas ORM: (\d+)', architecture_log)
+          if not (arch_python_files and arch_python_lines and arch_tables):
+              raise SystemExit('could not parse architecture snapshot')
+          python_files = int(arch_python_files.group(1))
+          python_lines = int(arch_python_lines.group(1))
+          orm_tables = int(arch_tables.group(1))
+          if orm_tables != 124:
+              raise SystemExit(f'unexpected ORM table count: {orm_tables}')
+
+          direct_routes = '\n'.join(f'- `{method} {path}`' for method, path in sorted(main_routes))
+          surfaces = [
+              'Analytics', 'Scenarios', 'Verification', 'Automations', 'Service Account',
+              'Customer Onboarding', 'Platform Administration', 'Document Center',
+              'Readiness / Alistamiento', 'Notifications', 'Portfolio multiempresa',
+              'Executive Portfolio', 'Compliance', 'Methodology Governance',
+              'Dashboard / core workspace', 'final dead-code hygiene',
+          ]
+          surfaces_md = '\n'.join(f'- {item}' for item in surfaces)
+
+          act = f'''# V1.9 · Certificación final\n\n## Estado\n\n**CERTIFICADA** sobre la rama `refactor/v1-9-0-core-surfaces`. Esta acta fue generada únicamente después de superar todos los gates integrales de V1.9.\n\n## Baseline y alcance\n\n- Baseline V1.8: `aa82b32c4e708e10429303f1b6fb7d3f2aed49e9`.\n- `main` permanece fuera de alcance y no fue modificado por la promoción de esta rama.\n- El PR #22 continúa draft.\n\n## Evidencia integral\n\n- Suite completa: **{passed} passed / {skipped} skipped**.\n- Smoke: **{smoke_passed} passed / {smoke_deselected} deselected**.\n- Arquitectura: **green**.\n- Estructura canónica sin `.git`: **green**.\n- Alembic desde instancia vacía con `SEED_DEMO=false`: **green**.\n- Contratos HTTP: **344 únicos**, sin duplicados `(method, path)`.\n- Tablas ORM: **{orm_tables}**.\n- Archivos Python: **{python_files}**.\n- Líneas Python: **{python_lines}**.\n- `app/main.py`: **{main_lines} líneas / {len(main_routes)} rutas directas**.\n\n## Composition root\n\nLas únicas rutas HTTP directas permitidas en `app/main.py` son:\n\n{direct_routes}\n\nEl resto de superficies HTTP tiene autoridad modular. `tests/test_v190_composition_root.py` fija esta frontera de forma persistente.\n\n## Superficies cerradas en V1.9\n\n{surfaces_md}\n\n## Higiene de workflows\n\nDurante esta certificación no existían materializadores ni diagnósticos residuales. El único workflow temporal presente es `certify-v19-final.yml`, que debe eliminarse inmediatamente después de esta acta. Tras esa limpieza, el conjunto permitido vuelve a ser exclusivamente:\n\n- `.github/workflows/ci.yml`\n- `.github/workflows/ci-canonical.yml`\n- `.github/workflows/deploy.yml`\n- `.github/workflows/version-ci.yml`\n\n## Resultado arquitectónico\n\nV1.9 parte de `app/main.py` **1.583 líneas / 49 rutas** en V1.8 y termina la certificación con **{main_lines} líneas / {len(main_routes)} rutas directas**, manteniendo **344 contratos HTTP** totales y **{orm_tables} tablas ORM**.\n\nLa rama queda lista para limpieza del workflow de certificación y un último CI canónico sobre el SHA limpio. No se autoriza merge automático ni promoción a `main` mediante esta acta.\n'''
+          Path('docs/architecture/V1_9_FINAL_CERTIFICATION.md').write_text(act, encoding='utf-8')
+          PY
+          git diff --check
+
+      - name: Commit final certification act
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/architecture/V1_9_FINAL_CERTIFICATION.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No certification changes to commit"; exit 1; }
+          git commit -m "docs(architecture): certify V1.9 final state"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
