@@ -26,7 +26,7 @@ jobs:
       - name: Generar lock transitivo con hashes
         run: |
           set -euo pipefail
-          python -m pip install 'pip-tools==7.5.0'
+          python -m pip install 'pip==26.1.2' 'pip-tools==7.6.0'
           python -m piptools compile \
             --generate-hashes \
             --resolver=backtracking \
