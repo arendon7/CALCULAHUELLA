@@ -1,0 +1,92 @@
+name: Materialize V1.9 scenarios routing
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-scenarios-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Scenarios HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = '@app.get("/escenarios", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/verificacion", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('scenario boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 3:
+              raise SystemExit(f"expected 3 scenario routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .database import add_audit, get_db\nfrom .db.models import ReductionScenario, ReductionScenarioAction\nfrom .scenarios import get_scenario, portfolio_macc, scenario_summary\n\n\n'''
+          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          module = header + 'def register_scenario_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable\n) -> None:\n' + indented
+          Path('app/scenarios_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .analytics_web import register_analytics_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('analytics import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .scenarios_web import register_scenario_routes\n', 1)
+          register_anchor = '''register_analytics_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date,\n    get_inventory, ensure_inventory_editable\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('analytics registration anchor missing')
+          registration = '''register_scenario_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nSCENARIO_ROUTES = {\n    ("GET", "/escenarios"),\n    ("POST", "/escenarios/nuevo"),\n    ("POST", "/escenarios/{scenario_id}/configurar"),\n}\n\n\ndef _login(client: TestClient, email: str) -> None:\n    response = client.post(\n        "/login",\n        data={"email": email, "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v190_scenarios_have_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/scenarios_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/escenarios"' not in main_source\n    assert '@app.post("/escenarios/' not in main_source\n    assert "register_scenario_routes(" in main_source\n    assert module_source.count("@app.") == 3\n    for authority in ("get_scenario", "scenario_summary", "portfolio_macc"):\n        assert authority in module_source\n    assert '@app.get("/verificacion"' not in module_source\n\n\ndef test_v190_scenario_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in SCENARIO_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == SCENARIO_ROUTES\n    assert len(actual) == len(SCENARIO_ROUTES)\n\n\ndef test_v190_scenario_client_is_read_only():\n    with TestClient(app) as client:\n        _login(client, "cliente@calculatuhuella.local")\n        page = client.get("/escenarios")\n        assert page.status_code == 200\n        denied = client.post(\n            "/escenarios/nuevo",\n            data={\n                "inventory_id": "1",\n                "name": "Escenario denegado V1.9",\n                "description": "No debe crearse",\n                "start_year": "2026",\n                "target_year": "2030",\n                "discount_rate": "8",\n            },\n            follow_redirects=False,\n        )\n        assert denied.status_code == 403\n'''
+          Path('tests/test_v190_scenarios_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Scenarios HTTP\n\n## Autoridad\n\n`app/scenarios_web.py` pasa a ser la autoridad HTTP de tres contratos: panel, creación y configuración de escenarios de reducción.\n\n## Dominio preservado\n\n`app/scenarios.py` conserva `get_scenario`, `scenario_summary` y `portfolio_macc`. No se alteran baseline, reducción total, inversión, ahorro, NPV, payback, MACC, adopción o cronograma.\n\n## Límites\n\nVerification no forma parte de este corte. Las mutaciones continúan exigiendo `manage_inventory` y un inventario editable; la lectura sigue disponible al usuario autenticado dentro de su organización.\n\n## Gates\n\nLos contratos históricos V0.8 protegen resumen financiero semilla y creación/configuración persistente. El contrato V1.9 protege autoridad HTTP, unicidad y lectura sin mutación para Cliente.\n'''
+          Path('docs/architecture/V1_9_SCENARIOS_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/scenarios_web.py app/main.py tests/test_v190_scenarios_routing.py
+          git diff --check
+      - name: Targeted V1.9 Scenarios authority
+        run: pytest -q tests/test_v190_scenarios_routing.py
+      - name: Historical V0.8 scenario contracts
+        run: pytest -q tests/test_app.py -k "v08"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Scenarios routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/scenarios_web.py app/main.py tests/test_v190_scenarios_routing.py docs/architecture/V1_9_SCENARIOS_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract scenarios HTTP"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
