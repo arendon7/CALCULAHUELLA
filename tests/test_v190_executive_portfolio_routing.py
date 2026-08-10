@@ -22,7 +22,8 @@ def test_v190_executive_portfolio_has_dedicated_http_authority():
     assert '@app.get("/direccion-ejecutiva"' not in main_source
     assert "register_executive_portfolio_routes(" in main_source
     assert module_source.count("@app.") == 1
-    assert "_compliance_score" in module_source
+    assert "from .compliance_web import compliance_score" in module_source
+    assert "_compliance_score" not in module_source
     assert "OrganizationMembership" in module_source
     assert '@app.get("/cumplimiento"' not in module_source
 

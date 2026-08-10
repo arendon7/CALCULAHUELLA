@@ -10,10 +10,11 @@ from .db.models import (
     ComplianceAssessment, DocumentControlRecord, EmissionSource, Inventory,
     OrganizationMembership, ReductionAction, ReviewObservation,
 )
+from .compliance_web import compliance_score
 
 
 def register_executive_portfolio_routes(
-    app, templates, common_context, require_user, ensure_capability, _compliance_score
+    app, templates, common_context, require_user, ensure_capability
 ) -> None:
     @app.get("/direccion-ejecutiva", response_class=HTMLResponse)
     def executive_portfolio_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
@@ -38,7 +39,7 @@ def register_executive_portfolio_routes(
                 documents = session.scalar(select(func.count(DocumentControlRecord.id)).where(DocumentControlRecord.organization_id == organization.id)) or 0
                 portfolio_total += float(emissions)
                 total_reduction += float(reduction)
-                cards.append({"organization": organization, "membership": membership, "inventory": inventory, "emissions": float(emissions), "compliance": _compliance_score(assessments), "open_observations": open_observations, "reduction": float(reduction), "documents": documents})
+                cards.append({"organization": organization, "membership": membership, "inventory": inventory, "emissions": float(emissions), "compliance": compliance_score(assessments), "open_observations": open_observations, "reduction": float(reduction), "documents": documents})
             else:
                 cards.append({"organization": organization, "membership": membership, "inventory": None, "emissions": 0.0, "compliance": 0, "open_observations": 0, "reduction": 0.0, "documents": 0})
         average_compliance = round(sum(item["compliance"] for item in cards) / max(len(cards), 1))
