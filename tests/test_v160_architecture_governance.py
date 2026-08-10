@@ -28,13 +28,18 @@ def test_architecture_snapshot_stays_within_v155_debt_ceiling():
     assert audit.regressions(data) == []
 
 
-def test_architecture_audit_exposes_main_hotspots_for_incremental_refactor():
+def test_architecture_audit_exposes_remaining_hotspots_and_recognizes_extracted_lifecycle():
     audit = _load_architecture_audit_module()
     data = audit.snapshot()
     hotspots = data["main_function_hotspots"]
     assert hotspots
     assert all(int(item["lines"]) > 0 for item in hotspots)
-    assert any(item["name"] == "clone_inventory_version" for item in hotspots)
+    # `clone_inventory_version` was the former ~190-line hotspot. Once its
+    # lifecycle service is extracted, governance must reward the reduction
+    # instead of requiring the debt to remain in main.py.
+    assert all(item["name"] != "clone_inventory_version" for item in hotspots)
+    assert max(int(item["lines"]) for item in hotspots) < 190
+    assert (ROOT / "app" / "inventory_lifecycle.py").is_file()
 
 
 def test_release_evidence_accepts_current_document_tree(tmp_path: Path):
