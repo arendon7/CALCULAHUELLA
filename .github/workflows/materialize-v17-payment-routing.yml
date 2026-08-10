@@ -1,4 +1,4 @@
-name: Materialize V1.7 payment routing
+name: Materialize V1.7 payment routing V2
 
 on:
   push:
@@ -43,12 +43,25 @@ jobs:
           block = source[start:end].rstrip() + '\n'
           if block.count('@app.') != 5:
               raise SystemExit(f"expected 5 acceptance/payment routes, found {block.count('@app.')}")
-          if 'class PaymentWebhookPayload' not in block:
-              raise SystemExit('webhook payload contract not captured')
 
-          header = '''from __future__ import annotations\n\nimport hashlib\nimport hmac\nimport json\nimport secrets\nfrom datetime import UTC, date, datetime\n\nfrom fastapi import Depends, Form, Header, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom pydantic import BaseModel, Field\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .config import settings\nfrom .database import get_db\nfrom .db.models import (\n    BillingInvoice,\n    CommercialLead,\n    CommercialProposal,\n    CustomerOnboardingItem,\n    Organization,\n    OrganizationSubscription,\n    PaymentTransaction,\n)\n\n\ndef register_payment_routes(app, templates) -> None:\n'''
-          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
-          Path('app/payment_web.py').write_text(header + indented, encoding='utf-8')
+          payload_marker = 'class PaymentWebhookPayload(BaseModel):\n'
+          webhook_marker = '@app.post("/api/pagos/webhook")\n'
+          if block.count(payload_marker) != 1 or block.count(webhook_marker) != 1:
+              raise SystemExit('payment webhook boundaries are not unique')
+          payload_start = block.index(payload_marker)
+          webhook_start = block.index(webhook_marker)
+          if payload_start >= webhook_start:
+              raise SystemExit('payment webhook payload must precede route')
+
+          pre_webhook_routes = block[:payload_start].rstrip() + '\n'
+          payload_block = block[payload_start:webhook_start].rstrip() + '\n'
+          webhook_route = block[webhook_start:].rstrip() + '\n'
+          route_block = pre_webhook_routes + '\n' + webhook_route
+
+          header = '''from __future__ import annotations\n\nimport hashlib\nimport hmac\nimport json\nimport secrets\nfrom datetime import UTC, date, datetime\n\nfrom fastapi import Depends, Form, Header, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom pydantic import BaseModel, Field\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .config import settings\nfrom .database import get_db\nfrom .db.models import (\n    BillingInvoice,\n    CommercialLead,\n    CommercialProposal,\n    CustomerOnboardingItem,\n    Organization,\n    OrganizationSubscription,\n    PaymentTransaction,\n)\n\n\n'''
+          indented_routes = ''.join(('    ' + line if line.strip() else line) for line in route_block.splitlines(keepends=True))
+          module = header + payload_block + '\n\ndef register_payment_routes(app, templates) -> None:\n' + indented_routes
+          Path('app/payment_web.py').write_text(module, encoding='utf-8')
 
           source = source[:start] + source[end:]
           import_anchor = 'from .commercial_web import register_commercial_routes\n'
@@ -61,19 +74,26 @@ jobs:
           source = source.replace(register_anchor, register_anchor + 'register_payment_routes(app, templates)\n', 1)
           main_path.write_text(source, encoding='utf-8')
 
-          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nPAYMENT_ROUTES = {\n    ("POST", "/propuesta/{token}/aceptar"),\n    ("POST", "/propuesta/{token}/rechazar"),\n    ("GET", "/pago/{token}"),\n    ("POST", "/pago/{token}/confirmar"),\n    ("POST", "/api/pagos/webhook"),\n}\n\n\ndef test_v170_payments_have_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/payment_web.py").read_text(encoding="utf-8")\n    for marker in (\n        '@app.post("/propuesta/{token}/aceptar"',\n        '@app.post("/propuesta/{token}/rechazar"',\n        '@app.get("/pago/{token}"',\n        '@app.post("/pago/{token}/confirmar"',\n        '@app.post("/api/pagos/webhook"',\n    ):\n        assert marker not in main_source\n    assert "register_payment_routes(app, templates)" in main_source\n    assert module_source.count("@app.") == 5\n    assert "class PaymentWebhookPayload" in module_source\n    assert "hmac.compare_digest" in module_source\n    assert "CustomerOnboardingItem" in module_source\n\n\ndef test_v170_payment_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in PAYMENT_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == PAYMENT_ROUTES\n    assert len(actual) == len(PAYMENT_ROUTES)\n\n\ndef test_v170_payment_webhook_rejects_unsigned_requests():\n    with TestClient(app) as client:\n        response = client.post(\n            "/api/pagos/webhook",\n            json={\n                "external_reference": "PAY-NOT-SIGNED",\n                "status": "paid",\n                "amount": 1000,\n                "payer_email": "payer@example.com",\n            },\n        )\n        assert response.status_code == 401\n        assert response.json()["detail"] == "Firma de pago inválida"\n'''
+          commercial_test_path = Path('tests/test_v170_commercial_routing.py')
+          commercial_test = commercial_test_path.read_text(encoding='utf-8')
+          old = '''    # Acceptance/payment intentionally stay outside this cut.\n    assert '@app.post("/propuesta/{token}/aceptar"' in main_source\n'''
+          new = '''    # Cut 2 delegates acceptance/payment to payment_web; commercial_web remains proposal-only.\n    assert '@app.post("/propuesta/{token}/aceptar"' not in main_source\n    assert "register_payment_routes(app, templates)" in main_source\n'''
+          if commercial_test.count(old) != 1:
+              raise SystemExit('commercial routing reconciliation anchor missing')
+          commercial_test_path.write_text(commercial_test.replace(old, new, 1), encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\nfrom app.payment_web import PaymentWebhookPayload\n\nROOT = Path(__file__).resolve().parents[1]\n\nPAYMENT_ROUTES = {\n    ("POST", "/propuesta/{token}/aceptar"),\n    ("POST", "/propuesta/{token}/rechazar"),\n    ("GET", "/pago/{token}"),\n    ("POST", "/pago/{token}/confirmar"),\n    ("POST", "/api/pagos/webhook"),\n}\n\n\ndef test_v170_payments_have_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/payment_web.py").read_text(encoding="utf-8")\n    for marker in (\n        '@app.post("/propuesta/{token}/aceptar"',\n        '@app.post("/propuesta/{token}/rechazar"',\n        '@app.get("/pago/{token}"',\n        '@app.post("/pago/{token}/confirmar"',\n        '@app.post("/api/pagos/webhook"',\n    ):\n        assert marker not in main_source\n    assert "register_payment_routes(app, templates)" in main_source\n    assert module_source.count("@app.") == 5\n    assert module_source.index("class PaymentWebhookPayload") < module_source.index("def register_payment_routes")\n    assert "hmac.compare_digest" in module_source\n    assert "CustomerOnboardingItem" in module_source\n\n\ndef test_v170_payment_payload_is_module_level_and_validates_json():\n    payload = PaymentWebhookPayload(\n        external_reference="PAY-TEST-001",\n        status="paid",\n        amount=1000,\n        payer_email="payer@example.com",\n    )\n    assert payload.external_reference == "PAY-TEST-001"\n    assert payload.amount == 1000\n\n\ndef test_v170_payment_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in PAYMENT_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == PAYMENT_ROUTES\n    assert len(actual) == len(PAYMENT_ROUTES)\n\n\ndef test_v170_payment_webhook_rejects_unsigned_requests_before_lookup():\n    with TestClient(app) as client:\n        response = client.post(\n            "/api/pagos/webhook",\n            json={\n                "external_reference": "PAY-NOT-SIGNED",\n                "status": "paid",\n                "amount": 1000,\n                "payer_email": "payer@example.com",\n            },\n        )\n        assert response.status_code == 401\n        assert response.json()["detail"] == "Firma de pago inválida"\n'''
           Path('tests/test_v170_payment_routing.py').write_text(test, encoding='utf-8')
 
-          doc = '''# V1.7 · Proposal Acceptance / Payments HTTP\n\n## Corte 2 de Commercial / Payments\n\n`app/payment_web.py` pasa a ser la autoridad HTTP de cinco contratos:\n\n- aceptar propuesta;\n- rechazar propuesta;\n- mostrar pago;\n- confirmar pago demostrativo;\n- webhook de pago.\n\n## Side effects preservados\n\nEl corte mantiene literalmente la semántica previa: hash de aceptación, creación idempotente de `PaymentTransaction`, pago demo, creación/asociación de organización, suscripción, registro administrativo de cobro, onboarding inicial y estado `Ganado` del lead.\n\n## Seguridad\n\nEl webhook mantiene `hmac.compare_digest`, secreto obligatorio, verificación del importe y normalización de estados. Un webhook sin firma debe responder HTTP 401.\n\n## Gates\n\nEl test histórico `test_commercial_proposal_acceptance_and_demo_payment` protege el flujo de extremo a extremo. El nuevo contrato V1.7 protege autoridad HTTP, unicidad y rechazo de webhook sin firma.\n'''
+          doc = '''# V1.7 · Proposal Acceptance / Payments HTTP\n\n## Corte 2 de Commercial / Payments\n\n`app/payment_web.py` pasa a ser la autoridad HTTP de cinco contratos:\n\n- aceptar propuesta;\n- rechazar propuesta;\n- mostrar pago;\n- confirmar pago demostrativo;\n- webhook de pago.\n\n## Side effects preservados\n\nEl corte mantiene literalmente la semántica previa: hash de aceptación, creación idempotente de `PaymentTransaction`, pago demo, creación/asociación de organización, suscripción, registro administrativo de cobro, onboarding inicial y estado `Ganado` del lead.\n\n## Seguridad y contrato FastAPI\n\n`PaymentWebhookPayload` queda a nivel de módulo, antes del registrador de rutas, para que FastAPI/Pydantic resuelvan el body JSON como modelo real. El webhook conserva `hmac.compare_digest`, secreto obligatorio, verificación del importe y normalización de estados. Un webhook con JSON válido pero sin firma debe responder HTTP 401 antes de consultar la transacción.\n\n## Gates\n\nEl test histórico `test_commercial_proposal_acceptance_and_demo_payment` protege el flujo de extremo a extremo. Los contratos V1.7 protegen autoridad HTTP, unicidad, resolución del payload y rechazo de webhook sin firma.\n'''
           Path('docs/architecture/V1_7_PAYMENT_ROUTING.md').write_text(doc, encoding='utf-8')
           PY
-          python -m py_compile app/payment_web.py app/main.py tests/test_v170_payment_routing.py
+          python -m py_compile app/payment_web.py app/main.py tests/test_v170_payment_routing.py tests/test_v170_commercial_routing.py
           git diff --check
-      - name: Targeted payment contracts
-        run: >-
-          pytest -q
-          tests/test_v170_payment_routing.py
-          tests/test_app.py -k "commercial_proposal_acceptance_and_demo_payment"
+      - name: Targeted V1.7 payment authority contracts
+        run: pytest -q tests/test_v170_payment_routing.py tests/test_v170_commercial_routing.py
+      - name: Historical commercial payment end-to-end
+        run: pytest -q tests/test_app.py -k "commercial_proposal_acceptance_and_demo_payment"
       - name: Full regression suite
         run: pytest -q
       - name: Architecture debt gate
@@ -86,7 +106,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add app/payment_web.py app/main.py tests/test_v170_payment_routing.py docs/architecture/V1_7_PAYMENT_ROUTING.md
+          git add app/payment_web.py app/main.py tests/test_v170_payment_routing.py tests/test_v170_commercial_routing.py docs/architecture/V1_7_PAYMENT_ROUTING.md
           git diff --cached --check
           git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
           git commit -m "refactor(routes): extract proposal acceptance and payment HTTP"
