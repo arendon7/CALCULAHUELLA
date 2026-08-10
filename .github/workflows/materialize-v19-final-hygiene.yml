@@ -25,23 +25,23 @@ jobs:
           cache: pip
       - run: python -m pip install --upgrade pip
       - run: pip install -r requirements.txt -r requirements-dev.txt
-      - name: Remove proven dead lead-complexity helper
+      - name: Remove semantically proven dead lead-complexity helper
         shell: bash
         run: |
           set -euo pipefail
           python - <<'PY'
+          import ast
           from pathlib import Path
 
-          roots = [Path('app'), Path('tests')]
-          refs = []
-          for root in roots:
+          semantic_refs = []
+          for root in (Path('app'), Path('tests')):
               for path in root.rglob('*.py'):
-                  text = path.read_text(encoding='utf-8')
-                  count = text.count('_lead_complexity')
-                  if count:
-                      refs.append((str(path), count))
-          if refs != [('app/main.py', 1)]:
-              raise SystemExit(f'_lead_complexity is not proven dead; refs={refs}')
+                  tree = ast.parse(path.read_text(encoding='utf-8'))
+                  for node in ast.walk(tree):
+                      if isinstance(node, ast.Name) and node.id == '_lead_complexity' and isinstance(node.ctx, ast.Load):
+                          semantic_refs.append((str(path), getattr(node, 'lineno', None)))
+          if semantic_refs:
+              raise SystemExit(f'_lead_complexity still has semantic consumers: {semantic_refs}')
 
           main_path = Path('app/main.py')
           source = main_path.read_text(encoding='utf-8')
@@ -56,7 +56,7 @@ jobs:
           test = '''from __future__ import annotations\n\nimport ast\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\nHTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}\nEXPECTED_SYSTEM_ROUTES = {\n    ("GET", "/modulos"),\n    ("GET", "/api/health"),\n    ("GET", "/api/ready"),\n}\n\n\ndef _main_http_routes() -> set[tuple[str, str]]:\n    source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    tree = ast.parse(source)\n    routes: set[tuple[str, str]] = set()\n    for node in ast.walk(tree):\n        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):\n            continue\n        for decorator in node.decorator_list:\n            if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):\n                continue\n            if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != "app":\n                continue\n            method = decorator.func.attr.lower()\n            if method not in HTTP_METHODS or not decorator.args:\n                continue\n            arg = decorator.args[0]\n            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):\n                routes.add((method.upper(), arg.value))\n    return routes\n\n\ndef test_v190_main_is_composition_root_with_only_system_http_routes():\n    assert _main_http_routes() == EXPECTED_SYSTEM_ROUTES\n\n\ndef test_v190_dead_lead_complexity_helper_is_absent():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    assert "_lead_complexity" not in main_source\n'''
           Path('tests/test_v190_composition_root.py').write_text(test, encoding='utf-8')
 
-          doc = '''# V1.9 · Final composition-root hygiene\n\n## Resultado\n\n`_lead_complexity` se eliminó únicamente después de comprobar automáticamente que su única referencia en `app/` + `tests/` era su propia definición en `app/main.py`. No se trasladó ni se reimplementó lógica muerta.\n\n## Contrato persistente\n\n`tests/test_v190_composition_root.py` fija la frontera final: `app/main.py` puede conservar como contratos HTTP directos únicamente `/modulos`, `/api/health` y `/api/ready`. El resto de superficies HTTP deben tener autoridad modular.\n\n## Intención arquitectónica\n\n`main.py` queda como composition root: middleware, contexto transversal, utilidades inyectadas, registro de módulos y endpoints de salud/sistema.\n'''
+          doc = '''# V1.9 · Final composition-root hygiene\n\n## Resultado\n\n`_lead_complexity` se eliminó únicamente después de comprobar por AST que no existía ningún uso semántico (`Name` en contexto `Load`) en `app/` ni `tests/`. Las menciones textuales en aserciones de frontera no se confundieron con consumidores de runtime. No se trasladó ni se reimplementó lógica muerta.\n\n## Contrato persistente\n\n`tests/test_v190_composition_root.py` fija la frontera final: `app/main.py` puede conservar como contratos HTTP directos únicamente `/modulos`, `/api/health` y `/api/ready`. El resto de superficies HTTP deben tener autoridad modular.\n\n## Intención arquitectónica\n\n`main.py` queda como composition root: middleware, contexto transversal, utilidades inyectadas, registro de módulos y endpoints de salud/sistema.\n'''
           Path('docs/architecture/V1_9_FINAL_HYGIENE.md').write_text(doc, encoding='utf-8')
           PY
           python -m py_compile app/main.py tests/test_v190_composition_root.py
