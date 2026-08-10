@@ -531,6 +531,10 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
         f"cobertura: {portfolio['coverage_percent']:.1f}%; brecha: {_number(portfolio['gap'])} tCO2e/año; "
         f"preparación del portafolio: {portfolio['readiness_score']}%."
     ), styles["BodySmall"]))
+    portfolio_control_rows = [["Indicador", "Valor", "Lectura"]] + [
+        [item["label"], item["display"], item["reading"]] for item in consulting["portfolio_control"]
+    ]
+    story.extend([_table(portfolio_control_rows, [42 * mm, 34 * mm, 100 * mm], font_size=6.8), Spacer(1, 5 * mm)])
     reduction_rows = [["Acción", "Clase", "Reducción", "Costo marginal", "Preparación", "Avance"]]
     for item in portfolio["actions"]:
         marginal = "Ahorro neto" if item["marginal_cost"] <= 0 else _money_cop(item["marginal_cost"]) + "/tCO2e"
@@ -539,26 +543,33 @@ def generate_technical_pdf(session: Session, inventory: Inventory, output: Path)
             marginal, f"{item['readiness_score']}%", f"{item['progress_percent']}%",
         ])
     story.extend([_table(reduction_rows, [48 * mm, 30 * mm, 26 * mm, 35 * mm, 21 * mm, 18 * mm], font_size=6.5), Spacer(1, 6 * mm)])
-    story.append(Paragraph("10. Hallazgos y recomendaciones", styles["Section"]))
+    story.append(Paragraph("10. Hallazgos, implicaciones y recomendaciones", styles["Section"]))
     finding_rows = [["Prioridad", "Tema", "Hallazgo", "Evidencia", "Recomendación"]]
     for item in consulting["findings"]:
         finding_rows.append([item["level"], item["topic"], item["finding"], item["evidence"], item["recommendation"]])
     story.extend([_table(finding_rows, [20 * mm, 24 * mm, 42 * mm, 42 * mm, 48 * mm], font_size=6.1), Spacer(1, 6 * mm)])
 
-    story.append(Paragraph("11. Puertas de entrega y limitaciones", styles["Section"]))
+    story.append(Paragraph("11. Gobierno de la entrega, limitaciones y uso", styles["Section"]))
     delivery_rows = [["Control", "Estado", "Detalle"]]
     for gate in delivery["gates"]:
         delivery_rows.append([gate["name"], gate["status"], gate["detail"]])
     story.extend([_table(delivery_rows, [47 * mm, 26 * mm, 98 * mm], font_size=6.6), Spacer(1, 5 * mm)])
     limitation_rows = [["Categoría", "Limitación"]] + [[item["category"], item["detail"]] for item in consulting["limitations"]]
     story.extend([_table(limitation_rows, [38 * mm, 133 * mm], font_size=6.8), Spacer(1, 5 * mm)])
-    story.append(Paragraph("12. Declaración técnica", styles["Section"]))
+    story.append(Paragraph("12. Declaración técnica y próximos pasos", styles["Section"]))
     story.append(Paragraph(
         f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "
         "El inventario fue elaborado a partir de la información registrada por la organización y los factores seleccionados. "
         "Los factores demostrativos deben sustituirse por fuentes oficiales o específicas antes de uso externo. "
-        "La aprobación dentro de la plataforma corresponde a control interno y no constituye verificación independiente.", styles["BodySmall"]
+        "La aprobación dentro de la plataforma corresponde a control interno y no constituye verificación independiente. "
+        "La cobertura del portafolio expresa capacidad estructurada frente al requerimiento y no constituye por sí sola una afirmación de cumplimiento.", styles["BodySmall"]
     ))
+    next_step_rows = [["Prioridad", "Etapa", "Próximo paso", "Responsable"]]
+    for item in delivery["action_plan"][:6]:
+        next_step_rows.append([item["priority"], item["stage"], item["title"], item["owner"]])
+    if len(next_step_rows) == 1:
+        next_step_rows.append(["Control", "Cierre", "Mantener trazabilidad y revisión del siguiente periodo.", "Dirección"])
+    story.append(_table(next_step_rows, [24 * mm, 31 * mm, 78 * mm, 43 * mm], font_size=6.6))
     doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)
 
 

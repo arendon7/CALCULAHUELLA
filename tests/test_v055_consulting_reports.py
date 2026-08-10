@@ -11,7 +11,7 @@ from sqlalchemy import select
 
 from app.database import Base, ENGINE, Inventory, ReportArtifact, SessionLocal, init_db
 from app.main import app
-from app.report_consulting import consulting_report_summary
+from app.report_consulting import consulting_report_summary, portfolio_control_view
 from app.report_docx import generate_editable_consulting_docx
 from app.reporting import generate_calculation_workbook
 from app.services.reports import generate_report
@@ -43,7 +43,28 @@ def test_v055_summary_explains_comparison_intensity_and_claims():
         assert len(summary["intensities"]) == 3
         assert summary["findings"]
         assert summary["limitations"]
+        control = {item["code"]: item for item in summary["portfolio_control"]}
+        assert control["required_reduction"]["value"] == summary["portfolio"]["required_reduction"]
+        assert control["expected_reduction"]["value"] == summary["portfolio"]["expected_reduction"]
+        assert control["gap"]["value"] == summary["portfolio"]["gap"]
+        assert control["coverage_percent"]["value"] == summary["portfolio"]["coverage_percent"]
         assert any(item["label"] == "Inventario verificado" and not item["allowed"] for item in summary["claims"])
+
+
+def test_v055_portfolio_control_handles_zero_gap_and_overcoverage_without_claiming_compliance():
+    zero = portfolio_control_view({
+        "required_reduction": 0.0, "expected_reduction": 0.0, "gap": 0.0, "coverage_percent": 0.0,
+    })
+    assert {item["code"]: item["value"] for item in zero} == {
+        "required_reduction": 0.0, "expected_reduction": 0.0, "gap": 0.0, "coverage_percent": 0.0,
+    }
+
+    over = portfolio_control_view({
+        "required_reduction": 100.0, "expected_reduction": 120.0, "gap": 0.0, "coverage_percent": 120.0,
+    })
+    coverage = next(item for item in over if item["code"] == "coverage_percent")
+    assert coverage["value"] == 120.0
+    assert "no implica cumplimiento automático" in coverage["reading"]
 
 
 def test_v055_workshop_page_and_api_load():
@@ -72,10 +93,14 @@ def test_v055_editable_docx_is_valid_and_substantive(tmp_path: Path):
         assert "word/document.xml" in archive.namelist()
     document = Document(output)
     text = "\n".join(paragraph.text for paragraph in document.paragraphs)
+    table_text = "\n".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)
     assert "Informe de huella de carbono" in text
     assert "Resumen ejecutivo" in text
-    assert "Limitaciones" in text
-    assert len(document.tables) >= 5
+    assert "Gobierno de la entrega, limitaciones y uso" in text
+    assert "Declaración técnica y próximos pasos" in text
+    for label in ("Reducción requerida", "Reducción esperada", "Brecha de reducción", "Cobertura del portafolio"):
+        assert label in table_text
+    assert len(document.tables) >= 8
 
 
 def test_v055_editable_artifact_is_persisted_and_downloadable():

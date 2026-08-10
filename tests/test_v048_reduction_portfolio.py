@@ -125,5 +125,8 @@ def test_v048_workbook_and_technical_report_include_portfolio_control(tmp_path: 
         generate_technical_pdf(session, inventory, output)
         text = "\n".join(page.extract_text() or "" for page in PdfReader(output).pages)
         assert "Portafolio de reducción y abatimiento" in text
-        assert "Reducción requerida" in text
-        assert "Cobertura" in text or "cobertura" in text
+        for label in ("Reducción requerida", "Reducción esperada", "Brecha de reducción", "Cobertura del portafolio"):
+            assert label in text
+        assert "Hallazgos, implicaciones y recomendaciones" in text
+        assert "Gobierno de la entrega, limitaciones y uso" in text
+        assert "Declaración técnica y próximos pasos" in text

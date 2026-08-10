@@ -256,6 +256,9 @@ def generate_editable_consulting_docx(session: Session, inventory: Inventory, ou
         f"Estado: {portfolio['portfolio_status']}. Cobertura de la meta: {portfolio['coverage_percent']:.1f}%. "
         f"Preparación: {portfolio['readiness_score']}%. Decisión principal: {portfolio['primary_decision']}"
     )
+    _table(document, [["Indicador", "Valor", "Lectura"]] + [
+        [item["label"], item["display"], item["reading"]] for item in summary["portfolio_control"]
+    ], [4.8, 4.0, 8.2])
     reduction_rows = [["Clasificación", "Acción", "Reducción esperada", "Preparación", "Responsable", "Estado"]]
     for item in portfolio["actions"][:12]:
         reduction_rows.append([
@@ -266,7 +269,10 @@ def generate_editable_consulting_docx(session: Session, inventory: Inventory, ou
         reduction_rows.append(["Pendiente", "Crear portafolio de reducción", "N/D", "0%", "Dirección", "No iniciado"])
     _table(document, reduction_rows, [3.0, 4.8, 3.2, 2.2, 3.3, 2.5])
 
-    _heading(document, "9. Limitaciones y reglas de comunicación", 1)
+    _heading(document, "9. Gobierno de la entrega, limitaciones y uso", 1)
+    _table(document, [["Control", "Estado", "Detalle"]] + [
+        [gate["name"], gate["status"], gate["detail"]] for gate in delivery["gates"]
+    ], [4.5, 3.0, 9.0])
     for item in summary["limitations"]:
         _bullet(document, f"{item['category']}: {item['detail']}")
     _table(document, [["Afirmación", "Permitida", "Orientación"]] + [
@@ -274,7 +280,20 @@ def generate_editable_consulting_docx(session: Session, inventory: Inventory, ou
     ], [4.0, 2.0, 10.5])
     _editable_note(document, "uso previsto", "Indique quién recibirá el documento, para qué decisión y bajo qué control de confidencialidad.")
 
-    _heading(document, "10. Anexo metodológico", 1)
+    _heading(document, "10. Declaración técnica y próximos pasos", 1)
+    document.add_paragraph(
+        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "
+        "El documento interpreta información ya calculada y controlada por la plataforma. "
+        "La aprobación interna no equivale a verificación independiente y la cobertura del portafolio no constituye, por sí sola, una afirmación de cumplimiento."
+    )
+    next_steps = [["Prioridad", "Etapa", "Próximo paso", "Responsable"]]
+    for item in delivery["action_plan"][:6]:
+        next_steps.append([item["priority"], item["stage"], item["title"], item["owner"]])
+    if len(next_steps) == 1:
+        next_steps.append(["Control", "Cierre", "Mantener trazabilidad y revisión del siguiente periodo.", "Dirección"] )
+    _table(document, next_steps, [2.5, 3.4, 7.0, 4.0])
+
+    _heading(document, "11. Anexo metodológico", 1)
     _table(document, [
         ["Partida", "Valor", "Tratamiento"],
         ["Emisiones brutas", f"{closure['balance']['gross_emissions']:.3f} tCO2e", "Inventario corporativo"],

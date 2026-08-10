@@ -81,7 +81,18 @@ Antes de escribir código:
 
 C0 termina cuando exista una lista exacta de bloques a portar y bloques a conservar.
 
-## Corte C1 propuesto
+## Resultado C0 · matriz semántica cerrada
+
+| Capa | Fuente canónica conservada | Portabilidad C1 | Bloques descartados |
+|---|---|---|---|
+| Narrativa consultiva | `portfolio_summary` recibido por `consulting_report_summary` | Proyección editorial de las cuatro magnitudes, sin fórmulas | Recalcular cobertura, brecha o emisiones |
+| PDF técnico | `portfolio` + `consulting_report_summary` | Cuadro de control, gobierno y próximos pasos | Sustituir factores, GWP o estados |
+| DOCX editable | `summary["portfolio"]` | Mismo cuadro de control, puertas de entrega y cierre técnico | Duplicar reglas de negocio |
+| Memoria XLSX / cálculo | Motor vigente | Sin cambios en C1 | Cualquier portabilidad editorial que altere cálculo |
+
+C0 confirma que las diferencias recuperables de V1.5.5 son editoriales. Los blobs locales históricos no están disponibles para un diff byte-a-byte, por lo que la reconciliación se limita deliberadamente a la evidencia auditada, los SHA registrados y los contratos V1.6 actuales.
+
+## Corte C1 implementado
 
 ### Salida PDF técnica
 

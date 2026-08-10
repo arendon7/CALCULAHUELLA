@@ -43,6 +43,52 @@ def _status(score: float, blocked: bool = False) -> str:
     return PROGRESS
 
 
+def portfolio_control_view(portfolio: dict[str, Any]) -> list[dict[str, Any]]:
+    """Project canonical portfolio magnitudes into reporting-only copy.
+
+    This helper formats and interprets existing values. It does not calculate
+    emissions, reduction potential, coverage or compliance.
+    """
+    coverage = portfolio["coverage_percent"]
+    if coverage > 100:
+        coverage_reading = "Capacidad estructurada superior al requerimiento; no implica cumplimiento automático."
+    elif coverage == 100:
+        coverage_reading = "Capacidad estructurada equivalente al requerimiento; su materialización depende de ejecución y seguimiento."
+    else:
+        coverage_reading = "Capacidad estructurada frente al requerimiento; la brecha pendiente permanece explícita."
+
+    return [
+        {
+            "code": "required_reduction",
+            "label": "Reducción requerida",
+            "value": portfolio["required_reduction"],
+            "display": f"{portfolio['required_reduction']:.2f} tCO2e/año",
+            "reading": "Magnitud de reducción asociada a la meta u objetivo registrado.",
+        },
+        {
+            "code": "expected_reduction",
+            "label": "Reducción esperada",
+            "value": portfolio["expected_reduction"],
+            "display": f"{portfolio['expected_reduction']:.2f} tCO2e/año",
+            "reading": "Suma ya estructurada en las acciones del portafolio.",
+        },
+        {
+            "code": "gap",
+            "label": "Brecha de reducción",
+            "value": portfolio["gap"],
+            "display": f"{portfolio['gap']:.2f} tCO2e/año",
+            "reading": "Diferencia pendiente reportada por el portafolio canónico.",
+        },
+        {
+            "code": "coverage_percent",
+            "label": "Cobertura del portafolio",
+            "value": coverage,
+            "display": f"{coverage:.1f}%",
+            "reading": coverage_reading,
+        },
+    ]
+
+
 def _intensity_metrics(session: Session, inventory: Inventory, analysis: dict[str, Any]) -> list[dict[str, Any]]:
     previous_info = analysis["history"].get("previous")
     previous_inventory = session.get(Inventory, previous_info["inventory_id"]) if previous_info else None
@@ -93,6 +139,7 @@ def consulting_report_summary(
     closure = closure or closure_summary(session, inventory)
     delivery = delivery or professional_delivery_summary(session, inventory, analysis=analysis, closure=closure)
     portfolio = portfolio or portfolio_summary(session, inventory)
+    portfolio_control = portfolio_control_view(portfolio)
 
     total = float(analysis["total"] or 0)
     quality = analysis["quality"]
@@ -266,4 +313,5 @@ def consulting_report_summary(
         "delivery": delivery,
         "closure": closure,
         "portfolio": portfolio,
+        "portfolio_control": portfolio_control,
     }
