@@ -126,6 +126,7 @@ from .methodology_admin_web import register_methodology_admin_routes
 from .supply_chain_web import register_supply_chain_routes
 from .support_web import register_support_routes
 from .commercial_web import register_commercial_routes
+from .payment_web import register_payment_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -1476,157 +1477,6 @@ def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes:
     plan = "ESENCIAL" if score <= 5 else "EMPRESARIAL" if score <= 12 else "CORPORATIVO"
     return score, plan
 
-@app.post("/propuesta/{token}/aceptar")
-def accept_public_proposal(
-    token: str, request: Request, accepted_by: str = Form(...), accepted_email: str = Form(...),
-    accept_terms: str | None = Form(None), session: Session = Depends(get_db),
-):
-    proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.public_token == token))
-    if not proposal:
-        raise HTTPException(404, "Propuesta no encontrada")
-    if not accept_terms:
-        raise HTTPException(400, "Debes aceptar las condiciones de la propuesta")
-    if proposal.valid_until and proposal.valid_until < date.today():
-        proposal.status = "Vencida"
-        session.commit()
-        raise HTTPException(409, "La propuesta está vencida")
-    timestamp = datetime.now(UTC)
-    client_ip = request.client.host if request.client else "unknown"
-    acceptance_source = f"{proposal.reference}|{accepted_by.strip()}|{accepted_email.strip().lower()}|{timestamp.isoformat()}|{proposal.first_year_total}|{proposal.contract_version}"
-    proposal.status = "Aceptada"
-    proposal.accepted_by = accepted_by.strip()
-    proposal.accepted_email = accepted_email.strip().lower()
-    proposal.accepted_ip = client_ip
-    proposal.accepted_at = timestamp
-    proposal.acceptance_hash = hashlib.sha256(acceptance_source.encode("utf-8")).hexdigest()
-    payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.proposal_id == proposal.id).order_by(PaymentTransaction.id.desc()).limit(1))
-    if not payment:
-        payment = PaymentTransaction(
-            proposal_id=proposal.id, public_token=secrets.token_urlsafe(24), gateway="Demo",
-            status="Pendiente", amount=proposal.first_year_total, currency="COP",
-            external_reference=f"PAY-{proposal.reference}", payer_name=proposal.accepted_by,
-            payer_email=proposal.accepted_email, provider_payload='{"mode": "demo"}',
-        )
-        session.add(payment)
-    session.commit()
-    return RedirectResponse(f"/pago/{payment.public_token}", status_code=303)
-
-@app.post("/propuesta/{token}/rechazar")
-def reject_public_proposal(token: str, request: Request, reason: str = Form(""), session: Session = Depends(get_db)):
-    proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.public_token == token))
-    if not proposal:
-        raise HTTPException(404, "Propuesta no encontrada")
-    proposal.status = "Rechazada"
-    proposal.rejection_reason = reason.strip()
-    session.commit()
-    return RedirectResponse(f"/propuesta/{token}", status_code=303)
-
-@app.get("/pago/{token}", response_class=HTMLResponse)
-def public_payment(token: str, request: Request, session: Session = Depends(get_db)):
-    payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.public_token == token).options(selectinload(PaymentTransaction.proposal)))
-    if not payment:
-        raise HTTPException(404, "Pago no encontrado")
-    return templates.TemplateResponse(request=request, name="public_payment.html", context={"payment": payment, "proposal": payment.proposal, "app_settings": settings})
-
-@app.post("/pago/{token}/confirmar")
-def confirm_demo_payment(
-    token: str, request: Request, payer_name: str = Form(...), payer_email: str = Form(...),
-    method: str = Form("Transferencia demostrativa"), session: Session = Depends(get_db),
-):
-    payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.public_token == token).options(selectinload(PaymentTransaction.proposal)))
-    if not payment or not payment.proposal:
-        raise HTTPException(404, "Pago no encontrado")
-    proposal = payment.proposal
-    if proposal.status != "Aceptada":
-        raise HTTPException(409, "La propuesta debe aceptarse antes del pago")
-    payment.status = "Pagada"
-    payment.gateway = "Demo"
-    payment.payer_name = payer_name.strip()
-    payment.payer_email = payer_email.strip().lower()
-    payment.paid_at = datetime.now(UTC)
-    payment.provider_payload = json.dumps({"mode": "demo", "method": method, "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
-    if not proposal.organization_id:
-        base_name = proposal.company_name.strip()
-        organization = session.scalar(select(Organization).where(Organization.name == base_name))
-        if not organization:
-            lead = session.get(CommercialLead, proposal.lead_id) if proposal.lead_id else None
-            organization = Organization(
-                name=base_name, trade_name=base_name, tax_id="PENDIENTE", sector=lead.sector if lead else "Por configurar",
-                country="Colombia", city=lead.city if lead else "Por configurar", employees=0,
-                contact_name=proposal.contact_name, contact_email=proposal.contact_email, status="Activa",
-            )
-            session.add(organization)
-            session.flush()
-        proposal.organization_id = organization.id
-        subscription = session.scalar(select(OrganizationSubscription).where(OrganizationSubscription.organization_id == organization.id))
-        if not subscription and proposal.plan_id:
-            renewal = date(date.today().year + 1, date.today().month, min(date.today().day, 28))
-            subscription = OrganizationSubscription(
-                organization_id=organization.id, plan_id=proposal.plan_id, billing_cycle=proposal.billing_cycle,
-                status="Activa", start_date=date.today(), renewal_date=renewal,
-                notes=f"Activada desde propuesta {proposal.reference} y pago demostrativo.",
-            )
-            session.add(subscription)
-            session.flush()
-        invoice = session.scalar(select(BillingInvoice).where(BillingInvoice.reference == f"COBRO-{proposal.reference}"))
-        if not invoice:
-            invoice = BillingInvoice(
-                organization_id=organization.id, subscription_id=subscription.id if subscription else None,
-                reference=f"COBRO-{proposal.reference}", period_start=date.today(),
-                period_end=date(date.today().year + 1, date.today().month, min(date.today().day, 28)),
-                amount=payment.amount, status="Pagada", issued_at=date.today(), due_date=date.today(),
-                paid_at=payment.paid_at, notes="Registro administrativo generado desde el pago demostrativo. No constituye factura electrónica.",
-            )
-            session.add(invoice)
-            session.flush()
-        payment.subscription_id = subscription.id if subscription else None
-        payment.invoice_id = invoice.id
-        onboarding_specs = [
-            ("ORG-01", "Organización", "Completar información legal y operativa", 10),
-            ("USR-01", "Accesos", "Invitar responsables y definir roles", 20),
-            ("MET-01", "Metodología", "Aprobar metodología y límites", 30),
-            ("DAT-01", "Información", "Cargar el primer conjunto de datos", 40),
-            ("CAL-01", "Cálculo", "Validar el primer cálculo trazable", 50),
-            ("REP-01", "Entrega", "Generar el primer informe", 60),
-        ]
-        for code, category, title, order in onboarding_specs:
-            if not session.scalar(select(CustomerOnboardingItem).where(CustomerOnboardingItem.organization_id == organization.id, CustomerOnboardingItem.code == code)):
-                session.add(CustomerOnboardingItem(
-                    organization_id=organization.id, code=code, category=category, title=title,
-                    description="Actividad creada automáticamente después de la contratación.", status="Pendiente",
-                    owner="Cliente", display_order=order, updated_by="sistema",
-                ))
-    if proposal.lead_id:
-        lead = session.get(CommercialLead, proposal.lead_id)
-        if lead:
-            lead.status = "Ganado"
-    session.commit()
-    return RedirectResponse(f"/pago/{token}", status_code=303)
-
-class PaymentWebhookPayload(BaseModel):
-    external_reference: str = Field(min_length=3, max_length=120)
-    status: str = Field(min_length=3, max_length=30)
-    amount: float = Field(ge=0)
-    payer_email: str = ""
-
-@app.post("/api/pagos/webhook")
-def payment_webhook(payload: PaymentWebhookPayload, x_payment_secret: str | None = Header(None), session: Session = Depends(get_db)):
-    if not settings.payment_webhook_secret or not hmac.compare_digest(x_payment_secret or "", settings.payment_webhook_secret):
-        raise HTTPException(401, "Firma de pago inválida")
-    payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.external_reference == payload.external_reference))
-    if not payment:
-        raise HTTPException(404, "Transacción no encontrada")
-    if abs(payment.amount - payload.amount) > 0.01:
-        raise HTTPException(409, "El valor informado no coincide")
-    normalized_status = payload.status.strip().lower()
-    mapping = {"paid": "Pagada", "approved": "Pagada", "pending": "Pendiente", "failed": "Fallida", "declined": "Fallida", "refunded": "Reembolsada"}
-    payment.status = mapping.get(normalized_status, payload.status[:30])
-    payment.payer_email = payload.payer_email.strip().lower() or payment.payer_email
-    payment.paid_at = datetime.now(UTC) if payment.status == "Pagada" else payment.paid_at
-    payment.provider_payload = json.dumps(payload.model_dump(), ensure_ascii=False)
-    session.commit()
-    return {"ok": True, "transaction_id": payment.id, "status": payment.status}
-
 def _contract_signature_hash(contract: ServiceContract, signed_by: str, signed_email: str, signed_at: datetime) -> str:
     payload = "|".join([
         contract.reference, str(contract.organization_id), contract.version,
@@ -2941,6 +2791,7 @@ register_support_routes(
 register_commercial_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, parse_date
 )
+register_payment_routes(app, templates)
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
 )

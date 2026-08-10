@@ -36,8 +36,9 @@ def test_v170_commercial_proposals_have_dedicated_http_authority():
     assert '@app.post("/comercial/leads/' not in main_source
     assert '@app.post("/comercial/propuestas/' not in main_source
     assert '@app.get("/propuesta/{token}"' not in main_source
-    # Acceptance/payment intentionally stay outside this cut.
-    assert '@app.post("/propuesta/{token}/aceptar"' in main_source
+    # Cut 2 delegates acceptance/payment to payment_web; commercial_web remains proposal-only.
+    assert '@app.post("/propuesta/{token}/aceptar"' not in main_source
+    assert "register_payment_routes(app, templates)" in main_source
     assert "register_commercial_routes(" in main_source
     assert module_source.count("@app.") == 5
     assert "PaymentTransaction" in module_source
