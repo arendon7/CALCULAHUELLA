@@ -12,13 +12,47 @@ Reducir la deuda residual de `app/main.py` en bounded contexts estratégicos que
 
 No se reescriben modelos climáticos, fórmulas de impacto, factores, GWP, motor de cálculo, semántica de reporting ni reglas de negocio salvo que un corte posterior lo declare de manera explícita y tenga contratos propios.
 
-## Secuencia inicial
+## Cortes materializados
 
-1. **Impact Intelligence HTTP** — mantener `app/impact_intelligence.py` como autoridad de métricas, snapshots, benchmarks y comparación de portafolio.
-2. **Climate Risk HTTP** — mantener `app/climate_risk.py` como autoridad de evaluación, scoring, controles y estados.
-3. **Climate Disclosure HTTP** — mantener `app/climate_disclosure.py` como autoridad de escenarios, divulgación y briefing de junta.
-4. **Consolidation / Release Governance HTTP** — separar hallazgos, gates de release y validaciones de journey sin cambiar decisiones de gobierno.
-5. Inventario residual y certificación integral V1.8.
+1. **Impact Intelligence HTTP — cerrado.** Cinco rutas pasaron a `app/impact_intelligence_web.py`; `app/impact_intelligence.py` conserva métricas, snapshots, benchmarks y comparación de portafolio.
+2. **Climate Risk HTTP — cerrado.** Nueve rutas pasaron a `app/climate_risk_web.py`; `app/climate_risk.py` conserva evaluación, scoring, controles y estados.
+3. **Climate Disclosure HTTP — cerrado.** Once rutas pasaron a `app/climate_disclosure_web.py`; `app/climate_disclosure.py` conserva escenarios, divulgación, comité y generación del board pack.
+4. **Consolidation / Release Governance HTTP — cerrado.** Siete rutas pasaron a `app/consolidation_web.py`; `app/consolidation.py` y `app/architecture.py` conservan readiness, resumen, exportación y snapshot arquitectónico.
+
+Todos los cortes anteriores pasaron contratos dirigidos, regresión completa, barrera arquitectónica y smoke antes de sus commits de producto. Cada materializador temporal fue retirado antes de certificar el `head` limpio.
+
+## Snapshot limpio previo a certificación
+
+`head`: `490551721e57d750c60e4254b04a7db840487fe5`  
+CI canónico: `31408913218` — **success**.
+
+- archivos Python: **142**;
+- líneas Python: **39.867**;
+- rutas HTTP: **344**;
+- tablas ORM: **124**;
+- `app/main.py`: **1.583 líneas / 49 rutas**;
+- `app/database.py`: **269 líneas**;
+- smoke: **56 passed / 496 deselected**;
+- Alembic desde instancia limpia: PASS.
+
+## Deuda residual deliberadamente diferida
+
+Los residuos principales de `app/main.py` ya no pertenecen al alcance estratégico V1.8 y se difieren a un ciclo apilado V1.9 para evitar *scope creep*:
+
+- Dashboard y analítica/indicadores;
+- escenarios;
+- verificación;
+- automatizaciones;
+- cuenta de servicio y suscripción;
+- onboarding;
+- configuración de plataforma;
+- control documental y otras superficies transversales.
+
+Hotspots representativos todavía presentes: `dashboard` (52 líneas), `review_gate_summary` (41), `_service_usage` (36), `automation_create` (33), `create_indicator` (31), `verification_portal` (31), `update_subscription` (29), `portfolio_create` (28) y `executive_portfolio_page` (27).
+
+## Cierre de alcance V1.8
+
+La secuencia funcional planificada quedó completada. El único trabajo restante de V1.8 es la **certificación integral final**, persistencia del acta técnica, eliminación del workflow temporal de certificación y CI canónico sobre el SHA final limpio.
 
 ## Reglas de materialización
 
