@@ -1,0 +1,148 @@
+name: Materialize historical test reconciliation
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-historical-test-reconciliation.yml
+
+permissions:
+  contents: write
+
+jobs:
+  reconcile:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Reconcile superseded historical assertions
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected one match, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # Iteration 18: canonical evidence now exists in docs/evidencia and
+          # organized governance docs satisfy controlled release, not public production.
+          replace_once(
+              "tests/test_iteration18_canonical_regressions.py",
+              '''def test_iteration18_current_repository_keeps_controlled_release_closed_without_test_evidence() -> None:\n    summary = release_candidate_summary(\n        ROOT,\n        critical_open=0,\n        approved_gates=9,\n        gate_count=9,\n        validated_journeys=5,\n        journey_count=5,\n    )\n    assert summary["version"] == "1.0.0"\n    assert summary["test_evidence"]["status"] == "missing"\n    assert summary["controlled_release_ready"] is False\n    assert summary["production_ready"] is False\n    assert all(item["ok"] is False for item in summary["external_checks"])\n''',
+              '''def test_iteration18_current_repository_recognizes_controlled_release_but_keeps_public_production_closed() -> None:\n    summary = release_candidate_summary(\n        ROOT,\n        critical_open=0,\n        approved_gates=9,\n        gate_count=9,\n        validated_journeys=5,\n        journey_count=5,\n    )\n    assert summary["version"] == "1.0.0"\n    assert summary["test_evidence"]["status"] == "passed"\n    assert summary["test_evidence"]["test_count"] >= 386\n    assert summary["controlled_release_ready"] is True\n    assert summary["production_ready"] is False\n    assert all(item["ok"] is False for item in summary["external_checks"])\n''',
+          )
+          replace_once(
+              "tests/test_iteration18_canonical_regressions.py",
+              '''def test_iteration18_structural_validator_is_conservative_without_formal_internal_bundle() -> None:\n    from scripts.validate_release_candidate import inspect_candidate\n\n    payload = inspect_candidate()\n    checks = {item["code"]: item for item in payload["checks"]}\n    assert payload["status"] == "failed"\n    assert checks["version"]["ok"] is True\n    assert checks["routes"]["ok"] is True\n    assert checks["models"]["ok"] is True\n    assert checks["templates"]["ok"] is True\n    assert checks["migration_head"]["ok"] is True\n    assert checks["legal_surface"]["ok"] is True\n    assert checks["controlled_release_defaults"]["ok"] is True\n    assert checks["public_production_conservative"]["ok"] is True\n    assert checks["internal_acceptance"]["ok"] is False\n''',
+              '''def test_iteration18_structural_validator_recognizes_organized_internal_bundle_and_remains_publicly_conservative() -> None:\n    from scripts.validate_release_candidate import inspect_candidate\n\n    payload = inspect_candidate()\n    checks = {item["code"]: item for item in payload["checks"]}\n    assert payload["status"] == "passed"\n    assert checks["version"]["ok"] is True\n    assert checks["routes"]["ok"] is True\n    assert checks["models"]["ok"] is True\n    assert checks["templates"]["ok"] is True\n    assert checks["migration_head"]["ok"] is True\n    assert checks["legal_surface"]["ok"] is True\n    assert checks["controlled_release_defaults"]["ok"] is True\n    assert checks["public_production_conservative"]["ok"] is True\n    assert checks["internal_acceptance"]["ok"] is True\n''',
+          )
+
+          # V1.4 integration remains a historical layer, but public runtime authority is V1.6.
+          replace_once(
+              "tests/test_uiux_v1_4_integration.py",
+              '''    assert "public-v1.4.css" in corpus\n    assert "public-v1.4.js" in corpus\n''',
+              '''    assert "public-v1.6.css" in corpus\n    assert "public-v1.6.js" in corpus\n    assert "public-v1.4.css" not in corpus\n    assert "public-v1.4.js" not in corpus\n''',
+          )
+
+          # V0.21 release gate must consume the current canonical evidence, while
+          # keeping the separate public-production gate closed.
+          replace_once(
+              "tests/test_v021_consolidation.py",
+              '''        # La canonización V1.0 no conservó el archivo legacy\n        # release/FINAL_TEST_EVIDENCE.json. La puerta debe permanecer cerrada\n        # hasta que exista evidencia material del release actual; no es válido\n        # inferirla desde RELEASE_CANONICA.json ni desde una declaración Markdown.\n        release = payload["release_candidate"]\n        assert release["controlled_release_ready"] is False\n        assert release["production_ready"] is False\n        assert release["test_evidence"]["status"] == "missing"\n        test_gate = next(item for item in release["package_checks"] if item["code"] == "V1-TESTS")\n        assert test_gate["ok"] is False\n        assert "estado missing" in test_gate["detail"]\n''',
+              '''        # La evidencia material canónica vive en docs/evidencia y habilita\n        # el despliegue controlado. La producción pública sigue siendo una puerta\n        # distinta y permanece cerrada sin validaciones externas.\n        release = payload["release_candidate"]\n        assert release["controlled_release_ready"] is True\n        assert release["production_ready"] is False\n        assert release["test_evidence"]["status"] == "passed"\n        assert release["test_evidence"]["test_count"] >= 386\n        test_gate = next(item for item in release["package_checks"] if item["code"] == "V1-TESTS")\n        assert test_gate["ok"] is True\n        assert "estado passed" in test_gate["detail"]\n''',
+          )
+
+          # V0.49 public copy and schema cardinality were historical snapshots.
+          replace_once(
+              "tests/test_v049_landing_windows_factor_dialogue.py",
+              '''def test_v049_public_landing_explains_value_greenatics_prices_and_flow():\n    with TestClient(app) as client:\n        response = client.get("/")\n        assert response.status_code == 200\n        assert "Potenciado por" in response.text\n        assert "GREENATICS" in response.text\n        assert "Del propósito de la medición a una decisión de gestión" in response.text\n        assert "Conversación técnica dato–factor" in response.text\n        assert "PLANES Y PRECIOS DE REFERENCIA" in response.text\n        assert "Dr. Carlos Andrés Uribe" in response.text\n        assert "Mensajes y requerimientos" in response.text\n        assert "$390.000" in response.text\n''',
+              '''def test_v049_public_landing_contract_is_preserved_through_the_v16_public_authority():\n    with TestClient(app) as client:\n        response = client.get("/")\n        assert response.status_code == 200\n        assert "Toda tu gestión de carbono" in response.text\n        assert "Plataforma colaborativa de gestión de carbono" in response.text\n        assert "Potenciado por GREENATICS" in response.text\n        assert "Ocho etapas desde el diagnóstico hasta la reducción" in response.text\n        assert "Cada cifra puede explicarse" in response.text\n        assert "no actúa automáticamente como organismo verificador o certificador" in response.text\n        assert "PLANES Y PRECIOS DE REFERENCIA" not in response.text\n''',
+          )
+          replace_once(
+              "tests/test_v049_landing_windows_factor_dialogue.py",
+              '''    assert len(Base.metadata.tables) == 120''',
+              '''    # V0.49 established a 120-table floor; later canonical migrations may add tables.\n    assert len(Base.metadata.tables) >= 120''',
+          )
+
+          # Same schema-history rule for V0.50.
+          replace_once(
+              "tests/test_v050_support_and_factor_governance.py",
+              '''    assert len(Base.metadata.tables) == 120''',
+              '''    # V0.50 established a 120-table floor; later canonical migrations may add tables.\n    assert len(Base.metadata.tables) >= 120''',
+          )
+
+          # V0.51 copy/guide/doc locations were superseded by the canonical V1.6 UX and docs tree.
+          replace_once(
+              "tests/test_v051_experience_content_environment.py",
+              '''def test_v051_public_content_is_clear_and_methodologically_bounded():\n    with TestClient(app) as client:\n        page = client.get("/")\n        assert page.status_code == 200\n        assert "Mide lo que corresponde" in page.text\n        assert "Software y acompañamiento proporcionales" in page.text\n        assert "Preguntas que conviene resolver" in page.text\n        assert "Las emisiones evitadas" in page.text\n        assert "EL FLUJO QUE PROPONE" not in page.text\n''',
+              '''def test_v051_public_content_remains_clear_and_methodologically_bounded_under_v16():\n    with TestClient(app) as client:\n        page = client.get("/")\n        assert page.status_code == 200\n        assert "Toda tu gestión de carbono" in page.text\n        assert "Ocho etapas desde el diagnóstico hasta la reducción" in page.text\n        assert "Cada cifra puede explicarse" in page.text\n        assert "no actúa automáticamente como organismo verificador o certificador" in page.text\n        assert "Mide lo que corresponde" not in page.text\n        assert "EL FLUJO QUE PROPONE" not in page.text\n''',
+          )
+          replace_once(
+              "tests/test_v051_experience_content_environment.py",
+              '''        assert "Seis preguntas que ordenan el inventario" in page.text''',
+              '''        assert "Ocho preguntas que ordenan el ciclo" in page.text''',
+          )
+          replace_once(
+              "tests/test_v051_experience_content_environment.py",
+              '''def test_v051_release_and_documentation_are_aligned():\n    assert 'version: str = "1.0.0"' in (ROOT / "app/config.py").read_text(encoding="utf-8")\n    assert 'ENGINE_VERSION = "1.1.0"' in (ROOT / "app/calculations.py").read_text(encoding="utf-8")\n    assert (ROOT / "V051_AUDITORIA_EXPERIENCIA_CONTENIDO_AMBIENTAL.md").is_file()\n    assert (ROOT / "GUIA_DE_CONTENIDO_Y_UX_V051.md").is_file()\n    assert (ROOT / "app/templates/guide.html").is_file()\n''',
+              '''def test_v051_release_and_documentation_are_aligned_with_canonical_distribution():\n    assert 'version: str = "1.0.0"' in (ROOT / "app/config.py").read_text(encoding="utf-8")\n    assert 'ENGINE_VERSION = "1.1.0"' in (ROOT / "app/calculations.py").read_text(encoding="utf-8")\n    assert (ROOT / "CANONICAL_RELEASE.md").is_file()\n    assert (ROOT / "RELEASE_CANONICA.json").is_file()\n    assert (ROOT / "docs/ITERACION_4_ESTABILIZACION.md").is_file()\n    assert (ROOT / "app/templates/guide.html").is_file()\n''',
+          )
+
+          # RC1 docs were intentionally organized under docs/gobierno and docs/guias.
+          replace_once(
+              "tests/test_v100_rc1_release_candidate.py",
+              '''def test_v1_internal_approval_and_launch_documents_are_distributed():\n    required = (\n        "ACTA_CIERRE_V1_0_0.md",\n        "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",\n        "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",\n        "INFORME_PILOTO_INTERNO_GREENATICS_V1.md",\n        "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",\n        "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md",\n        "GUIA_LANZAMIENTO_CONTROLADO_V1.md",\n    )\n    assert all((ROOT / name).is_file() for name in required)\n''',
+              '''def test_v1_internal_approval_and_launch_documents_are_distributed_in_canonical_tree():\n    required = (\n        "docs/gobierno/ACTA_CIERRE_V1_0_0.md",\n        "docs/gobierno/APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",\n        "docs/gobierno/APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",\n        "docs/guias/INFORME_PILOTO_INTERNO_GREENATICS_V1.md",\n        "docs/guias/INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",\n        "docs/gobierno/REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md",\n        "docs/guias/GUIA_LANZAMIENTO_CONTROLADO_V1.md",\n    )\n    assert all((ROOT / name).is_file() for name in required)\n''',
+          )
+          PY
+          git diff --check
+      - name: Targeted historical contract suite
+        run: >-
+          pytest -q
+          tests/test_iteration18_canonical_regressions.py
+          tests/test_uiux_v1_4_integration.py
+          tests/test_v021_consolidation.py
+          tests/test_v049_landing_windows_factor_dialogue.py
+          tests/test_v050_support_and_factor_governance.py
+          tests/test_v051_experience_content_environment.py
+          tests/test_v100_rc1_release_candidate.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit historical contract reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            tests/test_iteration18_canonical_regressions.py \
+            tests/test_uiux_v1_4_integration.py \
+            tests/test_v021_consolidation.py \
+            tests/test_v049_landing_windows_factor_dialogue.py \
+            tests/test_v050_support_and_factor_governance.py \
+            tests/test_v051_experience_content_environment.py \
+            tests/test_v100_rc1_release_candidate.py
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "test(v1.6): reconcile superseded historical contracts"
+          git push origin HEAD:refactor/v1-6-0-consolidation
