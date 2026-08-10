@@ -121,6 +121,7 @@ from .inventory_context import (
 )
 from .inventory_lifecycle import clone_inventory_version, next_inventory_version
 from .sectorization_web import register_sectorization_routes
+from .calculation_web import register_calculation_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -466,46 +467,6 @@ def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date
     if start < inventory.start_date or end > inventory.end_date:
         raise ValueError("periodo fuera del inventario")
     return start, end
-
-@app.get("/calculos", response_class=HTMLResponse)
-def calculations_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    inventory = get_inventory(session, user)
-    source_rows = []
-    total_calculations = 0
-    total_alerts = 0
-    total_errors = 0
-    for source in inventory.sources:
-        summary = source_calculation_summary(session, source.id)
-        source_rows.append({"source": source, "summary": summary, "assignments": len([item for item in source.factor_assignments if item.active])})
-        total_calculations += len(summary["calculations"])
-        total_alerts += int(summary["alerts"])
-        total_errors += int(summary["errors"])
-    return templates.TemplateResponse(
-        request=request,
-        name="calculations.html",
-        context=common_context(
-            request,
-            session,
-            user,
-            "calculations",
-            inventory=inventory,
-            source_rows=source_rows,
-            total_calculations=total_calculations,
-            total_alerts=total_alerts,
-            total_errors=total_errors,
-        ),
-    )
-
-@app.post("/inventarios/{inventory_id}/recalcular")
-def inventory_recalculate(inventory_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "view_methodology")
-    inventory = get_inventory(session, user, inventory_id)
-    ensure_inventory_editable(inventory)
-    result = recalculate_inventory(session, inventory)
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "RECALCULAR", "Inventario", inventory.name, f"{result['sources']} fuentes · {result['calculations']} cálculos · {len(result['warnings'])} alertas")
-    session.commit()
-    set_flash(request, f"Inventario recalculado: {result['calculations']} componentes y {len(result['warnings'])} alertas.", "error" if result["warnings"] else "success")
-    return RedirectResponse("/calculos", status_code=303)
 
 @app.get("/metodologia", response_class=HTMLResponse)
 def methodology_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
@@ -3952,6 +3913,10 @@ register_inventory_routes(
     DATA_ORIGINS,
 )
 register_sectorization_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash,
+    get_inventory, ensure_inventory_editable,
+)
+register_calculation_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash,
     get_inventory, ensure_inventory_editable,
 )
