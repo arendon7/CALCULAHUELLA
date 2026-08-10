@@ -35,6 +35,16 @@ from app.main import app, templates
 FORBIDDEN_NAMES = {"calculatuhuella.db", ".env", "session.key"}
 FORBIDDEN_PARTS = {"__pycache__", ".pytest_cache", "instance", ".final_validation_instance"}
 
+REQUIRED_DOCS = (
+    ("docs/gobierno/ACTA_CIERRE_V1_0_0.md", "ACTA_CIERRE_V1_0_0.md"),
+    ("docs/gobierno/APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md", "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md"),
+    ("docs/gobierno/APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md", "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md"),
+    ("docs/guias/INFORME_PILOTO_INTERNO_GREENATICS_V1.md", "INFORME_PILOTO_INTERNO_GREENATICS_V1.md"),
+    ("docs/guias/INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md", "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md"),
+    ("docs/gobierno/REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md", "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md"),
+    ("docs/guias/GUIA_LANZAMIENTO_CONTROLADO_V1.md", "GUIA_LANZAMIENTO_CONTROLADO_V1.md"),
+)
+
 
 def _sha256(path: Path) -> str:
     digest = hashlib.sha256()
@@ -42,6 +52,10 @@ def _sha256(path: Path) -> str:
         for chunk in iter(lambda: handle.read(1024 * 1024), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _has_document(canonical: str, legacy: str) -> bool:
+    return (ROOT / canonical).is_file() or (ROOT / legacy).is_file()
 
 
 def inspect_candidate() -> dict[str, object]:
@@ -62,19 +76,11 @@ def inspect_candidate() -> dict[str, object]:
     config = Config(str(ROOT / "alembic.ini"))
     script = ScriptDirectory.from_config(config)
     heads = list(script.get_heads())
-    required_docs = (
-        "ACTA_CIERRE_V1_0_0.md",
-        "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",
-        "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",
-        "INFORME_PILOTO_INTERNO_GREENATICS_V1.md",
-        "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",
-        "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md",
-        "GUIA_LANZAMIENTO_CONTROLADO_V1.md",
-    )
     required_legal = (
         "app/legal_web.py",
         "app/templates/legal_document.html",
     )
+    missing_docs = [canonical for canonical, legacy in REQUIRED_DOCS if not _has_document(canonical, legacy)]
     checks = [
         {"code": "version", "ok": settings.version == "1.0.0", "detail": settings.version},
         {"code": "routes", "ok": len(app.routes) >= 320, "detail": len(app.routes)},
@@ -82,7 +88,7 @@ def inspect_candidate() -> dict[str, object]:
         {"code": "templates", "ok": len(template_names) >= 80 and not template_errors, "detail": {"count": len(template_names), "errors": template_errors}},
         {"code": "migration_head", "ok": len(heads) == 1, "detail": heads},
         {"code": "clean_tree", "ok": not invalid_files, "detail": invalid_files},
-        {"code": "internal_acceptance", "ok": all((ROOT / name).is_file() for name in required_docs), "detail": list(required_docs)},
+        {"code": "internal_acceptance", "ok": not missing_docs, "detail": {"required": [canonical for canonical, _ in REQUIRED_DOCS], "missing": missing_docs}},
         {"code": "legal_surface", "ok": all((ROOT / name).is_file() for name in required_legal), "detail": list(required_legal)},
         {
             "code": "controlled_release_defaults",
