@@ -67,6 +67,7 @@ jobs:
             tests/test_v057_production_readiness.py \
             tests/test_v100_rc1_release_candidate.py \
             tests/test_v200_product_readiness_gate.py \
+            tests/test_v200_postgres_continuity_gate.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía
@@ -104,6 +105,81 @@ jobs:
             iteration4-targeted.xml
             iteration4-full.log
           if-no-files-found: warn
+          retention-days: 14
+
+  postgres-continuity:
+    name: Continuidad · restore PostgreSQL real
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: cth
+          POSTGRES_PASSWORD: cthpass
+          POSTGRES_DB: calculahuella_source
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U cth -d calculahuella_source"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+      BACKUP_SIGNING_SECRET: v2-ci-postgres-backup-signing-secret-2026-08-10
+      DATABASE_URL: postgresql+psycopg://cth:cthpass@127.0.0.1:5432/calculahuella_source
+      POSTGRES_RESTORE_DATABASE_URL: postgresql+psycopg://cth:cthpass@127.0.0.1:5432/calculahuella_restore
+      INSTANCE_DIR: /tmp/cth-postgres-continuity
+      CONTINUITY_EVIDENCE_PATH: postgres-restore-evidence.json
+      PGPASSWORD: cthpass
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y postgresql-client
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+          pg_dump --version
+          pg_restore --version
+
+      - name: Preparar base fuente y destino aislado
+        run: |
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+          psql -h 127.0.0.1 -U cth -d postgres -v ON_ERROR_STOP=1 <<'SQL'
+          DROP DATABASE IF EXISTS calculahuella_restore WITH (FORCE);
+          CREATE DATABASE calculahuella_restore OWNER cth;
+          SQL
+
+      - name: Crear, verificar, restaurar y auditar backup PostgreSQL
+        run: python scripts/postgres_restore_gate.py
+
+      - name: Publicar evidencia de continuidad PostgreSQL
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: postgres-continuity-evidence
+          path: postgres-restore-evidence.json
+          if-no-files-found: error
           retention-days: 14
 
   browser-gate:
