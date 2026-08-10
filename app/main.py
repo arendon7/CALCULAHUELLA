@@ -148,6 +148,7 @@ from .portfolio_web import register_portfolio_routes
 from .executive_portfolio_web import register_executive_portfolio_routes
 from .compliance_web import register_compliance_routes
 from .methodology_governance_web import register_methodology_governance_routes
+from .dashboard_web import register_dashboard_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -379,96 +380,6 @@ async def forbidden_handler(request: Request, exc: HTTPException):
             status_code=403,
         )
 
-@app.post("/preferencias/vista")
-def update_view_mode(
-    request: Request,
-    mode: str = Form(...),
-    return_url: str = Form("/dashboard"),
-    user: dict = Depends(require_user),
-):
-    request.session["view_mode"] = normalize_view_mode(mode)
-    destination = return_url if return_url.startswith("/") and not return_url.startswith("//") else "/dashboard"
-    set_flash(
-        request,
-        "Vista esencial activada: se prioriza el flujo del inventario."
-        if request.session["view_mode"] == "essential"
-        else "Vista completa activada: se muestran capacidades avanzadas e internas.",
-    )
-    return RedirectResponse(destination, status_code=303)
-
-@app.get("/recorrido-inventario", response_class=HTMLResponse)
-def inventory_journey_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    inventory = get_inventory(session, user)
-    workspace = guided_workspace(session, user, inventory)
-    journey = journey_detail(workspace, str(user["role"]))
-    session.commit()
-    return templates.TemplateResponse(
-        request=request,
-        name="inventory_journey.html",
-        context=common_context(
-            request,
-            session,
-            user,
-            "journey",
-            inventory=inventory,
-            journey=journey,
-        ),
-    )
-
-@app.get("/dashboard", response_class=HTMLResponse)
-def dashboard(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    inventory = get_inventory(session, user)
-    metrics = inventory_metrics(inventory)
-    inventories = list(session.scalars(select(Inventory).where(Inventory.organization_id == int(user["organization_id"])).order_by(Inventory.start_date.desc())))
-    tasks = list(session.scalars(
-        select(DataRequest)
-        .where(
-            DataRequest.inventory_id == inventory.id,
-            DataRequest.status.notin_(["Completada", "Cerrada"]),
-        )
-        .order_by(DataRequest.due_date)
-    ))
-    workspace = guided_workspace(session, user, inventory)
-    delivery = professional_delivery_summary(session, inventory)
-    dashboard_action = delivery["next_action"]
-    if str(user["role"]) == "Cliente":
-        if tasks:
-            dashboard_action = {
-                "name": "Atender solicitudes de información",
-                "detail": f"Tienes {len(tasks)} requerimiento(s) activo(s). Completa los datos o soportes solicitados antes de la revisión técnica.",
-                "owner": "Responsable de información",
-                "acceptance": "Solicitudes respondidas y evidencias vinculadas al periodo correcto.",
-                "href": "/informacion#solicitudes",
-                "action": "Abrir pendientes",
-            }
-        else:
-            dashboard_action = {
-                "name": "Completar datos y evidencias",
-                "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
-                "owner": "Responsable de información",
-                "acceptance": "Fuentes del periodo completas y soportes vinculados.",
-                "href": "/captura-guiada",
-                "action": "Continuar captura",
-            }
-    onboarding_rows = list(session.scalars(select(CustomerOnboardingItem).where(
-        CustomerOnboardingItem.organization_id == int(user["organization_id"])
-    ).order_by(CustomerOnboardingItem.display_order)))
-    onboarding_state = onboarding_summary(onboarding_rows, inventory_id=inventory.id)
-    guided_profile = load_guided_profile(session, inventory.organization)
-    guided_setup = guided_decision_plan(guided_profile, inventory.organization, inventory=inventory)
-    session.commit()
-    return templates.TemplateResponse(
-        request=request,
-        name="dashboard.html",
-        context=common_context(
-            request, session, user, "dashboard", inventory=inventory, inventories=inventories,
-            tasks=tasks, sources=inventory.sources, workspace=workspace, delivery=delivery,
-            dashboard_action=dashboard_action,
-            journey=journey_detail(workspace, str(user["role"])), onboarding=onboarding_state,
-            guided_setup=guided_setup, demo_story=demo_story_for(inventory.organization.trade_name), **metrics,
-        ),
-    )
-
 def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date]:
     if isinstance(value, datetime):
         parsed = value.date()
@@ -640,6 +551,9 @@ register_compliance_routes(
 )
 register_methodology_governance_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, parse_date, get_inventory
+)
+register_dashboard_routes(
+    app, templates, common_context, require_user, set_flash, get_inventory, inventory_metrics
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
