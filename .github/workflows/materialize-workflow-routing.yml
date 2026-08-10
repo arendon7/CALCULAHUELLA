@@ -1,0 +1,120 @@
+name: Materialize workflow routing
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-workflow-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract workflow HTTP surface from experience module
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          experience_path = Path("app/experience_web.py")
+          source = experience_path.read_text(encoding="utf-8")
+
+          constants_start = source.index("GUIDE_STAGES =")
+          helpers_start = source.index("def _work_navigation_item()")
+          register_start = source.index("def register_experience_routes(")
+          guide_route_start = source.index('    @app.get("/guia"', register_start)
+          work_route_start = source.index('    @app.get("/mi-trabajo"', guide_route_start)
+
+          constants = source[constants_start:helpers_start].rstrip() + "\n"
+          helpers = source[helpers_start:register_start].rstrip() + "\n"
+          guide_block = source[guide_route_start:work_route_start].rstrip() + "\n"
+          workflow_routes = source[work_route_start:].rstrip() + "\n"
+
+          if workflow_routes.count("@app.") != 5:
+              raise SystemExit(f"expected 5 workflow routes, found {workflow_routes.count('@app.')}")
+          if '/mi-trabajo' not in workflow_routes or '/api/mi-trabajo' not in workflow_routes:
+              raise SystemExit("workflow route block incomplete")
+
+          experience_header = '''from __future__ import annotations\n\nfrom fastapi import Depends, Request\nfrom fastapi.responses import HTMLResponse\nfrom sqlalchemy.orm import Session\n\nfrom .database import get_db\nfrom .delivery_readiness import professional_delivery_summary\n\n\n'''
+          experience_register = '''def register_experience_routes(app, templates, common_context, require_user, get_inventory) -> None:\n'''
+          experience_path.write_text(
+              experience_header + constants + "\n\n" + experience_register + guide_block,
+              encoding="utf-8",
+          )
+
+          workflow_header = '''from __future__ import annotations\n\nfrom datetime import date\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom . import product_experience\nfrom .database import Inventory, WorkItem, get_db\nfrom .workflow_domain import CANONICAL_STAGES, STATUSES, WORK_ITEM_TYPES\nfrom .workflow_bridge import sync_data_requests, transition_work_item\nfrom .workflow_service import (\n    ACTION_LABELS,\n    ACTIONS_REQUIRING_REASON,\n    WorkflowServiceError,\n    actions_for_item,\n    create_work_item,\n    status_label,\n    visible_work_items,\n    work_item_summary,\n)\n\n\n'''
+          workflow_register = '''def register_workflow_routes(app, templates, common_context, require_user) -> None:\n    _install_work_navigation()\n\n'''
+          Path("app/workflow_web.py").write_text(
+              workflow_header + helpers + "\n\n" + workflow_register + workflow_routes,
+              encoding="utf-8",
+          )
+
+          main_path = Path("app/main.py")
+          main = main_path.read_text(encoding="utf-8")
+          import_anchor = "from .experience_web import register_experience_routes\n"
+          if main.count(import_anchor) != 1:
+              raise SystemExit("experience import anchor missing")
+          main = main.replace(
+              import_anchor,
+              import_anchor + "from .workflow_web import register_workflow_routes\n",
+              1,
+          )
+          register_anchor = '''register_experience_routes(\n    app, templates, common_context, require_user, get_inventory\n)\n'''
+          if main.count(register_anchor) != 1:
+              raise SystemExit("experience registration anchor missing")
+          main = main.replace(
+              register_anchor,
+              '''register_workflow_routes(\n    app, templates, common_context, require_user\n)\n''' + register_anchor,
+              1,
+          )
+          main_path.write_text(main, encoding="utf-8")
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nWORKFLOW_ROUTES = {\n    ("GET", "/mi-trabajo"),\n    ("POST", "/mi-trabajo/nueva"),\n    ("POST", "/mi-trabajo/sincronizar"),\n    ("POST", "/mi-trabajo/{work_item_id}/accion"),\n    ("GET", "/api/mi-trabajo"),\n}\n\n\ndef _login(client: TestClient) -> None:\n    response = client.post(\n        "/login",\n        data={"email": "admin@calculatuhuella.local", "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v160_workflow_routes_have_dedicated_http_authority():\n    experience = (ROOT / "app/experience_web.py").read_text(encoding="utf-8")\n    workflow = (ROOT / "app/workflow_web.py").read_text(encoding="utf-8")\n    main = (ROOT / "app/main.py").read_text(encoding="utf-8")\n\n    assert "/mi-trabajo" not in experience\n    assert "workflow_service" not in experience\n    assert "workflow_bridge" not in experience\n    assert workflow.count("@app.") == 5\n    assert "register_workflow_routes(" in main\n    assert "register_experience_routes(" in main\n    assert '@app.get("/guia"' in experience\n\n\ndef test_v160_workflow_route_contract_is_unique_and_complete():\n    actual = []\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path and (path.startswith("/mi-trabajo") or path == "/api/mi-trabajo"):\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == WORKFLOW_ROUTES\n    assert len(actual) == len(WORKFLOW_ROUTES)\n\n\ndef test_v160_workflow_and_guide_coexist_after_extraction():\n    with TestClient(app) as client:\n        _login(client)\n        work = client.get("/mi-trabajo?scope=all")\n        guide = client.get("/guia")\n        api = client.get("/api/mi-trabajo?scope=all")\n        assert work.status_code == 200\n        assert "Mi trabajo" in work.text\n        assert guide.status_code == 200\n        assert "Diagnosticar" in guide.text\n        assert api.status_code == 200\n        assert api.json()["scope"] == "all"\n'''
+          Path("tests/test_v160_workflow_routing.py").write_text(test, encoding="utf-8")
+
+          doc = '''# V1.6 · Workflow routing\n\n## Estado previo\n\nLa lógica de workflow ya estaba separada en `workflow_domain.py`, `workflow_service.py`, `workflow_bridge.py` y `workflow_integrations.py`. La deuda restante era HTTP: las cinco rutas de `Mi trabajo` y su inyección de navegación convivían con `/guia` dentro de `experience_web.py`.\n\n## Corte materializado\n\n- `app/workflow_web.py` pasa a ser la autoridad HTTP de las 5 rutas `/mi-trabajo*`.\n- La promoción de `Mi trabajo` en la navegación se mueve con esa superficie.\n- `app/experience_web.py` queda dedicado a `/guia`, `GUIDE_STAGES` y `GLOSSARY`.\n- `app/main.py` solo registra ambos módulos.\n- No se modifican estados, transiciones, capacidades, sincronización de `DataRequest`, notificaciones ni reglas de asignación.\n\n## Contratos\n\n1. Exactamente cinco rutas de workflow, sin duplicados.\n2. `/mi-trabajo`, `/api/mi-trabajo` y `/guia` permanecen operativos.\n3. Iteration 15 protege el catálogo canónico.\n4. Iteration 16 protege asignación, visibilidad y ciclo completo.\n5. Iteration 17 protege integración y sincronización.\n6. Suite completa, arquitectura y smoke deben quedar verdes antes del commit.\n'''
+          Path("docs/architecture/V1_6_WORKFLOW_ROUTING.md").write_text(doc, encoding="utf-8")
+          PY
+          python -m py_compile app/experience_web.py app/workflow_web.py app/main.py tests/test_v160_workflow_routing.py
+          git diff --check
+      - name: Targeted workflow contracts
+        run: >-
+          pytest -q
+          tests/test_v160_workflow_routing.py
+          tests/test_iteration15_canonical_workflow.py
+          tests/test_iteration16_area_assignment.py
+          tests/test_iteration16_work_items.py
+          tests/test_iteration17_integrated_workflow.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit workflow routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/experience_web.py app/workflow_web.py app/main.py tests/test_v160_workflow_routing.py docs/architecture/V1_6_WORKFLOW_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract workflow HTTP surface"
+          git push origin HEAD:refactor/v1-6-0-consolidation
