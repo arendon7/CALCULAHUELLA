@@ -1,0 +1,92 @@
+name: Materialize V1.9 notifications routing
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-notifications-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Notifications HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = '@app.get("/notificaciones", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/portafolio", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('notification boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 4:
+              raise SystemExit(f"expected 4 notification routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nfrom datetime import UTC, datetime\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session\n\nfrom .database import get_db\nfrom .db.models import Notification\nfrom .notifications import get_or_create_preference\n\n\n'''
+          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          module = header + 'def register_notification_routes(\n    app, templates, common_context, require_user, set_flash\n) -> None:\n' + indented
+          Path('app/notifications_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .readiness_web import register_readiness_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('readiness import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .notifications_web import register_notification_routes\n', 1)
+          register_anchor = '''register_readiness_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('readiness registration anchor missing')
+          registration = '''register_notification_routes(\n    app, templates, common_context, require_user, set_flash\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nNOTIFICATION_ROUTES = {\n    ("GET", "/notificaciones"),\n    ("POST", "/notificaciones/{notification_id}/leer"),\n    ("POST", "/notificaciones/leer-todas"),\n    ("POST", "/notificaciones/preferencias"),\n}\n\n\ndef test_v190_notifications_have_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/notifications_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/notificaciones"' not in main_source\n    assert '@app.post("/notificaciones/' not in main_source\n    assert "register_notification_routes(" in main_source\n    assert module_source.count("@app.") == 4\n    assert "Notification.organization_id" in module_source\n    assert "Notification.user_id" in module_source\n    assert "get_or_create_preference" in module_source\n    assert '@app.get("/portafolio"' not in module_source\n\n\ndef test_v190_notification_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in NOTIFICATION_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == NOTIFICATION_ROUTES\n    assert len(actual) == len(NOTIFICATION_ROUTES)\n'''
+          Path('tests/test_v190_notifications_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Notifications HTTP\n\n## Autoridad\n\n`app/notifications_web.py` pasa a ser la autoridad HTTP de cuatro contratos personales: bandeja, lectura individual, lectura masiva y preferencias.\n\n## Semántica preservada\n\nSe mantienen `read_at`, enlace de retorno, preferencias `email_enabled` / `in_app_enabled` y frecuencias `Inmediato`, `Diario` y `Semanal`.\n\n## Aislamiento\n\nLa bandeja y las mutaciones conservan el filtro simultáneo por `organization_id` y `user_id`; una notificación no puede operarse desde otro usuario u organización mediante estas rutas.\n\n## Gates\n\nV0.11 protege lectura individual y persistencia de preferencias. El contrato V1.9 protege autoridad HTTP, unicidad y presencia explícita de ambos filtros de aislamiento.\n'''
+          Path('docs/architecture/V1_9_NOTIFICATIONS_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/notifications_web.py app/main.py tests/test_v190_notifications_routing.py
+          git diff --check
+      - name: Targeted V1.9 Notifications authority
+        run: pytest -q tests/test_v190_notifications_routing.py
+      - name: Historical V0.11 notification contract
+        run: pytest -q tests/test_app.py -k "v011_notifications_preferences_and_read_flow"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Notifications routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/notifications_web.py app/main.py tests/test_v190_notifications_routing.py docs/architecture/V1_9_NOTIFICATIONS_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract notifications HTTP"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
