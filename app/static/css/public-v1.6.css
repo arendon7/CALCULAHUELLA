@@ -12,6 +12,23 @@
 
 /* El flujo público refleja las ocho etapas canónicas. */
 .process-nav{grid-template-columns:repeat(8,1fr)}
+
+/* Handoff público → diagnóstico: dos respuestas reutilizables, sin PII. */
+.diagnostic-preconfig-grid{align-items:start}
+.landing-context-form{display:grid;gap:14px}
+.landing-context-form label{display:grid;gap:7px;text-align:left}
+.landing-context-form label>span{font-size:.76rem;font-weight:800;letter-spacing:.055em;text-transform:uppercase;color:rgba(255,255,255,.72)}
+.landing-context-form select{width:100%;min-height:46px;padding:10px 12px;border:1px solid rgba(255,255,255,.22);border-radius:12px;background:#fff;color:#17352d;font:inherit}
+.landing-context-form select:focus-visible{outline:3px solid rgba(255,255,255,.34);outline-offset:2px}
+.landing-context-submit{width:100%;margin-top:2px}
+.landing-context-privacy,.landing-context-status{margin:0;font-size:.76rem;line-height:1.45;color:rgba(255,255,255,.72)}
+.landing-context-status:not(:empty){padding:10px 12px;border-radius:10px;background:rgba(255,255,255,.09);color:#fff}
+.diagnostic-preconfig-boundary{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-top:20px}
+.diagnostic-preconfig-boundary div{display:grid;gap:2px;padding:10px 12px;border:1px solid rgba(255,255,255,.16);border-radius:12px;background:rgba(255,255,255,.06)}
+.diagnostic-preconfig-boundary strong{font-size:.75rem;text-transform:uppercase;letter-spacing:.06em}
+.diagnostic-preconfig-boundary span{font-size:.78rem;color:rgba(255,255,255,.74)}
+.diagnostic-preconfig-boundary i{font-style:normal;color:rgba(255,255,255,.52)}
+
 @media(max-width:900px){
   .process-nav{grid-template-columns:repeat(4,1fr)}
   .process-step:nth-child(4){border-right:0}
@@ -21,4 +38,6 @@
   .process-nav{grid-template-columns:repeat(2,1fr)}
   .process-step:nth-child(2n){border-right:0}
   .process-step:nth-child(-n+6){border-bottom:1px solid var(--line)}
+  .diagnostic-preconfig-boundary{display:grid;grid-template-columns:1fr}
+  .diagnostic-preconfig-boundary i{transform:rotate(90deg);justify-self:center}
 }
