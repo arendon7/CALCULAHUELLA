@@ -134,7 +134,7 @@ jobs:
             --require-hashes \
             --dest .pack/wheelhouse/x86_64 \
             --only-binary=:all: \
-            --platform macosx_10_13_x86_64 \
+            --platform macosx_11_0_x86_64 \
             --python-version 312 \
             --implementation cp \
             --abi cp312 \

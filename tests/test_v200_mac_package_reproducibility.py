@@ -32,6 +32,14 @@ def test_v200_mac_package_uses_immutable_runtime_and_hashed_lock() -> None:
     assert "starlette==" in lock
 
 
+def test_v200_mac_wheelhouses_share_modern_macos_11_floor() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--platform macosx_11_0_arm64" in workflow
+    assert "--platform macosx_11_0_x86_64" in workflow
+    assert "macosx_10_13_x86_64" not in workflow
+
+
 def test_v200_mac_package_has_verifiable_provenance_and_deterministic_archive_check() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
