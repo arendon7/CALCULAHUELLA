@@ -1,0 +1,92 @@
+name: Materialize V1.9 platform administration routing
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-platform-admin-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Platform Administration HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = '@app.get("/administracion-plataforma", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/portafolio", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('platform administration boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 4:
+              raise SystemExit(f"expected 4 platform administration routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nimport re\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import func, select\nfrom sqlalchemy.orm import Session\n\nfrom .config import settings\nfrom .database import add_audit, get_db\nfrom .db.models import AppUser, Notification, OrganizationMembership, PlatformSetting\nfrom .notifications import notify_roles, process_pending_notifications\nfrom .storage import storage\n\n\n'''
+          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          module = header + 'def register_platform_admin_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash\n) -> None:\n' + indented
+          Path('app/platform_admin_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .customer_onboarding_web import register_customer_onboarding_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('onboarding import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .platform_admin_web import register_platform_admin_routes\n', 1)
+          register_anchor = '''register_customer_onboarding_routes(\n    app, templates, common_context, require_user, set_flash, parse_date, get_inventory\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('onboarding registration anchor missing')
+          registration = '''register_platform_admin_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nPLATFORM_ADMIN_ROUTES = {\n    ("GET", "/administracion-plataforma"),\n    ("POST", "/administracion-plataforma/configuracion"),\n    ("POST", "/administracion-plataforma/notificaciones/prueba"),\n    ("POST", "/administracion-plataforma/notificaciones/procesar"),\n}\n\n\ndef _login(client: TestClient, email: str) -> None:\n    response = client.post(\n        "/login",\n        data={"email": email, "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v190_platform_admin_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/platform_admin_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/administracion-plataforma"' not in main_source\n    assert '@app.post("/administracion-plataforma/' not in main_source\n    assert "register_platform_admin_routes(" in main_source\n    assert module_source.count("@app.") == 4\n    assert "PlatformSetting" in module_source\n    assert "notify_roles" in module_source\n    assert "process_pending_notifications" in module_source\n    assert "storage.diagnostics" in module_source\n    assert '@app.get("/portafolio"' not in module_source\n\n\ndef test_v190_platform_admin_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in PLATFORM_ADMIN_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == PLATFORM_ADMIN_ROUTES\n    assert len(actual) == len(PLATFORM_ADMIN_ROUTES)\n\n\ndef test_v190_platform_admin_remains_restricted():\n    with TestClient(app) as client:\n        _login(client, "consultor@calculatuhuella.local")\n        assert client.get("/administracion-plataforma").status_code == 403\n        client.post("/logout")\n        _login(client, "admin@calculatuhuella.local")\n        assert client.get("/administracion-plataforma").status_code == 200\n'''
+          Path('tests/test_v190_platform_admin_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Platform Administration HTTP\n\n## Autoridad\n\n`app/platform_admin_web.py` pasa a ser la autoridad HTTP de cuatro contratos: panel de operación avanzada, configuración por organización, notificación de prueba y procesamiento de la cola.\n\n## Semántica preservada\n\nSe mantienen `PlatformSetting`, normalización de claves, auditoría, `notify_roles`, `process_pending_notifications`, tamaño de lote y diagnóstico de almacenamiento. Las preferencias personales `/notificaciones*` permanecen fuera de este corte.\n\n## Acceso\n\nLas cuatro rutas continúan exigiendo `manage_operations` y filtrando configuración/estadísticas por organización activa.\n\n## Gates\n\nV0.11 protege configuración persistente, notificación de prueba, procesamiento de cola y denegación a no administradores. El contrato V1.9 protege autoridad HTTP y unicidad.\n'''
+          Path('docs/architecture/V1_9_PLATFORM_ADMIN_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/platform_admin_web.py app/main.py tests/test_v190_platform_admin_routing.py
+          git diff --check
+      - name: Targeted V1.9 Platform Administration authority
+        run: pytest -q tests/test_v190_platform_admin_routing.py
+      - name: Historical V0.11 platform contracts
+        run: pytest -q tests/test_app.py -k "v011_admin_platform_and_notification_queue or v011_non_admin_cannot_access_platform_admin"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Platform Administration routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/platform_admin_web.py app/main.py tests/test_v190_platform_admin_routing.py docs/architecture/V1_9_PLATFORM_ADMIN_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract platform administration HTTP"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
