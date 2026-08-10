@@ -28,6 +28,8 @@ jobs:
           rsync -a --exclude='.git/' ./ /tmp/calculahuella-canonical-check/
           cd /tmp/calculahuella-canonical-check
           python tools/verify_canonical.py --skip-manifest
+      - name: Impedir crecimiento de deuda arquitectónica V1.6
+        run: python scripts/audit_architecture.py --enforce
       - run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
       - run: python -m alembic upgrade head
         env:
