@@ -1,0 +1,96 @@
+name: Materialize V1.8 climate risk routing
+
+on:
+  push:
+    branches: [refactor/v1-8-0-strategic-surfaces]
+    paths:
+      - .github/workflows/materialize-v18-climate-risk-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-8-0-strategic-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Climate Risk HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = 'def _require_climate_risk_view(user: dict[str, object]) -> None:\n'
+          route_marker = '@app.get("/riesgos-climaticos", response_class=HTMLResponse)\n'
+          end_marker = 'def _require_climate_disclosure_view(user: dict[str, object]) -> None:\n'
+          if source.count(start_marker) != 1 or source.count(route_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('climate risk boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 9:
+              raise SystemExit(f"expected 9 climate risk routes, found {block.count('@app.')}")
+          route_start = block.index(route_marker)
+          helper_block = block[:route_start].rstrip() + '\n'
+          route_block = block[route_start:].rstrip() + '\n'
+
+          header = '''from __future__ import annotations\n\nfrom io import BytesIO\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse, Response\nfrom openpyxl import Workbook\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session\n\nfrom .climate_risk import (\n    assessment_summary,\n    calculate_risk_scores,\n    refresh_assessment_status,\n    risk_level,\n    synchronize_control_effectiveness,\n)\nfrom .database import add_audit, get_db\nfrom .db.models import (\n    ClimateRisk,\n    ClimateRiskAssessment,\n    ClimateRiskControl,\n    ClimateTransitionAction,\n    ClimateTransitionRoadmap,\n    Inventory,\n)\n\n\n'''
+          indented_routes = ''.join(('    ' + line if line.strip() else line) for line in route_block.splitlines(keepends=True))
+          module = header + helper_block + '\n\ndef register_climate_risk_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date\n) -> None:\n' + indented_routes
+          Path('app/climate_risk_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .impact_intelligence_web import register_impact_intelligence_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('Impact Intelligence import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .climate_risk_web import register_climate_risk_routes\n', 1)
+          register_anchor = '''register_impact_intelligence_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('Impact Intelligence registration anchor missing')
+          registration = '''register_climate_risk_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nCLIMATE_RISK_ROUTES = {\n    ("GET", "/riesgos-climaticos"),\n    ("POST", "/riesgos-climaticos/evaluacion"),\n    ("POST", "/riesgos-climaticos/riesgos/nuevo"),\n    ("POST", "/riesgos-climaticos/riesgos/{risk_id}/actualizar"),\n    ("POST", "/riesgos-climaticos/controles/nuevo"),\n    ("POST", "/riesgos-climaticos/hoja-ruta"),\n    ("POST", "/riesgos-climaticos/acciones/nueva"),\n    ("POST", "/riesgos-climaticos/acciones/{action_id}/estado"),\n    ("GET", "/riesgos-climaticos/exportar.xlsx"),\n}\n\n\ndef _login(client: TestClient, email: str) -> None:\n    response = client.post(\n        "/login",\n        data={"email": email, "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v180_climate_risk_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/climate_risk_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/riesgos-climaticos"' not in main_source\n    assert '@app.post("/riesgos-climaticos/' not in main_source\n    assert "register_climate_risk_routes(" in main_source\n    assert module_source.count("@app.") == 9\n    assert "def _require_climate_risk_view" in module_source\n    assert "def _require_climate_disclosure_view" not in module_source\n    for authority in (\n        "assessment_summary",\n        "calculate_risk_scores",\n        "risk_level",\n        "synchronize_control_effectiveness",\n        "refresh_assessment_status",\n    ):\n        assert authority in module_source\n\n\ndef test_v180_climate_risk_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in CLIMATE_RISK_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == CLIMATE_RISK_ROUTES\n    assert len(actual) == len(CLIMATE_RISK_ROUTES)\n\n\ndef test_v180_climate_risk_client_stays_read_only():\n    with TestClient(app) as client:\n        _login(client, "cliente@calculatuhuella.local")\n        page = client.get("/riesgos-climaticos")\n        assert page.status_code == 200\n        denied = client.post(\n            "/riesgos-climaticos/riesgos/nuevo",\n            data={\n                "risk_type": "Físico",\n                "category": "Agudo",\n                "hazard": "Prueba V1.8 denegada",\n                "owner": "Operaciones",\n                "likelihood": "3",\n                "financial_impact": "3",\n                "operational_impact": "3",\n                "reputational_impact": "2",\n            },\n            follow_redirects=False,\n        )\n        assert denied.status_code == 403\n'''
+          Path('tests/test_v180_climate_risk_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.8 · Climate Risk HTTP\n\n## Autoridad\n\n`app/climate_risk_web.py` pasa a ser la autoridad HTTP de nueve contratos: evaluación climática, registro/actualización de riesgos, controles, hoja de ruta, acciones y exportación XLSX.\n\n## Dominio preservado\n\n`app/climate_risk.py` continúa siendo la autoridad de `assessment_summary`, `calculate_risk_scores`, `risk_level`, `synchronize_control_effectiveness` y `refresh_assessment_status`. No se alteran escalas 1–5, cálculo inherente/residual, efectividad combinada, exposición financiera ni readiness.\n\n## Acceso e aislamiento\n\nLa lectura continúa disponible para `view_climate_risk` o `manage_climate_risk`; las mutaciones exigen `manage_climate_risk`. Riesgos, controles, acciones e inventarios siguen restringidos a la organización activa.\n\n## Gates\n\nLos contratos históricos V0.19 protegen semilla, lectura cliente, scoring inherente/residual, efecto de controles, ciclo de acciones y exportación Excel. El contrato V1.8 protege autoridad HTTP, unicidad y permisos.\n'''
+          Path('docs/architecture/V1_8_CLIMATE_RISK_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/climate_risk_web.py app/main.py tests/test_v180_climate_risk_routing.py
+          git diff --check
+      - name: Targeted V1.8 Climate Risk authority
+        run: pytest -q tests/test_v180_climate_risk_routing.py
+      - name: Historical V0.19 Climate Risk contracts
+        run: pytest -q tests/test_app.py -k "v019"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Climate Risk routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/climate_risk_web.py app/main.py tests/test_v180_climate_risk_routing.py docs/architecture/V1_8_CLIMATE_RISK_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract climate risk HTTP"
+          git push origin HEAD:refactor/v1-8-0-strategic-surfaces
