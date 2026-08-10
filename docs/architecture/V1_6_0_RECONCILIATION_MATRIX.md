@@ -34,7 +34,7 @@ Una mejora entra a V1.6 únicamente si cumple simultáneamente:
 | Reporting narrativo | Mejor lectura de reducción/gobierno/cierre | Parcialmente anterior | **Pendiente de diff/port selectivo** |
 | Marca | Logo clásico canónico | Assets de marca canónicos | **Ya alineado** |
 | Reserva verificador/certificador | Explícita | Explícita | **Alineado** |
-| Handoff landing→diagnóstico | sector/objetivo, sin PII URL | Debe mantenerse como contrato de producto | **Reconciliar sin PII** |
+| Handoff landing→diagnóstico | sector/objetivo, sin PII URL | Contrato V1 con TTL y whitelist | **Portado y validado** |
 | Datos demo | 5 organizaciones certificadas | rama workflow contiene entorno demo avanzado | **No convertir demo en semántica productiva** |
 | Core version | 1.0.0 | 1.0.0 | **Mantener** |
 | Demo/release version | 1.5.5 | V1.6 como ciclo de producto | **Separar conceptos** |
@@ -52,7 +52,13 @@ Una mejora entra a V1.6 únicamente si cumple simultáneamente:
 - una sola autoridad CSS pública V1.6;
 - árbol documental actual reconocido por `release_candidate.py`;
 - árbol documental actual reconocido por `validate_release_candidate.py`;
-- eliminación de badge histórico V1.4 de la UI pública.
+- eliminación de badge histórico V1.4 de la UI pública;
+- preconfiguración sector + objetivo integrada en el parcial modular de la landing;
+- contrato `cth_landing_context_v1` / `cth.landing_context.v1` recuperado;
+- consumidor con TTL de 30 minutos y whitelist de `sector`/`objective`;
+- valores del productor alineados con los selects reales de `/diagnostico`;
+- sin PII ni interés comercial en el objeto reutilizable;
+- CI canónico verde para el handoff V1.6 en run `31359360758`.
 
 ### Pendiente de producto
 
@@ -65,14 +71,10 @@ Una mejora entra a V1.6 únicamente si cumple simultáneamente:
 2. **Reporting**
    - comparar `app/reporting.py` actual con V1.5.5;
    - portar solo mejoras editoriales/estructurales que no eliminen cambios posteriores;
-   - fijar required/expected/gap/coverage en output técnico.
+   - fijar required/expected/gap/coverage en output técnico;
+   - seguir `docs/architecture/V1_6_0_REPORTING_RECONCILIATION.md`.
 
-3. **Handoff público → diagnóstico**
-   - verificar que el contrato sector/objetivo está presente en la rama V1.6;
-   - TTL y whitelist;
-   - nunca PII en query string.
-
-4. **Empaquetado Mac**
+3. **Empaquetado Mac**
    - llevar backup/staging/rollback al workflow de artefactos cuando el core V1.6 esté estable;
    - no mezclar scripts `Modo Feria` con la app productiva.
 
@@ -103,4 +105,4 @@ Política:
 
 ## Criterio de cierre de reconciliación
 
-La reconciliación V1.5.5 se considera terminada cuando CSP, reporting y handoff estén portados/verificados, y la línea V1.6 pueda generar una demo equivalente o superior sin depender de archivos locales fuera de GitHub.
+La reconciliación V1.5.5 se considera terminada cuando CSP y reporting estén portados/verificados, y la línea V1.6 pueda generar una demo equivalente o superior sin depender de archivos locales fuera de GitHub.
