@@ -1,0 +1,146 @@
+name: Materialize reporting C1
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-reporting-c1.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Apply C1 editorial reconciliation
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          def replace_once(path: str, old: str, new: str) -> None:
+              target = Path(path)
+              text = target.read_text(encoding="utf-8")
+              count = text.count(old)
+              if count != 1:
+                  raise SystemExit(f"{path}: expected exactly one match, found {count}")
+              target.write_text(text.replace(old, new, 1), encoding="utf-8")
+
+          # 1) Canonical editorial projection: same portfolio values, no formulas.
+          replace_once(
+              "app/report_consulting.py",
+              '''def _status(score: float, blocked: bool = False) -> str:\n    if blocked:\n        return BLOCKED\n    if score >= 85:\n        return READY\n    return PROGRESS\n\n\n''',
+              '''def _status(score: float, blocked: bool = False) -> str:\n    if blocked:\n        return BLOCKED\n    if score >= 85:\n        return READY\n    return PROGRESS\n\n\ndef portfolio_control_view(portfolio: dict[str, Any]) -> list[dict[str, Any]]:\n    """Project canonical portfolio magnitudes into reporting-only copy.\n\n    This helper formats and interprets existing values. It does not calculate\n    emissions, reduction potential, coverage or compliance.\n    """\n    coverage = portfolio["coverage_percent"]\n    if coverage > 100:\n        coverage_reading = "Capacidad estructurada superior al requerimiento; no implica cumplimiento automático."\n    elif coverage == 100:\n        coverage_reading = "Capacidad estructurada equivalente al requerimiento; su materialización depende de ejecución y seguimiento."\n    else:\n        coverage_reading = "Capacidad estructurada frente al requerimiento; la brecha pendiente permanece explícita."\n\n    return [\n        {\n            "code": "required_reduction",\n            "label": "Reducción requerida",\n            "value": portfolio["required_reduction"],\n            "display": f"{portfolio['required_reduction']:.2f} tCO2e/año",\n            "reading": "Magnitud de reducción asociada a la meta u objetivo registrado.",\n        },\n        {\n            "code": "expected_reduction",\n            "label": "Reducción esperada",\n            "value": portfolio["expected_reduction"],\n            "display": f"{portfolio['expected_reduction']:.2f} tCO2e/año",\n            "reading": "Suma ya estructurada en las acciones del portafolio.",\n        },\n        {\n            "code": "gap",\n            "label": "Brecha de reducción",\n            "value": portfolio["gap"],\n            "display": f"{portfolio['gap']:.2f} tCO2e/año",\n            "reading": "Diferencia pendiente reportada por el portafolio canónico.",\n        },\n        {\n            "code": "coverage_percent",\n            "label": "Cobertura del portafolio",\n            "value": coverage,\n            "display": f"{coverage:.1f}%",\n            "reading": coverage_reading,\n        },\n    ]\n\n\n''',
+          )
+          replace_once(
+              "app/report_consulting.py",
+              '''    portfolio = portfolio or portfolio_summary(session, inventory)\n\n    total = float(analysis["total"] or 0)\n''',
+              '''    portfolio = portfolio or portfolio_summary(session, inventory)\n    portfolio_control = portfolio_control_view(portfolio)\n\n    total = float(analysis["total"] or 0)\n''',
+          )
+          replace_once(
+              "app/report_consulting.py",
+              '''        "closure": closure,\n        "portfolio": portfolio,\n    }''',
+              '''        "closure": closure,\n        "portfolio": portfolio,\n        "portfolio_control": portfolio_control,\n    }''',
+          )
+
+          # 2) Editable DOCX: explicit control table + governance + technical next steps.
+          replace_once(
+              "app/report_docx.py",
+              '''    document.add_paragraph(\n        f"Estado: {portfolio['portfolio_status']}. Cobertura de la meta: {portfolio['coverage_percent']:.1f}%. "\n        f"Preparación: {portfolio['readiness_score']}%. Decisión principal: {portfolio['primary_decision']}"\n    )\n    reduction_rows = [["Clasificación", "Acción", "Reducción esperada", "Preparación", "Responsable", "Estado"]]\n''',
+              '''    document.add_paragraph(\n        f"Estado: {portfolio['portfolio_status']}. Cobertura de la meta: {portfolio['coverage_percent']:.1f}%. "\n        f"Preparación: {portfolio['readiness_score']}%. Decisión principal: {portfolio['primary_decision']}"\n    )\n    _table(document, [["Indicador", "Valor", "Lectura"]] + [\n        [item["label"], item["display"], item["reading"]] for item in summary["portfolio_control"]\n    ], [4.8, 4.0, 8.2])\n    reduction_rows = [["Clasificación", "Acción", "Reducción esperada", "Preparación", "Responsable", "Estado"]]\n''',
+          )
+          replace_once(
+              "app/report_docx.py",
+              '''    _heading(document, "9. Limitaciones y reglas de comunicación", 1)\n    for item in summary["limitations"]:\n        _bullet(document, f"{item['category']}: {item['detail']}")\n    _table(document, [["Afirmación", "Permitida", "Orientación"]] + [\n        [item["label"], "Sí" if item["allowed"] else "No", item["guidance"]] for item in summary["claims"]\n    ], [4.0, 2.0, 10.5])\n    _editable_note(document, "uso previsto", "Indique quién recibirá el documento, para qué decisión y bajo qué control de confidencialidad.")\n\n    _heading(document, "10. Anexo metodológico", 1)\n''',
+              '''    _heading(document, "9. Gobierno de la entrega, limitaciones y uso", 1)\n    _table(document, [["Control", "Estado", "Detalle"]] + [\n        [gate["name"], gate["status"], gate["detail"]] for gate in delivery["gates"]\n    ], [4.5, 3.0, 9.0])\n    for item in summary["limitations"]:\n        _bullet(document, f"{item['category']}: {item['detail']}")\n    _table(document, [["Afirmación", "Permitida", "Orientación"]] + [\n        [item["label"], "Sí" if item["allowed"] else "No", item["guidance"]] for item in summary["claims"]\n    ], [4.0, 2.0, 10.5])\n    _editable_note(document, "uso previsto", "Indique quién recibirá el documento, para qué decisión y bajo qué control de confidencialidad.")\n\n    _heading(document, "10. Declaración técnica y próximos pasos", 1)\n    document.add_paragraph(\n        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "\n        "El documento interpreta información ya calculada y controlada por la plataforma. "\n        "La aprobación interna no equivale a verificación independiente y la cobertura del portafolio no constituye, por sí sola, una afirmación de cumplimiento."\n    )\n    next_steps = [["Prioridad", "Etapa", "Próximo paso", "Responsable"]]\n    for item in delivery["action_plan"][:6]:\n        next_steps.append([item["priority"], item["stage"], item["title"], item["owner"]])\n    if len(next_steps) == 1:\n        next_steps.append(["Control", "Cierre", "Mantener trazabilidad y revisión del siguiente periodo.", "Dirección"] )\n    _table(document, next_steps, [2.5, 3.4, 7.0, 4.0])\n\n    _heading(document, "11. Anexo metodológico", 1)\n''',
+          )
+
+          # 3) Technical PDF: same canonical control projection and aligned governance headings.
+          replace_once(
+              "app/reporting.py",
+              '''    story.append(Paragraph(_pdf_text(\n        f"Reducción requerida: {_number(portfolio['required_reduction'])} tCO2e/año; "\n        f"reducción estructurada: {_number(portfolio['expected_reduction'])} tCO2e/año; "\n        f"cobertura: {portfolio['coverage_percent']:.1f}%; brecha: {_number(portfolio['gap'])} tCO2e/año; "\n        f"preparación del portafolio: {portfolio['readiness_score']}%."\n    ), styles["BodySmall"]))\n    reduction_rows = [["Acción", "Clase", "Reducción", "Costo marginal", "Preparación", "Avance"]]\n''',
+              '''    story.append(Paragraph(_pdf_text(\n        f"Reducción requerida: {_number(portfolio['required_reduction'])} tCO2e/año; "\n        f"reducción estructurada: {_number(portfolio['expected_reduction'])} tCO2e/año; "\n        f"cobertura: {portfolio['coverage_percent']:.1f}%; brecha: {_number(portfolio['gap'])} tCO2e/año; "\n        f"preparación del portafolio: {portfolio['readiness_score']}%."\n    ), styles["BodySmall"]))\n    portfolio_control_rows = [["Indicador", "Valor", "Lectura"]] + [\n        [item["label"], item["display"], item["reading"]] for item in consulting["portfolio_control"]\n    ]\n    story.extend([_table(portfolio_control_rows, [42 * mm, 34 * mm, 100 * mm], font_size=6.8), Spacer(1, 5 * mm)])\n    reduction_rows = [["Acción", "Clase", "Reducción", "Costo marginal", "Preparación", "Avance"]]\n''',
+          )
+          replace_once(
+              "app/reporting.py",
+              '''    story.append(Paragraph("10. Hallazgos y recomendaciones", styles["Section"]))''',
+              '''    story.append(Paragraph("10. Hallazgos, implicaciones y recomendaciones", styles["Section"]))''',
+          )
+          replace_once(
+              "app/reporting.py",
+              '''    story.append(Paragraph("11. Puertas de entrega y limitaciones", styles["Section"]))''',
+              '''    story.append(Paragraph("11. Gobierno de la entrega, limitaciones y uso", styles["Section"]))''',
+          )
+          replace_once(
+              "app/reporting.py",
+              '''    story.append(Paragraph("12. Declaración técnica", styles["Section"]))\n    story.append(Paragraph(\n        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "\n        "El inventario fue elaborado a partir de la información registrada por la organización y los factores seleccionados. "\n        "Los factores demostrativos deben sustituirse por fuentes oficiales o específicas antes de uso externo. "\n        "La aprobación dentro de la plataforma corresponde a control interno y no constituye verificación independiente.", styles["BodySmall"]\n    ))\n    doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)\n''',
+              '''    story.append(Paragraph("12. Declaración técnica y próximos pasos", styles["Section"]))\n    story.append(Paragraph(\n        f"Estado de publicación: {'versión final controlada' if delivery['release_ready'] else 'borrador técnico'}. "\n        "El inventario fue elaborado a partir de la información registrada por la organización y los factores seleccionados. "\n        "Los factores demostrativos deben sustituirse por fuentes oficiales o específicas antes de uso externo. "\n        "La aprobación dentro de la plataforma corresponde a control interno y no constituye verificación independiente. "\n        "La cobertura del portafolio expresa capacidad estructurada frente al requerimiento y no constituye por sí sola una afirmación de cumplimiento.", styles["BodySmall"]\n    ))\n    next_step_rows = [["Prioridad", "Etapa", "Próximo paso", "Responsable"]]\n    for item in delivery["action_plan"][:6]:\n        next_step_rows.append([item["priority"], item["stage"], item["title"], item["owner"]])\n    if len(next_step_rows) == 1:\n        next_step_rows.append(["Control", "Cierre", "Mantener trazabilidad y revisión del siguiente periodo.", "Dirección"])\n    story.append(_table(next_step_rows, [24 * mm, 31 * mm, 78 * mm, 43 * mm], font_size=6.6))\n    doc.build(story, onFirstPage=_header_footer, onLaterPages=_header_footer)\n''',
+          )
+
+          # 4) Extend the existing report and portfolio contracts.
+          replace_once(
+              "tests/test_v055_consulting_reports.py",
+              '''from app.report_consulting import consulting_report_summary\n''',
+              '''from app.report_consulting import consulting_report_summary, portfolio_control_view\n''',
+          )
+          replace_once(
+              "tests/test_v055_consulting_reports.py",
+              '''        assert summary["findings"]\n        assert summary["limitations"]\n        assert any(item["label"] == "Inventario verificado" and not item["allowed"] for item in summary["claims"])\n''',
+              '''        assert summary["findings"]\n        assert summary["limitations"]\n        control = {item["code"]: item for item in summary["portfolio_control"]}\n        assert control["required_reduction"]["value"] == summary["portfolio"]["required_reduction"]\n        assert control["expected_reduction"]["value"] == summary["portfolio"]["expected_reduction"]\n        assert control["gap"]["value"] == summary["portfolio"]["gap"]\n        assert control["coverage_percent"]["value"] == summary["portfolio"]["coverage_percent"]\n        assert any(item["label"] == "Inventario verificado" and not item["allowed"] for item in summary["claims"])\n\n\ndef test_v055_portfolio_control_handles_zero_gap_and_overcoverage_without_claiming_compliance():\n    zero = portfolio_control_view({\n        "required_reduction": 0.0, "expected_reduction": 0.0, "gap": 0.0, "coverage_percent": 0.0,\n    })\n    assert {item["code"]: item["value"] for item in zero} == {\n        "required_reduction": 0.0, "expected_reduction": 0.0, "gap": 0.0, "coverage_percent": 0.0,\n    }\n\n    over = portfolio_control_view({\n        "required_reduction": 100.0, "expected_reduction": 120.0, "gap": 0.0, "coverage_percent": 120.0,\n    })\n    coverage = next(item for item in over if item["code"] == "coverage_percent")\n    assert coverage["value"] == 120.0\n    assert "no implica cumplimiento automático" in coverage["reading"]\n''',
+          )
+          replace_once(
+              "tests/test_v055_consulting_reports.py",
+              '''    text = "\\n".join(paragraph.text for paragraph in document.paragraphs)\n    assert "Informe de huella de carbono" in text\n    assert "Resumen ejecutivo" in text\n    assert "Limitaciones" in text\n    assert len(document.tables) >= 5\n''',
+              '''    text = "\\n".join(paragraph.text for paragraph in document.paragraphs)\n    table_text = "\\n".join(cell.text for table in document.tables for row in table.rows for cell in row.cells)\n    assert "Informe de huella de carbono" in text\n    assert "Resumen ejecutivo" in text\n    assert "Gobierno de la entrega, limitaciones y uso" in text\n    assert "Declaración técnica y próximos pasos" in text\n    for label in ("Reducción requerida", "Reducción esperada", "Brecha de reducción", "Cobertura del portafolio"):\n        assert label in table_text\n    assert len(document.tables) >= 8\n''',
+          )
+          replace_once(
+              "tests/test_v048_reduction_portfolio.py",
+              '''        assert "Portafolio de reducción y abatimiento" in text\n        assert "Reducción requerida" in text\n        assert "Cobertura" in text or "cobertura" in text''',
+              '''        assert "Portafolio de reducción y abatimiento" in text\n        for label in ("Reducción requerida", "Reducción esperada", "Brecha de reducción", "Cobertura del portafolio"):\n            assert label in text\n        assert "Hallazgos, implicaciones y recomendaciones" in text\n        assert "Gobierno de la entrega, limitaciones y uso" in text\n        assert "Declaración técnica y próximos pasos" in text''',
+          )
+
+          # 5) Record completed semantic reconciliation after all code contracts are in place.
+          doc = Path("docs/architecture/V1_6_0_REPORTING_RECONCILIATION.md")
+          text = doc.read_text(encoding="utf-8")
+          if "## Resultado C0 · matriz semántica cerrada" not in text:
+              marker = "## Corte C1 propuesto\n"
+              if marker not in text:
+                  raise SystemExit("reporting reconciliation doc: C1 marker not found")
+              c0 = '''## Resultado C0 · matriz semántica cerrada\n\n| Capa | Fuente canónica conservada | Portabilidad C1 | Bloques descartados |\n|---|---|---|---|\n| Narrativa consultiva | `portfolio_summary` recibido por `consulting_report_summary` | Proyección editorial de las cuatro magnitudes, sin fórmulas | Recalcular cobertura, brecha o emisiones |\n| PDF técnico | `portfolio` + `consulting_report_summary` | Cuadro de control, gobierno y próximos pasos | Sustituir factores, GWP o estados |\n| DOCX editable | `summary["portfolio"]` | Mismo cuadro de control, puertas de entrega y cierre técnico | Duplicar reglas de negocio |\n| Memoria XLSX / cálculo | Motor vigente | Sin cambios en C1 | Cualquier portabilidad editorial que altere cálculo |\n\nC0 confirma que las diferencias recuperables de V1.5.5 son editoriales. Los blobs locales históricos no están disponibles para un diff byte-a-byte, por lo que la reconciliación se limita deliberadamente a la evidencia auditada, los SHA registrados y los contratos V1.6 actuales.\n\n'''
+              text = text.replace(marker, c0 + "## Corte C1 implementado\n", 1)
+          doc.write_text(text, encoding="utf-8")
+          PY
+          git diff --check
+      - name: Targeted reporting contracts
+        run: pytest -q tests/test_v055_consulting_reports.py tests/test_v048_reduction_portfolio.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit reconciled C1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/report_consulting.py app/report_docx.py app/reporting.py tests/test_v055_consulting_reports.py tests/test_v048_reduction_portfolio.py docs/architecture/V1_6_0_REPORTING_RECONCILIATION.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "feat(reporting): reconcile C1 editorial outputs"
+          git push origin HEAD:refactor/v1-6-0-consolidation
