@@ -1,0 +1,92 @@
+name: Materialize V1.9 verification routing
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-verification-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Verification HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = '@app.get("/verificacion", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/notificaciones", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('verification boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 5:
+              raise SystemExit(f"expected 5 verification routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nfrom datetime import UTC, datetime\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import func, select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .database import add_audit, get_db\nfrom .db.models import (\n    ActivityData, EmissionCalculation, EmissionSource, Inventory, InventoryDecision,\n    ReportArtifact, VerificationFinding,\n)\nfrom .storage import storage\nfrom .verification import create_verification_package\n\n\n'''
+          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          module = header + 'def register_verification_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, review_gate_summary\n) -> None:\n' + indented
+          Path('app/verification_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .scenarios_web import register_scenario_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('scenario import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .verification_web import register_verification_routes\n', 1)
+          register_anchor = '''register_scenario_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('scenario registration anchor missing')
+          registration = '''register_verification_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, review_gate_summary\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nVERIFICATION_ROUTES = {\n    ("GET", "/verificacion"),\n    ("POST", "/verificacion/hallazgos/nuevo"),\n    ("POST", "/verificacion/hallazgos/{finding_id}/responder"),\n    ("POST", "/verificacion/hallazgos/{finding_id}/cerrar"),\n    ("POST", "/verificacion/paquete"),\n}\n\n\ndef _login(client: TestClient, email: str) -> None:\n    response = client.post(\n        "/login",\n        data={"email": email, "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v190_verification_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/verification_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/verificacion"' not in main_source\n    assert '@app.post("/verificacion/' not in main_source\n    assert "register_verification_routes(" in main_source\n    assert module_source.count("@app.") == 5\n    assert "create_verification_package" in module_source\n    assert "review_gate_summary" in module_source\n    assert '@app.get("/notificaciones"' not in module_source\n\n\ndef test_v190_verification_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in VERIFICATION_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == VERIFICATION_ROUTES\n    assert len(actual) == len(VERIFICATION_ROUTES)\n\n\ndef test_v190_verification_access_remains_role_bound():\n    with TestClient(app) as client:\n        _login(client, "cliente@calculatuhuella.local")\n        assert client.get("/verificacion").status_code == 403\n        client.post("/logout")\n        _login(client, "verificador@calculatuhuella.local")\n        page = client.get("/verificacion")\n        assert page.status_code == 200\n'''
+          Path('tests/test_v190_verification_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Verification HTTP\n\n## Autoridad\n\n`app/verification_web.py` pasa a ser la autoridad HTTP de cinco contratos: portal, alta/respuesta/cierre de hallazgos y generación del paquete de verificación.\n\n## Dominio preservado\n\n`app/verification.py` conserva la generación del paquete verificable. El gate de revisión sigue inyectando `review_gate_summary`; no se alteran cálculos, evidencia, decisiones, permisos ni contenidos del manifiesto.\n\n## Acceso\n\nPortal y paquete permanecen restringidos a auditor externo, revisión o aprobación. Alta/cierre exigen `external_audit`; la respuesta conserva los roles de gestión de inventario, provisión de datos o revisión.\n\n## Gates\n\nLos contratos históricos V0.7 protegen login del verificador y ciclo completo del hallazgo. V0.8 protege el ZIP de verificación con manifiesto, cálculos y hallazgos. El contrato V1.9 protege autoridad y unicidad HTTP.\n'''
+          Path('docs/architecture/V1_9_VERIFICATION_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/verification_web.py app/main.py tests/test_v190_verification_routing.py
+          git diff --check
+      - name: Targeted V1.9 Verification authority
+        run: pytest -q tests/test_v190_verification_routing.py
+      - name: Historical verifier lifecycle
+        run: pytest -q tests/test_app.py -k "v07_user_governance_and_verifier_login or v08_verification_package_is_downloadable_zip"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Verification routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/verification_web.py app/main.py tests/test_v190_verification_routing.py docs/architecture/V1_9_VERIFICATION_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract verification HTTP"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
