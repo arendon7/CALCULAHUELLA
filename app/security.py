@@ -312,8 +312,9 @@ class SecurityHeadersMiddleware:
                     b"cross-origin-resource-policy": b"same-origin",
                     b"x-permitted-cross-domain-policies": b"none",
                     b"content-security-policy": (
-                        b"default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
-                        b"font-src 'self'; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+                        b"default-src 'self'; img-src 'self' data:; style-src 'self'; style-src-elem 'self'; "
+                        b"style-src-attr 'unsafe-inline'; script-src 'self'; font-src 'self'; connect-src 'self'; "
+                        b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
                     ),
                 }
                 path = str(scope.get("path", ""))
