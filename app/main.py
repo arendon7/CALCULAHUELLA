@@ -148,6 +148,8 @@ from .guided_onboarding_web import register_guided_onboarding_routes
 from .service_operations_web import register_service_operations_routes
 from .experience_web import register_experience_routes
 from .legal_web import register_legal_routes
+from .public_web import register_public_routes
+from .auth_web import register_auth_routes
 from .period_close import assert_periods_editable
 from .pilot_execution import guided_workspace
 from .storage import storage, StorageError
@@ -689,116 +691,6 @@ async def forbidden_handler(request: Request, exc: HTTPException):
             context=common_context(request, session, user, "", title="Acceso restringido", message=str(exc.detail)),
             status_code=403,
         )
-
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request, session: Session = Depends(get_db)):
-    user = current_user(request)
-    plans = list(session.scalars(select(ServicePlan).where(ServicePlan.active.is_(True)).order_by(ServicePlan.monthly_fee)))
-    return templates.TemplateResponse(
-        request=request, name="public_home.html",
-        context={
-            "user": user, "app_settings": settings, "plans": plans,
-            "contact_sent": request.query_params.get("contacto") == "recibido",
-        },
-    )
-
-@app.post("/contacto")
-def public_contact_request(
-    request: Request,
-    company_name: str = Form(...),
-    contact_name: str = Form(...),
-    email: str = Form(...),
-    phone: str = Form(""),
-    sector: str = Form(""),
-    interest: str = Form("Quiero entender por dónde comenzar"),
-    message: str = Form(...),
-    accept_privacy: str | None = Form(None),
-    accept_commercial: str | None = Form(None),
-    session: Session = Depends(get_db),
-):
-    normalized_email = email.strip().lower()
-    if "@" not in normalized_email or len(company_name.strip()) < 2 or len(contact_name.strip()) < 2 or len(message.strip()) < 12:
-        raise HTTPException(400, "Completa empresa, contacto, correo válido y una descripción suficiente.")
-    if accept_privacy != "yes":
-        raise HTTPException(400, "Debes autorizar el tratamiento de datos para responder la solicitud.")
-    plan_map = {
-        "Huella Esencial": "ESENCIAL",
-        "Gestión de Carbono": "EMPRESARIAL",
-        "Gestión Avanzada y Verificación": "CORPORATIVO",
-    }
-    lead = CommercialLead(
-        public_token=secrets.token_urlsafe(24), company_name=company_name.strip(),
-        contact_name=contact_name.strip(), email=normalized_email, phone=phone.strip(),
-        sector=sector.strip() or "Por definir", city="", employees_band="Por definir",
-        facilities_count=1, has_previous_inventory=False, desired_scopes="Por definir",
-        objective=interest.strip(), urgency="Normal",
-        notes=(
-            f"Solicitud desde landing V1.0\n"
-            f"Autorización de privacidad: sí · versión {settings.legal_effective_date}\n"
-            f"Comunicaciones comerciales opcionales: {'sí' if accept_commercial == 'yes' else 'no'}\n\n"
-            f"{message.strip()}"
-        ),
-        complexity_score=0,
-        recommended_plan_code=plan_map.get(interest.strip(), ""), status="Nuevo", source="Landing pública V1.0",
-    )
-    session.add(lead)
-    session.commit()
-    return RedirectResponse("/?contacto=recibido#contacto", status_code=303)
-
-@app.get("/login", response_class=HTMLResponse)
-def login_page(request: Request):
-    existing_user = current_user(request)
-    if existing_user:
-        return RedirectResponse("/verificacion" if existing_user["role"] == "Verificador" else "/dashboard", status_code=303)
-    return templates.TemplateResponse(request=request, name="login.html", context={"error": None, "app_settings": settings})
-
-@app.post("/login", response_class=HTMLResponse)
-def login(request: Request, email: str = Form(...), password: str = Form(...)):
-    normalized_email = email.strip().lower()
-    client_ip = request.client.host if request.client else "unknown"
-    throttle = login_throttle.status(normalized_email, client_ip)
-    if throttle.blocked:
-        return templates.TemplateResponse(
-            request=request,
-            name="login.html",
-            context={"error": f"Demasiados intentos. Intenta nuevamente en {throttle.retry_after} segundos.", "app_settings": settings},
-            status_code=429,
-            headers={"Retry-After": str(throttle.retry_after)},
-        )
-    with SessionLocal() as session:
-        db_user = session.scalar(select(AppUser).where(AppUser.email == normalized_email, AppUser.active.is_(True)))
-        valid = db_user is not None and verify_password(password, db_user.password_hash)
-        if not valid:
-            blocked = login_throttle.failure(normalized_email, client_ip)
-            message = "Credenciales incorrectas." + (" Usa uno de los usuarios demostrativos." if settings.seed_demo else "")
-            status_code = 400
-            headers = None
-            if blocked.blocked:
-                message = f"Acceso bloqueado temporalmente por seguridad. Intenta en {blocked.retry_after} segundos."
-                status_code = 429
-                headers = {"Retry-After": str(blocked.retry_after)}
-            return templates.TemplateResponse(
-                request=request,
-                name="login.html",
-                context={"error": message, "app_settings": settings},
-                status_code=status_code,
-                headers=headers,
-            )
-        if password_needs_upgrade(db_user.password_hash):
-            db_user.password_hash = hash_password(password)
-        db_user.last_login = datetime.now(UTC)
-        add_audit(session, db_user.organization_id, db_user.email, "LOGIN", "Sesión", client_ip, "Acceso exitoso")
-        session.commit()
-    login_throttle.success(normalized_email, client_ip)
-    request.session.clear()
-    request.session["user_email"] = normalized_email
-    request.session["active_org_id"] = db_user.organization_id
-    return RedirectResponse("/verificacion" if db_user.role == "Verificador" else "/dashboard", status_code=303)
-
-@app.post("/logout")
-def logout(request: Request):
-    request.session.clear()
-    return RedirectResponse("/login", status_code=303)
 
 @app.post("/preferencias/vista")
 def update_view_mode(
@@ -4541,6 +4433,9 @@ def consolidation_api(session: Session = Depends(get_db), user: dict = Depends(r
     ensure_capability(user, "view_consolidation")
     summary = consolidation_summary(session, int(user["organization_id"]), BASE_DIR.parent)
     return Response(content=summary_json(summary), media_type="application/json")
+
+register_public_routes(app, templates, current_user)
+register_auth_routes(app, templates, current_user)
 
 register_organization_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash

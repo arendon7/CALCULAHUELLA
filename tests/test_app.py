@@ -1036,7 +1036,7 @@ def test_public_site_and_diagnostic_flow():
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert "Mide." in home.text
+        assert "Toda tu gestión de carbono, conectada" in home.text
         response = client.post(
             "/diagnostico",
             data={

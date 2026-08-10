@@ -21,8 +21,12 @@ def test_public_process_exposes_exactly_eight_canonical_stages():
         "Informe y cierre",
         "Reducción",
     ]
-    positions = [html.index(label) for label in expected]
-    assert positions == sorted(positions)
+    steps = [
+        line.split("<b>", 1)[1].split("</b>", 1)[0]
+        for line in html.splitlines()
+        if 'class="process-step' in line and "<b>" in line
+    ]
+    assert steps == expected
     for number in range(1, 9):
         assert f"ETAPA {number}" in html
 
@@ -60,7 +64,7 @@ def test_v16_public_javascript_knows_all_process_keys_and_core_interactions():
         "data-tab",
         "data-process",
         "data-trace",
-        "data-diagnostic-form",
+        "data-landing-context-form",
         "data-resource",
     ):
         assert contract in js
