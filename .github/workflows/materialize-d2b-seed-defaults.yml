@@ -1,0 +1,116 @@
+name: Materialize D2b seed defaults
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-d2b-seed-defaults.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract historical defaults authority
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          database = Path("app/database.py")
+          source = database.read_text(encoding="utf-8")
+          start_marker = "def _ensure_v012_defaults(session: Session) -> None:\n"
+          end_marker = "def init_db() -> None:\n"
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit("D2b boundaries are not unique")
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          defaults_source = source[start:end].rstrip() + "\n"
+
+          forbidden = (
+              "refresh_progress(",
+              "write_simple_pdf(",
+              "_seed_methodology(",
+              "_seed_sector_templates(",
+              "source_expected_periods(",
+              "get_db(",
+          )
+          found = [name for name in forbidden if name in defaults_source]
+          if found:
+              raise SystemExit(f"defaults are not independent from database helpers: {found}")
+
+          names = re.findall(r"^def (_ensure_[A-Za-z0-9_]+)\(", defaults_source, flags=re.MULTILINE)
+          if len(names) < 20 or "_ensure_v012_defaults" not in names or "_ensure_v100_final_defaults" not in names:
+              raise SystemExit(f"unexpected defaults function inventory: {names}")
+
+          header = '''from __future__ import annotations\n\nimport hashlib\nimport json\nimport math\nimport secrets\nfrom datetime import UTC, date, datetime\nfrom pathlib import Path\n\nfrom openpyxl import Workbook\nfrom sqlalchemy import delete, select\nfrom sqlalchemy.orm import Session\n\nfrom .audit import add_audit, audit_event_digest, backfill_audit_chain\nfrom .config import INSTANCE_DIR, PROJECT_DIR, settings\nfrom .db.base import Base, DB_PATH, ENGINE, SessionLocal, UPLOAD_DIR\nfrom .db.models import *  # noqa: F401,F403 - defaults operate on the canonical ORM models\nfrom .security import hash_password as secure_hash_password\n\n\ndef hash_password(password: str) -> str:\n    return secure_hash_password(password)\n\n\n'''
+          Path("app/seed_defaults.py").write_text(header + defaults_source, encoding="utf-8")
+
+          compat = "from .seed_defaults import (\n" + "".join(f"    {name},\n" for name in names) + ")\n\n\n"
+          database.write_text(source[:start].rstrip() + "\n\n\n" + compat + source[end:], encoding="utf-8")
+
+          seed_path = Path("app/seed.py")
+          seed = seed_path.read_text(encoding="utf-8")
+          import_start_marker = "from .database import (\n"
+          import_start = seed.index(import_start_marker)
+          import_end = seed.index(")\n\n", import_start) + 3
+          database_import = '''from .database import (\n    _seed_methodology,\n    _seed_sector_templates,\n    hash_password,\n    refresh_progress,\n    write_simple_pdf,\n)\n'''
+          defaults_import = "from .seed_defaults import (\n" + "".join(f"    {name},\n" for name in names) + ")\n\n"
+          seed_path.write_text(seed[:import_start] + database_import + defaults_import + seed[import_end:], encoding="utf-8")
+
+          test_path = Path("tests/test_v160_seed_bootstrap_extraction.py")
+          test = test_path.read_text(encoding="utf-8")
+          addition = '''\n\ndef test_v160_d2b_defaults_have_dedicated_authority_without_database_cycle():\n    import app.database as database_module\n    import app.seed_defaults as defaults_module\n\n    database_source = (ROOT / "app/database.py").read_text(encoding="utf-8")\n    defaults_source = (ROOT / "app/seed_defaults.py").read_text(encoding="utf-8")\n    seed_source = (ROOT / "app/seed.py").read_text(encoding="utf-8")\n\n    assert "def _ensure_v012_defaults" not in database_source\n    assert "def _ensure_v100_final_defaults" not in database_source\n    assert "def _ensure_v012_defaults" in defaults_source\n    assert "def _ensure_v100_final_defaults" in defaults_source\n    assert "from .database import" not in defaults_source\n    assert "from .seed_defaults import" in seed_source\n    assert database_module._ensure_v020_defaults is defaults_module._ensure_v020_defaults\n    assert database_module._ensure_v100_final_defaults is defaults_module._ensure_v100_final_defaults\n    assert len(database_source.splitlines()) < 350\n'''
+          if "test_v160_d2b_defaults_have_dedicated_authority_without_database_cycle" not in test:
+              test_path.write_text(test.rstrip() + addition + "\n", encoding="utf-8")
+
+          doc_path = Path("docs/architecture/V1_6_D2_SEED_DEFAULTS.md")
+          doc = doc_path.read_text(encoding="utf-8")
+          appendix = '''\n## D2b · defaults históricos\n\n- La cadena `_ensure_v012_defaults` → `_ensure_v100_final_defaults` vive en `app/seed_defaults.py`.\n- `app/seed_defaults.py` no importa `app.database` y, por contrato, no puede depender de helpers de la fachada.\n- `app.database` conserva reexports compatibles de los nombres privados históricos mientras se completa la consolidación.\n- `app/seed.py` consume los defaults directamente desde su autoridad nueva.\n- `database.py` queda concentrado en fachada de persistencia, helpers básicos de compatibilidad y semilla metodológica/sectorial.\n\n### Límite D2\n\nD2 no mueve modelos ORM, no cambia migraciones, no toca cálculos, no altera factores/GWP y no modifica contenido funcional de ningún default. El cambio es exclusivamente de propiedad modular.\n'''
+          if "## D2b · defaults históricos" not in doc:
+              doc_path.write_text(doc.rstrip() + "\n" + appendix, encoding="utf-8")
+          PY
+          python -m py_compile app/database.py app/seed.py app/seed_defaults.py tests/test_v160_seed_bootstrap_extraction.py
+          git diff --check
+      - name: Targeted D2b contracts
+        run: >-
+          pytest -q
+          tests/test_v160_seed_bootstrap_extraction.py
+          tests/test_v021_consolidation.py
+          tests/test_v050_support_and_factor_governance.py
+          tests/test_v100_rc1_release_candidate.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Migration head
+        run: python -m alembic upgrade head
+      - name: Commit D2b
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/database.py app/seed.py app/seed_defaults.py tests/test_v160_seed_bootstrap_extraction.py docs/architecture/V1_6_D2_SEED_DEFAULTS.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(database): extract D2b historical defaults"
+          git push origin HEAD:refactor/v1-6-0-consolidation
