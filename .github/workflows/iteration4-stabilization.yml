@@ -68,6 +68,7 @@ jobs:
             tests/test_v100_rc1_release_candidate.py \
             tests/test_v200_product_readiness_gate.py \
             tests/test_v200_postgres_continuity_gate.py \
+            tests/test_v200_postgres_schema_compatibility.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía
