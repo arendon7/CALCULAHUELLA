@@ -1,0 +1,42 @@
+CALCULA TU HUELLA · DEMO FULL AUTOCONTENIDA PARA macOS
+=====================================================
+
+Esta distribución incluye:
+- código completo del commit de release identificado en BUILD_PROVENANCE.json;
+- CPython 3.12 portable fijado para Apple Silicon (arm64) e Intel (x86_64);
+- dependencias Python bloqueadas con hashes y wheelhouse offline para ambas arquitecturas;
+- migraciones completas y base demo persistente;
+- lanzadores para instalar, abrir, cerrar, reiniciar y verificar;
+- manifiestos SHA-256 del contenido y del artefacto final.
+
+INSTALACIÓN
+1. Descomprime el ZIP completamente.
+2. Abre la carpeta resultante.
+3. Haz doble clic en: 1_INSTALAR_Y_ABRIR_DEMO.command
+4. Si macOS bloquea el primer inicio: clic derecho > Abrir > Abrir.
+5. El instalador detecta automáticamente Apple Silicon o Intel.
+6. No necesita Homebrew, VS Code ni Python instalado.
+7. No necesita internet para instalar dependencias.
+8. Antes de instalar, el lanzador verifica MANIFEST_SHA256.txt y falla si el paquete fue alterado.
+
+ACCESOS DEMO
+Contraseña para todos: Demo2026!
+- Administrador: admin@calculatuhuella.local
+- Consultor: consultor@calculatuhuella.local
+- Cliente: cliente@calculatuhuella.local
+- Revisor: revisor@calculatuhuella.local
+- Verificador: verificador@calculatuhuella.local
+
+DATOS LOCALES
+~/Library/Application Support/CalculaTuHuellaDemoFull/
+
+TRAZABILIDAD
+- BUILD_PROVENANCE.json identifica commit, runtime y lock usados.
+- PYTHON_RUNTIME_ORIGEN.json registra los dos binarios de Python y sus SHA-256.
+- WHEELHOUSE_SHA256.txt registra cada wheel incluido.
+- MANIFEST_SHA256.txt permite verificar todos los archivos internos.
+- El ZIP se publica junto con RELEASE_MANIFEST.json y su archivo .sha256.
+
+IMPORTANTE
+Es una demo local/controlada. No implica certificación, verificación independiente,
+cumplimiento regulatorio garantizado ni preparación productiva irrestricta.

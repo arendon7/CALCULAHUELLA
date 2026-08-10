@@ -1,0 +1,6 @@
+Contraseña común: Demo2026!
+Administrador: admin@calculatuhuella.local
+Consultor: consultor@calculatuhuella.local
+Cliente: cliente@calculatuhuella.local
+Revisor: revisor@calculatuhuella.local
+Verificador: verificador@calculatuhuella.local
