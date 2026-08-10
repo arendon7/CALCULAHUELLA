@@ -16,19 +16,45 @@ Reducir deuda residual de `app/main.py` por dominios cohesivos, sin reescribir r
 2. **Support HTTP — cerrado.** SLA, asignación, conversación, notas internas y estados conservan `support_workflow.py` como autoridad de negocio.
 3. **Commercial Proposal HTTP — cerrado.** Centro comercial, leads, creación/envío de propuesta y vista pública quedaron separados de aceptación y pagos.
 4. **Proposal Acceptance / Payments HTTP — cerrado.** Aceptación/rechazo, pago demo y webhook quedaron aislados en `payment_web.py`; `PaymentWebhookPayload` permanece a nivel de módulo para resolución correcta de FastAPI/Pydantic.
-5. **Commercial Operations HTTP — cerrado.** Once rutas de contratos, órdenes de servicio, cobros recurrentes, cartera y documentos de cobro quedaron en `commercial_operations_web.py`. El producto fue materializado en `f00a9fe3655a948a25031f0d73dae71d92a97854` y el materializador temporal se retiró en `ad4572a737b6e9aaef5bc7f63332392b8462fb43`.
+5. **Commercial Operations HTTP — cerrado.** Once rutas de contratos, órdenes de servicio, cobros recurrentes, cartera y documentos de cobro quedaron en `commercial_operations_web.py`.
+6. **Customer Success HTTP — cerrado.** Ocho rutas de perfil, salud, hitos, compromisos y renovación quedaron en `customer_success_web.py`; `customer_success.py` conserva la autoridad de métricas y reglas de salud/renovación. Producto materializado en `e21d49e1933c15e0ebff4153f4f11b11a9e3aaca`, materializador retirado en `90f61b93be6d21257329bcc81b6182614cff845d` y CI canónico limpio `31405709678` verde.
+7. **SaaS Administration HTTP — cerrado.** Cuatro rutas de panel, planes, suscripciones y estado de cobros quedaron en `saas_admin_web.py`. Producto materializado en `8e41a167b97bb715822fe734c5d638ead3883949`, materializador retirado en `08c0e044959f1571b274aea6c7b40bfea8a26d4d` y CI canónico limpio `31406108879` verde.
 
-Todos los cortes anteriores pasaron contratos dirigidos, regresión completa, barrera arquitectónica y smoke antes de sus commits de producto. Los materializadores temporales fueron retirados después de cada corte.
+Todos los cortes pasaron contratos dirigidos, regresión completa, barrera arquitectónica y smoke antes de sus commits de producto. Los materializadores temporales fueron retirados después de cada corte.
 
-## Secuencia restante
+## Inventario residual al cierre de alcance
 
-1. Customer Success HTTP, usando los contratos históricos V0.17 como gate funcional.
-2. SaaS Administration residual, solo después de certificar Customer Success.
-3. Inventario final de rutas/hotspots residuales.
-4. Certificación integral V1.7 y evidencia persistente.
+Snapshot canónico sobre `08c0e044959f1571b274aea6c7b40bfea8a26d4d`:
+
+- 138 archivos Python;
+- 39.755 líneas Python;
+- 344 rutas HTTP totales;
+- 124 tablas ORM;
+- `app/database.py`: 269 líneas;
+- `app/main.py`: **2.224 líneas y 81 rutas**;
+- smoke: **56/56**.
+
+Hotspots principales todavía presentes en `main.py`:
+
+- `dashboard`: 52 líneas;
+- `review_gate_summary`: 41 líneas;
+- `_service_usage`: 36 líneas;
+- `climate_scenario_create`: 34 líneas;
+- `automation_create`: 33 líneas;
+- `create_indicator`: 31 líneas;
+- `verification_portal`: 31 líneas;
+- `climate_requirement_create`: 29 líneas;
+- `update_consolidation_finding`: 28 líneas;
+- `update_release_gate`: 28 líneas.
+
+Estos residuos pertenecen a otros bounded contexts y no se incorporan artificialmente a V1.7. La siguiente ola debe tratarse como un ciclo apilado separado, con prioridad sugerida en Impact Intelligence, Climate Risk/Disclosure, consolidación/release governance y superficies transversales restantes.
+
+## Cierre de alcance V1.7
+
+La secuencia planificada quedó completada. El único trabajo restante de V1.7 es la **certificación integral final**, persistencia del acta técnica, limpieza del workflow de certificación y CI canónico sobre el SHA final limpio.
 
 ## Reglas
 
 Cada corte debe pasar contratos dirigidos, suite completa, `scripts/audit_architecture.py --enforce`, smoke canónico y Alembic cuando aplique antes del commit de producto. Los workflows temporales se eliminan antes de certificar el `head` limpio.
 
-No se modifican factores, GWP, fórmulas de huella o semántica de reporting salvo que un corte posterior lo declare explícitamente y tenga contratos específicos.
+No se modifican factores, GWP, fórmulas de huella o semántica de reporting salvo que un ciclo posterior lo declare explícitamente y tenga contratos específicos.
