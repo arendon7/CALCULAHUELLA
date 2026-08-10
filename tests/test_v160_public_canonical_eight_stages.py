@@ -42,7 +42,7 @@ def test_public_process_grid_supports_eight_stages_responsively():
     assert "repeat(2,1fr)" in css
 
 
-def test_v16_visual_layer_knows_all_process_keys():
+def test_v16_public_javascript_knows_all_process_keys_and_core_interactions():
     js = PUBLIC_V16_JS.read_text(encoding="utf-8")
     for key in (
         "diagnostico",
@@ -55,10 +55,21 @@ def test_v16_visual_layer_knows_all_process_keys():
         "accion",
     ):
         assert f"{key}:" in js
+    for contract in (
+        "data-menu-button",
+        "data-tab",
+        "data-process",
+        "data-trace",
+        "data-diagnostic-form",
+        "data-resource",
+    ):
+        assert contract in js
 
 
-def test_public_base_loads_v16_progressive_layer_and_hides_historical_badge():
+def test_public_base_loads_one_public_javascript_authority_and_hides_historical_badge():
     html = PUBLIC_BASE.read_text(encoding="utf-8")
     assert "public-v1.6.js" in html
+    assert "public-v1.4.js" not in html
+    assert html.count("public-v1.6.js") == 1
     assert "V1.4.0 integración controlada" not in html
     assert "no actúa automáticamente como organismo verificador o certificador" in html
