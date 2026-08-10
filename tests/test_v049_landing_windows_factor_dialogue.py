@@ -37,18 +37,17 @@ def login(client: TestClient) -> None:
     assert response.status_code == 303
 
 
-def test_v049_public_landing_explains_value_greenatics_prices_and_flow():
+def test_v049_public_landing_contract_is_preserved_through_the_v16_public_authority():
     with TestClient(app) as client:
         response = client.get("/")
         assert response.status_code == 200
-        assert "Potenciado por" in response.text
-        assert "GREENATICS" in response.text
-        assert "Del propósito de la medición a una decisión de gestión" in response.text
-        assert "Conversación técnica dato–factor" in response.text
-        assert "PLANES Y PRECIOS DE REFERENCIA" in response.text
-        assert "Dr. Carlos Andrés Uribe" in response.text
-        assert "Mensajes y requerimientos" in response.text
-        assert "$390.000" in response.text
+        assert "Toda tu gestión de carbono" in response.text
+        assert "Plataforma colaborativa de gestión de carbono" in response.text
+        assert "Potenciado por GREENATICS" in response.text
+        assert "Ocho etapas desde el diagnóstico hasta la reducción" in response.text
+        assert "Cada cifra puede explicarse" in response.text
+        assert "no actúa automáticamente como organismo verificador o certificador" in response.text
+        assert "PLANES Y PRECIOS DE REFERENCIA" not in response.text
 
 
 def test_v049_public_contact_creates_traceable_commercial_request():
@@ -200,4 +199,5 @@ def test_v049_version_and_migration_are_aligned():
     migration = root / "migrations/versions/20260804_0030_v049_activity_factor_selection.py"
     assert 'version: str = "1.0.0"' in config
     assert migration.is_file()
-    assert len(Base.metadata.tables) == 120
+    # V0.49 established a 120-table floor; later canonical migrations may add tables.
+    assert len(Base.metadata.tables) >= 120

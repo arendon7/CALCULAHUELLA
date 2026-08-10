@@ -18,14 +18,15 @@ def login(client: TestClient, email: str = "consultor@calculatuhuella.local") ->
     response = client.post("/login", data={"email": email, "password": "Demo2026!"}, follow_redirects=False)
     assert response.status_code == 303
 
-def test_v051_public_content_is_clear_and_methodologically_bounded():
+def test_v051_public_content_remains_clear_and_methodologically_bounded_under_v16():
     with TestClient(app) as client:
         page = client.get("/")
         assert page.status_code == 200
-        assert "Mide lo que corresponde" in page.text
-        assert "Software y acompañamiento proporcionales" in page.text
-        assert "Preguntas que conviene resolver" in page.text
-        assert "Las emisiones evitadas" in page.text
+        assert "Toda tu gestión de carbono" in page.text
+        assert "Ocho etapas desde el diagnóstico hasta la reducción" in page.text
+        assert "Cada cifra puede explicarse" in page.text
+        assert "no actúa automáticamente como organismo verificador o certificador" in page.text
+        assert "Mide lo que corresponde" not in page.text
         assert "EL FLUJO QUE PROPONE" not in page.text
 
 def test_v051_work_center_prioritizes_next_action_and_separates_controls():
@@ -43,7 +44,7 @@ def test_v051_guide_explains_process_states_limits_and_glossary():
         login(client, "cliente@calculatuhuella.local")
         page = client.get("/guia")
         assert page.status_code == 200
-        assert "Seis preguntas que ordenan el inventario" in page.text
+        assert "Ocho preguntas que ordenan el ciclo" in page.text
         assert "QUÉ HACE Y QUÉ NO HACE" in page.text
         assert "Dato de actividad" in page.text
         assert "Emisión evitada" in page.text
@@ -85,9 +86,10 @@ def test_v051_visible_labels_avoid_stale_versions_and_overclaiming():
     assert "Validar integridad demo" in demo
     assert "Entorno demo certificado" not in demo
 
-def test_v051_release_and_documentation_are_aligned():
+def test_v051_release_and_documentation_are_aligned_with_canonical_distribution():
     assert 'version: str = "1.0.0"' in (ROOT / "app/config.py").read_text(encoding="utf-8")
     assert 'ENGINE_VERSION = "1.1.0"' in (ROOT / "app/calculations.py").read_text(encoding="utf-8")
-    assert (ROOT / "V051_AUDITORIA_EXPERIENCIA_CONTENIDO_AMBIENTAL.md").is_file()
-    assert (ROOT / "GUIA_DE_CONTENIDO_Y_UX_V051.md").is_file()
+    assert (ROOT / "CANONICAL_RELEASE.md").is_file()
+    assert (ROOT / "RELEASE_CANONICA.json").is_file()
+    assert (ROOT / "docs/ITERACION_4_ESTABILIZACION.md").is_file()
     assert (ROOT / "app/templates/guide.html").is_file()

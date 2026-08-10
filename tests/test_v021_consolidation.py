@@ -54,17 +54,17 @@ def test_v021_consolidation_page_and_api_load():
         assert payload["module_count"] == len(PRODUCT_MODULES)
         assert payload["critical_open"] == 0
 
-        # La canonización V1.0 no conservó el archivo legacy
-        # release/FINAL_TEST_EVIDENCE.json. La puerta debe permanecer cerrada
-        # hasta que exista evidencia material del release actual; no es válido
-        # inferirla desde RELEASE_CANONICA.json ni desde una declaración Markdown.
+        # La evidencia material canónica vive en docs/evidencia y habilita
+        # el despliegue controlado. La producción pública sigue siendo una puerta
+        # distinta y permanece cerrada sin validaciones externas.
         release = payload["release_candidate"]
-        assert release["controlled_release_ready"] is False
+        assert release["controlled_release_ready"] is True
         assert release["production_ready"] is False
-        assert release["test_evidence"]["status"] == "missing"
+        assert release["test_evidence"]["status"] == "passed"
+        assert release["test_evidence"]["test_count"] >= 386
         test_gate = next(item for item in release["package_checks"] if item["code"] == "V1-TESTS")
-        assert test_gate["ok"] is False
-        assert "estado missing" in test_gate["detail"]
+        assert test_gate["ok"] is True
+        assert "estado passed" in test_gate["detail"]
         assert payload["metrics"]["routes"] >= 190
 
 

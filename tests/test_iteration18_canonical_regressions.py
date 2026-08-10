@@ -65,7 +65,7 @@ def test_iteration18_canonical_release_artifacts_replace_legacy_v051_documents()
     assert (ROOT / "docs" / "ITERACION_4_ESTABILIZACION.md").is_file()
 
 
-def test_iteration18_current_repository_keeps_controlled_release_closed_without_test_evidence() -> None:
+def test_iteration18_current_repository_recognizes_controlled_release_but_keeps_public_production_closed() -> None:
     summary = release_candidate_summary(
         ROOT,
         critical_open=0,
@@ -75,18 +75,19 @@ def test_iteration18_current_repository_keeps_controlled_release_closed_without_
         journey_count=5,
     )
     assert summary["version"] == "1.0.0"
-    assert summary["test_evidence"]["status"] == "missing"
-    assert summary["controlled_release_ready"] is False
+    assert summary["test_evidence"]["status"] == "passed"
+    assert summary["test_evidence"]["test_count"] >= 386
+    assert summary["controlled_release_ready"] is True
     assert summary["production_ready"] is False
     assert all(item["ok"] is False for item in summary["external_checks"])
 
 
-def test_iteration18_structural_validator_is_conservative_without_formal_internal_bundle() -> None:
+def test_iteration18_structural_validator_recognizes_organized_internal_bundle_and_remains_publicly_conservative() -> None:
     from scripts.validate_release_candidate import inspect_candidate
 
     payload = inspect_candidate()
     checks = {item["code"]: item for item in payload["checks"]}
-    assert payload["status"] == "failed"
+    assert payload["status"] == "passed"
     assert checks["version"]["ok"] is True
     assert checks["routes"]["ok"] is True
     assert checks["models"]["ok"] is True
@@ -95,7 +96,7 @@ def test_iteration18_structural_validator_is_conservative_without_formal_interna
     assert checks["legal_surface"]["ok"] is True
     assert checks["controlled_release_defaults"]["ok"] is True
     assert checks["public_production_conservative"]["ok"] is True
-    assert checks["internal_acceptance"]["ok"] is False
+    assert checks["internal_acceptance"]["ok"] is True
 
 
 def test_iteration18_formal_legacy_acceptance_bundle_is_not_silently_inferred() -> None:

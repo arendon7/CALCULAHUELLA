@@ -121,15 +121,15 @@ def test_v1_structural_validator_runs_successfully():
     assert all(item["ok"] for item in payload["checks"])
 
 
-def test_v1_internal_approval_and_launch_documents_are_distributed():
+def test_v1_internal_approval_and_launch_documents_are_distributed_in_canonical_tree():
     required = (
-        "ACTA_CIERRE_V1_0_0.md",
-        "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",
-        "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",
-        "INFORME_PILOTO_INTERNO_GREENATICS_V1.md",
-        "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",
-        "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md",
-        "GUIA_LANZAMIENTO_CONTROLADO_V1.md",
+        "docs/gobierno/ACTA_CIERRE_V1_0_0.md",
+        "docs/gobierno/APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md",
+        "docs/gobierno/APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md",
+        "docs/guias/INFORME_PILOTO_INTERNO_GREENATICS_V1.md",
+        "docs/guias/INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md",
+        "docs/gobierno/REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md",
+        "docs/guias/GUIA_LANZAMIENTO_CONTROLADO_V1.md",
     )
     assert all((ROOT / name).is_file() for name in required)
 

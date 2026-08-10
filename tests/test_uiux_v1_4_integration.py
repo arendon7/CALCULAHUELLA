@@ -31,8 +31,10 @@ def test_v14_public_runtime_uses_real_routes():
     assert 'href="/login"' in corpus
     assert "demo_funcional.html" not in corpus
     assert "localhost" not in corpus.lower()
-    assert "public-v1.4.css" in corpus
-    assert "public-v1.4.js" in corpus
+    assert "public-v1.6.css" in corpus
+    assert "public-v1.6.js" in corpus
+    assert "public-v1.4.css" not in corpus
+    assert "public-v1.4.js" not in corpus
 
 
 def test_v14_static_site_is_self_consistent():
