@@ -332,7 +332,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ACTUAL="$(git diff --name-only | sort)"
+          ACTUAL="$(printf '%s\n%s\n' "$(git diff --name-only)" "$(git ls-files --others --exclude-standard)" | sed '/^$/d' | sort -u)"
           EXPECTED=$'app/main.py\napp/user_context.py\ntests/test_v160_user_context.py'
           printf 'Archivos modificados:\n%s\n' "$ACTUAL"
           test "$ACTUAL" = "$EXPECTED"
