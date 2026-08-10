@@ -1,0 +1,80 @@
+--- a/app/main.py
++++ b/app/main.py
+@@ -149,6 +149,7 @@
+ from .experience_web import register_experience_routes
+ from .legal_web import register_legal_routes
+ from .public_web import register_public_routes
++from .auth_web import register_auth_routes
+ from .period_close import assert_periods_editable
+ from .pilot_execution import guided_workspace
+ from .storage import storage, StorageError
+@@ -691,61 +692,6 @@
+             status_code=403,
+         )
+ 
+-@app.get("/login", response_class=HTMLResponse)
+-def login_page(request: Request):
+-    existing_user = current_user(request)
+-    if existing_user:
+-        return RedirectResponse("/verificacion" if existing_user["role"] == "Verificador" else "/dashboard", status_code=303)
+-    return templates.TemplateResponse(request=request, name="login.html", context={"error": None, "app_settings": settings})
+-
+-@app.post("/login", response_class=HTMLResponse)
+-def login(request: Request, email: str = Form(...), password: str = Form(...)):
+-    normalized_email = email.strip().lower()
+-    client_ip = request.client.host if request.client else "unknown"
+-    throttle = login_throttle.status(normalized_email, client_ip)
+-    if throttle.blocked:
+-        return templates.TemplateResponse(
+-            request=request,
+-            name="login.html",
+-            context={"error": f"Demasiados intentos. Intenta nuevamente en {throttle.retry_after} segundos.", "app_settings": settings},
+-            status_code=429,
+-            headers={"Retry-After": str(throttle.retry_after)},
+-        )
+-    with SessionLocal() as session:
+-        db_user = session.scalar(select(AppUser).where(AppUser.email == normalized_email, AppUser.active.is_(True)))
+-        valid = db_user is not None and verify_password(password, db_user.password_hash)
+-        if not valid:
+-            blocked = login_throttle.failure(normalized_email, client_ip)
+-            message = "Credenciales incorrectas." + (" Usa uno de los usuarios demostrativos." if settings.seed_demo else "")
+-            status_code = 400
+-            headers = None
+-            if blocked.blocked:
+-                message = f"Acceso bloqueado temporalmente por seguridad. Intenta en {blocked.retry_after} segundos."
+-                status_code = 429
+-                headers = {"Retry-After": str(blocked.retry_after)}
+-            return templates.TemplateResponse(
+-                request=request,
+-                name="login.html",
+-                context={"error": message, "app_settings": settings},
+-                status_code=status_code,
+-                headers=headers,
+-            )
+-        if password_needs_upgrade(db_user.password_hash):
+-            db_user.password_hash = hash_password(password)
+-        db_user.last_login = datetime.now(UTC)
+-        add_audit(session, db_user.organization_id, db_user.email, "LOGIN", "Sesión", client_ip, "Acceso exitoso")
+-        session.commit()
+-    login_throttle.success(normalized_email, client_ip)
+-    request.session.clear()
+-    request.session["user_email"] = normalized_email
+-    request.session["active_org_id"] = db_user.organization_id
+-    return RedirectResponse("/verificacion" if db_user.role == "Verificador" else "/dashboard", status_code=303)
+-
+-@app.post("/logout")
+-def logout(request: Request):
+-    request.session.clear()
+-    return RedirectResponse("/login", status_code=303)
+-
+ @app.post("/preferencias/vista")
+ def update_view_mode(
+     request: Request,
+@@ -4489,6 +4435,7 @@
+     return Response(content=summary_json(summary), media_type="application/json")
+ 
+ register_public_routes(app, templates, current_user)
++register_auth_routes(app, templates, current_user)
+ 
+ register_organization_routes(
+     app, templates, common_context, require_user, ensure_capability, set_flash
