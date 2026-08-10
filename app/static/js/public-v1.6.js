@@ -1,4 +1,7 @@
 (() => {
+  const LANDING_CONTEXT_KEY = 'cth_landing_context_v1';
+  const LANDING_CONTEXT_SCHEMA = 'cth.landing_context.v1';
+
   const menuButton = document.querySelector('[data-menu-button]');
   const mobilePanel = document.querySelector('[data-mobile-panel]');
 
@@ -148,39 +151,39 @@
     if (stateTarget) stateTarget.textContent = state;
   }));
 
-  const diagnosticForm = document.querySelector('[data-diagnostic-form]');
-  if (diagnosticForm) {
-    diagnosticForm.addEventListener('submit', event => {
+  const landingContextForm = document.querySelector('[data-landing-context-form]');
+  if (landingContextForm) {
+    landingContextForm.addEventListener('submit', event => {
       event.preventDefault();
-      const fd = new FormData(diagnosticForm);
-      const sector = fd.get('sector');
-      const sedes = Math.max(1, Number(fd.get('sedes') || 1));
-      const primera = fd.get('primera');
-      const datos = fd.get('datos');
-      const objetivo = fd.get('objetivo');
-      if (!sector) return;
-      const sectorBase = {servicios:8, industria:18, agro:16, logistica:14, residuos:15}[sector] || 10;
-      const sources = Math.min(60, sectorBase + Math.max(0, sedes - 1) * 3 + (objetivo === 'verificacion' ? 4 : 0));
-      const complexityScore = sedes + (sector === 'industria' || sector === 'agro' ? 3 : 1) + (datos === 'baja' ? 4 : datos === 'media' ? 2 : 0) + (objetivo === 'verificacion' ? 4 : objetivo === 'reducir' ? 2 : 0);
-      const complexity = complexityScore >= 12 ? 'Alta' : complexityScore >= 7 ? 'Media' : 'Baja';
-      const maturity = primera === 'si' ? (datos === 'alta' ? 'Inicial organizada' : 'Inicial') : (objetivo === 'reducir' ? 'En gestión' : 'Intermedia');
-      const route = objetivo === 'verificacion' || complexity === 'Alta' ? 'Gestión Avanzada' : (primera === 'si' && objetivo === 'medir' ? 'Huella Esencial' : 'Gestión de Carbono');
-      const areas = Math.min(12, 3 + Math.ceil(sources / 7));
-      const setText = (selector, value) => {
-        const target = document.querySelector(selector);
-        if (target) target.textContent = value;
+      if (!landingContextForm.reportValidity()) return;
+
+      const sector = landingContextForm.elements.landing_sector?.value || '';
+      const objective = landingContextForm.elements.landing_objective?.value || '';
+      const status = landingContextForm.querySelector('[data-landing-context-status]');
+      if (!sector || !objective) return;
+
+      const context = {
+        schema: LANDING_CONTEXT_SCHEMA,
+        version: '1.0',
+        source: 'public_home_v1.6',
+        created_at: new Date().toISOString(),
+        reusable: { sector, objective },
+        destination: '/diagnostico'
       };
-      setText('[data-result-maturity]', maturity);
-      setText('[data-result-complexity]', complexity);
-      setText('[data-result-sources]', String(sources));
-      setText('[data-result-areas]', String(areas));
-      setText('[data-result-route]', route);
-      setText('[data-result-note]', `Ruta orientativa: ${route}. El alcance definitivo requiere revisar fuentes, límites, datos y objetivos con el equipo técnico.`);
+
+      let saved = false;
       try {
-        localStorage.setItem('cthDiagnostic', JSON.stringify({sector, sedes, primera, datos, objetivo, maturity, complexity, sources, areas, route}));
+        window.localStorage.setItem(LANDING_CONTEXT_KEY, JSON.stringify(context));
+        saved = true;
       } catch (_) {
-        // El diagnóstico sigue funcionando sin persistencia local.
+        saved = false;
       }
+      if (status) {
+        status.textContent = saved
+          ? 'Contexto preparado. Continuamos al diagnóstico.'
+          : 'Continuamos al diagnóstico sin reutilizar respuestas.';
+      }
+      window.location.assign('/diagnostico');
     });
   }
 
