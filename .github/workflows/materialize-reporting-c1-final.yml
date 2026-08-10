@@ -1,0 +1,67 @@
+name: Materialize reporting C1 final
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-reporting-c1-final.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Apply exact reviewed C1 patch
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+          import textwrap
+          source = Path('.github/workflows/materialize-reporting-c1.yml').read_text(encoding='utf-8')
+          opening = "          python - <<'PY'\n"
+          start = source.index(opening) + len(opening)
+          end = source.index("\n          PY\n", start)
+          script = textwrap.dedent(source[start:end])
+          exec(compile(script, 'reviewed-reporting-c1.py', 'exec'), {})
+          PY
+          git diff --check
+      - name: Targeted reporting contracts
+        run: pytest -q tests/test_v055_consulting_reports.py tests/test_v048_reduction_portfolio.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit reconciled C1
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add \
+            app/report_consulting.py \
+            app/report_docx.py \
+            app/reporting.py \
+            tests/test_v055_consulting_reports.py \
+            tests/test_v048_reduction_portfolio.py \
+            docs/architecture/V1_6_0_REPORTING_RECONCILIATION.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "feat(reporting): reconcile C1 editorial outputs"
+          git push origin HEAD:refactor/v1-6-0-consolidation
