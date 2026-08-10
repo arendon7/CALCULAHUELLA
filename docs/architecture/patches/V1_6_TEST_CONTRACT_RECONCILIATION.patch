@@ -11,7 +11,7 @@
              data={
 --- a/tests/test_v160_public_canonical_eight_stages.py
 +++ b/tests/test_v160_public_canonical_eight_stages.py
-@@ -18,8 +18,12 @@ def test_public_process_exposes_exactly_eight_canonical_stages():
+@@ -21,7 +21,11 @@ def test_public_process_exposes_exactly_eight_canonical_stages():
          "Informe y cierre",
          "Reducción",
      ]
@@ -25,7 +25,10 @@
 +    assert steps == expected
      for number in range(1, 9):
          assert f"ETAPA {number}" in html
-@@ -51,7 +55,7 @@ def test_v16_public_javascript_knows_all_process_keys_and_core_interactions():
+@@ -57,10 +61,10 @@ def test_v16_public_javascript_knows_all_process_keys_and_core_interactions():
+         assert f"{key}:" in js
+     for contract in (
+         "data-menu-button",
          "data-tab",
          "data-process",
          "data-trace",
