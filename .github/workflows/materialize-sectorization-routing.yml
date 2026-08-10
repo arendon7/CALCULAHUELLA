@@ -1,0 +1,96 @@
+name: Materialize sectorization routing
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-sectorization-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract sectorization HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path("app/main.py")
+          source = main_path.read_text(encoding="utf-8")
+          start_marker = '@app.get("/sectorizacion", response_class=HTMLResponse)\n'
+          end_marker = 'def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date]:\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit("sectorization boundaries are not unique")
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + "\n"
+          if block.count("@app.") != 2:
+              raise SystemExit(f"expected 2 sectorization routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .database import add_audit, get_db, refresh_progress\nfrom .db.models import (\n    EmissionFactor,\n    EmissionFactorVersion,\n    EmissionSource,\n    SectorTemplate,\n    SourceFactorAssignment,\n)\n\n\ndef register_sectorization_routes(\n    app,\n    templates,\n    common_context,\n    require_user,\n    ensure_capability,\n    set_flash,\n    get_inventory,\n    ensure_inventory_editable,\n) -> None:\n'''
+          indented = "".join(("    " + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          Path("app/sectorization_web.py").write_text(header + indented, encoding="utf-8")
+
+          source = source[:start] + source[end:]
+          import_anchor = "from .inventory_lifecycle import clone_inventory_version, next_inventory_version\n"
+          if source.count(import_anchor) != 1:
+              raise SystemExit("inventory lifecycle import anchor missing")
+          source = source.replace(
+              import_anchor,
+              import_anchor + "from .sectorization_web import register_sectorization_routes\n",
+              1,
+          )
+          register_anchor = '''register_inventory_routes(\n    app,\n    templates,\n    common_context,\n    require_user,\n    ensure_capability,\n    set_flash,\n    parse_date,\n    get_inventory,\n    get_source_for_user,\n    ensure_inventory_editable,\n    inventory_metrics,\n    ALLOWED_UNITS,\n    DATA_ORIGINS,\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit("inventory route registration anchor missing")
+          source = source.replace(
+              register_anchor,
+              register_anchor + '''register_sectorization_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable,\n)\n''',
+              1,
+          )
+          main_path.write_text(source, encoding="utf-8")
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\nfrom sqlalchemy import func, select\n\nfrom app.db.base import SessionLocal\nfrom app.db.models import EmissionSource, SectorTemplate\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nSECTORIZATION_ROUTES = {\n    ("GET", "/sectorizacion"),\n    ("POST", "/sectorizacion/aplicar"),\n}\n\n\ndef _login(client: TestClient) -> None:\n    response = client.post(\n        "/login",\n        data={"email": "consultor@calculatuhuella.local", "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v160_sectorization_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/sectorization_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/sectorizacion"' not in main_source\n    assert '@app.post("/sectorizacion/aplicar"' not in main_source\n    assert "register_sectorization_routes(" in main_source\n    assert module_source.count("@app.") == 2\n    assert "refresh_progress" in module_source\n    assert "SourceFactorAssignment" in module_source\n\n\ndef test_v160_sectorization_route_contract_is_unique_and_complete():\n    actual = []\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path and path.startswith("/sectorizacion"):\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == SECTORIZATION_ROUTES\n    assert len(actual) == len(SECTORIZATION_ROUTES)\n\n\ndef test_v160_sector_template_application_remains_idempotent():\n    with TestClient(app) as client:\n        _login(client)\n        page = client.get("/sectorizacion")\n        assert page.status_code == 200\n        with SessionLocal() as session:\n            template = session.scalar(\n                select(SectorTemplate).where(SectorTemplate.sector == "Servicios y oficinas")\n            )\n            assert template is not None\n            before = session.scalar(\n                select(func.count()).select_from(EmissionSource).where(EmissionSource.inventory_id == 1)\n            ) or 0\n            template_id = template.id\n        first = client.post(\n            "/sectorizacion/aplicar",\n            data={\n                "inventory_id": 1,\n                "template_id": template_id,\n                "facility_id": 1,\n                "include_optional": "true",\n            },\n            follow_redirects=False,\n        )\n        assert first.status_code == 303\n        with SessionLocal() as session:\n            after = session.scalar(\n                select(func.count()).select_from(EmissionSource).where(EmissionSource.inventory_id == 1)\n            ) or 0\n        assert after > before\n        second = client.post(\n            "/sectorizacion/aplicar",\n            data={\n                "inventory_id": 1,\n                "template_id": template_id,\n                "facility_id": 1,\n                "include_optional": "true",\n            },\n            follow_redirects=False,\n        )\n        assert second.status_code == 303\n        with SessionLocal() as session:\n            final_count = session.scalar(\n                select(func.count()).select_from(EmissionSource).where(EmissionSource.inventory_id == 1)\n            ) or 0\n        assert final_count == after\n'''
+          Path("tests/test_v160_sectorization_routing.py").write_text(test, encoding="utf-8")
+
+          doc = '''# V1.6 · Data Surfaces · Sectorization\n\n## Estado previo\n\nCaptura (`capture_web.py`), información (`information_web.py`) e importaciones operativas (`operational_imports_web.py`) ya tenían autoridad propia. La superficie de datos que permanecía embebida en `main.py` era sectorización.\n\n## Corte materializado\n\n- `GET /sectorizacion` y `POST /sectorizacion/aplicar` pasan a `app/sectorization_web.py`.\n- `main.py` conserva únicamente el registro del módulo.\n- Se preservan selección de plantilla, deduplicación de fuentes, selección de sede, asignación automática de versiones de factor aprobadas, actualización de progreso y auditoría.\n\n## Contratos\n\n1. Exactamente dos rutas de sectorización, sin duplicados.\n2. La pantalla sigue disponible.\n3. Aplicar una plantilla crea fuentes cuando corresponde.\n4. Reaplicar la misma plantilla no duplica fuentes.\n5. No se modifica lógica de cálculo, factores, GWP ni migraciones.\n'''
+          Path("docs/architecture/V1_6_DATA_SURFACES_SECTORIZATION.md").write_text(doc, encoding="utf-8")
+          PY
+          python -m py_compile app/sectorization_web.py app/main.py tests/test_v160_sectorization_routing.py
+          git diff --check
+      - name: Targeted sectorization contracts
+        run: pytest -q tests/test_v160_sectorization_routing.py tests/test_app.py -k "sectorization or sector"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit sectorization routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/sectorization_web.py app/main.py tests/test_v160_sectorization_routing.py docs/architecture/V1_6_DATA_SURFACES_SECTORIZATION.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract sectorization data surface"
+          git push origin HEAD:refactor/v1-6-0-consolidation
