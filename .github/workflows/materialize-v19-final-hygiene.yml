@@ -1,0 +1,84 @@
+name: Materialize V1.9 final hygiene
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-final-hygiene.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Remove proven dead lead-complexity helper
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          roots = [Path('app'), Path('tests')]
+          refs = []
+          for root in roots:
+              for path in root.rglob('*.py'):
+                  text = path.read_text(encoding='utf-8')
+                  count = text.count('_lead_complexity')
+                  if count:
+                      refs.append((str(path), count))
+          if refs != [('app/main.py', 1)]:
+              raise SystemExit(f'_lead_complexity is not proven dead; refs={refs}')
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = 'def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes: str, has_previous_inventory: bool, objective: str, urgency: str) -> tuple[int, str]:\n'
+          end_marker = 'register_public_routes(app, templates, current_user)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('dead helper boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          main_path.write_text(source[:start] + source[end:], encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nimport ast\nfrom pathlib import Path\n\nROOT = Path(__file__).resolve().parents[1]\nHTTP_METHODS = {"get", "post", "put", "patch", "delete", "options", "head"}\nEXPECTED_SYSTEM_ROUTES = {\n    ("GET", "/modulos"),\n    ("GET", "/api/health"),\n    ("GET", "/api/ready"),\n}\n\n\ndef _main_http_routes() -> set[tuple[str, str]]:\n    source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    tree = ast.parse(source)\n    routes: set[tuple[str, str]] = set()\n    for node in ast.walk(tree):\n        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):\n            continue\n        for decorator in node.decorator_list:\n            if not isinstance(decorator, ast.Call) or not isinstance(decorator.func, ast.Attribute):\n                continue\n            if not isinstance(decorator.func.value, ast.Name) or decorator.func.value.id != "app":\n                continue\n            method = decorator.func.attr.lower()\n            if method not in HTTP_METHODS or not decorator.args:\n                continue\n            arg = decorator.args[0]\n            if isinstance(arg, ast.Constant) and isinstance(arg.value, str):\n                routes.add((method.upper(), arg.value))\n    return routes\n\n\ndef test_v190_main_is_composition_root_with_only_system_http_routes():\n    assert _main_http_routes() == EXPECTED_SYSTEM_ROUTES\n\n\ndef test_v190_dead_lead_complexity_helper_is_absent():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    assert "_lead_complexity" not in main_source\n'''
+          Path('tests/test_v190_composition_root.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Final composition-root hygiene\n\n## Resultado\n\n`_lead_complexity` se eliminó únicamente después de comprobar automáticamente que su única referencia en `app/` + `tests/` era su propia definición en `app/main.py`. No se trasladó ni se reimplementó lógica muerta.\n\n## Contrato persistente\n\n`tests/test_v190_composition_root.py` fija la frontera final: `app/main.py` puede conservar como contratos HTTP directos únicamente `/modulos`, `/api/health` y `/api/ready`. El resto de superficies HTTP deben tener autoridad modular.\n\n## Intención arquitectónica\n\n`main.py` queda como composition root: middleware, contexto transversal, utilidades inyectadas, registro de módulos y endpoints de salud/sistema.\n'''
+          Path('docs/architecture/V1_9_FINAL_HYGIENE.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/main.py tests/test_v190_composition_root.py
+          git diff --check
+      - name: Targeted V1.9 composition-root contract
+        run: pytest -q tests/test_v190_composition_root.py
+      - name: Public site regression
+        run: pytest -q tests/test_app.py -k "public_site_and_diagnostic_flow or core_pages_load"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit final V1.9 hygiene
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/main.py tests/test_v190_composition_root.py docs/architecture/V1_9_FINAL_HYGIENE.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(core): finalize V1.9 composition root"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
