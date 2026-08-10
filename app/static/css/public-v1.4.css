@@ -6,3 +6,16 @@
 @import url("./v14-public/part-5.css");
 @import url("./v14-public/part-6.css");
 @import url("./v14-public/part-7.css");
+
+/* V1.6.0: el flujo público debe reflejar las ocho etapas canónicas. */
+.process-nav{grid-template-columns:repeat(8,1fr)}
+@media(max-width:900px){
+  .process-nav{grid-template-columns:repeat(4,1fr)}
+  .process-step:nth-child(4){border-right:0}
+  .process-step:nth-child(-n+4){border-bottom:1px solid var(--line)}
+}
+@media(max-width:560px){
+  .process-nav{grid-template-columns:repeat(2,1fr)}
+  .process-step:nth-child(2n){border-right:0}
+  .process-step:nth-child(-n+6){border-bottom:1px solid var(--line)}
+}
