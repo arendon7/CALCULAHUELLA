@@ -1,12 +1,9 @@
-name: Iteraciones 4–6 · estabilización, roles y relevo
+name: V2.0 · Product readiness gate
 
 on:
-  push:
-    branches:
-      - integration/workflow-v1.5.0
   pull_request:
     branches:
-      - integration/uiux-v1.4.0
+      - refactor/v1-9-0-core-surfaces
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
@@ -14,11 +11,12 @@ permissions:
   contents: read
 
 concurrency:
-  group: iteration4-${{ github.ref }}
+  group: product-readiness-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   stabilize:
+    name: Regresión, seguridad y continuidad
     runs-on: ubuntu-latest
     timeout-minutes: 60
     env:
@@ -54,7 +52,7 @@ jobs:
           rm -rf "${RUNNER_TEMP}/cth-pycache"
           PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-pycache" python -m compileall -q app tests scripts migrations
 
-      - name: Ejecutar pruebas de estabilización, flujo y roles
+      - name: Ejecutar contratos de product readiness
         run: |
           pytest -q \
             tests/test_iteration15_canonical_workflow.py \
@@ -63,6 +61,12 @@ jobs:
             tests/test_iteration17_integrated_workflow.py \
             tests/test_iteration18_stabilization.py \
             tests/test_iteration19_role_journeys.py \
+            tests/test_v024_security_hardening.py \
+            tests/test_v030_mac_lifecycle.py \
+            tests/test_v034_operational_hardening.py \
+            tests/test_v057_production_readiness.py \
+            tests/test_v100_rc1_release_candidate.py \
+            tests/test_v200_product_readiness_gate.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía
@@ -80,6 +84,9 @@ jobs:
           INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic upgrade head
           INSTANCE_DIR="${RUNNER_TEMP}/cth-existing" python -m alembic current
 
+      - name: Gate de deuda arquitectónica
+        run: python scripts/audit_architecture.py --enforce
+
       - name: Suite smoke
         run: python scripts/run_test_tier.py smoke --durations 10 --timeout 420
 
@@ -88,11 +95,11 @@ jobs:
           set -o pipefail
           python scripts/run_test_tier.py full --durations 5 --timeout 420 2>&1 | tee iteration4-full.log
 
-      - name: Publicar evidencia de estabilización
+      - name: Publicar evidencia de product readiness
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: iteration4-stabilization-evidence
+          name: product-readiness-evidence
           path: |
             iteration4-targeted.xml
             iteration4-full.log
