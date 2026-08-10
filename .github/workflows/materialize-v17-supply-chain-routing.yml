@@ -1,0 +1,96 @@
+name: Materialize V1.7 supply chain routing
+
+on:
+  push:
+    branches: [refactor/v1-7-0-domain-surfaces]
+    paths:
+      - .github/workflows/materialize-v17-supply-chain-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-7-0-domain-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract supply-chain HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path("app/main.py")
+          source = main_path.read_text(encoding="utf-8")
+          start_marker = '@app.get("/cadena-valor", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/escenarios", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit("supply-chain route boundaries are not unique")
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + "\n"
+          if block.count("@app.") != 12:
+              raise SystemExit(f"expected 12 supply-chain routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nimport hashlib\nimport secrets\nfrom datetime import UTC, datetime\nfrom io import BytesIO\nfrom pathlib import Path\n\nfrom fastapi import Depends, File, Form, HTTPException, Request, UploadFile\nfrom fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response\nfrom openpyxl import Workbook\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .config import settings\nfrom .database import add_audit, get_db\nfrom .db.models import (\n    Inventory,\n    Scope3CategoryAssessment,\n    Supplier,\n    SupplierCampaign,\n    SupplierDataRequest,\n    SupplierResponse,\n)\nfrom .scope3_catalog import canonical_category_label, category_from_value\nfrom .security import validate_upload_bytes\nfrom .storage import storage\nfrom .supply_chain import (\n    approved_duplicate_responses,\n    calculate_supplier_response,\n    campaign_summary,\n    ensure_scope3_assessments,\n    inventory_supply_chain_summary,\n    quality_level as supplier_quality_level,\n    sync_supplier_source,\n    validate_supplier_response,\n)\n\n\ndef register_supply_chain_routes(\n    app,\n    templates,\n    common_context,\n    require_user,\n    ensure_capability,\n    set_flash,\n    parse_date,\n    get_inventory,\n    ensure_inventory_editable,\n    safe_filename,\n    allowed_upload_extensions,\n    max_upload_size,\n) -> None:\n    ALLOWED_UPLOAD_EXTENSIONS = allowed_upload_extensions\n    MAX_UPLOAD_SIZE = max_upload_size\n'''
+          indented = "".join(("    " + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          Path("app/supply_chain_web.py").write_text(header + indented, encoding="utf-8")
+
+          source = source[:start] + source[end:]
+          import_anchor = "from .methodology_admin_web import register_methodology_admin_routes\n"
+          if source.count(import_anchor) != 1:
+              raise SystemExit("methodology admin import anchor missing")
+          source = source.replace(
+              import_anchor,
+              import_anchor + "from .supply_chain_web import register_supply_chain_routes\n",
+              1,
+          )
+          register_anchor = '''register_methodology_admin_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, ALLOWED_UNITS\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit("methodology admin registration anchor missing")
+          source = source.replace(
+              register_anchor,
+              register_anchor + '''register_supply_chain_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    parse_date, get_inventory, ensure_inventory_editable, safe_filename,\n    ALLOWED_UPLOAD_EXTENSIONS, MAX_UPLOAD_SIZE,\n)\n''',
+              1,
+          )
+          main_path.write_text(source, encoding="utf-8")
+
+          test = '''from __future__ import annotations\n\nfrom io import BytesIO\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\nfrom openpyxl import load_workbook\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nSUPPLY_CHAIN_ROUTES = {\n    ("GET", "/cadena-valor"),\n    ("GET", "/api/cadena-valor/resumen"),\n    ("POST", "/cadena-valor/categorias/{category_code}/evaluar"),\n    ("POST", "/cadena-valor/proveedores/nuevo"),\n    ("POST", "/cadena-valor/campanas/nueva"),\n    ("POST", "/cadena-valor/solicitudes/nueva"),\n    ("POST", "/cadena-valor/solicitudes/{request_id}/renovar"),\n    ("GET", "/proveedor/responder/{token}"),\n    ("POST", "/proveedor/responder/{token}"),\n    ("POST", "/cadena-valor/respuestas/{response_id}/revisar"),\n    ("GET", "/cadena-valor/respuestas/{response_id}/evidencia"),\n    ("GET", "/cadena-valor/plantilla.xlsx"),\n}\n\n\ndef _login(client: TestClient) -> None:\n    response = client.post(\n        "/login",\n        data={"email": "admin@calculatuhuella.local", "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v170_supply_chain_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/supply_chain_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/cadena-valor"' not in main_source\n    assert '@app.post("/cadena-valor/' not in main_source\n    assert '@app.get("/proveedor/responder/' not in main_source\n    assert '@app.post("/proveedor/responder/' not in main_source\n    assert "register_supply_chain_routes(" in main_source\n    assert module_source.count("@app.") == 12\n    assert "from .supply_chain import" in module_source\n    assert "def calculate_supplier_response(" not in module_source\n    assert "def validate_supplier_response(" not in module_source\n\n\ndef test_v170_supply_chain_route_contract_is_unique_and_complete():\n    actual = []\n    relevant_paths = {path for _, path in SUPPLY_CHAIN_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant_paths:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == SUPPLY_CHAIN_ROUTES\n    assert len(actual) == len(SUPPLY_CHAIN_ROUTES)\n\n\ndef test_v170_supply_chain_page_api_and_workbook_remain_available():\n    with TestClient(app) as client:\n        _login(client)\n        page = client.get("/cadena-valor")\n        api = client.get("/api/cadena-valor/resumen")\n        workbook_response = client.get("/cadena-valor/plantilla.xlsx")\n        assert page.status_code == 200\n        assert api.status_code == 200\n        assert len(api.json()["categories"]) == 15\n        assert workbook_response.status_code == 200\n        assert workbook_response.content[:2] == b"PK"\n        workbook = load_workbook(BytesIO(workbook_response.content), data_only=True)\n        assert workbook.sheetnames == ["Solicitudes proveedores", "Screening 15 categorías"]\n'''
+          Path("tests/test_v170_supply_chain_routing.py").write_text(test, encoding="utf-8")
+
+          doc = '''# V1.7 · Supply Chain / Scope 3 HTTP\n\n## Baseline\n\nV1.7 parte de la V1.6 certificada. `app/supply_chain.py` ya contiene la autoridad de screening, validación, cálculo de respuestas, calidad, duplicados y sincronización de la fuente de proveedor.\n\n## Corte\n\nLas 12 rutas del flujo de cadena de valor pasan de `app/main.py` a `app/supply_chain_web.py` como una única superficie cohesiva:\n\n- screening y resumen Scope 3;\n- proveedores, campañas y solicitudes;\n- renovación del enlace seguro;\n- portal público del proveedor;\n- carga de evidencia;\n- revisión y sincronización;\n- descarga de evidencia;\n- plantilla XLSX.\n\n## Regla crítica\n\nEl corte mueve HTTP, no lógica de dominio. `app/supply_chain.py`, `scope3_catalog.py`, validación de archivos, almacenamiento y auditoría conservan sus contratos previos.\n\n## Gates\n\n- `tests/test_iteration6_scope3_supply_chain.py` protege las 15 categorías, screening, portal, incompatibilidad de unidades, duplicados y workbook.\n- `tests/test_v170_supply_chain_routing.py` protege autoridad HTTP y unicidad de las 12 rutas.\n- suite completa, arquitectura y smoke deben quedar verdes antes del commit.\n'''
+          Path("docs/architecture/V1_7_SUPPLY_CHAIN_ROUTING.md").write_text(doc, encoding="utf-8")
+          PY
+          python -m py_compile app/supply_chain_web.py app/main.py tests/test_v170_supply_chain_routing.py
+          git diff --check
+      - name: Targeted supply-chain contracts
+        run: pytest -q tests/test_v170_supply_chain_routing.py tests/test_iteration6_scope3_supply_chain.py
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit supply-chain routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/supply_chain_web.py app/main.py tests/test_v170_supply_chain_routing.py docs/architecture/V1_7_SUPPLY_CHAIN_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract supply-chain HTTP surface"
+          git push origin HEAD:refactor/v1-7-0-domain-surfaces
