@@ -32,7 +32,7 @@ def test_v200_product_readiness_workflow_has_real_postgres_restore_job() -> None
     assert "calculahuella_restore" in source
     assert "BACKUP_SIGNING_SECRET" in source
     assert "POSTGRES_RESTORE_DATABASE_URL" in source
-    assert "python scripts/postgres_restore_gate.py" in source
+    assert "python -m scripts.postgres_restore_gate" in source
     assert "postgres-restore-evidence.json" in source
     assert "postgres-continuity-evidence" in source
 
@@ -40,3 +40,4 @@ def test_v200_product_readiness_workflow_has_real_postgres_restore_job() -> None
 def test_v200_postgres_continuity_is_part_of_targeted_release_contract() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
     assert "tests/test_v200_postgres_continuity_gate.py" in source
+    assert "tests/test_v200_postgres_methodology_schema.py" in source
