@@ -145,6 +145,7 @@ from .document_center_web import register_document_center_routes
 from .readiness_web import register_readiness_routes
 from .notifications_web import register_notification_routes
 from .portfolio_web import register_portfolio_routes
+from .executive_portfolio_web import register_executive_portfolio_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -498,35 +499,6 @@ def _compliance_score(rows: list[ComplianceAssessment]) -> int:
     weights = {"Cumple": 100, "Parcial": 50, "Pendiente": 0, "No cumple": 0}
     return round(sum(weights.get(row.status, 0) for row in applicable) / len(applicable))
 
-@app.get("/direccion-ejecutiva", response_class=HTMLResponse)
-def executive_portfolio_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_portfolio")
-    memberships = list(session.scalars(
-        select(OrganizationMembership)
-        .where(OrganizationMembership.user_id == int(user["id"]), OrganizationMembership.active.is_(True))
-        .options(selectinload(OrganizationMembership.organization))
-        .order_by(OrganizationMembership.id)
-    ))
-    cards = []
-    portfolio_total = 0.0
-    total_reduction = 0.0
-    for membership in memberships:
-        organization = membership.organization
-        inventory = session.scalar(select(Inventory).where(Inventory.organization_id == organization.id).order_by(Inventory.start_date.desc(), Inventory.id.desc()).limit(1))
-        if inventory:
-            emissions = session.scalar(select(func.coalesce(func.sum(EmissionSource.emissions), 0.0)).where(EmissionSource.inventory_id == inventory.id, EmissionSource.included.is_(True))) or 0.0
-            assessments = list(session.scalars(select(ComplianceAssessment).where(ComplianceAssessment.inventory_id == inventory.id).options(selectinload(ComplianceAssessment.requirement))))
-            open_observations = session.scalar(select(func.count(ReviewObservation.id)).where(ReviewObservation.inventory_id == inventory.id, ReviewObservation.status != "Cerrada")) or 0
-            reduction = session.scalar(select(func.coalesce(func.sum(ReductionAction.expected_reduction), 0.0)).where(ReductionAction.inventory_id == inventory.id)) or 0.0
-            documents = session.scalar(select(func.count(DocumentControlRecord.id)).where(DocumentControlRecord.organization_id == organization.id)) or 0
-            portfolio_total += float(emissions)
-            total_reduction += float(reduction)
-            cards.append({"organization": organization, "membership": membership, "inventory": inventory, "emissions": float(emissions), "compliance": _compliance_score(assessments), "open_observations": open_observations, "reduction": float(reduction), "documents": documents})
-        else:
-            cards.append({"organization": organization, "membership": membership, "inventory": None, "emissions": 0.0, "compliance": 0, "open_observations": 0, "reduction": 0.0, "documents": 0})
-    average_compliance = round(sum(item["compliance"] for item in cards) / max(len(cards), 1))
-    return templates.TemplateResponse(request=request, name="executive_portfolio.html", context=common_context(request, session, user, "executive", cards=cards, portfolio_total=portfolio_total, total_reduction=total_reduction, average_compliance=average_compliance))
-
 @app.get("/cumplimiento", response_class=HTMLResponse)
 def compliance_page(request: Request, inventory_id: int | None = None, session: Session = Depends(get_db), user: dict = Depends(require_user)):
     ensure_capability(user, "view_compliance")
@@ -755,6 +727,9 @@ register_notification_routes(
 )
 register_portfolio_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
+)
+register_executive_portfolio_routes(
+    app, templates, common_context, require_user, ensure_capability, _compliance_score
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
