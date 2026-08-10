@@ -141,6 +141,7 @@ from .automations_web import register_automation_routes
 from .service_account_web import register_service_account_routes
 from .customer_onboarding_web import register_customer_onboarding_routes
 from .platform_admin_web import register_platform_admin_routes
+from .document_center_web import register_document_center_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -743,57 +744,6 @@ def methodology_snapshot_create(request: Request, inventory_id: int = Form(...),
     set_flash(request, "Configuración metodológica congelada para el inventario.")
     return RedirectResponse("/gobierno-metodologico", status_code=303)
 
-@app.get("/centro-documental", response_class=HTMLResponse)
-def document_center_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_documents")
-    records = list(session.scalars(select(DocumentControlRecord).where(DocumentControlRecord.organization_id == int(user["organization_id"])).options(selectinload(DocumentControlRecord.inventory), selectinload(DocumentControlRecord.evidence), selectinload(DocumentControlRecord.report)).order_by(DocumentControlRecord.category, DocumentControlRecord.document_code)))
-    inventories = list(session.scalars(select(Inventory).where(Inventory.organization_id == int(user["organization_id"])).order_by(Inventory.start_date.desc())))
-    evidence = list(session.scalars(select(EvidenceDocument).join(Inventory).where(Inventory.organization_id == int(user["organization_id"])).order_by(EvidenceDocument.uploaded_at.desc()).limit(100)))
-    reports = list(session.scalars(select(ReportArtifact).join(Inventory).where(Inventory.organization_id == int(user["organization_id"])).order_by(ReportArtifact.generated_at.desc()).limit(100)))
-    due = [row for row in records if row.review_due and row.review_due <= date.today()]
-    return templates.TemplateResponse(request=request, name="document_center.html", context=common_context(request, session, user, "documents", records=records, inventories=inventories, evidence=evidence, reports=reports, due=due))
-
-@app.post("/centro-documental/registros/nuevo")
-def document_record_create(request: Request, document_code: str = Form(...), title: str = Form(...), category: str = Form("Soporte"), version: str = Form("1.0"), owner: str = Form("Gestión ambiental"), confidentiality: str = Form("Interno"), retention_years: int = Form(7), review_due: str = Form(""), inventory_id: int | None = Form(None), evidence_document_id: int | None = Form(None), report_artifact_id: int | None = Form(None), notes: str = Form(""), session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_documents")
-    organization_id = int(user["organization_id"])
-    if session.scalar(select(DocumentControlRecord).where(DocumentControlRecord.organization_id == organization_id, DocumentControlRecord.document_code == document_code.strip())):
-        raise HTTPException(409, "El código documental ya existe")
-    inventory = get_inventory(session, user, inventory_id) if inventory_id else None
-    evidence = None
-    report = None
-    if evidence_document_id:
-        evidence = session.scalar(select(EvidenceDocument).join(Inventory).where(EvidenceDocument.id == evidence_document_id, Inventory.organization_id == organization_id))
-        if not evidence:
-            raise HTTPException(400, "Evidencia inválida")
-    if report_artifact_id:
-        report = session.scalar(select(ReportArtifact).join(Inventory).where(ReportArtifact.id == report_artifact_id, Inventory.organization_id == organization_id))
-        if not report:
-            raise HTTPException(400, "Informe inválido")
-    row = DocumentControlRecord(organization_id=organization_id, inventory_id=inventory.id if inventory else None, evidence_document_id=evidence.id if evidence else None, report_artifact_id=report.id if report else None, document_code=document_code.strip(), title=title.strip(), category=category.strip(), version=version.strip(), owner=owner.strip(), confidentiality=confidentiality, retention_years=max(1, retention_years), review_due=parse_date(review_due) if review_due else None, status="Vigente", sha256=(evidence.sha256 if evidence else (report.sha256 if report else "")), notes=notes.strip(), created_by=str(user["email"]))
-    session.add(row)
-    add_audit(session, organization_id, str(user["email"]), "REGISTRAR", "Documento controlado", row.document_code, row.title)
-    session.commit()
-    set_flash(request, "Documento incorporado al registro maestro.")
-    return RedirectResponse("/centro-documental", status_code=303)
-
-@app.post("/centro-documental/registros/{record_id}/actualizar")
-def document_record_update(record_id: int, request: Request, status: str = Form(...), version: str = Form(...), owner: str = Form(...), confidentiality: str = Form(...), review_due: str = Form(""), notes: str = Form(""), session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_documents")
-    row = session.scalar(select(DocumentControlRecord).where(DocumentControlRecord.id == record_id, DocumentControlRecord.organization_id == int(user["organization_id"])))
-    if not row:
-        raise HTTPException(404, "Documento no encontrado")
-    row.status = status
-    row.version = version.strip()
-    row.owner = owner.strip()
-    row.confidentiality = confidentiality
-    row.review_due = parse_date(review_due) if review_due else None
-    row.notes = notes.strip()
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "ACTUALIZAR", "Documento controlado", row.document_code, f"Versión {row.version} · {row.status}")
-    session.commit()
-    set_flash(request, "Control documental actualizado.")
-    return RedirectResponse("/centro-documental", status_code=303)
-
 @app.get("/alistamiento", response_class=HTMLResponse)
 def readiness_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
     ensure_capability(user, "manage_readiness")
@@ -948,6 +898,9 @@ register_customer_onboarding_routes(
 )
 register_platform_admin_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
+)
+register_document_center_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date, get_inventory
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
