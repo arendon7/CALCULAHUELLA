@@ -134,6 +134,7 @@ from .impact_intelligence_web import register_impact_intelligence_routes
 from .climate_risk_web import register_climate_risk_routes
 from .climate_disclosure_web import register_climate_disclosure_routes
 from .consolidation_web import register_consolidation_routes
+from .analytics_web import register_analytics_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -479,79 +480,6 @@ def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date
     if start < inventory.start_date or end > inventory.end_date:
         raise ValueError("periodo fuera del inventario")
     return start, end
-
-@app.get("/analisis", response_class=HTMLResponse)
-def analysis_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    inventory = get_inventory(session, user)
-    analysis = full_analysis(session, inventory)
-    return templates.TemplateResponse(
-        request=request,
-        name="analysis.html",
-        context=common_context(
-            request, session, user, "analysis", inventory=inventory,
-            indicator_types=[("Producción", "t"), ("Empleados", "personas"), ("Ingresos", "COP"), ("Servicios", "servicios"), ("Área", "m²")],
-            **analysis,
-        ),
-    )
-
-@app.post("/analisis/indicadores/nuevo")
-def create_indicator(
-    request: Request,
-    inventory_id: int = Form(...),
-    indicator_type: str = Form(...),
-    value: float = Form(...),
-    unit: str = Form(...),
-    period_start: str = Form(...),
-    period_end: str = Form(...),
-    source_name: str = Form("Registro operativo"),
-    facility_id: int | None = Form(None),
-    notes: str = Form(""),
-    session: Session = Depends(get_db),
-    user: dict = Depends(require_user),
-):
-    ensure_capability(user, "manage_inventory")
-    inventory = get_inventory(session, user, inventory_id)
-    ensure_inventory_editable(inventory)
-    if value < 0:
-        raise HTTPException(400, "El valor del indicador no puede ser negativo")
-    indicator = ActivityIndicator(
-        inventory_id=inventory.id, facility_id=facility_id or None,
-        period_start=parse_date(period_start), period_end=parse_date(period_end),
-        indicator_type=indicator_type.strip(), value=value, unit=unit.strip(),
-        source_name=source_name.strip() or "Registro operativo", notes=notes.strip(),
-        status="Cargado", created_by=str(user["email"]),
-    )
-    session.add(indicator)
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "CREAR", "Indicador", indicator.indicator_type, f"{value} {unit}")
-    session.commit()
-    set_flash(request, "Indicador operativo registrado.")
-    return RedirectResponse("/analisis", status_code=303)
-
-@app.post("/analisis/indicadores/{indicator_id}/editar")
-def update_indicator(
-    indicator_id: int, request: Request, value: float = Form(...), unit: str = Form(...),
-    source_name: str = Form("Registro operativo"), notes: str = Form(""),
-    session: Session = Depends(get_db), user: dict = Depends(require_user),
-):
-    ensure_capability(user, "manage_inventory")
-    indicator = session.scalar(
-        select(ActivityIndicator).join(Inventory).where(
-            ActivityIndicator.id == indicator_id, Inventory.organization_id == int(user["organization_id"])
-        )
-    )
-    if not indicator:
-        raise HTTPException(404, "Indicador no encontrado")
-    inventory = get_inventory(session, user, indicator.inventory_id)
-    ensure_inventory_editable(inventory)
-    previous = f"{indicator.value} {indicator.unit}"
-    indicator.value = value
-    indicator.unit = unit.strip()
-    indicator.source_name = source_name.strip() or indicator.source_name
-    indicator.notes = notes.strip()
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "EDITAR", "Indicador", indicator.indicator_type, previous_value=previous, new_value=f"{value} {unit}")
-    session.commit()
-    set_flash(request, "Indicador actualizado.")
-    return RedirectResponse("/analisis", status_code=303)
 
 @app.get("/escenarios", response_class=HTMLResponse)
 def scenarios_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
@@ -1484,6 +1412,10 @@ register_climate_disclosure_routes(
 )
 register_consolidation_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
+)
+register_analytics_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date,
+    get_inventory, ensure_inventory_editable
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
