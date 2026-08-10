@@ -1,0 +1,99 @@
+name: Materialize calculation routing
+
+on:
+  push:
+    branches: [refactor/v1-6-0-consolidation]
+    paths:
+      - .github/workflows/materialize-calculation-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-6-0-consolidation
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract calculation HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path("app/main.py")
+          source = main_path.read_text(encoding="utf-8")
+          start_marker = '@app.get("/calculos", response_class=HTMLResponse)\n'
+          end_marker = '@app.get("/metodologia", response_class=HTMLResponse)\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit("calculation route boundaries are not unique")
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + "\n"
+          if block.count("@app.") != 2:
+              raise SystemExit(f"expected 2 calculation routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nfrom fastapi import Depends, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy.orm import Session\n\nfrom .calculations import recalculate_inventory, source_calculation_summary\nfrom .database import add_audit, get_db\n\n\ndef register_calculation_routes(\n    app,\n    templates,\n    common_context,\n    require_user,\n    ensure_capability,\n    set_flash,\n    get_inventory,\n    ensure_inventory_editable,\n) -> None:\n'''
+          indented = "".join(("    " + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          Path("app/calculation_web.py").write_text(header + indented, encoding="utf-8")
+
+          source = source[:start] + source[end:]
+          import_anchor = "from .sectorization_web import register_sectorization_routes\n"
+          if source.count(import_anchor) != 1:
+              raise SystemExit("sectorization import anchor missing")
+          source = source.replace(
+              import_anchor,
+              import_anchor + "from .calculation_web import register_calculation_routes\n",
+              1,
+          )
+          register_anchor = '''register_sectorization_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable,\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit("sectorization registration anchor missing")
+          source = source.replace(
+              register_anchor,
+              register_anchor + '''register_calculation_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash,\n    get_inventory, ensure_inventory_editable,\n)\n''',
+              1,
+          )
+          main_path.write_text(source, encoding="utf-8")
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\nfrom sqlalchemy import select\n\nfrom app.calculations import source_calculation_summary\nfrom app.db.base import SessionLocal\nfrom app.db.models import EmissionSource, Inventory\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nCALCULATION_ROUTES = {\n    ("GET", "/calculos"),\n    ("POST", "/inventarios/{inventory_id}/recalcular"),\n}\n\n\ndef _login(client: TestClient) -> None:\n    response = client.post(\n        "/login",\n        data={"email": "consultor@calculatuhuella.local", "password": "Demo2026!"},\n        follow_redirects=False,\n    )\n    assert response.status_code == 303\n\n\ndef test_v160_calculation_routes_have_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/calculation_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/calculos"' not in main_source\n    assert '@app.post("/inventarios/{inventory_id}/recalcular"' not in main_source\n    assert "register_calculation_routes(" in main_source\n    assert module_source.count("@app.") == 2\n    assert "recalculate_inventory" in module_source\n    assert "source_calculation_summary" in module_source\n    assert "def recalculate_inventory(" not in module_source\n    assert "def source_calculation_summary(" not in module_source\n\n\ndef test_v160_calculation_route_contract_is_unique_and_complete():\n    actual = []\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path == "/calculos" or path == "/inventarios/{inventory_id}/recalcular":\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == CALCULATION_ROUTES\n    assert len(actual) == len(CALCULATION_ROUTES)\n\n\ndef test_v160_calculation_page_uses_existing_engine_results():\n    with SessionLocal() as session:\n        inventory = session.scalar(select(Inventory).order_by(Inventory.id))\n        source = session.scalar(select(EmissionSource).where(EmissionSource.inventory_id == inventory.id).order_by(EmissionSource.id))\n        assert inventory is not None and source is not None\n        before = source_calculation_summary(session, source.id)\n        source_id = source.id\n    with TestClient(app) as client:\n        _login(client)\n        page = client.get("/calculos")\n        assert page.status_code == 200\n        response = client.post(\n            f"/inventarios/{inventory.id}/recalcular",\n            follow_redirects=False,\n        )\n        assert response.status_code == 303\n        assert response.headers["location"] == "/calculos"\n    with SessionLocal() as session:\n        after = source_calculation_summary(session, source_id)\n        assert len(after["calculations"]) == len(before["calculations"])\n        assert after["errors"] == before["errors"]\n'''
+          Path("tests/test_v160_calculation_routing.py").write_text(test, encoding="utf-8")
+
+          doc = '''# V1.6 · Methodology / Calculation Boundary · Calculation HTTP\n\n## Corte\n\n- `GET /calculos` y `POST /inventarios/{inventory_id}/recalcular` pasan a `app/calculation_web.py`.\n- `app/main.py` conserva únicamente el registro del módulo.\n- `app/calculations.py` sigue siendo la autoridad de `recalculate_inventory` y `source_calculation_summary`.\n\n## Regla crítica\n\nEste corte mueve **orquestación HTTP**, no cálculo. No se copian ni modifican fórmulas, conversiones, factores, gases, GWP, snapshots ni reglas de error/alerta.\n\n## Contratos\n\n1. Exactamente dos rutas, sin duplicados.\n2. `/calculos` sigue operativo.\n3. Recalcular mantiene redirect y usa el motor existente.\n4. La estructura de resultados por fuente permanece compatible.\n5. Suite completa, arquitectura y smoke verdes antes del commit.\n'''
+          Path("docs/architecture/V1_6_CALCULATION_HTTP_BOUNDARY.md").write_text(doc, encoding="utf-8")
+          PY
+          python -m py_compile app/calculation_web.py app/main.py tests/test_v160_calculation_routing.py
+          git diff --check
+      - name: Targeted calculation contracts
+        run: >-
+          pytest -q
+          tests/test_v160_calculation_routing.py
+          tests/test_app.py -k "calculation or recalcul or formula or diesel or conversion"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit calculation routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/calculation_web.py app/main.py tests/test_v160_calculation_routing.py docs/architecture/V1_6_CALCULATION_HTTP_BOUNDARY.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract calculation HTTP boundary"
+          git push origin HEAD:refactor/v1-6-0-consolidation
