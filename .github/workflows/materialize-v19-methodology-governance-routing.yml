@@ -1,0 +1,92 @@
+name: Materialize V1.9 methodology governance routing
+
+on:
+  push:
+    branches: [refactor/v1-9-0-core-surfaces]
+    paths:
+      - .github/workflows/materialize-v19-methodology-governance-routing.yml
+
+permissions:
+  contents: write
+
+jobs:
+  materialize:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: refactor/v1-9-0-core-surfaces
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: python -m pip install --upgrade pip
+      - run: pip install -r requirements.txt -r requirements-dev.txt
+      - name: Extract Methodology Governance HTTP surface
+        shell: bash
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          main_path = Path('app/main.py')
+          source = main_path.read_text(encoding='utf-8')
+          start_marker = '@app.get("/gobierno-metodologico", response_class=HTMLResponse)\n'
+          end_marker = 'def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes: str, has_previous_inventory: bool, objective: str, urgency: str) -> tuple[int, str]:\n'
+          if source.count(start_marker) != 1 or source.count(end_marker) != 1:
+              raise SystemExit('methodology governance boundaries are not unique')
+          start = source.index(start_marker)
+          end = source.index(end_marker)
+          block = source[start:end].rstrip() + '\n'
+          if block.count('@app.') != 4:
+              raise SystemExit(f"expected 4 methodology governance routes, found {block.count('@app.')}")
+
+          header = '''from __future__ import annotations\n\nimport hashlib\nimport json\nfrom datetime import UTC, datetime\n\nfrom fastapi import Depends, Form, HTTPException, Request\nfrom fastapi.responses import HTMLResponse, RedirectResponse\nfrom sqlalchemy import select\nfrom sqlalchemy.orm import Session, selectinload\n\nfrom .database import add_audit, get_db\nfrom .db.models import Inventory, InventoryMethodologySnapshot, MethodologyRelease\n\n\n'''
+          indented = ''.join(('    ' + line if line.strip() else line) for line in block.splitlines(keepends=True))
+          module = header + 'def register_methodology_governance_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date, get_inventory\n) -> None:\n' + indented
+          Path('app/methodology_governance_web.py').write_text(module, encoding='utf-8')
+
+          source = source[:start] + source[end:]
+          import_anchor = 'from .compliance_web import register_compliance_routes\n'
+          if source.count(import_anchor) != 1:
+              raise SystemExit('compliance import anchor missing')
+          source = source.replace(import_anchor, import_anchor + 'from .methodology_governance_web import register_methodology_governance_routes\n', 1)
+          register_anchor = '''register_compliance_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory\n)\n'''
+          if source.count(register_anchor) != 1:
+              raise SystemExit('compliance registration anchor missing')
+          registration = '''register_methodology_governance_routes(\n    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date, get_inventory\n)\n'''
+          source = source.replace(register_anchor, register_anchor + registration, 1)
+          main_path.write_text(source, encoding='utf-8')
+
+          test = '''from __future__ import annotations\n\nfrom pathlib import Path\n\nfrom fastapi.testclient import TestClient\n\nfrom app.main import app\n\nROOT = Path(__file__).resolve().parents[1]\n\nGOVERNANCE_ROUTES = {\n    ("GET", "/gobierno-metodologico"),\n    ("POST", "/gobierno-metodologico/versiones/nueva"),\n    ("POST", "/gobierno-metodologico/versiones/{release_id}/aprobar"),\n    ("POST", "/gobierno-metodologico/snapshots/nuevo"),\n}\n\n\ndef _login(client: TestClient, email: str) -> None:\n    response = client.post(\n        "/login", data={"email": email, "password": "Demo2026!"}, follow_redirects=False\n    )\n    assert response.status_code == 303\n\n\ndef test_v190_methodology_governance_has_dedicated_http_authority():\n    main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")\n    module_source = (ROOT / "app/methodology_governance_web.py").read_text(encoding="utf-8")\n    assert '@app.get("/gobierno-metodologico"' not in main_source\n    assert '@app.post("/gobierno-metodologico/' not in main_source\n    assert "register_methodology_governance_routes(" in main_source\n    assert module_source.count("@app.") == 4\n    assert "MethodologyRelease" in module_source\n    assert "InventoryMethodologySnapshot" in module_source\n    assert "hashlib.sha256" in module_source\n    assert "_lead_complexity" not in module_source\n\n\ndef test_v190_methodology_governance_route_contract_is_unique_and_complete():\n    actual = []\n    relevant = {path for _, path in GOVERNANCE_ROUTES}\n    for route in app.routes:\n        path = getattr(route, "path", None)\n        methods = getattr(route, "methods", set()) or set()\n        if path in relevant:\n            actual.extend((method, path) for method in methods if method in {"GET", "POST"})\n    assert set(actual) == GOVERNANCE_ROUTES\n    assert len(actual) == len(GOVERNANCE_ROUTES)\n\n\ndef test_v190_methodology_governance_remains_permission_bound():\n    with TestClient(app) as client:\n        _login(client, "cliente@calculatuhuella.local")\n        assert client.get("/gobierno-metodologico").status_code == 403\n        client.post("/logout")\n        _login(client, "consultor@calculatuhuella.local")\n        assert client.get("/gobierno-metodologico").status_code == 200\n'''
+          Path('tests/test_v190_methodology_governance_routing.py').write_text(test, encoding='utf-8')
+
+          doc = '''# V1.9 · Methodology Governance HTTP\n\n## Autoridad\n\n`app/methodology_governance_web.py` pasa a ser la autoridad HTTP del panel de gobierno metodológico, alta de versiones, aprobación y snapshots por inventario.\n\n## Semántica preservada\n\nLas versiones nacen en `Borrador`, conservan huella SHA-256 sobre nombre/versión/referencia/notas y registran organismo emisor y fechas. La aprobación mantiene `approved_by`/`approved_at`. Los snapshots congelan metodología, versión, GWP, enfoque de consolidación, materialidad y política del inventario.\n\n## Acceso e aislamiento\n\nLas cuatro rutas continúan exigiendo `manage_methodology_governance`. Releases y snapshots permanecen limitados a la organización activa; el inventario se resuelve mediante `get_inventory`.\n\n## Gates\n\nV0.13 protege el lifecycle completo: creación por Consultor, aprobación por Revisor y snapshot vinculado a la versión aprobada. El contrato V1.9 protege autoridad HTTP, unicidad y permisos.\n'''
+          Path('docs/architecture/V1_9_METHODOLOGY_GOVERNANCE_ROUTING.md').write_text(doc, encoding='utf-8')
+          PY
+          python -m py_compile app/methodology_governance_web.py app/main.py tests/test_v190_methodology_governance_routing.py
+          git diff --check
+      - name: Targeted V1.9 Methodology Governance authority
+        run: pytest -q tests/test_v190_methodology_governance_routing.py
+      - name: Historical V0.13 methodology governance lifecycle
+        run: pytest -q tests/test_app.py -k "v013_methodology_release_and_snapshot"
+      - name: Full regression suite
+        run: pytest -q
+      - name: Architecture debt gate
+        run: python scripts/audit_architecture.py --enforce
+      - name: Canonical smoke tier
+        run: python scripts/run_test_tier.py smoke --durations 10 --timeout 300
+      - name: Commit Methodology Governance routing
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add app/methodology_governance_web.py app/main.py tests/test_v190_methodology_governance_routing.py docs/architecture/V1_9_METHODOLOGY_GOVERNANCE_ROUTING.md
+          git diff --cached --check
+          git diff --cached --quiet && { echo "No changes to commit"; exit 0; }
+          git commit -m "refactor(routes): extract methodology governance HTTP"
+          git push origin HEAD:refactor/v1-9-0-core-surfaces
