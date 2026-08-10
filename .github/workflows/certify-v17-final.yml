@@ -104,13 +104,13 @@ jobs:
 
           main_text = Path('app/main.py').read_text(encoding='utf-8')
           main_lines = len(main_text.splitlines())
-          main_routes = main_text.count('@app.')
+          main_routes = sum(1 for _, _, file, _ in routes if file == 'app/main.py')
           if main_lines > 2224:
               raise SystemExit(f'app/main.py grew beyond V1.7 ceiling: {main_lines}')
           if main_routes > 81:
-              raise SystemExit(f'app/main.py route count grew beyond V1.7 ceiling: {main_routes}')
+              raise SystemExit(f'app/main.py HTTP route count grew beyond V1.7 ceiling: {main_routes}')
           print(f'HTTP uniqueness OK: {len(routes)} contracts')
-          print(f'app/main.py ceiling OK: {main_lines} lines / {main_routes} routes')
+          print(f'app/main.py ceiling OK: {main_lines} lines / {main_routes} HTTP routes')
           PY
       - name: Full regression suite
         shell: bash
