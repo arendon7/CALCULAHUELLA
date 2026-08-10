@@ -28,3 +28,21 @@ def test_v160_d2a_bootstrap_remains_idempotent_on_seeded_database():
     assert after == before
     assert len(Base.metadata.tables) == 124
     assert ENGINE is not None
+
+def test_v160_d2b_defaults_have_dedicated_authority_without_database_cycle():
+    import app.database as database_module
+    import app.seed_defaults as defaults_module
+
+    database_source = (ROOT / "app/database.py").read_text(encoding="utf-8")
+    defaults_source = (ROOT / "app/seed_defaults.py").read_text(encoding="utf-8")
+    seed_source = (ROOT / "app/seed.py").read_text(encoding="utf-8")
+
+    assert "def _ensure_v012_defaults" not in database_source
+    assert "def _ensure_v100_final_defaults" not in database_source
+    assert "def _ensure_v012_defaults" in defaults_source
+    assert "def _ensure_v100_final_defaults" in defaults_source
+    assert "from .database import" not in defaults_source
+    assert "from .seed_defaults import" in seed_source
+    assert database_module._ensure_v020_defaults is defaults_module._ensure_v020_defaults
+    assert database_module._ensure_v100_final_defaults is defaults_module._ensure_v100_final_defaults
+    assert len(database_source.splitlines()) < 350

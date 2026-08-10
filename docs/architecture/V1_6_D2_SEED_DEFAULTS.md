@@ -23,3 +23,15 @@ Reducir la concentración de `app/database.py` sin modificar modelos ORM, migrac
 ## Siguiente corte
 
 D2b extraerá la cadena `_ensure_v012_defaults` → `_ensure_v100_final_defaults` a una autoridad específica de defaults, conservando fachadas privadas solo si existe dependencia real comprobada.
+
+## D2b · defaults históricos
+
+- La cadena `_ensure_v012_defaults` → `_ensure_v100_final_defaults` vive en `app/seed_defaults.py`.
+- `app/seed_defaults.py` no importa `app.database` y, por contrato, no puede depender de helpers de la fachada.
+- `app.database` conserva reexports compatibles de los nombres privados históricos mientras se completa la consolidación.
+- `app/seed.py` consume los defaults directamente desde su autoridad nueva.
+- `database.py` queda concentrado en fachada de persistencia, helpers básicos de compatibilidad y semilla metodológica/sectorial.
+
+### Límite D2
+
+D2 no mueve modelos ORM, no cambia migraciones, no toca cálculos, no altera factores/GWP y no modifica contenido funcional de ningún default. El cambio es exclusivamente de propiedad modular.

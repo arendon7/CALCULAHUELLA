@@ -15,6 +15,21 @@ from .config import INSTANCE_DIR, PROJECT_DIR, settings
 from .db.base import Base, ENGINE, SessionLocal, UPLOAD_DIR
 from .db.models import *  # noqa: F401,F403 - bootstrap consumes the canonical ORM models
 from .database import (
+    _seed_methodology,
+    _seed_sector_templates,
+    hash_password,
+    refresh_progress,
+    write_simple_pdf,
+)
+from .seed_defaults import (
+    _ensure_v012_defaults,
+    _ensure_v013_defaults,
+    _ensure_v014_defaults,
+    _ensure_v015_defaults,
+    _ensure_v016_defaults,
+    _ensure_v017_defaults,
+    _ensure_v018_defaults,
+    _ensure_v019_defaults,
     _ensure_v020_defaults,
     _ensure_v021_defaults,
     _ensure_v022_defaults,
@@ -37,11 +52,6 @@ from .database import (
     _ensure_v045_defaults,
     _ensure_v050_defaults,
     _ensure_v100_final_defaults,
-    _seed_methodology,
-    _seed_sector_templates,
-    hash_password,
-    refresh_progress,
-    write_simple_pdf,
 )
 
 def init_db() -> None:
