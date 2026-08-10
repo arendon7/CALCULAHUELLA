@@ -3,7 +3,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 PROCESS = ROOT / "app" / "templates" / "public" / "v14" / "process_trace.html"
-PUBLIC_CSS = ROOT / "app" / "static" / "css" / "public-v1.4.css"
+PUBLIC_CSS = ROOT / "app" / "static" / "css" / "public-v1.6.css"
 PUBLIC_V16_JS = ROOT / "app" / "static" / "js" / "public-v1.6.js"
 PUBLIC_BASE = ROOT / "app" / "templates" / "public_base.html"
 
@@ -66,8 +66,11 @@ def test_v16_public_javascript_knows_all_process_keys_and_core_interactions():
         assert contract in js
 
 
-def test_public_base_loads_one_public_javascript_authority_and_hides_historical_badge():
+def test_public_base_loads_single_v16_public_asset_authority_and_hides_historical_badge():
     html = PUBLIC_BASE.read_text(encoding="utf-8")
+    assert "public-v1.6.css" in html
+    assert "public-v1.4.css" not in html
+    assert html.count("public-v1.6.css") == 1
     assert "public-v1.6.js" in html
     assert "public-v1.4.js" not in html
     assert html.count("public-v1.6.js") == 1
