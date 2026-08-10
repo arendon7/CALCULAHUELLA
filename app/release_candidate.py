@@ -11,6 +11,7 @@ MIN_REGRESSION_TESTS = 386
 
 def _load_test_evidence(project_dir: Path) -> dict[str, Any]:
     candidates = [
+        project_dir / "docs" / "evidencia" / "FINAL_TEST_EVIDENCE.json",
         project_dir / "release" / "FINAL_TEST_EVIDENCE.json",
         project_dir / "release" / "RC1_TEST_EVIDENCE.json",
     ]
@@ -23,6 +24,11 @@ def _load_test_evidence(project_dir: Path) -> dict[str, Any]:
         return {"status": "invalid", "test_count": 0, "path": str(path)}
     payload["path"] = str(path)
     return payload
+
+
+def _evidence_file_exists(project_dir: Path, canonical: str, legacy: str) -> bool:
+    """Accept the organized V1.5.x documentation tree and legacy V1 root layout."""
+    return (project_dir / canonical).is_file() or (project_dir / legacy).is_file()
 
 
 def _gate(code: str, label: str, ok: bool, detail: str, *, group: str) -> dict[str, object]:
@@ -46,8 +52,8 @@ def release_candidate_summary(
     package_checks = [
         _gate("V1-VERSION", "Versión final identificada", settings.version == "1.0.0", f"Versión activa: {settings.version}", group="Paquete"),
         _gate("V1-TESTS", "Regresión automatizada documentada", tests_ok, f"{test_count} pruebas · estado {evidence.get('status', 'missing')}", group="Paquete"),
-        _gate("V1-SCOPE", "Alcance funcional congelado", (project_dir / "ACTA_CIERRE_V1_0_0.md").is_file(), "Acta de cierre y regla de comunicación", group="Paquete"),
-        _gate("V1-LEGAL-PAGES", "Documentación legal incorporada", (project_dir / "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md").is_file(), "Términos, privacidad, DPA, SLA y limitaciones", group="Paquete"),
+        _gate("V1-SCOPE", "Alcance funcional congelado", _evidence_file_exists(project_dir, "docs/gobierno/ACTA_CIERRE_V1_0_0.md", "ACTA_CIERRE_V1_0_0.md"), "Acta de cierre y regla de comunicación", group="Paquete"),
+        _gate("V1-LEGAL-PAGES", "Documentación legal incorporada", _evidence_file_exists(project_dir, "docs/gobierno/APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md", "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md"), "Términos, privacidad, DPA, SLA y limitaciones", group="Paquete"),
     ]
     governance_checks = [
         _gate("V1-CRITICAL", "Sin hallazgos críticos abiertos", critical_open == 0, f"{critical_open} hallazgos críticos abiertos", group="Gobierno"),
@@ -58,35 +64,35 @@ def release_candidate_summary(
         _gate(
             "V1-CARLOS",
             "Revisión metodológica interna de Carlos",
-            settings.final_methodology_internal_approved and (project_dir / "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md").is_file(),
+            settings.final_methodology_internal_approved and _evidence_file_exists(project_dir, "docs/gobierno/APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md", "APROBACION_METODOLOGICA_V1_CARLOS_URIBE.md"),
             "Aprobación del diseño metodológico; no equivale a verificación de inventarios",
             group="Aceptación interna",
         ),
         _gate(
             "V1-LEGAL",
             "Revisión jurídica interna de Agustín",
-            settings.final_legal_internal_approved and (project_dir / "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md").is_file(),
+            settings.final_legal_internal_approved and _evidence_file_exists(project_dir, "docs/gobierno/APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md", "APROBACION_JURIDICA_V1_AGUSTIN_RENDON.md"),
             "Base contractual aprobada; identidad productiva debe configurarse",
             group="Aceptación interna",
         ),
         _gate(
             "V1-GREENATICS",
             "Piloto funcional interno Greenatics",
-            settings.final_greenatics_internal_pilot_approved and (project_dir / "INFORME_PILOTO_INTERNO_GREENATICS_V1.md").is_file(),
+            settings.final_greenatics_internal_pilot_approved and _evidence_file_exists(project_dir, "docs/guias/INFORME_PILOTO_INTERNO_GREENATICS_V1.md", "INFORME_PILOTO_INTERNO_GREENATICS_V1.md"),
             "Escenario multisede y controles sectoriales con datos demostrativos",
             group="Aceptación interna",
         ),
         _gate(
             "V1-SECOND",
             "Piloto funcional interno multisectorial",
-            settings.final_second_sector_internal_pilot_approved and (project_dir / "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md").is_file(),
+            settings.final_second_sector_internal_pilot_approved and _evidence_file_exists(project_dir, "docs/guias/INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md", "INFORME_PILOTO_INTERNO_SEGUNDO_SECTOR_V1.md"),
             "Validación de no sobreajuste con escenarios de servicios, industria y agro",
             group="Aceptación interna",
         ),
         _gate(
             "V1-SECURITY-INTERNAL",
             "Revisión interna de seguridad",
-            (project_dir / "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md").is_file(),
+            _evidence_file_exists(project_dir, "docs/gobierno/REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md", "REVISION_SEGURIDAD_INTERNA_OWASP_ASVS_V1.md"),
             "Controles internos basados en OWASP ASVS; no es auditoría independiente",
             group="Aceptación interna",
         ),
