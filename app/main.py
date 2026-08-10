@@ -142,6 +142,7 @@ from .service_account_web import register_service_account_routes
 from .customer_onboarding_web import register_customer_onboarding_routes
 from .platform_admin_web import register_platform_admin_routes
 from .document_center_web import register_document_center_routes
+from .readiness_web import register_readiness_routes
 from .access_control import ROLE_CAPABILITIES, can_open_route
 from .product_registry import PRODUCT_MODULES
 from .product_experience import demo_story_for, journey_detail, navigation_for, normalize_view_mode, role_profile
@@ -744,35 +745,6 @@ def methodology_snapshot_create(request: Request, inventory_id: int = Form(...),
     set_flash(request, "Configuración metodológica congelada para el inventario.")
     return RedirectResponse("/gobierno-metodologico", status_code=303)
 
-@app.get("/alistamiento", response_class=HTMLResponse)
-def readiness_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_readiness")
-    rows = list(session.scalars(select(CommercialReadinessItem).where(CommercialReadinessItem.organization_id == int(user["organization_id"])).order_by(CommercialReadinessItem.display_order)))
-    weights = {"Completado": 100, "En progreso": 50, "Pendiente": 0, "Bloqueado": 0}
-    score = round(sum(weights.get(row.status, 0) for row in rows) / max(len(rows), 1))
-    categories = {}
-    for row in rows:
-        categories.setdefault(row.category, []).append(row)
-    return templates.TemplateResponse(request=request, name="readiness.html", context=common_context(request, session, user, "readiness", rows=rows, categories=categories, readiness_score=score))
-
-@app.post("/alistamiento/{item_id}/actualizar")
-def readiness_update(item_id: int, request: Request, status: str = Form(...), owner: str = Form(...), due_date: str = Form(""), notes: str = Form(""), session: Session = Depends(get_db), user: dict = Depends(require_user)):
-    ensure_capability(user, "manage_readiness")
-    row = session.scalar(select(CommercialReadinessItem).where(CommercialReadinessItem.id == item_id, CommercialReadinessItem.organization_id == int(user["organization_id"])))
-    if not row:
-        raise HTTPException(404, "Elemento no encontrado")
-    if status not in {"Completado", "En progreso", "Pendiente", "Bloqueado"}:
-        raise HTTPException(400, "Estado inválido")
-    row.status = status
-    row.owner = owner.strip()
-    row.due_date = parse_date(due_date) if due_date else None
-    row.notes = notes.strip()
-    row.updated_by = str(user["email"])
-    add_audit(session, int(user["organization_id"]), str(user["email"]), "ACTUALIZAR", "Alistamiento comercial", row.title, status)
-    session.commit()
-    set_flash(request, "Elemento de alistamiento actualizado.")
-    return RedirectResponse("/alistamiento", status_code=303)
-
 def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes: str, has_previous_inventory: bool, objective: str, urgency: str) -> tuple[int, str]:
     employee_points = {"1 a 20": 1, "21 a 50": 2, "51 a 200": 4, "Más de 200": 6}.get(employees_band, 2)
     score = employee_points + min(max(facilities_count, 1), 8)
@@ -901,6 +873,9 @@ register_platform_admin_routes(
 )
 register_document_center_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, parse_date, get_inventory
+)
+register_readiness_routes(
+    app, templates, common_context, require_user, ensure_capability, set_flash, parse_date
 )
 register_report_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, get_inventory
