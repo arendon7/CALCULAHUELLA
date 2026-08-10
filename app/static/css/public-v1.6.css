@@ -1,0 +1,24 @@
+/* Calcula tu Huella V1.6 — agregador público canónico.
+ * Los parciales v14-public se conservan temporalmente para evitar un rename masivo
+ * sin valor funcional durante la consolidación arquitectónica.
+ */
+@import url("./v14-public/part-1.css");
+@import url("./v14-public/part-2.css");
+@import url("./v14-public/part-3.css");
+@import url("./v14-public/part-4.css");
+@import url("./v14-public/part-5.css");
+@import url("./v14-public/part-6.css");
+@import url("./v14-public/part-7.css");
+
+/* El flujo público refleja las ocho etapas canónicas. */
+.process-nav{grid-template-columns:repeat(8,1fr)}
+@media(max-width:900px){
+  .process-nav{grid-template-columns:repeat(4,1fr)}
+  .process-step:nth-child(4){border-right:0}
+  .process-step:nth-child(-n+4){border-bottom:1px solid var(--line)}
+}
+@media(max-width:560px){
+  .process-nav{grid-template-columns:repeat(2,1fr)}
+  .process-step:nth-child(2n){border-right:0}
+  .process-step:nth-child(-n+6){border-bottom:1px solid var(--line)}
+}
