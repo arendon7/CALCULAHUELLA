@@ -78,7 +78,7 @@ jobs:
           test = test_path.read_text(encoding="utf-8")
           addition = '''\n\ndef test_v160_d2b_defaults_have_dedicated_authority_without_database_cycle():\n    import app.database as database_module\n    import app.seed_defaults as defaults_module\n\n    database_source = (ROOT / "app/database.py").read_text(encoding="utf-8")\n    defaults_source = (ROOT / "app/seed_defaults.py").read_text(encoding="utf-8")\n    seed_source = (ROOT / "app/seed.py").read_text(encoding="utf-8")\n\n    assert "def _ensure_v012_defaults" not in database_source\n    assert "def _ensure_v100_final_defaults" not in database_source\n    assert "def _ensure_v012_defaults" in defaults_source\n    assert "def _ensure_v100_final_defaults" in defaults_source\n    assert "from .database import" not in defaults_source\n    assert "from .seed_defaults import" in seed_source\n    assert database_module._ensure_v020_defaults is defaults_module._ensure_v020_defaults\n    assert database_module._ensure_v100_final_defaults is defaults_module._ensure_v100_final_defaults\n    assert len(database_source.splitlines()) < 350\n'''
           if "test_v160_d2b_defaults_have_dedicated_authority_without_database_cycle" not in test:
-              test_path.write_text(test.rstrip() + addition + "\n", encoding="utf-8")
+              test_path.write_text(test.rstrip() + addition.rstrip() + "\n", encoding="utf-8")
 
           doc_path = Path("docs/architecture/V1_6_D2_SEED_DEFAULTS.md")
           doc = doc_path.read_text(encoding="utf-8")
