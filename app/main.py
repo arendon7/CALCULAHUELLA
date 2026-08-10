@@ -405,20 +405,6 @@ def _parse_excel_period(value: object, inventory: Inventory) -> tuple[date, date
         raise ValueError("periodo fuera del inventario")
     return start, end
 
-def _lead_complexity(employees_band: str, facilities_count: int, desired_scopes: str, has_previous_inventory: bool, objective: str, urgency: str) -> tuple[int, str]:
-    employee_points = {"1 a 20": 1, "21 a 50": 2, "51 a 200": 4, "Más de 200": 6}.get(employees_band, 2)
-    score = employee_points + min(max(facilities_count, 1), 8)
-    if "3" in desired_scopes:
-        score += 3
-    if has_previous_inventory:
-        score += 1
-    if any(keyword in objective.lower() for keyword in ("verificación", "regulator", "licitación")):
-        score += 2
-    if urgency == "Alta":
-        score += 1
-    plan = "ESENCIAL" if score <= 5 else "EMPRESARIAL" if score <= 12 else "CORPORATIVO"
-    return score, plan
-
 register_public_routes(app, templates, current_user)
 register_auth_routes(app, templates, current_user)
 
