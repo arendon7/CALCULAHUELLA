@@ -148,6 +148,7 @@ from .product_intelligence_web import register_product_intelligence_routes
 from .guided_onboarding_web import register_guided_onboarding_routes
 from .service_operations_web import register_service_operations_routes
 from .experience_web import register_experience_routes
+from .workflow_web import register_workflow_routes
 from .legal_web import register_legal_routes
 from .public_web import register_public_routes
 from .auth_web import register_auth_routes
@@ -4267,6 +4268,9 @@ register_reduction_routes(
 )
 register_delivery_routes(
     app, templates, common_context, require_user, get_inventory
+)
+register_workflow_routes(
+    app, templates, common_context, require_user
 )
 register_experience_routes(
     app, templates, common_context, require_user, get_inventory
