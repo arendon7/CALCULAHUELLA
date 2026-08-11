@@ -1,0 +1,507 @@
+name: V2.0 · Materializar startup y storage fail-safe
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-startup-storage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      INSTANCE_DIR: /tmp/cth-startup-storage-v20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Materializar arranque no bloqueante y storage acotado
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          config = Path('app/config.py')
+          text = config.read_text(encoding='utf-8')
+          old = '''    s3_access_key: str = os.environ.get("S3_ACCESS_KEY", "").strip()\n    s3_secret_key: str = os.environ.get("S3_SECRET_KEY", "").strip()\n    external_storage_root: str = os.environ.get("EXTERNAL_STORAGE_ROOT", "").strip()\n'''
+          new = '''    s3_access_key: str = os.environ.get("S3_ACCESS_KEY", "").strip()\n    s3_secret_key: str = os.environ.get("S3_SECRET_KEY", "").strip()\n    s3_connect_timeout_seconds: float = float(os.environ.get("S3_CONNECT_TIMEOUT_SECONDS", "3"))\n    s3_read_timeout_seconds: float = float(os.environ.get("S3_READ_TIMEOUT_SECONDS", "5"))\n    s3_max_attempts: int = int(os.environ.get("S3_MAX_ATTEMPTS", "2"))\n    external_storage_root: str = os.environ.get("EXTERNAL_STORAGE_ROOT", "").strip()\n'''
+          if text.count(old) != 1:
+              raise SystemExit('Campos S3 esperados no encontrados')
+          text = text.replace(old, new, 1)
+          old = '''        if self.storage_backend == "s3" and not self.s3_bucket:\n            issues.append("S3_BUCKET es obligatorio cuando STORAGE_BACKEND=s3.")\n        if self.storage_backend == "filesystem" and not self.external_storage_root:\n'''
+          new = '''        if self.storage_backend == "s3" and not self.s3_bucket:\n            issues.append("S3_BUCKET es obligatorio cuando STORAGE_BACKEND=s3.")\n        if self.storage_backend == "s3" and self.s3_endpoint_url and (not self.s3_access_key or not self.s3_secret_key):\n            issues.append("S3_ACCESS_KEY y S3_SECRET_KEY son obligatorios para endpoints S3 personalizados.")\n        if bool(self.s3_access_key) != bool(self.s3_secret_key):\n            issues.append("S3_ACCESS_KEY y S3_SECRET_KEY deben configurarse como pareja.")\n        if self.s3_connect_timeout_seconds <= 0 or self.s3_read_timeout_seconds <= 0:\n            issues.append("Los timeouts S3 deben ser mayores que cero.")\n        if self.s3_max_attempts < 1:\n            issues.append("S3_MAX_ATTEMPTS debe ser al menos 1.")\n        if self.external_probe_timeout_seconds <= 0:\n            issues.append("EXTERNAL_PROBE_TIMEOUT_SECONDS debe ser mayor que cero.")\n        if self.storage_backend == "filesystem" and not self.external_storage_root:\n'''
+          if text.count(old) != 1:
+              raise SystemExit('Bloque production_issues S3 esperado no encontrado')
+          config.write_text(text.replace(old, new, 1), encoding='utf-8')
+
+          readiness = Path('app/production_readiness.py')
+          text = readiness.read_text(encoding='utf-8')
+          old = '''        "S3_ACCESS_KEY": "CONFIGURAR_EN_GESTOR_DE_SECRETOS",\n        "S3_SECRET_KEY": "CONFIGURAR_EN_GESTOR_DE_SECRETOS",\n        "OBJECT_STORAGE_VERSIONING_CONFIRMED": "true",\n'''
+          new = '''        "S3_ACCESS_KEY": "CONFIGURAR_EN_GESTOR_DE_SECRETOS",\n        "S3_SECRET_KEY": "CONFIGURAR_EN_GESTOR_DE_SECRETOS",\n        "S3_CONNECT_TIMEOUT_SECONDS": "3",\n        "S3_READ_TIMEOUT_SECONDS": "5",\n        "S3_MAX_ATTEMPTS": "2",\n        "EXTERNAL_PROBE_TIMEOUT_SECONDS": "3",\n        "OBJECT_STORAGE_VERSIONING_CONFIRMED": "true",\n'''
+          if text.count(old) != 1:
+              raise SystemExit('Plantilla S3 esperada no encontrada')
+          readiness.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+
+          cat > app/storage.py <<'PY'
+          from __future__ import annotations
+
+          import hashlib
+          import shutil
+          from pathlib import Path
+
+          from .config import INSTANCE_DIR, settings
+
+
+          class StorageError(RuntimeError):
+              pass
+
+
+          class StorageService:
+              """Almacenamiento local, filesystem externo o S3-compatible.
+
+              La construcción del servicio nunca depende de red ni de un volumen externo.
+              Los recursos externos se validan en la primera operación o en verified_probe().
+              """
+
+              def __init__(self) -> None:
+                  self.backend = settings.storage_backend
+                  self.local_root = (
+                      Path(settings.external_storage_root).expanduser().resolve()
+                      if self.backend == "filesystem" and settings.external_storage_root
+                      else INSTANCE_DIR
+                  )
+                  self._client = None
+
+              @staticmethod
+              def normalize_key(key: str) -> str:
+                  clean = key.strip().lstrip("/").replace("..", "_")
+                  if not clean:
+                      raise StorageError("La clave de almacenamiento está vacía")
+                  return clean
+
+              def _ensure_local_root(self) -> Path:
+                  if self.backend == "filesystem" and not settings.external_storage_root:
+                      raise StorageError("EXTERNAL_STORAGE_ROOT es obligatorio para filesystem")
+                  try:
+                      self.local_root.mkdir(parents=True, exist_ok=True)
+                  except OSError as exc:
+                      raise StorageError(f"No fue posible preparar el almacenamiento filesystem: {exc}") from exc
+                  return self.local_root
+
+              @staticmethod
+              def _validate_s3_configuration() -> None:
+                  if not settings.s3_bucket:
+                      raise StorageError("S3_BUCKET es obligatorio para S3")
+                  if settings.s3_endpoint_url and (not settings.s3_access_key or not settings.s3_secret_key):
+                      raise StorageError("S3_ACCESS_KEY y S3_SECRET_KEY son obligatorios para endpoints S3 personalizados")
+                  if bool(settings.s3_access_key) != bool(settings.s3_secret_key):
+                      raise StorageError("S3_ACCESS_KEY y S3_SECRET_KEY deben configurarse como pareja")
+
+              def _build_s3_client(self, *, probe: bool = False):
+                  try:
+                      import boto3
+                      from botocore.config import Config
+                  except ImportError as exc:  # pragma: no cover - solo producción S3
+                      raise StorageError("Instala boto3 para usar STORAGE_BACKEND=s3") from exc
+                  self._validate_s3_configuration()
+                  if probe:
+                      timeout = max(float(settings.external_probe_timeout_seconds), 0.1)
+                      connect_timeout = timeout
+                      read_timeout = timeout
+                      attempts = 1
+                  else:
+                      connect_timeout = max(float(settings.s3_connect_timeout_seconds), 0.1)
+                      read_timeout = max(float(settings.s3_read_timeout_seconds), 0.1)
+                      attempts = max(1, int(settings.s3_max_attempts))
+                  client_config = Config(
+                      connect_timeout=connect_timeout,
+                      read_timeout=read_timeout,
+                      retries={"total_max_attempts": attempts, "mode": "standard"},
+                  )
+                  return boto3.client(
+                      "s3",
+                      endpoint_url=settings.s3_endpoint_url or None,
+                      region_name=settings.s3_region or None,
+                      aws_access_key_id=settings.s3_access_key or None,
+                      aws_secret_access_key=settings.s3_secret_key or None,
+                      config=client_config,
+                  )
+
+              def _s3_client(self):
+                  if self._client is None:
+                      self._client = self._build_s3_client()
+                  return self._client
+
+              def put_bytes(self, key: str, content: bytes, content_type: str = "application/octet-stream") -> str:
+                  key = self.normalize_key(key)
+                  if self.backend in {"local", "filesystem"}:
+                      root = self._ensure_local_root()
+                      path = (root / key).resolve()
+                      if root not in path.parents and path != root:
+                          raise StorageError("Ruta de almacenamiento no permitida")
+                      path.parent.mkdir(parents=True, exist_ok=True)
+                      path.write_bytes(content)
+                      return key
+                  client = self._s3_client()
+                  client.put_object(Bucket=settings.s3_bucket, Key=key, Body=content, ContentType=content_type)
+                  return key
+
+              def put_file(self, key: str, source: Path, content_type: str = "application/octet-stream") -> str:
+                  key = self.normalize_key(key)
+                  source = source.resolve()
+                  if not source.is_file():
+                      raise FileNotFoundError(source)
+                  if self.backend in {"local", "filesystem"}:
+                      root = self._ensure_local_root()
+                      destination = (root / key).resolve()
+                      if root not in destination.parents and destination != root:
+                          raise StorageError("Ruta de almacenamiento no permitida")
+                      destination.parent.mkdir(parents=True, exist_ok=True)
+                      if source != destination:
+                          shutil.copy2(source, destination)
+                      return key
+                  client = self._s3_client()
+                  extra = {"ContentType": content_type} if content_type else None
+                  if extra:
+                      client.upload_file(str(source), settings.s3_bucket, key, ExtraArgs=extra)
+                  else:
+                      client.upload_file(str(source), settings.s3_bucket, key)
+                  return key
+
+              def local_path(self, key: str) -> Path | None:
+                  if self.backend not in {"local", "filesystem"}:
+                      return None
+                  root = self._ensure_local_root()
+                  path = (root / self.normalize_key(key)).resolve()
+                  if root not in path.parents and path != root:
+                      return None
+                  return path
+
+              def get_bytes(self, key: str) -> bytes:
+                  key = self.normalize_key(key)
+                  if self.backend in {"local", "filesystem"}:
+                      path = self.local_path(key)
+                      if not path or not path.is_file():
+                          raise FileNotFoundError(key)
+                      return path.read_bytes()
+                  response = self._s3_client().get_object(Bucket=settings.s3_bucket, Key=key)
+                  return response["Body"].read()
+
+              def exists(self, key: str) -> bool:
+                  if self.backend in {"local", "filesystem"}:
+                      try:
+                          path = self.local_path(key)
+                      except StorageError:
+                          return False
+                      return bool(path and path.is_file())
+                  try:
+                      self._s3_client().head_object(Bucket=settings.s3_bucket, Key=self.normalize_key(key))
+                      return True
+                  except Exception:
+                      return False
+
+              def delete(self, key: str) -> None:
+                  key = self.normalize_key(key)
+                  if self.backend in {"local", "filesystem"}:
+                      path = self.local_path(key)
+                      if path:
+                          path.unlink(missing_ok=True)
+                      return
+                  self._s3_client().delete_object(Bucket=settings.s3_bucket, Key=key)
+
+              def list_objects(self, prefix: str = "") -> list[dict[str, object]]:
+                  prefix = prefix.strip().lstrip("/")
+                  if self.backend in {"local", "filesystem"}:
+                      root = self._ensure_local_root()
+                      base = (root / prefix).resolve() if prefix else root
+                      if root not in base.parents and base != root:
+                          raise StorageError("Prefijo de almacenamiento no permitido")
+                      if not base.exists():
+                          return []
+                      rows = []
+                      for path in sorted(base.rglob("*")):
+                          if path.is_file():
+                              rows.append({
+                                  "key": str(path.relative_to(root)).replace("\\", "/"),
+                                  "size": path.stat().st_size,
+                                  "etag": "",
+                              })
+                      return rows
+                  client = self._s3_client()
+                  rows: list[dict[str, object]] = []
+                  token = None
+                  while True:
+                      kwargs = {"Bucket": settings.s3_bucket, "Prefix": prefix}
+                      if token:
+                          kwargs["ContinuationToken"] = token
+                      response = client.list_objects_v2(**kwargs)
+                      for item in response.get("Contents", []):
+                          rows.append({"key": item["Key"], "size": int(item.get("Size", 0)), "etag": str(item.get("ETag", "")).strip('"')})
+                      if not response.get("IsTruncated"):
+                          break
+                      token = response.get("NextContinuationToken")
+                  return sorted(rows, key=lambda item: str(item["key"]))
+
+              def presigned_url(self, key: str, expires: int = 900) -> str:
+                  if self.backend != "s3":
+                      raise StorageError("Las URL firmadas solo aplican a S3")
+                  return self._s3_client().generate_presigned_url(
+                      "get_object",
+                      Params={"Bucket": settings.s3_bucket, "Key": self.normalize_key(key)},
+                      ExpiresIn=expires,
+                  )
+
+              def verified_probe(self) -> dict[str, object]:
+                  payload = b"Calcula tu Huella storage probe v1.0"
+                  expected = hashlib.sha256(payload).hexdigest()
+                  key = ".health/storage-v100final.probe"
+                  if self.backend == "s3":
+                      client = None
+                      try:
+                          client = self._build_s3_client(probe=True)
+                          client.put_object(Bucket=settings.s3_bucket, Key=key, Body=payload, ContentType="text/plain")
+                          response = client.get_object(Bucket=settings.s3_bucket, Key=key)
+                          restored = response["Body"].read()
+                          actual = hashlib.sha256(restored).hexdigest()
+                          return {
+                              "backend": self.backend,
+                              "ok": actual == expected,
+                              "sha256": actual,
+                              "detail": settings.s3_bucket,
+                          }
+                      except Exception as exc:
+                          return {"backend": self.backend, "ok": False, "sha256": "", "detail": str(exc)}
+                      finally:
+                          if client is not None:
+                              try:
+                                  client.delete_object(Bucket=settings.s3_bucket, Key=key)
+                              except Exception:
+                                  pass
+                  try:
+                      self.put_bytes(key, payload, "text/plain")
+                      restored = self.get_bytes(key)
+                      actual = hashlib.sha256(restored).hexdigest()
+                      return {
+                          "backend": self.backend,
+                          "ok": actual == expected,
+                          "sha256": actual,
+                          "detail": str(self.local_root),
+                      }
+                  except Exception as exc:
+                      return {"backend": self.backend, "ok": False, "sha256": "", "detail": str(exc)}
+                  finally:
+                      try:
+                          self.delete(key)
+                      except Exception:
+                          pass
+
+              def diagnostics(self) -> dict[str, object]:
+                  result = self.verified_probe()
+                  if result["ok"]:
+                      result["detail"] = f"{result['detail']} · lectura/escritura SHA-256 correcta"
+                  return result
+
+
+          storage = StorageService()
+          PY
+
+          cat > start_prod.sh <<'SH'
+          #!/usr/bin/env bash
+          set -euo pipefail
+
+          ROOT="$(cd "$(dirname "$0")" && pwd)"
+          cd "$ROOT"
+
+          if [ -f .env ]; then
+            set -a
+            source .env
+            set +a
+          fi
+
+          source scripts/runtime_python.sh
+          cth_runtime_python "$ROOT"
+          PY="$CTH_RUNTIME_PYTHON"
+
+          export APP_ENV="${APP_ENV:-production}"
+          export HOST="${HOST:-0.0.0.0}"
+          export PORT="${PORT:-8765}"
+          export OPEN_BROWSER=0
+
+          # La base local/transaccional sí es requisito de arranque y falla cerrado.
+          "$PY" -m alembic upgrade head
+          "$PY" - <<'PYCODE'
+          from app.database import init_db
+          init_db()
+          print("Esquema e inicialización verificados.")
+          PYCODE
+
+          # No ejecutar probes de red/objeto antes de abrir el puerto. La disponibilidad
+          # estricta se expone en /api/ready y scripts/check_ready.py queda como auditoría manual.
+          exec "$PY" -m uvicorn app.main:app \
+            --host "$HOST" \
+            --port "$PORT" \
+            --workers "${WEB_CONCURRENCY:-2}" \
+            --proxy-headers \
+            --forwarded-allow-ips "${FORWARDED_ALLOW_IPS:-*}" \
+            --no-access-log
+          SH
+          chmod +x start_prod.sh
+
+          python -m py_compile app/config.py app/storage.py app/production_readiness.py scripts/check_ready.py
+          bash -n start_prod.sh
+          git diff --check
+
+      - name: Reproducir contratos de fail-safe sin red real
+        shell: bash
+        run: |
+          python - <<'PY'
+          import io
+          from dataclasses import replace
+          from pathlib import Path
+          from tempfile import TemporaryDirectory
+
+          import boto3
+          import app.config as config_module
+          import app.storage as storage_module
+
+          original = storage_module.settings
+          calls = []
+
+          class FakeClient:
+              def __init__(self):
+                  self.objects = {}
+              def put_object(self, *, Bucket, Key, Body, ContentType=None):
+                  self.objects[(Bucket, Key)] = bytes(Body)
+              def get_object(self, *, Bucket, Key):
+                  return {"Body": io.BytesIO(self.objects[(Bucket, Key)])}
+              def delete_object(self, *, Bucket, Key):
+                  self.objects.pop((Bucket, Key), None)
+              def head_object(self, *, Bucket, Key):
+                  if (Bucket, Key) not in self.objects:
+                      raise KeyError(Key)
+                  return {}
+              def list_objects_v2(self, **kwargs):
+                  return {"Contents": [], "IsTruncated": False}
+              def upload_file(self, *args, **kwargs):
+                  return None
+              def generate_presigned_url(self, *args, **kwargs):
+                  return "https://example.invalid/signed"
+
+          def fake_client(service_name, **kwargs):
+              assert service_name == "s3"
+              calls.append(kwargs)
+              return FakeClient()
+
+          boto3.client = fake_client
+          try:
+              s3_settings = replace(
+                  original,
+                  storage_backend="s3",
+                  s3_bucket="bucket-test",
+                  s3_endpoint_url="https://s3.example.invalid",
+                  s3_access_key="key",
+                  s3_secret_key="secret",
+                  s3_connect_timeout_seconds=2.5,
+                  s3_read_timeout_seconds=4.5,
+                  s3_max_attempts=2,
+                  external_probe_timeout_seconds=0.75,
+              )
+              storage_module.settings = s3_settings
+              service = storage_module.StorageService()
+              assert calls == [], "Construir StorageService no debe crear cliente S3"
+              assert service._client is None
+
+              probe = service.verified_probe()
+              assert probe["ok"] is True, probe
+              assert service._client is None, "El probe no debe poblar el cliente normal"
+              assert len(calls) == 1
+              probe_cfg = calls[0]["config"]
+              assert probe_cfg.connect_timeout == 0.75
+              assert probe_cfg.read_timeout == 0.75
+              assert probe_cfg.retries["total_max_attempts"] == 1
+
+              service.put_bytes("demo/a.txt", b"abc", "text/plain")
+              assert len(calls) == 2
+              normal_cfg = calls[1]["config"]
+              assert normal_cfg.connect_timeout == 2.5
+              assert normal_cfg.read_timeout == 4.5
+              assert normal_cfg.retries["total_max_attempts"] == 2
+              cached = service._client
+              service.exists("demo/a.txt")
+              assert service._client is cached
+              assert len(calls) == 2
+
+              missing = replace(s3_settings, s3_access_key="", s3_secret_key="")
+              storage_module.settings = missing
+              before = len(calls)
+              degraded = storage_module.StorageService().verified_probe()
+              assert degraded["ok"] is False
+              assert "obligatorios" in degraded["detail"]
+              assert len(calls) == before, "Configuración inválida debe fallar antes de boto3.client"
+              issues = missing.production_issues()
+              assert any("endpoints S3 personalizados" in item for item in issues)
+
+              with TemporaryDirectory() as tmp:
+                  target = Path(tmp) / "mount" / "documents"
+                  fs_settings = replace(original, storage_backend="filesystem", external_storage_root=str(target))
+                  storage_module.settings = fs_settings
+                  filesystem = storage_module.StorageService()
+                  assert not target.exists(), "El constructor no debe tocar el volumen externo"
+                  filesystem.put_bytes("proof.txt", b"ok")
+                  assert target.joinpath("proof.txt").read_bytes() == b"ok"
+          finally:
+              storage_module.settings = original
+          print('startup/storage fail-safe reproduction OK')
+          PY
+
+          python - <<'PY'
+          from pathlib import Path
+          start = Path('start_prod.sh').read_text(encoding='utf-8')
+          ready = Path('scripts/check_ready.py').read_text(encoding='utf-8')
+          env = Path('app/production_readiness.py').read_text(encoding='utf-8')
+          assert 'scripts/check_ready.py' not in start
+          assert 'alembic upgrade head' in start
+          assert 'uvicorn app.main:app' in start
+          assert 'diagnostic_snapshot()' in ready
+          assert 'return 0 if snapshot.get("status") == "ready" else 1' in ready
+          for key in ('S3_CONNECT_TIMEOUT_SECONDS', 'S3_READ_TIMEOUT_SECONDS', 'S3_MAX_ATTEMPTS', 'EXTERNAL_PROBE_TIMEOUT_SECONDS'):
+              assert key in env
+          print('startup/readiness static contracts OK')
+          PY
+
+      - name: Ejecutar regresión operativa dirigida
+        shell: bash
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          pytest -q tests/test_v034_operational_hardening.py tests/test_v057_production_readiness.py
+
+      - name: Commit limpio y autoeliminación
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/materialize-v20-startup-storage.yml
+          git add app/config.py app/storage.py app/production_readiness.py start_prod.sh
+          git commit -m "fix(v2.0): decouple startup from external storage readiness"
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
