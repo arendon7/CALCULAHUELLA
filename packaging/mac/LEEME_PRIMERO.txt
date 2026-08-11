@@ -9,6 +9,13 @@ Esta distribución incluye:
 - lanzadores para instalar, abrir, cerrar, reiniciar y verificar;
 - manifiestos SHA-256 del contenido y del artefacto final.
 
+V2.0 · ESTABILIDAD Y READINESS
+- El paquete incorpora exactamente el runtime del commit declarado en BUILD_PROVENANCE.json.
+- El arranque local no depende de una comprobación de Storage externo antes de abrir el puerto.
+- /api/health funciona como liveness ligero.
+- /api/ready mantiene el diagnóstico estricto de dependencias y puede responder 503 cuando una dependencia externa está degradada.
+- Los controles de Storage S3 usan timeouts y reintentos acotados; una configuración inválida falla antes de tocar red.
+
 INSTALACIÓN
 1. Descomprime el ZIP completamente.
 2. Abre la carpeta resultante.
