@@ -31,21 +31,5 @@
   </section>
   <footer>La respuesta no se incorpora automáticamente al inventario. Primero pasa por revisión técnica, control de calidad y verificación de doble conteo.</footer>
 </main>
-<script>
-(() => {
-  const method = document.getElementById('supplier-method');
-  if (!method) return;
-  const activity = document.getElementById('activity-fields');
-  const factor = document.getElementById('factor-fields');
-  const total = document.getElementById('total-fields');
-  const sync = () => {
-    const value = method.value;
-    activity.hidden = value === 'Huella total suministrada' || value === 'Factor por gasto';
-    factor.hidden = value === 'Huella total suministrada';
-    total.hidden = value !== 'Huella total suministrada';
-  };
-  method.addEventListener('change', sync);
-  sync();
-})();
-</script>
+<script src="{{ url_for('static', path='js/supplier_portal.js') }}" defer></script>
 </body></html>
