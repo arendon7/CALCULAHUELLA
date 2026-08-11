@@ -49,6 +49,15 @@ def test_v200_product_readiness_gate_keeps_real_browser_and_role_journeys() -> N
     assert "python scripts/browser_handoff_gate.py" in source
 
 
+def test_v200_product_readiness_gate_covers_full_climate_journey() -> None:
+    source = _workflow()
+    assert "Huella completa · Chromium" in source
+    assert "CLIMATE_GATE_BASE_URL: http://127.0.0.1:8768" in source
+    assert "CLIMATE_GATE_ARTIFACT_DIR: climate-gate-artifacts" in source
+    assert "python scripts/browser_climate_journey_gate.py" in source
+    assert "climate-journey-evidence" in source
+
+
 def test_v200_product_readiness_gate_keeps_full_release_barriers() -> None:
     source = _workflow()
     assert "python tools/verify_canonical.py --skip-manifest" in source
