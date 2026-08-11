@@ -68,6 +68,13 @@ def test_v200_climate_gate_distinguishes_temporal_coverage_from_support_backlog(
     assert 'support_coverage' not in terminal_block
 
 
+def test_v200_climate_gate_reports_source_progress_when_quality_gate_blocks() -> None:
+    source = CLIMATE_GATE.read_text(encoding="utf-8")
+    assert 'source_state = [' in source
+    assert '"progress": item.progress' in source
+    assert 'Estado de fuentes: {source_state}' in source
+
+
 def test_v200_product_readiness_gate_keeps_full_release_barriers() -> None:
     source = _workflow()
     assert "python tools/verify_canonical.py --skip-manifest" in source
