@@ -1,6 +1,11 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
+from types import SimpleNamespace
+
+from app.capture_guidance import capture_summary
+from app.database import refresh_inventory_progress
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,6 +71,74 @@ def test_v200_climate_gate_distinguishes_temporal_coverage_from_support_backlog(
     terminal_block = source.split("if not pending:", 1)[1].split("item = pending[0]", 1)[0]
     assert 'pending_sources' not in terminal_block
     assert 'support_coverage' not in terminal_block
+
+
+def test_v200_guided_capture_excludes_supplier_managed_aggregate() -> None:
+    record = SimpleNamespace(
+        id=1,
+        period_start=date(2025, 1, 1),
+        period_end=date(2025, 12, 31),
+        evidence_id=None,
+        status="Cargado",
+    )
+    operational = SimpleNamespace(
+        included=True,
+        category="Combustión fija",
+        data_frequency="Anual",
+        preferred_unit="L",
+        name="Diésel",
+        scope=1,
+        materiality="Alta",
+        activity_records=[record],
+    )
+    supplier_aggregate = SimpleNamespace(
+        included=True,
+        category="Datos específicos de proveedores",
+        data_frequency="Anual",
+        preferred_unit="tCO₂e",
+        name="Cadena de valor consolidada desde proveedores",
+        scope=3,
+        materiality="Alta",
+        activity_records=[],
+        progress=50,
+    )
+    inventory = SimpleNamespace(
+        start_date=date(2025, 1, 1),
+        end_date=date(2025, 12, 31),
+        sources=[operational, supplier_aggregate],
+    )
+
+    summary = capture_summary(inventory)
+
+    assert summary["sources"] == 1
+    assert summary["coverage"] == 100
+    assert [item["source"].name for item in summary["cards"]] == ["Diésel"]
+
+
+def test_v200_supplier_authority_refreshes_aggregate_inventory_progress() -> None:
+    progress_values = [100, 50]
+    session = SimpleNamespace(
+        flush=lambda: None,
+        scalars=lambda _query: list(progress_values),
+    )
+    inventory = SimpleNamespace(progress=0, current_stage="Recolección", locked=False, status="Activo")
+
+    refresh_inventory_progress(session, inventory)
+    assert inventory.progress == 75
+    assert inventory.current_stage == "Recolección"
+
+    progress_values[:] = [100, 100]
+    refresh_inventory_progress(session, inventory)
+    assert inventory.progress == 100
+    assert inventory.current_stage == "Cálculo"
+
+    inventory.locked = True
+    inventory.status = "Cerrado"
+    inventory.current_stage = "Cerrado"
+    progress_values[:] = [100, 50]
+    refresh_inventory_progress(session, inventory)
+    assert inventory.progress == 75
+    assert inventory.current_stage == "Cerrado"
 
 
 def test_v200_climate_gate_reports_source_progress_when_quality_gate_blocks() -> None:
