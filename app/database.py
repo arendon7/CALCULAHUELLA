@@ -68,7 +68,9 @@ def refresh_inventory_progress(session: Session, inventory: Inventory) -> None:
         select(EmissionSource.progress).where(EmissionSource.inventory_id == inventory.id)
     ))
     inventory.progress = round(sum(progresses) / len(progresses)) if progresses else 0
-    if not inventory.locked and inventory.status != "Cerrado":
+    generic_stages = {"", "Recolección", "Cálculo"}
+    current_stage = str(inventory.current_stage or "")
+    if not inventory.locked and inventory.status != "Cerrado" and current_stage in generic_stages:
         inventory.current_stage = "Recolección" if inventory.progress < 100 else "Cálculo"
 
 

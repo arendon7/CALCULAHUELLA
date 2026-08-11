@@ -116,6 +116,28 @@ def test_supplier_sync_refreshes_aggregate_inventory_progress() -> None:
         assert inventory.progress == 100
 
 
+
+
+def test_inventory_progress_refresh_preserves_correction_stage() -> None:
+    with SessionLocal() as session:
+        inventory = session.scalar(
+            select(Inventory)
+            .where(Inventory.name == "Inventario corporativo 2025")
+            .options(selectinload(Inventory.sources))
+        )
+        assert inventory is not None
+        inventory.status = "Borrador"
+        inventory.locked = False
+        inventory.current_stage = "Corrección"
+        for source in inventory.sources:
+            source.progress = 100
+        session.flush()
+
+        refresh_inventory_progress(session, inventory)
+
+        assert inventory.progress == 100
+        assert inventory.current_stage == "Corrección"
+
 def test_inventory_progress_refresh_preserves_closed_stage() -> None:
     with SessionLocal() as session:
         inventory = session.scalar(
