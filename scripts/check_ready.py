@@ -18,7 +18,13 @@ sys.path.insert(0, str(ROOT))
 from app.database import init_db  # noqa: E402
 from app.operations import diagnostic_snapshot  # noqa: E402
 
-init_db()
-snapshot = diagnostic_snapshot()
-print(json.dumps(snapshot, ensure_ascii=False, indent=2))
-raise SystemExit(0 if snapshot["status"] == "ready" else 1)
+
+def main() -> int:
+    init_db()
+    snapshot = diagnostic_snapshot()
+    print(json.dumps(snapshot, ensure_ascii=False, indent=2))
+    return 0 if snapshot.get("status") == "ready" else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
