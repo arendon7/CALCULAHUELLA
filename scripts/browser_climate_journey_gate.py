@@ -391,6 +391,10 @@ def _persistence_contract() -> dict[str, object]:
         incomplete = [source.name for source in sources if source.included and source.progress < 100]
         if incomplete:
             raise AssertionError(f"Fuentes incompletas después del journey: {incomplete}")
+        if inventory.progress != 100:
+            raise AssertionError(
+                f"El inventario conserva progreso agregado {inventory.progress}% pese a tener todas las fuentes completas."
+            )
         error_count = session.scalar(
             select(func.count())
             .select_from(EmissionCalculation)

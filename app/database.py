@@ -61,6 +61,17 @@ def source_expected_periods(source: EmissionSource) -> int:
 SUPPLIER_MANAGED_CATEGORY = "Datos específicos de proveedores"
 
 
+def refresh_inventory_progress(session: Session, inventory: Inventory) -> None:
+    """Synchronize inventory progress from the persisted source authorities."""
+    session.flush()
+    progresses = list(session.scalars(
+        select(EmissionSource.progress).where(EmissionSource.inventory_id == inventory.id)
+    ))
+    inventory.progress = round(sum(progresses) / len(progresses)) if progresses else 0
+    if not inventory.locked and inventory.status != "Cerrado":
+        inventory.current_stage = "Recolección" if inventory.progress < 100 else "Cálculo"
+
+
 def refresh_progress(session: Session, inventory: Inventory) -> None:
     # ActivityData puede insertarse por source_id mientras activity_records ya está cargada.
     # Consultar la tabla después del flush evita persistir un progreso rezagado un periodo.
@@ -87,9 +98,7 @@ def refresh_progress(session: Session, inventory: Inventory) -> None:
             source.status = "Completado"
         else:
             source.status = "En progreso"
-    if inventory.sources:
-        inventory.progress = round(sum(source.progress for source in inventory.sources) / len(inventory.sources))
-    inventory.current_stage = "Recolección" if inventory.progress < 100 else "Cálculo"
+    refresh_inventory_progress(session, inventory)
 
 
 def _seed_methodology(session: Session) -> dict[str, object]:

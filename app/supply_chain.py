@@ -15,6 +15,7 @@ from .database import (
     Scope3CategoryAssessment,
     SupplierDataRequest,
     SupplierResponse,
+    refresh_inventory_progress,
 )
 from .scope3_catalog import SCOPE3_CATEGORIES, canonical_category_label, category_catalog, category_from_value
 
@@ -259,6 +260,9 @@ def sync_supplier_source(session: Session, inventory_id: int) -> EmissionSource:
     source.progress = round(approved / requests * 100) if requests else 0
     source.status = "Completado" if requests and approved == requests else ("En progreso" if approved else "Pendiente")
     session.flush()
+    inventory = session.get(Inventory, inventory_id)
+    if inventory is not None:
+        refresh_inventory_progress(session, inventory)
     return source
 
 
