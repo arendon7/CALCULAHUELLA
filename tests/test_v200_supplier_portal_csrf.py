@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from app.security import _csrf_form_value
+
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -24,3 +26,19 @@ def test_supplier_portal_is_not_exempted_from_csrf_middleware() -> None:
     source = (ROOT / "app" / "security.py").read_text(encoding="utf-8")
     assert 'path.startswith("/proveedor/")' not in source
     assert 'path.startswith("/api/")' in source
+
+
+def test_multipart_csrf_parser_returns_token_not_following_field() -> None:
+    boundary = "----WebKitFormBoundaryV20"
+    token = "token-v20-abcdefghijklmnopqrstuvwxyz-123456"
+    body = (
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="_csrf_token"\r\n\r\n'
+        f"{token}\r\n"
+        f"--{boundary}\r\n"
+        'Content-Disposition: form-data; name="method"\r\n\r\n'
+        "Huella total suministrada\r\n"
+        f"--{boundary}--\r\n"
+    ).encode()
+
+    assert _csrf_form_value(f"multipart/form-data; boundary={boundary}", body) == token
