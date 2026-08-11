@@ -52,7 +52,9 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import json, os, urllib.request
+          import json
+          import os
+          import urllib.request
 
           repo = os.environ["GITHUB_REPOSITORY"]
           token = os.environ["GH_TOKEN"]
@@ -77,7 +79,11 @@ jobs:
               run = api(f"actions/runs/{run_id}")
               assert run["conclusion"] == "success", (key, run["status"], run["conclusion"])
               assert run["head_sha"] == expected_sha, (key, run["head_sha"], expected_sha)
-              evidence[key] = {"run_id": int(run_id), "conclusion": run["conclusion"], "head_sha": run["head_sha"]}
+              evidence[key] = {
+                  "run_id": int(run_id),
+                  "conclusion": run["conclusion"],
+                  "head_sha": run["head_sha"],
+              }
 
           artifact = api(f"actions/artifacts/{os.environ['PACKAGE_ARTIFACT_ID']}")
           assert artifact["expired"] is False
@@ -88,7 +94,9 @@ jobs:
               "size_in_bytes": artifact["size_in_bytes"],
               "digest": artifact["digest"],
           }
-          open("v20-external-evidence.json", "w", encoding="utf-8").write(json.dumps(evidence, indent=2, ensure_ascii=False))
+          open("v20-external-evidence.json", "w", encoding="utf-8").write(
+              json.dumps(evidence, indent=2, ensure_ascii=False)
+          )
           print(json.dumps(evidence, indent=2, ensure_ascii=False))
           PY
 
@@ -103,8 +111,11 @@ jobs:
             --output /tmp/v20-final-mac-actions.zip
           echo "${PACKAGE_OUTER_SHA256}  /tmp/v20-final-mac-actions.zip" | sha256sum --check --strict
           python - <<'PY'
-          import hashlib, io, json, os, zipfile
-          from pathlib import PurePosixPath
+          import hashlib
+          import io
+          import json
+          import os
+          import zipfile
 
           outer_path = "/tmp/v20-final-mac-actions.zip"
           product_sha = os.environ["PRODUCT_SHA"]
@@ -116,7 +127,11 @@ jobs:
               inner_name = release["artifact"]
               inner_bytes = outer.read(inner_name)
               inner_sha = hashlib.sha256(inner_bytes).hexdigest()
-              assert inner_sha == expected_inner == release["artifact_sha256"], (inner_sha, expected_inner, release["artifact_sha256"])
+              assert inner_sha == expected_inner == release["artifact_sha256"], (
+                  inner_sha,
+                  expected_inner,
+                  release["artifact_sha256"],
+              )
 
           checked = 0
           with zipfile.ZipFile(io.BytesIO(inner_bytes)) as inner:
@@ -126,20 +141,21 @@ jobs:
               assert provenance["python_runtime"]["version"] == "3.12.13", provenance
               assert provenance["python_runtime"]["release_tag"] == "20260807", provenance
               manifest_name = next(name for name in inner.namelist() if name.endswith("/MANIFEST_SHA256.txt"))
-              root = manifest_name[: -len("MANIFEST_SHA256.txt")]
+              prefix = manifest_name[: -len("MANIFEST_SHA256.txt")]
               manifest = inner.read(manifest_name).decode("utf-8")
               for raw in manifest.splitlines():
                   raw = raw.strip()
                   if not raw:
                       continue
                   digest, rel = raw.split("  ", 1)
-                  target = root + rel
+                  target = prefix + rel
                   actual = hashlib.sha256(inner.read(target)).hexdigest()
                   assert actual == digest, (target, actual, digest)
                   checked += 1
               names = inner.namelist()
               forbidden = ("/source/tests/", "/source/.github/", "/source/packaging/")
               assert not any(any(marker in name for marker in forbidden) for name in names)
+
           result = {
               "outer_sha256": os.environ["PACKAGE_OUTER_SHA256"],
               "inner_sha256": expected_inner,
@@ -147,7 +163,9 @@ jobs:
               "source_commit": product_sha,
               "runtime": "CPython 3.12.13 / 20260807",
           }
-          open("v20-package-verification.json", "w", encoding="utf-8").write(json.dumps(result, indent=2, ensure_ascii=False))
+          open("v20-package-verification.json", "w", encoding="utf-8").write(
+              json.dumps(result, indent=2, ensure_ascii=False)
+          )
           print(json.dumps(result, indent=2, ensure_ascii=False))
           PY
 
@@ -164,7 +182,8 @@ jobs:
         shell: bash
         run: |
           python - <<'PY'
-          import ast, json
+          import ast
+          import json
           from pathlib import Path
           from app.db.base import Base
           import app.db.models  # noqa: F401
@@ -182,12 +201,11 @@ jobs:
           assert not list((root / '.github/workflows').glob('materialize-*.yml'))
           assert not list((root / '.github/workflows').glob('diagnose-*.yml'))
 
-          methods = {'get','post','put','delete','patch','options','head'}
+          methods = {'get', 'post', 'put', 'delete', 'patch', 'options', 'head'}
           routes = []
           main_routes = []
-          python_files = list((root / 'app').rglob('*.py')) + list((root / 'tests').rglob('*.py')) + list((root / 'scripts').rglob('*.py')) + list((root / 'migrations').rglob('*.py'))
-          all_app_files = list((root / 'app').rglob('*.py'))
-          for path in all_app_files:
+          app_files = list((root / 'app').rglob('*.py'))
+          for path in app_files:
               tree = ast.parse(path.read_text(encoding='utf-8'), filename=str(path))
               for node in ast.walk(tree):
                   if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
@@ -205,27 +223,38 @@ jobs:
                       routes.append(pair)
                       if path == root / 'app/main.py':
                           main_routes.append(pair)
-          duplicates = sorted({pair for pair in routes if routes.count(pair) > 1})
-          assert not duplicates, duplicates
+
+          seen = set()
+          duplicates = set()
+          for pair in routes:
+              if pair in seen:
+                  duplicates.add(pair)
+              seen.add(pair)
+          assert not duplicates, sorted(duplicates)
           assert len(routes) == 344, len(routes)
-          assert sorted(main_routes) == sorted([('GET','/modulos'),('GET','/api/health'),('GET','/api/ready')]), main_routes
+          assert sorted(main_routes) == sorted([
+              ('GET', '/modulos'),
+              ('GET', '/api/health'),
+              ('GET', '/api/ready'),
+          ]), main_routes
 
           main_lines = len((root / 'app/main.py').read_text(encoding='utf-8').splitlines())
           assert main_lines == 639, main_lines
           table_count = len(Base.metadata.tables)
           assert table_count == 124, table_count
-          py_count = len(all_app_files)
-          app_lines = sum(len(path.read_text(encoding='utf-8').splitlines()) for path in all_app_files)
           metrics = {
-              'app_python_files': py_count,
-              'app_python_lines': app_lines,
+              'app_python_files': len(app_files),
+              'app_python_lines': sum(len(path.read_text(encoding='utf-8').splitlines()) for path in app_files),
               'main_lines': main_lines,
               'main_direct_routes': len(main_routes),
               'http_routes': len(routes),
               'orm_tables': table_count,
               'workflows_during_certification': workflows,
           }
-          Path('v20-architecture-metrics.json').write_text(json.dumps(metrics, indent=2), encoding='utf-8')
+          Path('v20-architecture-metrics.json').write_text(
+              json.dumps(metrics, indent=2),
+              encoding='utf-8',
+          )
           print(json.dumps(metrics, indent=2))
           PY
           git diff --check
@@ -273,79 +302,81 @@ jobs:
           passed = tests - failures - errors - skipped
           assert failures == 0 and errors == 0
 
-          text = f'''# V2.0 · Certificación final de product readiness
-
-## Estado
-
-**CERTIFICADA** para cierre técnico sobre la rama `stabilization/v2-0-0-product-readiness`.
-
-Esta acta se generó únicamente después de superar de nuevo los gates integrales y de verificar criptográficamente el artefacto Mac correspondiente al mismo SHA de producto.
-
-## Baseline y gobierno
-
-- Baseline V1.9 certificada: `19d46ba63dfc243d69c7aa42f94e58d4576435d0`.
-- SHA de producto V2.0 certificado: `{external['product_readiness']['head_sha']}`.
-- PR: **#23**, permanece **draft**.
-- `main` permanece fuera de alcance; esta certificación **no autoriza merge automático**.
-
-## Evidencia integral
-
-- Pytest integral directo: **{passed} passed / {skipped} skipped**.
-- Product-readiness completo: **run {external['product_readiness']['run_id']} · success**, con 8 jobs (regresión/seguridad/continuidad, PostgreSQL restore, Chromium, Firefox, WebKit, cinco roles, handoff y huella climática completa).
-- CI canónico del SHA de producto: **run {external['canonical_ci']['run_id']} · success**.
-- Arquitectura: **green**.
-- Smoke independiente: **56 passed**.
-- Alembic desde instancia vacía hasta `20260810_0039`: **green**.
-- Estructura canónica comprobada sobre copia sin `.git`: **green**.
-- Contratos HTTP: **{metrics['http_routes']} únicos**, sin duplicados `(method, path)`.
-- Tablas ORM: **{metrics['orm_tables']}**.
-- `app/main.py`: **{metrics['main_lines']} líneas / {metrics['main_direct_routes']} rutas directas**.
-
-## Artefacto Mac reproducible
-
-- Workflow de empaquetado: **run {external['mac_package']['run_id']} · success**.
-- Artifact ID: **{external['package_artifact']['artifact_id']}**.
-- SHA-256 del ZIP de Actions: `{package['outer_sha256']}`.
-- SHA-256 del ZIP entregable interno: `{package['inner_sha256']}`.
-- Entradas verificadas contra `MANIFEST_SHA256.txt`: **{package['manifest_entries_verified']}**, sin discrepancias.
-- Runtime: **{package['runtime']}**.
-- El runtime del paquete declara exactamente el SHA de producto certificado.
-- El runtime excluye `tests/`, `.github/` y `packaging/` de la carga distribuida.
-
-## Capacidades de promotion-readiness cerradas en V2.0
-
-1. Gate moderno de product readiness asociado al PR actual.
-2. Continuidad PostgreSQL con backup, restore aislado y auditoría.
-3. Paquete Mac reproducible, hash-locked y con procedencia explícita.
-4. Journey climático completo en navegador real: captura operativa, cadena de proveedores, cálculo, revisión, segregación de aprobación, informe, cierre y paquete de verificación.
-5. Frontera correcta entre captura de actividad y fuente consolidada de proveedores, con progreso agregado coherente.
-6. Portal de proveedores protegido por CSRF sin romper el flujo público seguro.
-7. Liveness/readiness separados: el servidor abre puerto sin bloquearse por Storage externo; `/api/ready` conserva diagnóstico estricto.
-8. Timeouts y reintentos S3 acotados; configuración inválida falla antes de tocar red.
-
-## Composition root
-
-Se preserva la frontera V1.9. Las únicas rutas HTTP directas en `app/main.py` son:
-
-- `GET /api/health`
-- `GET /api/ready`
-- `GET /modulos`
-
-## Higiene de workflows
-
-Durante la certificación existen los cuatro workflows permanentes y este certificador temporal. El certificador se elimina en el mismo commit que persiste esta acta. El estado limpio debe volver a:
-
-- `.github/workflows/ci.yml`
-- `.github/workflows/iteration4-stabilization.yml`
-- `.github/workflows/package-mac-selfcontained.yml`
-- `.github/workflows/pages.yml`
-
-## Alcance de la afirmación
-
-Esta certificación demuestra **readiness técnico y operativo controlado del ciclo V2.0**. No convierte por sí sola una demo o configuración sin servicios externos reales en producción pública certificada, ni sustituye verificación independiente de inventarios de carbono.
-
-La siguiente y única acción de gobierno es: limpiar el certificador (realizado con esta acta), ejecutar CI canónico sobre el SHA limpio y actualizar PR #23 manteniéndolo draft. No se autoriza promoción a `main` mediante esta acta.
-'''
+          lines = [
+              '# V2.0 · Certificación final de product readiness',
+              '',
+              '## Estado',
+              '',
+              '**CERTIFICADA** para cierre técnico sobre la rama `stabilization/v2-0-0-product-readiness`.',
+              '',
+              'Esta acta se generó únicamente después de superar de nuevo los gates integrales y de verificar criptográficamente el artefacto Mac correspondiente al mismo SHA de producto.',
+              '',
+              '## Baseline y gobierno',
+              '',
+              '- Baseline V1.9 certificada: `19d46ba63dfc243d69c7aa42f94e58d4576435d0`.',
+              f'- SHA de producto V2.0 certificado: `{external["product_readiness"]["head_sha"]}`.',
+              '- PR: **#23**, permanece **draft**.',
+              '- `main` permanece fuera de alcance; esta certificación **no autoriza merge automático**.',
+              '',
+              '## Evidencia integral',
+              '',
+              f'- Pytest integral directo: **{passed} passed / {skipped} skipped**.',
+              f'- Product-readiness completo: **run {external["product_readiness"]["run_id"]} · success**, con 8 jobs: regresión/seguridad/continuidad, PostgreSQL restore, Chromium, Firefox, WebKit, cinco roles, handoff y huella climática completa.',
+              f'- CI canónico del SHA de producto: **run {external["canonical_ci"]["run_id"]} · success**.',
+              '- Arquitectura: **green**.',
+              '- Smoke independiente: **56 passed**.',
+              '- Alembic desde instancia vacía hasta `20260810_0039`: **green**.',
+              '- Estructura canónica comprobada sobre copia sin `.git`: **green**.',
+              f'- Contratos HTTP: **{metrics["http_routes"]} únicos**, sin duplicados `(method, path)`.',
+              f'- Tablas ORM: **{metrics["orm_tables"]}**.',
+              f'- `app/main.py`: **{metrics["main_lines"]} líneas / {metrics["main_direct_routes"]} rutas directas**.',
+              '',
+              '## Artefacto Mac reproducible',
+              '',
+              f'- Workflow de empaquetado: **run {external["mac_package"]["run_id"]} · success**.',
+              f'- Artifact ID: **{external["package_artifact"]["artifact_id"]}**.',
+              f'- SHA-256 del ZIP de Actions: `{package["outer_sha256"]}`.',
+              f'- SHA-256 del ZIP entregable interno: `{package["inner_sha256"]}`.',
+              f'- Entradas verificadas contra `MANIFEST_SHA256.txt`: **{package["manifest_entries_verified"]}**, sin discrepancias.',
+              f'- Runtime: **{package["runtime"]}**.',
+              '- El runtime del paquete declara exactamente el SHA de producto certificado.',
+              '- El runtime excluye `tests/`, `.github/` y `packaging/` de la carga distribuida.',
+              '',
+              '## Capacidades de promotion-readiness cerradas en V2.0',
+              '',
+              '1. Gate moderno de product readiness asociado al PR actual.',
+              '2. Continuidad PostgreSQL con backup, restore aislado y auditoría.',
+              '3. Paquete Mac reproducible, hash-locked y con procedencia explícita.',
+              '4. Journey climático completo en navegador real: captura operativa, cadena de proveedores, cálculo, revisión, segregación de aprobación, informe, cierre y paquete de verificación.',
+              '5. Frontera correcta entre captura de actividad y fuente consolidada de proveedores, con progreso agregado coherente.',
+              '6. Portal de proveedores protegido por CSRF sin romper el flujo público seguro.',
+              '7. Liveness/readiness separados: el servidor abre puerto sin bloquearse por Storage externo; `/api/ready` conserva diagnóstico estricto.',
+              '8. Timeouts y reintentos S3 acotados; configuración inválida falla antes de tocar red.',
+              '',
+              '## Composition root',
+              '',
+              'Se preserva la frontera V1.9. Las únicas rutas HTTP directas en `app/main.py` son:',
+              '',
+              '- `GET /api/health`',
+              '- `GET /api/ready`',
+              '- `GET /modulos`',
+              '',
+              '## Higiene de workflows',
+              '',
+              'Durante la certificación existen los cuatro workflows permanentes y este certificador temporal. El certificador se elimina en el mismo commit que persiste esta acta. El estado limpio debe volver a:',
+              '',
+              '- `.github/workflows/ci.yml`',
+              '- `.github/workflows/iteration4-stabilization.yml`',
+              '- `.github/workflows/package-mac-selfcontained.yml`',
+              '- `.github/workflows/pages.yml`',
+              '',
+              '## Alcance de la afirmación',
+              '',
+              'Esta certificación demuestra **readiness técnico y operativo controlado del ciclo V2.0**. No convierte por sí sola una demo o configuración sin servicios externos reales en producción pública certificada, ni sustituye verificación independiente de inventarios de carbono.',
+              '',
+              'La siguiente y única acción de gobierno es: limpiar el certificador, ejecutar CI canónico sobre el SHA limpio y actualizar PR #23 manteniéndolo draft. No se autoriza promoción a `main` mediante esta acta.',
+          ]
+          text = '\n'.join(lines) + '\n'
           Path('docs/architecture/V2_0_FINAL_CERTIFICATION.md').write_text(text, encoding='utf-8')
           print(text)
           PY
