@@ -23,6 +23,9 @@ from app.database import (
     ReportArtifact,
     ReviewObservation,
     SessionLocal,
+    SupplierCampaign,
+    SupplierDataRequest,
+    SupplierResponse,
     VerificationFinding,
 )
 
@@ -150,6 +153,79 @@ def _open_details(container, summary_text: str):
     if not bool(details.evaluate("el => el.open")):
         details.locator("summary").click()
     return details
+
+
+def _complete_supplier_chain(reviewer: Page) -> list[dict[str, object]]:
+    with SessionLocal() as session:
+        inventory = session.scalar(select(Inventory).where(Inventory.name == INVENTORY_NAME))
+        if inventory is None:
+            raise AssertionError(f"No existe {INVENTORY_NAME!r}.")
+        requests = list(session.scalars(
+            select(SupplierDataRequest)
+            .join(SupplierCampaign)
+            .where(SupplierCampaign.inventory_id == inventory.id)
+            .order_by(SupplierDataRequest.id)
+        ))
+        pending = []
+        for item in requests:
+            response = session.scalar(select(SupplierResponse).where(SupplierResponse.request_id == item.id))
+            if response is None or response.review_status != "Aprobado":
+                pending.append({
+                    "request_id": item.id,
+                    "token": item.access_token,
+                    "product_service": item.product_service,
+                })
+
+    completed: list[dict[str, object]] = []
+    for index, item in enumerate(pending, 1):
+        token = str(item["token"])
+        reviewer.goto(f"{BASE_URL}/proveedor/responder/{token}", wait_until="networkidle")
+        form = reviewer.locator("form#supplier-response-form")
+        form.wait_for(state="visible")
+        form.locator('select[name="method"]').select_option("Huella total suministrada")
+        form.locator('input[name="reported_emissions_tco2e"]').fill(str(18.0 + index * 3.0))
+        form.locator('input[name="methodology"]').fill("GHG Protocol Scope 3 · dato primario del proveedor")
+        form.locator('textarea[name="boundary"]').fill(
+            "Cradle-to-gate: materias primas, energía y producción hasta la puerta del proveedor; periodo 2025."
+        )
+        form.locator('textarea[name="notes"]').fill("Respuesta E2E V2.0 para completar la cadena de valor.")
+        form.locator("button.btn-primary").click()
+        reviewer.wait_for_load_state("networkidle")
+
+        with SessionLocal() as session:
+            response = session.scalar(
+                select(SupplierResponse).where(SupplierResponse.request_id == int(item["request_id"]))
+            )
+            if response is None:
+                raise AssertionError(f"La solicitud {item['request_id']} no persistió respuesta.")
+            response_id = response.id
+
+        reviewer.goto(f"{BASE_URL}/cadena-valor", wait_until="networkidle")
+        review_form = reviewer.locator(f'form[action="/cadena-valor/respuestas/{response_id}/revisar"]')
+        review_form.wait_for(state="attached")
+        review_form.evaluate("el => { const d = el.closest('details'); if (d) d.open = true; }")
+        review_form.locator('select[name="decision"]').select_option("Aprobado")
+        review_form.locator('textarea[name="reviewer_comments"]').fill(
+            "Metodología y límite documentados; respuesta aprobada para consolidación Scope 3 E2E."
+        )
+        review_form.locator("button").click()
+        reviewer.wait_for_load_state("networkidle")
+        completed.append({**item, "response_id": response_id, "decision": "Aprobado"})
+
+    with SessionLocal() as session:
+        inventory = session.scalar(select(Inventory).where(Inventory.name == INVENTORY_NAME))
+        supplier_source = session.scalar(
+            select(EmissionSource).where(
+                EmissionSource.inventory_id == inventory.id,
+                EmissionSource.category == "Datos específicos de proveedores",
+            )
+        )
+        if supplier_source is None or supplier_source.progress != 100:
+            raise AssertionError(
+                f"La fuente consolidada de proveedores no quedó completa: "
+                f"{getattr(supplier_source, 'progress', None)}"
+            )
+    return completed
 
 
 def _close_internal_blocker(client: Page, reviewer: Page) -> None:
@@ -427,6 +503,10 @@ def main() -> int:
         captured = _capture_pending_records(pages["Cliente"])
         evidence["capture_records"] = captured
         evidence["screenshots"].append(_screenshot(pages["Cliente"], "01-captura-completa.png"))
+
+        supplier_responses = _complete_supplier_chain(pages["Revisor"])
+        evidence["supplier_responses"] = supplier_responses
+        evidence["screenshots"].append(_screenshot(pages["Revisor"], "01b-cadena-valor-completa.png"))
 
         _assert_calculation_gate(pages["Consultor"])
         evidence["screenshots"].append(_screenshot(pages["Consultor"], "02-calculo-sin-errores.png"))
