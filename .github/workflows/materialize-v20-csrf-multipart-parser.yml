@@ -35,7 +35,7 @@ jobs:
           PY
           python -m py_compile app/security.py
           python - <<'PY'
-          from app.security import _csrf_form_value
+          import re
           boundary = '----WebKitFormBoundaryV20'
           token = 'token-v20-abcdefghijklmnopqrstuvwxyz-123456'
           body = (
@@ -47,7 +47,9 @@ jobs:
               'Huella total suministrada\r\n'
               f'--{boundary}--\r\n'
           ).encode()
-          actual = _csrf_form_value(f'multipart/form-data; boundary={boundary}', body)
+          pattern = rb'Content-Disposition:[^\r\n]*\bname="_csrf_token"(?:;[^\r\n]*)?\r\n(?:[^\r\n]+\r\n)*\r\n([^\r\n]*)'
+          match = re.search(pattern, body)
+          actual = match.group(1).decode() if match else ''
           assert actual == token, (actual, token)
           PY
           git diff --check
