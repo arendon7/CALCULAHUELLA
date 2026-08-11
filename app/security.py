@@ -159,7 +159,7 @@ def _csrf_form_value(content_type: str, body: bytes) -> str:
         return values.get(CSRF_FIELD, [""])[0]
     if content_type.startswith("multipart/form-data"):
         # El token es corto y se inyecta como campo oculto en todos los formularios.
-        pattern = rb'name="_csrf_token"\r\n(?:[^\r\n]*\r\n)*\r\n([^\r\n]+)'
+        pattern = rb'Content-Disposition:[^\r\n]*\bname="_csrf_token"(?:;[^\r\n]*)?\r\n(?:[^\r\n]+\r\n)*\r\n([^\r\n]*)'
         match = re.search(pattern, body[: min(len(body), 1024 * 1024)])
         return match.group(1).decode("utf-8", errors="replace") if match else ""
     return ""
