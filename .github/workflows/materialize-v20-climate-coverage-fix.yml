@@ -1,0 +1,45 @@
+name: V2.0 · Materializar corrección cobertura climática
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-climate-coverage-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  fix:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+      - name: Reconciliar cobertura temporal y backlog documental
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/browser_climate_journey_gate.py')
+          source = path.read_text(encoding='utf-8')
+          old = '''        if not pending:\n            if float(summary["coverage"]) != 100 or int(summary["pending_sources"]) != 0:\n                raise AssertionError(f"Cobertura inconsistente al finalizar captura: {summary}")\n            return captured\n'''
+          new = '''        if not pending:\n            uncovered = [\n                str(item["name"])\n                for item in summary["sources"]\n                if float(item.get("coverage", 0)) < 100\n            ]\n            if float(summary["coverage"]) != 100 or uncovered:\n                raise AssertionError(\n                    f"Cobertura temporal inconsistente al finalizar captura: "\n                    f"coverage={summary['coverage']}, uncovered={uncovered}"\n                )\n            return captured\n'''
+          if source.count(old) != 1:
+              raise SystemExit(f'Contrato esperado encontrado {source.count(old)} veces; no se modifica.')
+          path.write_text(source.replace(old, new), encoding='utf-8')
+          PY
+          python -m py_compile scripts/browser_climate_journey_gate.py
+      - name: Commit limpio y autoeliminación
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/materialize-v20-climate-coverage-fix.yml
+          git add scripts/browser_climate_journey_gate.py
+          git commit -m 'test(v2.0): distinguish temporal coverage from support backlog'
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
