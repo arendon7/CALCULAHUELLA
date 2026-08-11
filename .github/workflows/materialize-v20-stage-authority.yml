@@ -60,7 +60,7 @@ jobs:
           python -m py_compile app/database.py
           rm -rf "${INSTANCE_DIR}"
           pytest -q \
-            tests/test_v160_inventory_lifecycle.py::test_closed_inventory_requires_new_version_for_corrections \
+            tests/test_v160_inventory_lifecycle.py::test_v160_clone_inventory_version_preserves_structure_and_original \
             tests/test_v200_refresh_progress.py
           git diff --check
 
