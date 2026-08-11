@@ -196,6 +196,7 @@ class CSRFMiddleware:
         should_set_cookie = not token or len(token) < 24
         if should_set_cookie:
             token = secrets.token_urlsafe(32)
+        scope.setdefault("state", {})["csrf_token"] = token
 
         body = b""
         replayed = False
