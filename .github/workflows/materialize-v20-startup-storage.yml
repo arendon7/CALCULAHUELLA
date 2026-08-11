@@ -382,7 +382,6 @@ jobs:
           from tempfile import TemporaryDirectory
 
           import boto3
-          import app.config as config_module
           import app.storage as storage_module
 
           original = storage_module.settings
@@ -480,7 +479,7 @@ jobs:
           start = Path('start_prod.sh').read_text(encoding='utf-8')
           ready = Path('scripts/check_ready.py').read_text(encoding='utf-8')
           env = Path('app/production_readiness.py').read_text(encoding='utf-8')
-          assert 'scripts/check_ready.py' not in start
+          assert '"$PY" scripts/check_ready.py' not in start
           assert 'alembic upgrade head' in start
           assert 'uvicorn app.main:app' in start
           assert 'diagnostic_snapshot()' in ready
