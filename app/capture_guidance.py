@@ -13,6 +13,17 @@ FREQUENCY_MONTHS = {
     "anual": 12,
 }
 
+SUPPLIER_MANAGED_CATEGORY = "Datos específicos de proveedores"
+
+
+def is_activity_capture_source(source: Any) -> bool:
+    """Return whether a source is managed through operational activity capture.
+
+    Supplier-consolidated Scope 3 sources are synchronized from approved supplier
+    responses and must never be completed by creating ActivityData records.
+    """
+    return str(getattr(source, "category", "") or "").strip() != SUPPLIER_MANAGED_CATEGORY
+
 
 def add_months(value: date, months: int) -> date:
     month_index = value.month - 1 + months
@@ -130,7 +141,7 @@ def source_capture_card(inventory: Any, source: Any) -> dict[str, Any]:
 
 
 def capture_summary(inventory: Any) -> dict[str, Any]:
-    cards = [source_capture_card(inventory, source) for source in inventory.sources if source.included]
+    cards = [source_capture_card(inventory, source) for source in inventory.sources if source.included and is_activity_capture_source(source)]
     cards.sort(key=lambda item: (-item["priority_score"], item["source"].scope, item["source"].name.casefold()))
     expected = sum(item["expected_count"] for item in cards)
     complete = sum(item["complete_count"] for item in cards)

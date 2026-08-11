@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
 from .calculations import recalculate_source
-from .capture_guidance import capture_summary
+from .capture_guidance import capture_summary, is_activity_capture_source
 from .config import settings
 from .database import ActivityData, EmissionSource, EvidenceDocument, Inventory, add_audit, get_db, refresh_progress
 from .period_close import assert_periods_editable
@@ -162,6 +162,8 @@ def register_capture_routes(
         source = session.scalar(select(EmissionSource).where(EmissionSource.id == source_id, EmissionSource.inventory_id == inventory.id))
         if not source:
             raise HTTPException(400, "Fuente inválida")
+        if not is_activity_capture_source(source):
+            raise HTTPException(409, "Esta fuente se gestiona desde Cadena de valor y no admite captura operativa directa")
         if unit not in allowed_units or data_origin not in data_origins:
             raise HTTPException(400, "Unidad u origen inválidos")
         start_date = parse_date(period_start)
