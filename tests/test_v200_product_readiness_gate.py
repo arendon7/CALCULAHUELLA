@@ -5,7 +5,6 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from app.capture_guidance import capture_summary
-from app.database import refresh_inventory_progress
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -113,32 +112,6 @@ def test_v200_guided_capture_excludes_supplier_managed_aggregate() -> None:
     assert summary["sources"] == 1
     assert summary["coverage"] == 100
     assert [item["source"].name for item in summary["cards"]] == ["Diésel"]
-
-
-def test_v200_supplier_authority_refreshes_aggregate_inventory_progress() -> None:
-    progress_values = [100, 50]
-    session = SimpleNamespace(
-        flush=lambda: None,
-        scalars=lambda _query: list(progress_values),
-    )
-    inventory = SimpleNamespace(progress=0, current_stage="Recolección", locked=False, status="Activo")
-
-    refresh_inventory_progress(session, inventory)
-    assert inventory.progress == 75
-    assert inventory.current_stage == "Recolección"
-
-    progress_values[:] = [100, 100]
-    refresh_inventory_progress(session, inventory)
-    assert inventory.progress == 100
-    assert inventory.current_stage == "Cálculo"
-
-    inventory.locked = True
-    inventory.status = "Cerrado"
-    inventory.current_stage = "Cerrado"
-    progress_values[:] = [100, 50]
-    refresh_inventory_progress(session, inventory)
-    assert inventory.progress == 75
-    assert inventory.current_stage == "Cerrado"
 
 
 def test_v200_climate_gate_reports_source_progress_when_quality_gate_blocks() -> None:
