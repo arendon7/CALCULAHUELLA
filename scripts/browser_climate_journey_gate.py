@@ -100,8 +100,16 @@ def _capture_pending_records(page: Page) -> list[dict[str, object]]:
         summary = _capture_summary(page)
         pending = [item for item in summary["sources"] if item.get("next_start")]
         if not pending:
-            if float(summary["coverage"]) != 100 or int(summary["pending_sources"]) != 0:
-                raise AssertionError(f"Cobertura inconsistente al finalizar captura: {summary}")
+            uncovered = [
+                str(item["name"])
+                for item in summary["sources"]
+                if float(item.get("coverage", 0)) < 100
+            ]
+            if float(summary["coverage"]) != 100 or uncovered:
+                raise AssertionError(
+                    f"Cobertura temporal inconsistente al finalizar captura: "
+                    f"coverage={summary['coverage']}, uncovered={uncovered}"
+                )
             return captured
 
         item = pending[0]
