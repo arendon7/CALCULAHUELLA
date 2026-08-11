@@ -5,6 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "iteration4-stabilization.yml"
+CLIMATE_GATE = ROOT / "scripts" / "browser_climate_journey_gate.py"
 
 
 def _workflow() -> str:
@@ -56,6 +57,15 @@ def test_v200_product_readiness_gate_covers_full_climate_journey() -> None:
     assert "CLIMATE_GATE_ARTIFACT_DIR: climate-gate-artifacts" in source
     assert "python scripts/browser_climate_journey_gate.py" in source
     assert "climate-journey-evidence" in source
+
+
+def test_v200_climate_gate_distinguishes_temporal_coverage_from_support_backlog() -> None:
+    source = CLIMATE_GATE.read_text(encoding="utf-8")
+    assert 'uncovered = [' in source
+    assert 'float(summary["coverage"]) != 100 or uncovered' in source
+    terminal_block = source.split("if not pending:", 1)[1].split("item = pending[0]", 1)[0]
+    assert 'pending_sources' not in terminal_block
+    assert 'support_coverage' not in terminal_block
 
 
 def test_v200_product_readiness_gate_keeps_full_release_barriers() -> None:
