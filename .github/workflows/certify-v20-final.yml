@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_ENV: local
-      SEED_DEMO: "false"
+      SEED_DEMO: "true"
       SCHEDULER_ENABLED: "0"
       STRUCTURED_LOGGING: "0"
       PBKDF2_ITERATIONS: "10000"
@@ -138,8 +138,8 @@ jobs:
               provenance_name = next(name for name in inner.namelist() if name.endswith("/BUILD_PROVENANCE.json"))
               provenance = json.loads(inner.read(provenance_name))
               assert provenance["source_commit"] == product_sha, provenance
-              assert provenance["python_runtime"]["version"] == "3.12.13", provenance
-              assert provenance["python_runtime"]["release_tag"] == "20260807", provenance
+              assert provenance["python"]["version"] == "3.12.13", provenance
+              assert provenance["python"]["release_tag"] == "20260807", provenance
               manifest_name = next(name for name in inner.namelist() if name.endswith("/MANIFEST_SHA256.txt"))
               prefix = manifest_name[: -len("MANIFEST_SHA256.txt")]
               manifest = inner.read(manifest_name).decode("utf-8")
@@ -148,6 +148,8 @@ jobs:
                   if not raw:
                       continue
                   digest, rel = raw.split("  ", 1)
+                  while rel.startswith("./"):
+                      rel = rel[2:]
                   target = prefix + rel
                   actual = hashlib.sha256(inner.read(target)).hexdigest()
                   assert actual == digest, (target, actual, digest)
@@ -156,6 +158,7 @@ jobs:
               forbidden = ("/source/tests/", "/source/.github/", "/source/packaging/")
               assert not any(any(marker in name for marker in forbidden) for name in names)
 
+          assert checked == 4005, checked
           result = {
               "outer_sha256": os.environ["PACKAGE_OUTER_SHA256"],
               "inner_sha256": expected_inner,
@@ -175,6 +178,7 @@ jobs:
           rm -rf /tmp/calculahuella-v20-canonical
           mkdir -p /tmp/calculahuella-v20-canonical
           rsync -a --exclude='.git/' ./ /tmp/calculahuella-v20-canonical/
+          rm -f /tmp/calculahuella-v20-canonical/.github/workflows/certify-v20-final.yml
           cd /tmp/calculahuella-v20-canonical
           python tools/verify_canonical.py --skip-manifest
 
@@ -276,6 +280,9 @@ jobs:
 
       - name: Alembic desde base vacía
         shell: bash
+        env:
+          SEED_DEMO: "false"
+          INSTANCE_DIR: /tmp/cth-v20-final-cert-empty
         run: |
           rm -rf "${INSTANCE_DIR}"
           mkdir -p "${INSTANCE_DIR}"
