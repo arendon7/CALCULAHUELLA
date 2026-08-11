@@ -1,19 +1,49 @@
 {
   "brand": "Calcula tu Huella",
   "system": "Marca Maestra v1",
-  "release": "1.0.0",
-  "canonical_assets": {
+  "release_target": "2.1.0",
+  "descriptor": "Plataforma digital de gestión de huella de carbono",
+  "claim": "Convierte tus datos en decisiones climáticas",
+  "approved_master": {
+    "status": "recoverable_exact_primary_from_embedded_html",
+    "source": "Frontend Kit v1 y experiencias autocontenidas históricas verificadas",
+    "geometry": "C circular envolvente, barras ascendentes y hoja integrada",
+    "redraw_allowed": false,
+    "placeholder_allowed": false,
+    "expected_primary": {
+      "filename": "logo-oficial.png",
+      "width": 470,
+      "height": 195,
+      "encoding": "PNG data URI base64",
+      "minimum_independent_sources": 2,
+      "transformation": "none"
+    },
+    "verified_source_names": [
+      "v0_44_experiencia.html",
+      "experiencia_interna.html",
+      "index.html autocontenido de Marca Maestra v1"
+    ],
+    "pending_independent_assets": [
+      "logo-oficial-blanco.png",
+      "favicon-64.png",
+      "favicon-256.png"
+    ]
+  },
+  "compatibility_assets": {
     "brand-primary.svg": {
       "sha256": "3bc5a29975a3b49076d7c754b64732f91a5e501f252522a5298d708541a6ebba",
-      "bytes": 1485
+      "bytes": 1485,
+      "status": "legacy_not_approved_master"
     },
     "brand-reversed.svg": {
       "sha256": "3499c96d39d1bc584aa32d100b5cee899fe2c47d1d6e2ab4de1a895f6eb944a6",
-      "bytes": 1407
+      "bytes": 1407,
+      "status": "legacy_not_approved_master"
     },
     "brand-symbol.svg": {
       "sha256": "2088d54af227ed0a2844f9c82fc260330401065c5a703e922dc1644b4ee0ad80",
-      "bytes": 805
+      "bytes": 805,
+      "status": "legacy_not_approved_master"
     }
   }
 }
