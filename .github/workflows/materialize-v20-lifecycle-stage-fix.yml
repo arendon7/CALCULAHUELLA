@@ -1,0 +1,56 @@
+name: V2.0 · Materializar corrección de etapa lifecycle
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-lifecycle-stage-fix.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+
+      - name: Preservar etapa explícita de corrección
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          lifecycle = Path('app/inventory_lifecycle.py')
+          text = lifecycle.read_text(encoding='utf-8')
+          old = '''    session.flush()\n    refresh_progress(session, new_inventory)\n    recalculate_inventory(session, new_inventory)\n    return new_inventory\n'''
+          new = '''    session.flush()\n    refresh_progress(session, new_inventory)\n    recalculate_inventory(session, new_inventory)\n    # El progreso se deriva de las fuentes, pero una versión reabierta pertenece\n    # explícitamente al workflow de Corrección hasta una transición posterior.\n    new_inventory.current_stage = "Corrección"\n    return new_inventory\n'''
+          if text.count(old) != 1:
+              raise SystemExit(f'Contrato lifecycle inesperado: {text.count(old)} coincidencias')
+          lifecycle.write_text(text.replace(old, new), encoding='utf-8')
+
+          workflow = Path('.github/workflows/iteration4-stabilization.yml')
+          text = workflow.read_text(encoding='utf-8')
+          anchor = '            tests/test_v200_product_readiness_gate.py \\\n'
+          addition = anchor + '            tests/test_v200_refresh_progress.py \\\n'
+          if text.count(anchor) != 1:
+              raise SystemExit(f'Contrato targeted inesperado: {text.count(anchor)} coincidencias')
+          if 'tests/test_v200_refresh_progress.py' not in text:
+              text = text.replace(anchor, addition)
+          workflow.write_text(text, encoding='utf-8')
+          PY
+
+          python -m py_compile app/inventory_lifecycle.py
+          pytest -q tests/test_v160_inventory_lifecycle.py::test_v160_clone_inventory_version_preserves_structure_and_original tests/test_v200_refresh_progress.py
+
+      - name: Commit limpio y autoeliminación
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/materialize-v20-lifecycle-stage-fix.yml
+          git add app/inventory_lifecycle.py .github/workflows/iteration4-stabilization.yml
+          git commit -m "fix(v2.0): preserve correction stage after progress refresh"
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
