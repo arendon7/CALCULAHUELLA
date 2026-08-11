@@ -296,6 +296,9 @@ def start_pilot_execution(
 
     pilot.status = "En ejecución"
     refresh_progress(session, inventory)
+    # La preparación termina al crear las fuentes y solicitudes controladas.
+    # Desde aquí la autoridad del lifecycle del piloto es la recolección de datos.
+    inventory.current_stage = "Recolección"
     add_audit(
         session,
         organization_id,
