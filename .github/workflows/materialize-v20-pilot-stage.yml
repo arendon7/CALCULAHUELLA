@@ -1,0 +1,67 @@
+name: V2.0 · Materializar transición de etapa piloto
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-pilot-stage.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      INSTANCE_DIR: /tmp/cth-pilot-stage-v20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Materializar transición explícita del piloto
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/pilot_execution.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''    pilot.status = "En ejecución"\n    refresh_progress(session, inventory)\n    add_audit(\n'''
+          new = '''    pilot.status = "En ejecución"\n    refresh_progress(session, inventory)\n    # La preparación termina al crear las fuentes y solicitudes controladas.\n    # Desde aquí la autoridad del lifecycle del piloto es la recolección de datos.\n    inventory.current_stage = "Recolección"\n    add_audit(\n'''
+          if text.count(old) != 1:
+              raise SystemExit('Transición final del piloto no encontrada exactamente una vez')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile app/pilot_execution.py app/database.py
+          rm -rf "${INSTANCE_DIR}"
+          pytest -q \
+            tests/test_v025_guided_pilot.py::test_v025_start_pilot_creates_inventory_sources_requests_and_issues \
+            tests/test_v160_inventory_lifecycle.py::test_v160_clone_inventory_version_preserves_structure_and_original \
+            tests/test_v200_refresh_progress.py
+          git diff --check
+
+      - name: Commit limpio y autoeliminación
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/materialize-v20-pilot-stage.yml
+          git add app/pilot_execution.py
+          git commit -m "fix(v2.0): advance initialized pilot to collection stage"
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
