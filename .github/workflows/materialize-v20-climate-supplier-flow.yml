@@ -1,0 +1,60 @@
+name: V2.0 · Materializar flujo proveedor en journey climático
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-climate-supplier-flow.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+      - name: Incorporar lifecycle real de proveedores al journey
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('scripts/browser_climate_journey_gate.py')
+          source = path.read_text(encoding='utf-8')
+
+          old_import = '''    SessionLocal,\n    VerificationFinding,\n'''
+          new_import = '''    SessionLocal,\n    SupplierCampaign,\n    SupplierDataRequest,\n    SupplierResponse,\n    VerificationFinding,\n'''
+          if source.count(old_import) != 1:
+              raise SystemExit('No se encontró bloque de imports esperado una sola vez.')
+          source = source.replace(old_import, new_import)
+
+          marker = '''def _close_internal_blocker(client: Page, reviewer: Page) -> None:\n'''
+          helper = '''def _complete_supplier_chain(reviewer: Page) -> list[dict[str, object]]:\n    with SessionLocal() as session:\n        inventory = session.scalar(select(Inventory).where(Inventory.name == INVENTORY_NAME))\n        if inventory is None:\n            raise AssertionError(f"No existe {INVENTORY_NAME!r}.")\n        requests = list(session.scalars(\n            select(SupplierDataRequest)\n            .join(SupplierCampaign)\n            .where(SupplierCampaign.inventory_id == inventory.id)\n            .order_by(SupplierDataRequest.id)\n        ))\n        pending = []\n        for item in requests:\n            response = session.scalar(select(SupplierResponse).where(SupplierResponse.request_id == item.id))\n            if response is None or response.review_status != "Aprobado":\n                pending.append({\n                    "request_id": item.id,\n                    "token": item.access_token,\n                    "product_service": item.product_service,\n                })\n\n    completed: list[dict[str, object]] = []\n    for index, item in enumerate(pending, 1):\n        token = str(item["token"])\n        reviewer.goto(f"{BASE_URL}/proveedor/responder/{token}", wait_until="networkidle")\n        form = reviewer.locator("form#supplier-response-form")\n        form.wait_for(state="visible")\n        form.locator('select[name="method"]').select_option("Huella total suministrada")\n        form.locator('input[name="reported_emissions_tco2e"]').fill(str(18.0 + index * 3.0))\n        form.locator('input[name="methodology"]').fill("GHG Protocol Scope 3 · dato primario del proveedor")\n        form.locator('textarea[name="boundary"]').fill(\n            "Cradle-to-gate: materias primas, energía y producción hasta la puerta del proveedor; periodo 2025."\n        )\n        form.locator('textarea[name="notes"]').fill("Respuesta E2E V2.0 para completar la cadena de valor.")\n        form.locator("button.btn-primary").click()\n        reviewer.wait_for_load_state("networkidle")\n\n        with SessionLocal() as session:\n            response = session.scalar(\n                select(SupplierResponse).where(SupplierResponse.request_id == int(item["request_id"]))\n            )\n            if response is None:\n                raise AssertionError(f"La solicitud {item['request_id']} no persistió respuesta.")\n            response_id = response.id\n\n        reviewer.goto(f"{BASE_URL}/cadena-valor", wait_until="networkidle")\n        review_form = reviewer.locator(f'form[action="/cadena-valor/respuestas/{response_id}/revisar"]')\n        review_form.wait_for(state="attached")\n        review_form.evaluate("el => { const d = el.closest('details'); if (d) d.open = true; }")\n        review_form.locator('select[name="decision"]').select_option("Aprobado")\n        review_form.locator('textarea[name="reviewer_comments"]').fill(\n            "Metodología y límite documentados; respuesta aprobada para consolidación Scope 3 E2E."\n        )\n        review_form.locator("button").click()\n        reviewer.wait_for_load_state("networkidle")\n        completed.append({**item, "response_id": response_id, "decision": "Aprobado"})\n\n    with SessionLocal() as session:\n        inventory = session.scalar(select(Inventory).where(Inventory.name == INVENTORY_NAME))\n        supplier_source = session.scalar(\n            select(EmissionSource).where(\n                EmissionSource.inventory_id == inventory.id,\n                EmissionSource.category == "Datos específicos de proveedores",\n            )\n        )\n        if supplier_source is None or supplier_source.progress != 100:\n            raise AssertionError(\n                f"La fuente consolidada de proveedores no quedó completa: "\n                f"{getattr(supplier_source, 'progress', None)}"\n            )\n    return completed\n\n\n'''
+          if source.count(marker) != 1:
+              raise SystemExit('No se encontró marcador para helper de proveedores.')
+          source = source.replace(marker, helper + marker)
+
+          old_call = '''        captured = _capture_pending_records(pages["Cliente"])\n        evidence["capture_records"] = captured\n        evidence["screenshots"].append(_screenshot(pages["Cliente"], "01-captura-completa.png"))\n\n        _assert_calculation_gate(pages["Consultor"])\n'''
+          new_call = '''        captured = _capture_pending_records(pages["Cliente"])\n        evidence["capture_records"] = captured\n        evidence["screenshots"].append(_screenshot(pages["Cliente"], "01-captura-completa.png"))\n\n        supplier_responses = _complete_supplier_chain(pages["Revisor"])\n        evidence["supplier_responses"] = supplier_responses\n        evidence["screenshots"].append(_screenshot(pages["Revisor"], "01b-cadena-valor-completa.png"))\n\n        _assert_calculation_gate(pages["Consultor"])\n'''
+          if source.count(old_call) != 1:
+              raise SystemExit('No se encontró bloque de llamada esperado.')
+          source = source.replace(old_call, new_call)
+
+          path.write_text(source, encoding='utf-8')
+          PY
+          python -m py_compile scripts/browser_climate_journey_gate.py
+      - name: Commit limpio y autoeliminación
+        run: |
+          set -euo pipefail
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git rm .github/workflows/materialize-v20-climate-supplier-flow.yml
+          git add scripts/browser_climate_journey_gate.py
+          git commit -m 'test(v2.0): complete supplier lifecycle in climate journey'
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
