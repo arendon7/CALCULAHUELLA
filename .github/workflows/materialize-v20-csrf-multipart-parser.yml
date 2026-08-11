@@ -1,0 +1,63 @@
+name: V2.0 · Materializar parser CSRF multipart
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-csrf-multipart-parser.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Corregir extracción multipart del token CSRF
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          path = Path('app/security.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''        pattern = rb'name="_csrf_token"\\r\\n(?:[^\\r\\n]*\\r\\n)*\\r\\n([^\\r\\n]+)'\n'''
+          new = '''        pattern = rb'Content-Disposition:[^\\r\\n]*\\bname="_csrf_token"(?:;[^\\r\\n]*)?\\r\\n(?:[^\\r\\n]+\\r\\n)*\\r\\n([^\\r\\n]*)'\n'''
+          if text.count(old) != 1:
+              raise SystemExit('Patrón multipart CSRF esperado no encontrado exactamente una vez')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile app/security.py
+          python - <<'PY'
+          from app.security import _csrf_form_value
+          boundary = '----WebKitFormBoundaryV20'
+          token = 'token-v20-abcdefghijklmnopqrstuvwxyz-123456'
+          body = (
+              f'--{boundary}\r\n'
+              'Content-Disposition: form-data; name="_csrf_token"\r\n\r\n'
+              f'{token}\r\n'
+              f'--{boundary}\r\n'
+              'Content-Disposition: form-data; name="method"\r\n\r\n'
+              'Huella total suministrada\r\n'
+              f'--{boundary}--\r\n'
+          ).encode()
+          actual = _csrf_form_value(f'multipart/form-data; boundary={boundary}', body)
+          assert actual == token, (actual, token)
+          PY
+          git diff --check
+
+      - name: Commit limpio y autoeliminación
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/materialize-v20-csrf-multipart-parser.yml
+          git add app/security.py
+          git commit -m "fix(v2.0): parse csrf token from multipart forms correctly"
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
