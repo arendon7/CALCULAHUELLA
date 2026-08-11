@@ -156,7 +156,10 @@ jobs:
 
           rsync -a ./ "$ROOT/source/" \
             --exclude '.git/' \
+            --exclude '.github/' \
             --exclude '.pack/' \
+            --exclude 'tests/' \
+            --exclude 'packaging/' \
             --exclude '__pycache__/' \
             --exclude '*.pyc' \
             --exclude '.venv/' \

@@ -40,6 +40,14 @@ def test_v200_mac_wheelhouses_share_modern_macos_11_floor() -> None:
     assert "macosx_10_13_x86_64" not in workflow
 
 
+def test_v200_mac_package_excludes_non_runtime_ci_and_test_sources() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "--exclude '.github/'" in workflow
+    assert "--exclude 'tests/'" in workflow
+    assert "--exclude 'packaging/'" in workflow
+
+
 def test_v200_mac_package_has_verifiable_provenance_and_deterministic_archive_check() -> None:
     workflow = WORKFLOW.read_text(encoding="utf-8")
 
