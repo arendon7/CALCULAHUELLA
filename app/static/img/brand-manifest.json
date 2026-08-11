@@ -1,49 +1,49 @@
 {
   "brand": "Calcula tu Huella",
-  "system": "Marca Maestra v1",
+  "system": "Identidad canónica · logo clásico",
   "release_target": "2.1.0",
   "descriptor": "Plataforma digital de gestión de huella de carbono",
   "claim": "Convierte tus datos en decisiones climáticas",
   "approved_master": {
-    "status": "recoverable_exact_primary_from_embedded_html",
-    "source": "Frontend Kit v1 y experiencias autocontenidas históricas verificadas",
-    "geometry": "C circular envolvente, barras ascendentes y hoja integrada",
+    "status": "installed_exact_classic",
+    "decision_version": "1.4.2",
+    "decision_date": "2026-08-06",
+    "source": "MARCA_CANONICA_LOGO_CLASICO.md",
+    "geometry": "Huella y gráfica ascendente en verde y azul",
     "redraw_allowed": false,
     "placeholder_allowed": false,
-    "expected_primary": {
-      "filename": "logo-oficial.png",
-      "width": 470,
-      "height": 195,
-      "encoding": "PNG data URI base64",
-      "minimum_independent_sources": 2,
-      "transformation": "none"
+    "variants_allowed": false,
+    "assets": {
+      "logo_primary": {
+        "path": "app/static/img/brand-primary.svg",
+        "authorized_source_path": "assets_marca_canonica/logo_clasico_primary.svg",
+        "media_type": "image/svg+xml",
+        "sha256": "04a9b2557c1aff819eef52364dbe88677044299a6c868a7318703fdccffa638e",
+        "bytes": 1484
+      },
+      "symbol": {
+        "path": "app/static/img/brand-symbol.svg",
+        "authorized_source_path": "assets_marca_canonica/logo_clasico_symbol.svg",
+        "media_type": "image/svg+xml",
+        "sha256": "c43e33c89860aac5d7f582009b7d53e7902aa7704c9484fefcb1e2a2f99ce3e8",
+        "bytes": 855
+      }
     },
-    "verified_source_names": [
-      "v0_44_experiencia.html",
-      "experiencia_interna.html",
-      "index.html autocontenido de Marca Maestra v1"
-    ],
-    "pending_independent_assets": [
-      "logo-oficial-blanco.png",
-      "favicon-64.png",
-      "favicon-256.png"
+    "mandatory_surfaces": [
+      "public_header",
+      "authenticated_sidebar",
+      "mobile_navigation",
+      "favicon_and_installable_access",
+      "public_footer",
+      "reports_and_previews",
+      "landing_product_mockups",
+      "downloadable_and_commercial_material"
     ]
   },
-  "compatibility_assets": {
-    "brand-primary.svg": {
-      "sha256": "3bc5a29975a3b49076d7c754b64732f91a5e501f252522a5298d708541a6ebba",
-      "bytes": 1485,
-      "status": "legacy_not_approved_master"
-    },
-    "brand-reversed.svg": {
-      "sha256": "3499c96d39d1bc584aa32d100b5cee899fe2c47d1d6e2ab4de1a895f6eb944a6",
-      "bytes": 1407,
-      "status": "legacy_not_approved_master"
-    },
-    "brand-symbol.svg": {
-      "sha256": "2088d54af227ed0a2844f9c82fc260330401065c5a703e922dc1644b4ee0ad80",
-      "bytes": 805,
-      "status": "legacy_not_approved_master"
-    }
-  }
+  "deprecated_active_assets": [
+    "brand-reversed.svg",
+    "logo.svg",
+    "logo-white.svg",
+    "favicon.svg"
+  ]
 }
