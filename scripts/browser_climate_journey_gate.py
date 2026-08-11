@@ -280,7 +280,18 @@ def _submit_review(page: Page) -> None:
 def _recommend(page: Page) -> None:
     page.goto(f"{BASE_URL}/control", wait_until="networkidle")
     if "Listo para aprobar" not in page.locator(".approval-panel").inner_text():
-        raise AssertionError(f"Las puertas de calidad no quedaron listas: {page.locator('.approval-panel').inner_text()}")
+        with SessionLocal() as session:
+            inventory = session.scalar(select(Inventory).where(Inventory.name == INVENTORY_NAME))
+            source_state = [
+                {"name": item.name, "category": item.category, "included": item.included, "progress": item.progress}
+                for item in session.scalars(
+                    select(EmissionSource).where(EmissionSource.inventory_id == inventory.id).order_by(EmissionSource.id)
+                )
+            ] if inventory else []
+        raise AssertionError(
+            f"Las puertas de calidad no quedaron listas: {page.locator('.approval-panel').inner_text()} | "
+            f"Estado de fuentes: {source_state}"
+        )
     form = page.locator('form[action="/control/inventario/recomendar"]')
     form.wait_for(state="visible")
     form.locator('textarea[name="comments"]').fill(
