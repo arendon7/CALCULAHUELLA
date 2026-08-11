@@ -42,3 +42,15 @@ def test_multipart_csrf_parser_returns_token_not_following_field() -> None:
     ).encode()
 
     assert _csrf_form_value(f"multipart/form-data; boundary={boundary}", body) == token
+
+
+def test_supplier_portal_uses_external_script_under_strict_csp() -> None:
+    template = (ROOT / "app" / "templates" / "supplier_portal.html").read_text(encoding="utf-8")
+    script = ROOT / "app" / "static" / "js" / "supplier_portal.js"
+
+    assert "<script>" not in template
+    assert "js/supplier_portal.js" in template
+    assert script.is_file()
+    source = script.read_text(encoding="utf-8")
+    assert "supplier-method" in source
+    assert "addEventListener('change', sync)" in source
