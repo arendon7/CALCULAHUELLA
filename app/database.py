@@ -58,11 +58,28 @@ def source_expected_periods(source: EmissionSource) -> int:
     return 12
 
 
+SUPPLIER_MANAGED_CATEGORY = "Datos específicos de proveedores"
+
+
 def refresh_progress(session: Session, inventory: Inventory) -> None:
+    # ActivityData puede insertarse por source_id mientras activity_records ya está cargada.
+    # Consultar la tabla después del flush evita persistir un progreso rezagado un periodo.
+    session.flush()
+    source_ids = [source.id for source in inventory.sources if source.id is not None]
+    periods_by_source: dict[int, set[tuple[int, int]]] = {source_id: set() for source_id in source_ids}
+    if source_ids:
+        rows = session.execute(
+            select(ActivityData.source_id, ActivityData.period_start).where(ActivityData.source_id.in_(source_ids))
+        ).all()
+        for source_id, period_start in rows:
+            periods_by_source.setdefault(int(source_id), set()).add((period_start.year, period_start.month))
+
     for source in inventory.sources:
+        if source.category == SUPPLIER_MANAGED_CATEGORY:
+            # Su progreso pertenece a sync_supplier_source(), basado en respuestas aprobadas.
+            continue
         expected = source_expected_periods(source)
-        distinct_periods = {(item.period_start.year, item.period_start.month) for item in source.activity_records}
-        count = len(distinct_periods)
+        count = len(periods_by_source.get(source.id, set()))
         source.progress = min(100, round(count / max(expected, 1) * 100))
         if count == 0:
             source.status = "Pendiente"
