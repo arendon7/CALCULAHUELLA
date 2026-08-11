@@ -1,0 +1,123 @@
+name: V2.0 · Materializar progreso autoritativo
+
+on:
+  push:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - .github/workflows/materialize-v20-refresh-progress.yml
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      INSTANCE_DIR: /tmp/cth-progress-v20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: stabilization/v2-0-0-product-readiness
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: pip install -r requirements-dev.txt
+
+      - name: Corregir refresh_progress y reproducir relación ORM obsoleta
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          path = Path('app/database.py')
+          text = path.read_text(encoding='utf-8')
+          old = '''def refresh_progress(session: Session, inventory: Inventory) -> None:\n    for source in inventory.sources:\n        expected = source_expected_periods(source)\n        distinct_periods = {(item.period_start.year, item.period_start.month) for item in source.activity_records}\n        count = len(distinct_periods)\n        source.progress = min(100, round(count / max(expected, 1) * 100))\n        if count == 0:\n            source.status = "Pendiente"\n        elif source.progress >= 100:\n            source.status = "Completado"\n        else:\n            source.status = "En progreso"\n    if inventory.sources:\n        inventory.progress = round(sum(source.progress for source in inventory.sources) / len(inventory.sources))\n    inventory.current_stage = "Recolección" if inventory.progress < 100 else "Cálculo"\n'''
+          new = '''SUPPLIER_MANAGED_CATEGORY = "Datos específicos de proveedores"\n\n\ndef refresh_progress(session: Session, inventory: Inventory) -> None:\n    # ActivityData puede insertarse por source_id mientras activity_records ya está cargada.\n    # Consultar la tabla después del flush evita persistir un progreso rezagado un periodo.\n    session.flush()\n    source_ids = [source.id for source in inventory.sources if source.id is not None]\n    periods_by_source: dict[int, set[tuple[int, int]]] = {source_id: set() for source_id in source_ids}\n    if source_ids:\n        rows = session.execute(\n            select(ActivityData.source_id, ActivityData.period_start).where(ActivityData.source_id.in_(source_ids))\n        ).all()\n        for source_id, period_start in rows:\n            periods_by_source.setdefault(int(source_id), set()).add((period_start.year, period_start.month))\n\n    for source in inventory.sources:\n        if source.category == SUPPLIER_MANAGED_CATEGORY:\n            # Su progreso pertenece a sync_supplier_source(), basado en respuestas aprobadas.\n            continue\n        expected = source_expected_periods(source)\n        count = len(periods_by_source.get(source.id, set()))\n        source.progress = min(100, round(count / max(expected, 1) * 100))\n        if count == 0:\n            source.status = "Pendiente"\n        elif source.progress >= 100:\n            source.status = "Completado"\n        else:\n            source.status = "En progreso"\n    if inventory.sources:\n        inventory.progress = round(sum(source.progress for source in inventory.sources) / len(inventory.sources))\n    inventory.current_stage = "Recolección" if inventory.progress < 100 else "Cálculo"\n'''
+          if text.count(old) != 1:
+              raise SystemExit('refresh_progress esperado no encontrado exactamente una vez')
+          path.write_text(text.replace(old, new, 1), encoding='utf-8')
+          PY
+          python -m py_compile app/database.py
+          rm -rf "${INSTANCE_DIR}"
+          python - <<'PY'
+          from datetime import date
+          from sqlalchemy import select
+          from sqlalchemy.orm import selectinload
+
+          from app.database import ActivityData, EmissionSource, Inventory, SessionLocal, init_db, refresh_progress
+
+          init_db()
+          with SessionLocal() as session:
+              inventory = session.scalar(
+                  select(Inventory)
+                  .where(Inventory.name == "Inventario corporativo 2025")
+                  .options(selectinload(Inventory.sources).selectinload(EmissionSource.activity_records))
+              )
+              assert inventory is not None
+              residuos = next(source for source in inventory.sources if source.name == "Residuos")
+              proveedor = next(source for source in inventory.sources if source.category == "Datos específicos de proveedores")
+
+              # La semilla trae enero-junio. Completar julio-noviembre y recargar la colección en 11 meses.
+              for month in range(7, 12):
+                  session.add(ActivityData(
+                      source_id=residuos.id,
+                      period_start=date(2025, month, 1),
+                      period_end=date(2025, month, 28),
+                      value=20.0,
+                      unit="t",
+                      data_origin="Registro operativo",
+                      quality_level="B",
+                      status="Cargado",
+                      created_by="test@calculatuhuella.local",
+                  ))
+              session.flush()
+              session.expire(residuos, ["activity_records"])
+              assert len(residuos.activity_records) == 11
+
+              # Insertar diciembre por FK: la colección ORM permanece deliberadamente en 11.
+              session.add(ActivityData(
+                  source_id=residuos.id,
+                  period_start=date(2025, 12, 1),
+                  period_end=date(2025, 12, 28),
+                  value=20.0,
+                  unit="t",
+                  data_origin="Registro operativo",
+                  quality_level="B",
+                  status="Cargado",
+                  created_by="test@calculatuhuella.local",
+              ))
+              session.flush()
+              assert len(residuos.activity_records) == 11
+
+              proveedor.progress = 73
+              proveedor.status = "En progreso"
+              refresh_progress(session, inventory)
+              assert residuos.progress == 100, residuos.progress
+              assert residuos.status == "Completado", residuos.status
+              assert proveedor.progress == 73, proveedor.progress
+              assert proveedor.status == "En progreso", proveedor.status
+          print('refresh_progress: stale relationship + supplier authority OK')
+          PY
+          git diff --check
+
+      - name: Commit limpio y autoeliminación
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm .github/workflows/materialize-v20-refresh-progress.yml
+          git add app/database.py
+          git commit -m "fix(v2.0): derive source progress from persisted activity data"
+          git push origin HEAD:stabilization/v2-0-0-product-readiness
