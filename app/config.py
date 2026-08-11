@@ -59,6 +59,9 @@ class Settings:
     s3_region: str = os.environ.get("S3_REGION", "us-east-1").strip()
     s3_access_key: str = os.environ.get("S3_ACCESS_KEY", "").strip()
     s3_secret_key: str = os.environ.get("S3_SECRET_KEY", "").strip()
+    s3_connect_timeout_seconds: float = float(os.environ.get("S3_CONNECT_TIMEOUT_SECONDS", "5"))
+    s3_read_timeout_seconds: float = float(os.environ.get("S3_READ_TIMEOUT_SECONDS", "30"))
+    s3_max_attempts: int = int(os.environ.get("S3_MAX_ATTEMPTS", "3"))
     external_storage_root: str = os.environ.get("EXTERNAL_STORAGE_ROOT", "").strip()
     metrics_token: str = os.environ.get("METRICS_TOKEN", "").strip()
     alert_webhook_secret: str = os.environ.get("ALERT_WEBHOOK_SECRET", "").strip()
@@ -80,7 +83,7 @@ class Settings:
     scheduler_enabled: bool = env_bool("SCHEDULER_ENABLED", True)
     scheduler_interval_seconds: int = int(os.environ.get("SCHEDULER_INTERVAL_SECONDS", "60"))
     payment_backend: str = os.environ.get("PAYMENT_BACKEND", "demo").strip().lower()
-    payment_webhook_secret: str = os.environ.get("PAYMENT_WEBHOOK_SECRET", "").strip()
+    payment_webhook_secret: str = os.environ.get("PAYMENT_WEBHOOK_SECRET", "")
     csrf_enabled: bool = env_bool("CSRF_ENABLED", True)
     structured_logging: bool = env_bool("STRUCTURED_LOGGING", True)
     audit_chain_enabled: bool = env_bool("AUDIT_CHAIN_ENABLED", True)
@@ -142,6 +145,16 @@ class Settings:
             issues.append("METRICS_MAX_SERIES debe ser al menos 100 para conservar visibilidad operativa.")
         if self.storage_backend == "s3" and not self.s3_bucket:
             issues.append("S3_BUCKET es obligatorio cuando STORAGE_BACKEND=s3.")
+        if self.storage_backend == "s3" and self.s3_endpoint_url and (not self.s3_access_key or not self.s3_secret_key):
+            issues.append("S3_ACCESS_KEY y S3_SECRET_KEY son obligatorios para endpoints S3 personalizados.")
+        if bool(self.s3_access_key) != bool(self.s3_secret_key):
+            issues.append("S3_ACCESS_KEY y S3_SECRET_KEY deben configurarse como pareja.")
+        if self.s3_connect_timeout_seconds <= 0 or self.s3_read_timeout_seconds <= 0:
+            issues.append("Los timeouts S3 deben ser mayores que cero.")
+        if self.s3_max_attempts < 1:
+            issues.append("S3_MAX_ATTEMPTS debe ser al menos 1.")
+        if self.external_probe_timeout_seconds <= 0:
+            issues.append("EXTERNAL_PROBE_TIMEOUT_SECONDS debe ser mayor que cero.")
         if self.storage_backend == "filesystem" and not self.external_storage_root:
             issues.append("EXTERNAL_STORAGE_ROOT es obligatorio cuando STORAGE_BACKEND=filesystem.")
         if self.storage_backend not in {"local", "filesystem", "s3"}:
