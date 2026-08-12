@@ -1,0 +1,74 @@
+<section class="section preview-app-section" id="demo-app">
+  <div class="container">
+    <header class="section-head preview-head">
+      <div class="eyebrow">Explora la plataforma desde GitHub Pages</div>
+      <h2>No solo leas la propuesta: recorre cómo se trabaja</h2>
+      <p>Esta vista usa datos demostrativos y funciona completamente en tu navegador. Sirve para revisar arquitectura de información, flujos, lenguaje y experiencia de usuario mientras seguimos desarrollando la aplicación real.</p>
+      <div class="preview-notice"><strong>Modo preview.</strong> Esta experiencia no ejecuta el backend transaccional ni sustituye la aplicación FastAPI. Los cambios que hagas aquí se guardan solo en este navegador.</div>
+    </header>
+
+    <div class="preview-shell" data-preview-shell>
+      <div class="preview-topbar">
+        <div class="preview-brand"><img src="assets/symbol.svg" alt=""><div><strong>Calcula tu Huella</strong><span>Inventario corporativo 2026</span></div></div>
+        <div class="preview-top-actions"><span class="preview-role" data-preview-role>Consultor</span><span class="preview-status">68 % completo</span></div>
+      </div>
+      <div class="preview-layout">
+        <aside class="preview-sidebar" aria-label="Módulos de la demo">
+          <button class="preview-nav active" data-preview-view="trabajo"><span>⌂</span>Mi trabajo</button>
+          <button class="preview-nav" data-preview-view="informacion"><span>▦</span>Información</button>
+          <button class="preview-nav" data-preview-view="calidad"><span>✓</span>Calidad</button>
+          <button class="preview-nav" data-preview-view="calculo"><span>∑</span>Cálculo</button>
+          <button class="preview-nav" data-preview-view="analisis"><span>◫</span>Análisis</button>
+          <button class="preview-nav" data-preview-view="reduccion"><span>↘</span>Reducción</button>
+          <button class="preview-nav" data-preview-view="control"><span>◎</span>Control</button>
+          <button class="preview-nav" data-preview-view="informes"><span>▤</span>Informes</button>
+        </aside>
+        <main class="preview-main" aria-live="polite">
+          <div class="preview-context">
+            <div><small data-preview-kicker>PRÓXIMA ACCIÓN</small><h3 data-preview-title>Completar información pendiente</h3><p data-preview-subtitle>4 solicitudes requieren atención antes de cerrar la recopilación.</p></div>
+            <label class="preview-role-select">Ver como<select data-preview-role-select><option>Consultor</option><option>Administrador</option><option>Cliente</option><option>Revisor</option><option>Verificador</option></select></label>
+          </div>
+
+          <section class="preview-view active" data-preview-panel="trabajo">
+            <div class="preview-metrics"><article><span>Completitud</span><strong>68 %</strong><i><b style="width:68%"></b></i></article><article><span>Evidencia</span><strong>54 %</strong><i><b style="width:54%"></b></i></article><article><span>Revisión</span><strong>12 %</strong><i><b style="width:12%"></b></i></article></div>
+            <div class="preview-grid-2"><article class="preview-card"><small>PRIORIDAD ALTA</small><h4>Facturas de electricidad · Sede Yarumal</h4><p>Falta marzo de 2026. El dato bloquea el cierre de alcance 2.</p><button data-preview-action="resolve">Marcar como gestionado</button></article><article class="preview-card"><small>ESTADO DEL INVENTARIO</small><h4>Recopilación en curso</h4><ul><li>14 fuentes configuradas</li><li>5 áreas responsables</li><li>3 observaciones abiertas</li></ul></article></div>
+          </section>
+
+          <section class="preview-view" data-preview-panel="informacion" hidden>
+            <div class="preview-table-wrap"><table class="preview-table"><thead><tr><th>Fuente</th><th>Responsable</th><th>Datos</th><th>Evidencia</th><th>Estado</th></tr></thead><tbody><tr><td>Electricidad · Yarumal</td><td>Administración</td><td>2/3 meses</td><td>2 archivos</td><td><span class="pill amber">Pendiente</span></td></tr><tr><td>Diésel · Flota propia</td><td>Operaciones</td><td>12/12 meses</td><td>12 archivos</td><td><span class="pill green">Completo</span></td></tr><tr><td>Residuos orgánicos</td><td>Planta</td><td>12/12 meses</td><td>Bitácoras</td><td><span class="pill green">Completo</span></td></tr><tr><td>Viajes de negocio</td><td>Administración</td><td>Parcial</td><td>Sin soporte</td><td><span class="pill amber">Revisar</span></td></tr></tbody></table></div>
+          </section>
+
+          <section class="preview-view" data-preview-panel="calidad" hidden>
+            <div class="preview-quality"><article><strong>7</strong><span>fuentes con calidad alta</span></article><article><strong>4</strong><span>requieren evidencia adicional</span></article><article><strong>3</strong><span>observaciones abiertas</span></article></div>
+            <article class="preview-card"><small>OBSERVACIÓN</small><h4>Viajes de negocio · método de estimación</h4><p>El dato fue estimado a partir de gasto. Conviene reemplazarlo por trayectos o kilómetros cuando sea posible.</p><div class="preview-actions"><button>Solicitar mejora</button><button class="secondary">Aceptar con limitación</button></div></article>
+          </section>
+
+          <section class="preview-view" data-preview-panel="calculo" hidden>
+            <div class="preview-result"><small>RESULTADO PRELIMINAR</small><strong>1.248,6</strong><span>tCO₂e</span><p>No incluye tres fuentes todavía pendientes de revisión.</p></div>
+            <div class="preview-grid-3"><article><span>Alcance 1</span><b>612,4</b><small>49 %</small></article><article><span>Alcance 2</span><b>188,7</b><small>15 %</small></article><article><span>Alcance 3 priorizado</span><b>447,5</b><small>36 %</small></article></div>
+            <article class="preview-card trace-mini"><h4>Cómo se construyó una cifra</h4><div><span>12.450 kWh</span><i>×</i><span>factor vigente</span><i>→</i><strong>resultado CO₂e</strong></div><small>Dato, evidencia, unidad, factor, fórmula y revisión permanecen relacionados.</small></article>
+          </section>
+
+          <section class="preview-view" data-preview-panel="analisis" hidden>
+            <div class="preview-hotspots"><article><span>01</span><div><b>Diésel · transporte propio</b><i style="width:100%"></i></div><strong>38 %</strong></article><article><span>02</span><div><b>Compras y suministros</b><i style="width:68%"></i></div><strong>26 %</strong></article><article><span>03</span><div><b>Electricidad</b><i style="width:39%"></i></div><strong>15 %</strong></article><article><span>04</span><div><b>Residuos</b><i style="width:24%"></i></div><strong>9 %</strong></article></div>
+            <article class="preview-card"><small>LECTURA EJECUTIVA</small><h4>El 64 % del resultado está concentrado en dos frentes</h4><p>Transporte propio y compras merecen el primer análisis de viabilidad porque concentran impacto y disponen de datos suficientemente robustos.</p></article>
+          </section>
+
+          <section class="preview-view" data-preview-panel="reduccion" hidden>
+            <div class="preview-roadmap"><article><span class="pill blue">Evaluación</span><div><b>Optimizar rutas</b><small>Operaciones · Dic 2026</small></div><strong>42 tCO₂e</strong></article><article><span class="pill green">Priorizada</span><div><b>Solar en planta</b><small>Gerencia · Jun 2027</small></div><strong>88 tCO₂e</strong></article><article><span class="pill amber">Seguimiento</span><div><b>Control por vehículo</b><small>Logística · mensual</small></div><strong>7 %</strong></article></div>
+            <p class="preview-footnote">Una acción implementada no se presenta automáticamente como reducción lograda: se separan potencial, implementación, resultado observado y eventual verificación.</p>
+          </section>
+
+          <section class="preview-view" data-preview-panel="control" hidden>
+            <div class="preview-gates"><article><span>1</span><div><b>Completitud</b><small>4 pendientes</small></div><em>NO LISTO</em></article><article><span>2</span><div><b>Calidad</b><small>3 observaciones abiertas</small></div><em>NO LISTO</em></article><article><span>3</span><div><b>Metodología</b><small>Snapshot registrado</small></div><em class="ok">LISTO</em></article><article><span>4</span><div><b>Segregación</b><small>Revisor asignado</small></div><em class="ok">LISTO</em></article></div>
+            <article class="preview-card"><small>REGLA DE APROBACIÓN</small><h4>No cerrar mientras existan pendientes críticos</h4><p>La plataforma hace visible qué condición impide aprobar y quién debe resolverla.</p></article>
+          </section>
+
+          <section class="preview-view" data-preview-panel="informes" hidden>
+            <div class="preview-report-grid"><article><small>GERENCIA</small><h4>Ficha ejecutiva</h4><p>Resultado, hotspots, cambios y decisiones.</p><button data-preview-download>Vista previa</button></article><article><small>TÉCNICO</small><h4>Informe metodológico</h4><p>Alcance, factores, calidad, limitaciones y resultados.</p><button data-preview-download>Vista previa</button></article><article><small>TRAZABILIDAD</small><h4>Memoria de cálculo</h4><p>Datos, unidades, conversiones, fórmulas y versiones.</p><button data-preview-download>Vista previa</button></article><article><small>REVISIÓN</small><h4>Expediente de evidencias</h4><p>Documentos, observaciones, decisiones y responsables.</p><button data-preview-download>Vista previa</button></article></div>
+          </section>
+        </main>
+      </div>
+    </div>
+  </div>
+</section>
