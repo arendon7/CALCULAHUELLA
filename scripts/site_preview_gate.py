@@ -22,23 +22,41 @@ def _browser_errors(page: Page) -> tuple[list[str], list[str]]:
 def _layout_state(page: Page) -> dict[str, object]:
     return page.evaluate(
         """
-        () => ({
-          viewport: window.innerWidth,
-          document_width: document.documentElement.scrollWidth,
-          body_width: document.body.scrollWidth,
-          overflow: Math.max(
-            0,
-            document.documentElement.scrollWidth - window.innerWidth,
-            document.body.scrollWidth - window.innerWidth
-          ),
-          h1_count: document.querySelectorAll('h1').length,
-          visible_eyebrows: [...document.querySelectorAll('.eyebrow,.eyebrow-light')]
-            .filter(el => getComputedStyle(el).display !== 'none').length,
-          dead_links: [...document.querySelectorAll('a[href="#"]')].length,
-          price_section: Boolean(document.querySelector('#precios')),
-          demo_section: Boolean(document.querySelector('#demo-app')),
-          skip_link: Boolean(document.querySelector('.skip-link[href="#contenido"]')),
-        })
+        () => {
+          const experience = document.querySelector('#experiencia');
+          const years = experience?.querySelector('.experience-years');
+          const diagnostic = document.querySelector('#diagnostico');
+          const finalCta = document.querySelector('.craft-final-cta');
+          const prototype = document.querySelector('.craft-prototype-note');
+          const er = experience?.getBoundingClientRect();
+          const yr = years?.getBoundingClientRect();
+          return {
+            viewport: window.innerWidth,
+            document_width: document.documentElement.scrollWidth,
+            body_width: document.body.scrollWidth,
+            overflow: Math.max(
+              0,
+              document.documentElement.scrollWidth - window.innerWidth,
+              document.body.scrollWidth - window.innerWidth
+            ),
+            h1_count: document.querySelectorAll('h1').length,
+            visible_eyebrows: [...document.querySelectorAll('.eyebrow,.eyebrow-light')]
+              .filter(el => getComputedStyle(el).display !== 'none').length,
+            dead_links: [...document.querySelectorAll('a[href="#"]')].length,
+            price_section: Boolean(document.querySelector('#precios')),
+            demo_section: Boolean(document.querySelector('#demo-app')),
+            skip_link: Boolean(document.querySelector('.skip-link[href="#contenido"]')),
+            experience_years_contained: Boolean(er && yr && yr.top >= er.top - 1 && yr.bottom <= er.bottom + 1),
+            final_cta_after_diagnostic: Boolean(
+              diagnostic && finalCta &&
+              (diagnostic.compareDocumentPosition(finalCta) & Node.DOCUMENT_POSITION_FOLLOWING)
+            ),
+            final_cta_before_prototype: Boolean(
+              finalCta && prototype &&
+              (finalCta.compareDocumentPosition(prototype) & Node.DOCUMENT_POSITION_FOLLOWING)
+            ),
+          };
+        }
         """
     )
 
@@ -55,6 +73,10 @@ def _assert_base_contract(page: Page, label: str) -> dict[str, object]:
         raise AssertionError(f"{label}: existen enlaces href=# sin destino: {state}")
     if not state["price_section"] or not state["demo_section"] or not state["skip_link"]:
         raise AssertionError(f"{label}: falta una superficie pública crítica: {state}")
+    if not state["experience_years_contained"]:
+        raise AssertionError(f"{label}: el bloque de experiencia escapó de su sección: {state}")
+    if not state["final_cta_after_diagnostic"] or not state["final_cta_before_prototype"]:
+        raise AssertionError(f"{label}: el CTA final no cierra el recorrido real: {state}")
     return state
 
 
