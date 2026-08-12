@@ -7,6 +7,7 @@
     "reports-decision.html",
     "preview-app.html",
     "reduction-solutions.html",
+    "proof-scenarios.html",
     "plans-trust.html",
     "experience-resources-diagnostic.html"
   ];
