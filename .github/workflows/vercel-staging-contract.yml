@@ -10,8 +10,11 @@ on:
       - "migrations/**"
       - "requirements*.txt"
       - "scripts/vercel_staging_contract.py"
+      - "scripts/postgres_legacy_migration_gate.py"
       - "tests/test_vercel_staging_adapter.py"
       - "tests/test_migration_legacy_compat.py"
+      - "tests/test_v200_postgres_schema_compatibility.py"
+      - "tests/test_v200_postgres_methodology_schema.py"
       - "vercel.json"
       - ".github/workflows/vercel-staging-contract.yml"
   workflow_dispatch:
@@ -27,9 +30,24 @@ jobs:
   runtime:
     name: FastAPI serverless contract
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: cth_legacy_gate
+          POSTGRES_USER: cth
+          POSTGRES_PASSWORD: cth_gate_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U cth -d cth_legacy_gate"
+          --health-interval=5s
+          --health-timeout=5s
+          --health-retries=10
     env:
       SERVERLESS_STAGING_ARTIFACT_DIR: serverless-staging-artifacts
+      POSTGRES_LEGACY_DATABASE_URL: postgresql+psycopg://cth:cth_gate_password@127.0.0.1:5432/cth_legacy_gate
     steps:
       - uses: actions/checkout@v4
 
@@ -41,12 +59,16 @@ jobs:
       - name: Instalar aplicación y dependencias de gate
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt -r requirements-dev.txt
+          pip install -r requirements-prod.txt -r requirements-dev.txt
 
       - name: Verificar adaptador y compatibilidad Alembic
         run: |
           pytest -q tests/test_vercel_staging_adapter.py
           pytest -q tests/test_migration_legacy_compat.py
+          pytest -q tests/test_v200_postgres_schema_compatibility.py tests/test_v200_postgres_methodology_schema.py
+
+      - name: Certificar upgrade legado sobre PostgreSQL 17
+        run: python scripts/postgres_legacy_migration_gate.py
 
       - name: Ejecutar FastAPI desde api.index:app
         run: python scripts/vercel_staging_contract.py
