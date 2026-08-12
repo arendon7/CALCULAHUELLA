@@ -17,6 +17,17 @@ VIEWPORTS = (
     ("mobile-390", 390, 844),
     ("mobile-360", 360, 800),
 )
+CORE_SURFACE_VIEWPORTS = (
+    ("desktop-1440", 1440, 900),
+    ("mobile-390", 390, 844),
+)
+CORE_SURFACES = (
+    ("inventarios", "/inventarios"),
+    ("captura-guiada", "/captura-guiada"),
+    ("calidad-datos", "/calidad-datos"),
+    ("informes", "/reportes"),
+    ("informacion", "/informacion"),
+)
 WEBKIT_STYLE_ATTR_WARNING = "Refused to apply a stylesheet because"
 
 
@@ -158,11 +169,8 @@ def _overflow_offenders(page: Page) -> list[dict[str, object]]:
     )
 
 
-def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[str, object]:
-    page.set_viewport_size({"width": width, "height": height})
-    page.goto(f"{BASE_URL}/mi-trabajo?scope=all", wait_until="networkidle")
-    _close_transient_dialogs(page)
-    dimensions = page.evaluate(
+def _page_dimensions(page: Page) -> dict[str, int]:
+    return page.evaluate(
         """
         () => ({
           clientWidth: document.documentElement.clientWidth,
@@ -171,6 +179,13 @@ def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[
         })
         """
     )
+
+
+def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[str, object]:
+    page.set_viewport_size({"width": width, "height": height})
+    page.goto(f"{BASE_URL}/mi-trabajo?scope=all", wait_until="networkidle")
+    _close_transient_dialogs(page)
+    dimensions = _page_dimensions(page)
     overflow = max(dimensions["scrollWidth"], dimensions["bodyScrollWidth"]) - dimensions["clientWidth"]
     offenders = _overflow_offenders(page) if overflow > 1 else []
 
@@ -193,6 +208,40 @@ def _viewport_contract(page: Page, label: str, width: int, height: int) -> dict[
     return diagnostic
 
 
+def _core_surface_visual_evidence(page: Page) -> list[dict[str, object]]:
+    evidence: list[dict[str, object]] = []
+    if BROWSER_NAME != "chromium":
+        return evidence
+
+    for slug, path in CORE_SURFACES:
+        for viewport, width, height in CORE_SURFACE_VIEWPORTS:
+            page.set_viewport_size({"width": width, "height": height})
+            page.goto(f"{BASE_URL}{path}", wait_until="networkidle")
+            _close_transient_dialogs(page)
+            page.locator("h1").first.wait_for(state="visible")
+            dimensions = _page_dimensions(page)
+            overflow = max(dimensions["scrollWidth"], dimensions["bodyScrollWidth"]) - dimensions["clientWidth"]
+            offenders = _overflow_offenders(page) if overflow > 1 else []
+            screenshot = ARTIFACT_DIR / f"core-{slug}-{viewport}.png"
+            page.screenshot(path=str(screenshot), full_page=True)
+            row = {
+                "surface": slug,
+                "path": path,
+                "viewport": viewport,
+                "width": width,
+                "height": height,
+                "overflow_px": overflow,
+                "dimensions": dimensions,
+                "offenders": offenders,
+                "screenshot": screenshot.name,
+            }
+            evidence.append(row)
+            if overflow > 1:
+                diagnostic_path = ARTIFACT_DIR / f"overflow-core-{slug}-{viewport}.json"
+                diagnostic_path.write_text(json.dumps(row, ensure_ascii=False, indent=2), encoding="utf-8")
+    return evidence
+
+
 def _known_webkit_style_warning(text: str) -> bool:
     return (
         BROWSER_NAME == "webkit"
@@ -210,6 +259,7 @@ def main() -> int:
         "browser_engine": BROWSER_NAME,
         "base_url": BASE_URL,
         "viewports": [],
+        "core_surfaces": [],
     }
 
     with sync_playwright() as playwright:
@@ -238,6 +288,7 @@ def main() -> int:
         for label, width, height in VIEWPORTS:
             result["viewports"].append(_viewport_contract(page, label, width, height))
 
+        result["core_surfaces"] = _core_surface_visual_evidence(page)
         result["console_errors"] = console_errors
         result["known_engine_warnings"] = known_engine_warnings
         result["page_errors"] = page_errors
@@ -246,10 +297,11 @@ def main() -> int:
         print(json.dumps(result, ensure_ascii=False, indent=2))
 
         overflow_failures = [row for row in result["viewports"] if row["overflow_px"] > 1]
+        overflow_failures.extend(row for row in result["core_surfaces"] if row["overflow_px"] > 1)
         if overflow_failures:
             summary = [
                 {
-                    "label": row["label"],
+                    "label": row.get("label") or f"{row.get('surface')}:{row.get('viewport')}",
                     "overflow_px": row["overflow_px"],
                     "top_offenders": row["offenders"][:6],
                 }
