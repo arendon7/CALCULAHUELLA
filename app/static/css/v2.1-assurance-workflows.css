@@ -124,6 +124,18 @@ body.app-shell .verification-main,
 body.app-shell .verification-side{
   min-width:0;
 }
+body.app-shell .verification-main,
+body.app-shell .verification-side{
+  grid-template-columns:minmax(0,1fr);
+}
+body.app-shell .verification-main > *,
+body.app-shell .verification-side > *,
+body.app-shell .gate-grid,
+body.app-shell .finding-list,
+body.app-shell .finding-card{
+  min-width:0;
+  max-width:100%;
+}
 body.app-shell .verification-side{
   position:sticky;
   top:calc(var(--topbar-height,72px) + 18px);
@@ -132,7 +144,6 @@ body.app-shell .verification-main > .card:first-child{
   border-width:2px;
 }
 body.app-shell .finding-card{
-  min-width:0;
   border-left-width:4px;
 }
 body.app-shell .finding-card:not(.severity-informativa){
@@ -142,6 +153,8 @@ body.app-shell .finding-actions details[open]{
   background:var(--surface-soft,#f8fafc);
 }
 body.app-shell .verification-main .table-wrap{
+  display:block;
+  width:100%;
   max-width:100%;
   min-width:0;
   overflow-x:auto;
@@ -255,6 +268,16 @@ body.app-shell .panel > .table-wrap table{
   body.app-shell .verification-side{
     position:relative;
     top:auto;
+  }
+  body.app-shell .verification-layout{
+    grid-template-columns:minmax(0,1fr);
+    width:100%;
+    max-width:100%;
+  }
+  body.app-shell .verification-main,
+  body.app-shell .verification-side{
+    width:100%;
+    max-width:100%;
   }
   body.app-shell .verifier-hero{
     grid-template-columns:repeat(2,minmax(0,1fr));
