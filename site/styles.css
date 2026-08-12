@@ -8,3 +8,26 @@
 @import url("./styles/part-7.css");
 @import url("./styles/v2.1-public.css");
 @import url("./styles/v2.1-preview.css");
+@import url("./styles/v2.1-craft.css");
+@import url("./styles/v2.1-craft-polish.css");
+
+/* Reset explícito de reglas heredadas que pertenecían al antiguo bloque visual. */
+.craft-experience .experience-years{
+  position:static;
+  left:auto;
+  bottom:auto;
+  background:transparent;
+  border-radius:0;
+  padding:0;
+  box-shadow:none;
+}
+.craft-experience .experience-signature .portrait-mark{
+  width:74px;
+  height:74px;
+  border-radius:50%;
+  background:var(--forest);
+  border:0;
+  color:#fff;
+  font-size:1.08rem;
+  letter-spacing:.04em;
+}
