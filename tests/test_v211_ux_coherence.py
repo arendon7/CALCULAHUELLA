@@ -60,6 +60,8 @@ def test_coherence_layers_are_loaded_and_preserve_accessible_motion_and_focus() 
         assert "prefers-reduced-motion:reduce" in css
         assert ":focus-visible" in css
 
-    assert ".process-nav{grid-template-columns:repeat(4,minmax(0,1fr))}" in public_css
+    # The V2.1 layer is intentionally namespaced to the public shell; the
+    # contract protects the 4x2 desktop layout without encouraging global CSS.
+    assert ".public-v14-body .process-nav{grid-template-columns:repeat(4,minmax(0,1fr))}" in public_css
     assert "body.app-shell" in product_css
     assert ".work-center-head .head-actions .btn{display:none}" in product_css
