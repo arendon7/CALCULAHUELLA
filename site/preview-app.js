@@ -13,6 +13,14 @@
     informes: ['ENTREGABLES', 'Comunicar sin perder trazabilidad', 'Una misma versión controlada alimenta informes para distintos destinatarios.']
   };
 
+  const roleFocus = {
+    Consultor: ['Preparar y coordinar el inventario', 'El consultor conecta fuentes, responsables, calidad, cálculo y entregables sin perder trazabilidad.'],
+    Administrador: ['Mantener estructura, usuarios y continuidad', 'La vista administrativa prioriza configuración, responsables, periodos y condiciones para que el trabajo pueda operar.'],
+    Cliente: ['Responder solicitudes y aportar evidencia', 'La vista cliente reduce el trabajo a pendientes concretos: qué dato falta, qué soporte se espera y cuándo debe entregarse.'],
+    Revisor: ['Evaluar calidad y resolver observaciones', 'La vista de revisión concentra suficiencia, consistencia, limitaciones, hallazgos y decisiones antes de aprobar internamente.'],
+    Verificador: ['Recorrer evidencia y trazabilidad', 'La vista de verificación prioriza acceso ordenado a metodología, evidencia, hallazgos y cadena de cálculo sin asumir independencia automática.']
+  };
+
   const navs = [...shell.querySelectorAll('[data-preview-view]')];
   const panels = [...shell.querySelectorAll('[data-preview-panel]')];
   const kicker = shell.querySelector('[data-preview-kicker]');
@@ -20,6 +28,8 @@
   const subtitle = shell.querySelector('[data-preview-subtitle]');
   const roleLabel = shell.querySelector('[data-preview-role]');
   const roleSelect = shell.querySelector('[data-preview-role-select]');
+  const roleFocusTitle = shell.querySelector('[data-preview-role-focus-title]');
+  const roleFocusText = shell.querySelector('[data-preview-role-focus-text]');
 
   const show = (view) => {
     navs.forEach(button => button.classList.toggle('active', button.dataset.previewView === view));
@@ -35,6 +45,13 @@
     try { localStorage.setItem('cth-pages-preview-view', view); } catch (_) {}
   };
 
+  const applyRoleFocus = (role) => {
+    const copy = roleFocus[role] || roleFocus.Consultor;
+    if (roleLabel) roleLabel.textContent = role;
+    if (roleFocusTitle) roleFocusTitle.textContent = copy[0];
+    if (roleFocusText) roleFocusText.textContent = copy[1];
+  };
+
   navs.forEach(button => button.addEventListener('click', () => show(button.dataset.previewView)));
 
   if (roleSelect) {
@@ -42,9 +59,9 @@
       const savedRole = localStorage.getItem('cth-pages-preview-role');
       if (savedRole && [...roleSelect.options].some(option => option.value === savedRole)) roleSelect.value = savedRole;
     } catch (_) {}
-    roleLabel.textContent = roleSelect.value;
+    applyRoleFocus(roleSelect.value);
     roleSelect.addEventListener('change', () => {
-      roleLabel.textContent = roleSelect.value;
+      applyRoleFocus(roleSelect.value);
       try { localStorage.setItem('cth-pages-preview-role', roleSelect.value); } catch (_) {}
     });
   }
@@ -72,6 +89,23 @@
       setTimeout(() => { button.textContent = original; }, 1500);
     });
   });
+
+  const traceDialog = shell.querySelector('[data-preview-trace-dialog]');
+  const traceOpen = shell.querySelector('[data-preview-trace-open]');
+  const traceClose = shell.querySelector('[data-preview-trace-close]');
+  if (traceDialog && traceOpen) {
+    traceOpen.addEventListener('click', () => {
+      if (typeof traceDialog.showModal === 'function') traceDialog.showModal();
+      else traceDialog.setAttribute('open', '');
+    });
+    traceClose?.addEventListener('click', () => traceDialog.close());
+    traceDialog.addEventListener('click', event => {
+      if (event.target !== traceDialog) return;
+      const rect = traceDialog.getBoundingClientRect();
+      const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
+      if (!inside) traceDialog.close();
+    });
+  }
 
   let initial = 'trabajo';
   try { initial = localStorage.getItem('cth-pages-preview-view') || initial; } catch (_) {}
