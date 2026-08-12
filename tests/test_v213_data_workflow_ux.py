@@ -7,6 +7,7 @@ import pytest
 ROOT = Path(__file__).resolve().parents[1]
 APP_CSS = ROOT / "app" / "static" / "css" / "app.css"
 DATA_CSS = ROOT / "app" / "static" / "css" / "v2.1-data-workflows.css"
+BROWSER_GATE = ROOT / "scripts" / "browser_workflow_gate.py"
 INFORMATION = ROOT / "app" / "templates" / "information.html"
 SOURCES = ROOT / "app" / "templates" / "sources.html"
 SOURCE = ROOT / "app" / "templates" / "source.html"
@@ -68,3 +69,15 @@ def test_data_workflows_collapse_deliberately_on_mobile_without_masking_overflow
     assert ".task-jumpbar{top:58px" in css
     assert "overflow-x:hidden" not in css
     assert "prefers-reduced-motion:reduce" in css
+
+
+@pytest.mark.smoke
+def test_v213_browser_gate_persists_core_desktop_and_mobile_visual_evidence() -> None:
+    script = BROWSER_GATE.read_text(encoding="utf-8")
+    for path in ("/inventarios", "/captura-guiada", "/calidad-datos", "/reportes", "/informacion"):
+        assert f'"{path}"' in script
+    assert '("desktop-1440", 1440, 900)' in script
+    assert '("mobile-390", 390, 844)' in script
+    assert 'page.screenshot(path=str(screenshot), full_page=True)' in script
+    assert 'if BROWSER_NAME != "chromium"' in script
+    assert 'overflow-core-' in script
