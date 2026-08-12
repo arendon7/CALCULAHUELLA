@@ -1,0 +1,143 @@
+/* V2.1.3 · Data Workflows
+   Información, mapa de fuentes y detalle de fuente.
+   Prioriza pendiente → responsable → evidencia → decisión metodológica. */
+
+/* Resúmenes: números como orientación, no como decoración. */
+body.app-shell .data-summary-grid,
+body.app-shell .source-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+body.app-shell .data-summary-grid .mini-card,
+body.app-shell .source-summary-grid .mini-card{min-height:112px;padding:17px 18px;border:1px solid var(--v212-app-line);border-radius:17px;background:#fff;box-shadow:0 7px 24px rgba(11,59,46,.04)}
+body.app-shell .data-summary-grid .mini-card strong,
+body.app-shell .source-summary-grid .mini-card strong{display:block;margin:5px 0;font-size:1.45rem;line-height:1.05;letter-spacing:-.04em;color:#183229}
+body.app-shell .data-summary-grid .mini-card p,
+body.app-shell .source-summary-grid .mini-card p{margin:0;color:var(--v212-app-muted);line-height:1.4}
+body.app-shell .data-summary-grid .mini-card:last-child{border-color:rgba(190,112,75,.22);background:linear-gradient(145deg,#fffaf6,#fff)}
+body.app-shell .source-summary-grid .mini-card:nth-child(3){border-color:rgba(202,154,108,.24);background:#fffbf7}
+
+/* Navegación de tareas: permanece visible y muestra la secuencia operativa. */
+body.app-shell .task-jumpbar{position:sticky;top:72px;z-index:12;display:grid;grid-auto-flow:column;grid-auto-columns:minmax(170px,1fr);gap:8px;margin:0 0 18px;padding:8px;border:1px solid rgba(11,59,46,.09);border-radius:17px;background:rgba(248,251,249,.94);backdrop-filter:blur(18px) saturate(135%);box-shadow:0 10px 28px rgba(11,59,46,.06);overflow:auto;scrollbar-width:none}
+body.app-shell .task-jumpbar::-webkit-scrollbar{display:none}
+body.app-shell .task-jumpbar>a{display:grid;grid-template-columns:32px minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;align-items:center;min-height:58px;padding:9px 11px;border:1px solid transparent;border-radius:12px;background:transparent;color:#29483d;transition:background .16s ease,border-color .16s ease,transform .16s ease}
+body.app-shell .task-jumpbar>a:hover,body.app-shell .task-jumpbar>a:focus-visible{background:#fff;border-color:var(--v212-app-line);transform:translateY(-1px)}
+body.app-shell .task-jumpbar>a>span{grid-row:1/3;display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#e8f1ec;color:#0b3b2e;font-weight:850}
+body.app-shell .task-jumpbar>a>strong{align-self:end;font-size:.82rem;color:#183229}
+body.app-shell .task-jumpbar>a>small{align-self:start;margin-top:2px;color:#73827a;font-size:.68rem;line-height:1.25}
+
+/* Información: historial amplio + acción secundaria contenida. */
+body.app-shell .section-title-row{margin:24px 0 12px}
+body.app-shell .section-title-row>div{align-items:center}
+body.app-shell .section-number{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#0b3b2e;color:#fff;font-weight:850}
+body.app-shell .information-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.55fr);gap:16px;align-items:start}
+body.app-shell .information-layout.wide-form-layout{grid-template-columns:minmax(0,1.8fr) minmax(300px,.62fr)}
+body.app-shell .information-layout>.sticky-form{position:sticky;top:158px;padding:18px;background:linear-gradient(180deg,#fff,#f8fbf9)}
+body.app-shell .task-focused-form .form-primary-fields{display:grid;gap:12px}
+body.app-shell .advanced-form-fields{margin-top:4px;box-shadow:none!important;background:#fafcfb}
+body.app-shell .first-data-guide{display:grid;grid-template-columns:minmax(0,.8fr) minmax(0,1.2fr);gap:24px;align-items:center;margin-bottom:18px;background:linear-gradient(145deg,#0b3b2e,#165342);color:#fff;border-color:transparent;box-shadow:0 18px 42px rgba(11,59,46,.12)}
+body.app-shell .first-data-guide :is(h2,p,small,strong){color:#fff}
+body.app-shell .first-data-guide>div>small{opacity:.7}
+body.app-shell .first-data-guide ol{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin:0;padding:0;list-style:none}
+body.app-shell .first-data-guide li{padding:13px;border-radius:13px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11)}
+body.app-shell .first-data-guide li>span{display:grid;place-items:center;width:27px;height:27px;margin-bottom:8px;border-radius:9px;background:#fff;color:#0b3b2e;font-weight:850}
+body.app-shell .first-data-guide li strong,body.app-shell .first-data-guide li small{display:block}
+body.app-shell .first-data-guide li small{margin-top:4px;opacity:.72;line-height:1.35}
+
+/* Solicitudes: cada requerimiento se lee como una tarea con responsable y vencimiento. */
+body.app-shell .request-list{display:grid;gap:9px}
+body.app-shell .request-list>article{position:relative;display:grid;grid-template-columns:8px minmax(0,1fr) minmax(190px,.42fr);gap:14px;align-items:center;padding:15px 16px;border:1px solid var(--v212-app-line);border-radius:15px;background:#fff;box-shadow:0 6px 20px rgba(11,59,46,.035)}
+body.app-shell .request-list .request-status{width:8px;height:100%;min-height:48px;border-radius:999px;background:#a7c1a0}
+body.app-shell .request-list article h3{margin:0 0 5px;font-size:1rem;letter-spacing:-.02em}
+body.app-shell .request-list article p{margin:0 0 6px;color:#607068;line-height:1.45}
+body.app-shell .request-list article small{color:#75837c;line-height:1.35}
+body.app-shell .compact-status-form{display:flex;gap:7px;align-items:center;justify-content:flex-end}
+body.app-shell .compact-status-form select{min-width:0}
+body.app-shell .compact-status-form .tiny-button{flex:0 0 auto}
+body.app-shell .progressive-action-card{box-shadow:none;background:#fafcfb}
+body.app-shell .task-form-disclosure{box-shadow:none!important;border:0!important;background:transparent}
+body.app-shell .task-form-disclosure>summary{min-height:64px;padding:12px 4px;cursor:pointer}
+body.app-shell .task-form-disclosure>summary strong{display:block;margin:3px 0;color:#183229}
+body.app-shell .task-form-disclosure>summary span{display:block;color:#73827a;font-size:.72rem;line-height:1.4}
+
+/* Evidencias: integridad y estado quedan visualmente diferenciados. */
+body.app-shell #evidencias .document-name{color:#183229}
+body.app-shell #evidencias .hash-code{display:inline-flex;padding:4px 7px;border-radius:8px;background:#eef4f0;color:#426056;font-size:.72rem}
+body.app-shell #evidencias table{min-width:920px}
+body.app-shell #datos table{min-width:1080px}
+
+/* Ruta de primer inventario: progreso claro antes del mapa de fuentes. */
+body.app-shell .first-inventory-route{display:grid;grid-template-columns:minmax(0,1fr) 32px minmax(0,1fr) 32px minmax(0,1fr);gap:8px;align-items:center;padding:15px 18px;margin-bottom:14px;background:linear-gradient(180deg,#fff,#f8fbf9);box-shadow:none}
+body.app-shell .first-inventory-route>article{display:flex;gap:11px;align-items:center;min-width:0;padding:9px;border-radius:13px}
+body.app-shell .first-inventory-route>article>span{display:grid;place-items:center;flex:0 0 34px;width:34px;height:34px;border-radius:11px;background:#e9f1ec;color:#0b3b2e;font-weight:850}
+body.app-shell .first-inventory-route>article.current{background:#eef6f2}
+body.app-shell .first-inventory-route>article.current>span{background:#0b3b2e;color:#fff}
+body.app-shell .first-inventory-route>article.complete>span{background:#dff0e4;color:#1d6b4f}
+body.app-shell .first-inventory-route article strong,body.app-shell .first-inventory-route article small,body.app-shell .first-inventory-route article p{display:block}
+body.app-shell .first-inventory-route article p{margin:2px 0 0;color:#74827b;font-size:.7rem}
+body.app-shell .first-inventory-route>i{height:2px;background:linear-gradient(90deg,#a7c1a0,#dce8df)}
+
+/* Mapa de fuentes: configuración asistida arriba; edición manual queda secundaria. */
+body.app-shell .starter-library{margin-bottom:16px;overflow:hidden;background:linear-gradient(180deg,#fff,#f9fbfa)}
+body.app-shell .starter-library>summary{min-height:70px;padding:16px 20px;cursor:pointer}
+body.app-shell .starter-library-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:12px;padding:0 18px 18px}
+body.app-shell .starter-library-card{display:flex;flex-direction:column;min-height:300px;padding:17px;border:1px solid var(--v212-app-line);border-radius:15px;background:#fff}
+body.app-shell .starter-library-card h3{margin:4px 0 7px;letter-spacing:-.025em}
+body.app-shell .starter-library-card>details{box-shadow:none!important;background:#fafcfb}
+body.app-shell .starter-library-card>.btn{margin-top:auto}
+body.app-shell .source-management-layout{grid-template-columns:minmax(0,1.75fr) minmax(290px,.55fr)}
+body.app-shell .source-management-layout>aside{position:sticky;top:158px}
+body.app-shell #mapa-fuentes table{min-width:1120px}
+body.app-shell #mapa-fuentes tr.source-excluded{opacity:.68;background:#fafafa}
+body.app-shell #mapa-fuentes .source-name{display:flex;gap:8px;align-items:center;min-width:180px;font-weight:780;color:#183229}
+body.app-shell #mapa-fuentes .source-icon{display:grid;place-items:center;flex:0 0 30px;width:30px;height:30px;border-radius:9px;background:#edf5f0;color:#0b3b2e}
+body.app-shell .source-next-step{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;margin-top:16px;padding:22px 24px;border-color:rgba(45,111,115,.18);background:linear-gradient(135deg,#f1f7f4,#fff);box-shadow:0 12px 30px rgba(11,59,46,.06)}
+body.app-shell .source-next-step h2{margin:4px 0 6px;letter-spacing:-.035em}
+body.app-shell .source-next-step p{margin:0;color:var(--v212-app-muted)}
+
+/* Detalle de fuente: salud de la fuente antes de cálculo detallado. */
+body.app-shell .calculation-notice{margin-bottom:14px;border-radius:15px;box-shadow:none}
+body.app-shell .source-config-panel{margin-bottom:14px;overflow:hidden;background:#fafcfb;box-shadow:none!important}
+body.app-shell .source-config-panel>summary{min-height:66px;padding:15px 18px;cursor:pointer}
+body.app-shell .source-config-form{padding:0 18px 18px}
+body.app-shell .source-config-form .form-save-row{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;display:flex;justify-content:space-between;gap:18px;align-items:center;padding:13px 15px;border:1px solid rgba(11,59,46,.10);border-radius:14px;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);box-shadow:0 12px 32px rgba(11,59,46,.10)}
+body.app-shell .source-detail-taskbar{margin-bottom:14px}
+body.app-shell .calculation-v04{display:grid;grid-template-columns:minmax(0,1fr);gap:14px}
+body.app-shell .calculation-stack{display:grid;gap:14px;min-width:0}
+body.app-shell .calculation-card{overflow:hidden}
+body.app-shell #datos-actividad table{min-width:980px}
+body.app-shell .methodological-checklist-card{box-shadow:none!important;background:#fafcfb}
+body.app-shell .factor-conversation-card{border-color:rgba(45,111,115,.16)}
+body.app-shell .section-intro{max-width:82ch;color:var(--v212-app-muted);line-height:1.6}
+body.app-shell .row-editor>summary{min-height:36px;display:inline-flex;align-items:center;padding-inline:8px;border-radius:9px;cursor:pointer;color:#426056;font-weight:720}
+
+@media(max-width:1100px){
+  body.app-shell .data-summary-grid,body.app-shell .source-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:minmax(0,1.4fr) minmax(260px,.6fr)}
+  body.app-shell .first-data-guide{grid-template-columns:1fr}
+}
+
+@media(max-width:900px){
+  body.app-shell .task-jumpbar{top:64px;margin-inline:-2px;grid-auto-columns:minmax(160px,44vw)}
+  body.app-shell .information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:1fr}
+  body.app-shell .information-layout>.sticky-form,body.app-shell .source-management-layout>aside{position:static}
+  body.app-shell .first-inventory-route{grid-template-columns:1fr;gap:5px}
+  body.app-shell .first-inventory-route>i{width:2px;height:16px;margin-left:25px}
+  body.app-shell .request-list>article{grid-template-columns:8px minmax(0,1fr)}
+  body.app-shell .request-list>article>.compact-status-form{grid-column:2;justify-content:flex-start}
+}
+
+@media(max-width:620px){
+  body.app-shell .data-summary-grid,body.app-shell .source-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  body.app-shell .data-summary-grid .mini-card,body.app-shell .source-summary-grid .mini-card{min-height:96px;padding:13px}
+  body.app-shell .data-summary-grid .mini-card strong,body.app-shell .source-summary-grid .mini-card strong{font-size:1.25rem}
+  body.app-shell .task-jumpbar{top:58px;grid-auto-columns:minmax(150px,72vw);border-radius:14px;padding:6px}
+  body.app-shell .first-data-guide ol{grid-template-columns:1fr}
+  body.app-shell .request-list>article{padding:12px;gap:10px}
+  body.app-shell .request-list>article>.compact-status-form{display:grid;grid-template-columns:1fr auto;width:100%}
+  body.app-shell .source-next-step{grid-template-columns:1fr;padding:18px}
+  body.app-shell .source-next-step .btn{width:100%}
+  body.app-shell .source-config-form .form-save-row{display:grid;grid-template-columns:1fr}
+  body.app-shell .source-config-form .form-save-row .btn{width:100%;min-height:50px}
+}
+
+@media(prefers-reduced-motion:reduce){
+  body.app-shell .task-jumpbar>a{transition:none}
+}
