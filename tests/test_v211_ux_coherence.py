@@ -94,7 +94,7 @@ def test_v212_mobile_and_brand_polish_are_fail_closed() -> None:
 
 
 @pytest.mark.smoke
-def test_github_pages_preview_tracks_v212_navigation_brand_and_mobile_overlay() -> None:
+def test_github_pages_preview_tracks_current_navigation_brand_and_mobile_overlay() -> None:
     index = SITE_INDEX.read_text(encoding="utf-8")
     styles = SITE_STYLES.read_text(encoding="utf-8")
     overlay = SITE_OVERLAY.read_text(encoding="utf-8")
@@ -102,9 +102,10 @@ def test_github_pages_preview_tracks_v212_navigation_brand_and_mobile_overlay() 
     nav = index.split('class="nav-links"', 1)[1].split("</nav>", 1)[0]
 
     assert 'class="public-v14-body"' in index
-    assert nav.count("<a ") == 4
-    for target in ("#como-funciona", "#plataforma", "#informes", "#soluciones"):
-        assert target in nav
+    expected_targets = ("#valor", "#como-funciona", "#demo-app", "#precios", "#preguntas")
+    assert nav.count("<a ") == len(expected_targets)
+    for target in expected_targets:
+        assert f'href="{target}"' in nav
     assert 'href="assets/symbol.svg"' in index
     assert 'url("./styles/v2.1-public.css")' in styles
     assert "overflow-x:clip" in overlay
