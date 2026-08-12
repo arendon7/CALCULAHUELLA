@@ -1,0 +1,60 @@
+/* V2.1.1 · Coherence pass público. Capa final sobre V1.6. */
+.public-v14-body{--container:min(1180px,calc(100% - 40px))}
+.public-v14-body .site-header{background:rgba(255,255,255,.96);box-shadow:0 1px 0 rgba(11,59,46,.05)}
+.public-v14-body .nav{min-height:74px;height:auto;grid-template-columns:215px minmax(0,1fr) auto;gap:28px}
+.public-v14-body .brand img{width:205px}
+.public-v14-body .nav-links{gap:22px;font-size:.9rem}
+.public-v14-body .nav-actions{gap:14px}
+.public-v14-body .hero{padding:76px 0 62px}
+.public-v14-body .hero-grid{grid-template-columns:minmax(0,1.02fr) minmax(470px,.98fr);gap:58px}
+.public-v14-body .hero h1{max-width:720px;font-size:clamp(3rem,5.2vw,4.9rem);line-height:1.01;text-wrap:balance}
+.public-v14-body .hero-copy>p{max-width:650px;margin:24px 0 28px;font-size:1.12rem;line-height:1.65}
+.public-v14-body .hero-actions{align-items:center}
+.public-v14-body .hero-demo-link{display:inline-flex;margin-top:18px;color:var(--forest);font-size:.9rem;font-weight:760;text-decoration:underline;text-decoration-color:rgba(11,59,46,.25);text-underline-offset:4px}
+.public-v14-body .hero-micro{margin-top:18px}
+.public-v14-body .product-stage{min-height:520px}
+.public-v14-body .trust-grid{grid-template-columns:repeat(3,minmax(0,1fr));gap:0}
+.public-v14-body .trust-item{min-width:0}
+.public-v14-body .section{padding-block:88px}
+.public-v14-body .section-head{max-width:780px}
+.public-v14-body .section-head h2,.public-v14-body .collab-copy h2,.public-v14-body .decision-copy h2,.public-v14-body .experience-copy h2,.public-v14-body .diagnostic-copy h2{text-wrap:balance}
+.public-v14-body .section-head>p,.public-v14-body .collab-copy>p,.public-v14-body .decision-copy>p,.public-v14-body .experience-copy>p{max-width:70ch;line-height:1.7}
+/* Las ocho etapas permanecen íntegras, pero dejan de comprimirse en una sola fila. */
+.public-v14-body .process-nav{grid-template-columns:repeat(4,minmax(0,1fr))}
+.public-v14-body .process-step:nth-child(4n){border-right:0}
+.public-v14-body .process-step:nth-child(-n+4){border-bottom:1px solid var(--line)}
+.public-v14-body .problem-card,.public-v14-body .agility-card,.public-v14-body .solution-card,.public-v14-body .report-item{box-shadow:none}
+.public-v14-body .problem-cards,.public-v14-body .agility-grid{gap:16px}
+.public-v14-body :is(section[id],.diagnostic-cta[id]){scroll-margin-top:92px}
+.public-v14-body :is(a,button,input,select,textarea,summary):focus-visible{outline:3px solid rgba(45,111,115,.34);outline-offset:3px}
+@media(hover:none){.public-v14-body .btn:hover{transform:none}}
+@media(max-width:1100px){
+  .public-v14-body .nav{grid-template-columns:1fr auto}
+  .public-v14-body .nav-links{display:none}
+  .public-v14-body .menu-button{display:grid}
+  .public-v14-body .hero-grid{grid-template-columns:1fr;gap:42px}
+  .public-v14-body .hero-copy{max-width:760px}
+  .public-v14-body .product-stage{width:min(100%,760px);min-height:auto;margin-inline:auto}
+}
+@media(max-width:760px){
+  .public-v14-body{--container:min(100% - 28px,1180px)}
+  .public-v14-body .section{padding-block:68px}
+  .public-v14-body .hero{padding:58px 0 48px}
+  .public-v14-body .hero h1{font-size:clamp(2.55rem,12vw,3.5rem)}
+  .public-v14-body .trust-grid{grid-template-columns:1fr}
+  .public-v14-body .process-nav{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .public-v14-body .process-step:nth-child(4n){border-right:1px solid var(--line)}
+  .public-v14-body .process-step:nth-child(2n){border-right:0}
+  .public-v14-body .process-step:nth-child(-n+6){border-bottom:1px solid var(--line)}
+}
+@media(max-width:560px){
+  .public-v14-body .nav{min-height:68px}
+  .public-v14-body .brand img{width:178px}
+  .public-v14-body .nav-actions .login-link,.public-v14-body .nav-actions>.btn{display:none}
+  .public-v14-body .hero-actions{display:grid;grid-template-columns:1fr}
+  .public-v14-body .hero-actions .btn{width:100%}
+  .public-v14-body .hero-micro{display:grid;grid-template-columns:1fr;gap:9px}
+}
+@media(prefers-reduced-motion:reduce){
+  .public-v14-body *,.public-v14-body *::before,.public-v14-body *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
