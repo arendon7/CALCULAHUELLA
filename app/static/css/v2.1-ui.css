@@ -1,21 +1,207 @@
-/* V2.1.1 · Capa de coherencia UX de producto. Solo actúa sobre el shell interno. */
-body.app-shell .page-content{width:min(100%,1480px);margin-inline:auto;padding-inline:clamp(18px,2.6vw,38px)}
-body.app-shell .work-center-head{align-items:flex-start;gap:24px;margin-bottom:22px}
-body.app-shell .work-center-head>div:first-child{max-width:780px}
+/* V2.1.2 · Capa de experiencia de producto. Jerarquía operacional, responsive y marca canónica. */
+body.app-shell{
+  --v212-app-bg:#f4f8f5;
+  --v212-app-surface:#ffffff;
+  --v212-app-line:rgba(11,59,46,.11);
+  --v212-app-soft:#eef5f0;
+  --v212-app-muted:#61716a;
+  --v212-app-shadow:0 14px 36px rgba(11,59,46,.07);
+  --v212-app-shadow-strong:0 24px 54px rgba(11,59,46,.12);
+  background:
+    radial-gradient(circle at 82% -10%,rgba(167,193,160,.16),transparent 25%),
+    linear-gradient(180deg,#f8faf9 0%,var(--v212-app-bg) 100%);
+}
+
+/* Sidebar: la marca clásica se muestra sin filtro ni redibujo, sobre placa clara. */
+body.app-shell .sidebar{width:258px;background:linear-gradient(180deg,#082f25 0%,#0b3b2e 62%,#092f26 100%);border-right:1px solid rgba(255,255,255,.08);box-shadow:12px 0 42px rgba(7,38,30,.13)}
+body.app-shell .sidebar .brand{margin:4px 4px 12px;padding:11px 12px;border-radius:16px;background:#fff;box-shadow:0 10px 28px rgba(0,0,0,.12)}
+body.app-shell .sidebar .brand img{filter:none;opacity:1;width:100%;max-width:196px;max-height:58px;margin-inline:auto}
+body.app-shell .workspace-identity{margin:0 4px 17px;padding:14px 15px;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.065);border-radius:15px}
+body.app-shell .workspace-identity small{color:#bcd3c5;letter-spacing:.11em}
+body.app-shell .workspace-identity strong{color:#fff;font-size:.95rem}
+body.app-shell .workspace-identity span{color:#d7e5dc;line-height:1.4}
+body.app-shell .nav-search{margin-inline:4px;border-radius:13px;background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.11)}
+body.app-shell .nav-search input{color:#fff;background:transparent}
+body.app-shell .nav-search input::placeholder{color:rgba(255,255,255,.58)}
+body.app-shell .nav-label{color:#adc8b8;letter-spacing:.115em}
+body.app-shell .nav-item{min-height:44px;border-radius:12px;color:#d8e6dd;transition:background .16s ease,color .16s ease,transform .16s ease}
+body.app-shell .nav-item:hover,body.app-shell .nav-item:focus-visible{background:rgba(255,255,255,.10);color:#fff;transform:translateX(2px)}
+body.app-shell .nav-item.active{background:#fff;color:#0b3b2e;box-shadow:0 10px 26px rgba(0,0,0,.16)}
+body.app-shell .nav-item.active span{color:#2d6f73}
+body.app-shell .nav-disclosure>summary{min-height:46px;color:#d9e8df;border-radius:12px}
+body.app-shell .view-mode-form{margin-inline:4px;border-color:rgba(255,255,255,.12);background:rgba(255,255,255,.055);border-radius:14px}
+body.app-shell .view-mode-form button{min-height:42px}
+body.app-shell .sidebar-motto{margin-inline:4px;border:1px solid rgba(255,255,255,.08);background:rgba(255,255,255,.055)}
+body.app-shell .user-box{margin-inline:4px}
+
+/* Shell principal. */
+body.app-shell .main-area{margin-left:258px;width:calc(100% - 258px);min-width:0}
+body.app-shell .topbar{min-height:72px;height:auto;padding:10px clamp(18px,2.5vw,36px);background:rgba(255,255,255,.88);backdrop-filter:blur(20px) saturate(140%);border-bottom:1px solid rgba(11,59,46,.08);box-shadow:0 4px 26px rgba(11,59,46,.035)}
+body.app-shell .topbar-title{color:#0b3b2e;font-weight:820;letter-spacing:-.02em}
+body.app-shell .topbar-actions{gap:9px;min-width:0}
+body.app-shell .version-pill,body.app-shell .org-name,body.app-shell .icon-button,body.app-shell .org-switcher>summary{border-color:var(--v212-app-line);background:rgba(255,255,255,.96);border-radius:12px;box-shadow:0 5px 18px rgba(11,59,46,.035)}
+body.app-shell .topbar-actions .icon-button,body.app-shell .topbar .mobile-only{min-width:44px;min-height:44px}
+body.app-shell .org-name{min-height:42px;display:inline-flex;align-items:center;padding-inline:12px;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.app-shell .page-content{width:min(100%,1480px);margin-inline:auto;padding:clamp(24px,3vw,38px) clamp(18px,2.6vw,38px) 86px}
+
+/* Jerarquía de página: estado y siguiente acción primero. */
+body.app-shell .work-center-head{align-items:flex-start;gap:24px;margin-bottom:22px;padding:2px 0 4px}
+body.app-shell .work-center-head>div:first-child{max-width:800px}
+body.app-shell .work-center-head .breadcrumb{margin-bottom:9px}
+body.app-shell .work-center-head .active-context{display:inline-flex;align-items:center;min-height:32px;padding:6px 10px;margin-bottom:10px!important;border-radius:999px;background:#edf5ef;color:#426056!important;font-size:.72rem!important;font-weight:720}
+body.app-shell .work-center-head h1{margin:0 0 7px;font-size:clamp(2rem,3.5vw,3rem);line-height:1;letter-spacing:-.05em}
+body.app-shell .work-center-head>div:first-child>p:last-child{max-width:68ch;line-height:1.6;font-size:.92rem}
 /* La acción prioritaria ya vive en work-command; evitamos un CTA duplicado en la cabecera. */
 body.app-shell .work-center-head .head-actions .btn{display:none}
-body.app-shell .work-center-head .period-chip{min-height:40px;display:inline-flex;align-items:center}
-body.app-shell .demo-story{box-shadow:none;border-style:dashed}
+body.app-shell .work-center-head .period-chip{min-height:42px;display:inline-flex;align-items:center;border-radius:999px;padding-inline:14px;background:#fff;border:1px solid var(--v212-app-line);box-shadow:0 6px 20px rgba(11,59,46,.04)}
+
+/* Componentes base: menos caja genérica, más sistema. */
+body.app-shell .card,body.app-shell .panel,body.app-shell .table-card,body.app-shell details{border-color:var(--v212-app-line);box-shadow:0 7px 24px rgba(11,59,46,.045)}
+body.app-shell .card{border-radius:18px}
+body.app-shell .card-head{gap:16px}
+body.app-shell .card-head h3{letter-spacing:-.025em}
+body.app-shell .demo-story{border-style:dashed;box-shadow:none;background:linear-gradient(135deg,#fff,#f6faf7)}
 body.app-shell .demo-story .btn.btn-primary{background:transparent;color:inherit;border-color:currentColor;box-shadow:none}
-body.app-shell .work-command{border-radius:20px;box-shadow:0 14px 34px rgba(15,45,77,.09);margin-block:18px 22px}
+body.app-shell .setup-attention{border-left:4px solid #ca9a6c;background:linear-gradient(135deg,#fff,#fbf8f3)}
+body.app-shell .setup-attention-score{border-radius:16px;background:#f5eee4}
+
+/* Siguiente acción: comando principal de la pantalla. */
+body.app-shell .work-command{position:relative;display:grid;grid-template-columns:minmax(0,1fr) minmax(250px,.36fr);gap:26px;align-items:stretch;margin-block:18px 22px;padding:clamp(22px,3vw,32px);border:1px solid rgba(11,59,46,.10);border-radius:22px;background:
+  radial-gradient(circle at 88% 14%,rgba(167,193,160,.24),transparent 28%),
+  linear-gradient(135deg,#fff 0%,#f5faf6 62%,#edf6f0 100%);box-shadow:var(--v212-app-shadow-strong);overflow:hidden}
+body.app-shell .work-command::before{content:"";position:absolute;left:0;top:0;bottom:0;width:5px;background:linear-gradient(#2d6f73,#a7c1a0)}
 body.app-shell .work-command-main{max-width:820px}
-body.app-shell .work-command-main h2{max-width:760px;text-wrap:balance}
-body.app-shell .inventory-pulse{margin-bottom:18px}
-body.app-shell .compact-guided-workspace{box-shadow:none}
-body.app-shell .dashboard-disclosure>summary{min-height:56px;cursor:pointer}
-body.app-shell .topbar-actions .icon-button,body.app-shell .topbar .mobile-only{min-width:44px;min-height:44px}
-body.app-shell :is(a,button,input,select,textarea,summary):focus-visible{outline:3px solid rgba(45,120,185,.38);outline-offset:3px}
+body.app-shell .work-command-main .eyebrow{margin-bottom:12px;color:#2d6f73}
+body.app-shell .work-command-main h2{max-width:760px;margin:0 0 10px;font-size:clamp(1.6rem,2.6vw,2.25rem);line-height:1.08;letter-spacing:-.04em;text-wrap:balance}
+body.app-shell .work-command-main>p{max-width:70ch;margin:0 0 16px;color:var(--v212-app-muted);line-height:1.62}
+body.app-shell .work-command-meta{display:flex;gap:10px;flex-wrap:wrap}
+body.app-shell .work-command-meta span{padding:8px 10px;border-radius:11px;background:rgba(255,255,255,.74);border:1px solid rgba(11,59,46,.08);font-size:.76rem}
+body.app-shell .work-command-action{display:flex;flex-direction:column;justify-content:center;align-items:flex-start;padding:18px;border-radius:17px;background:rgba(11,59,46,.92);color:#fff;box-shadow:0 16px 34px rgba(11,59,46,.14)}
+body.app-shell .work-command-action small{color:#c8ddd0;letter-spacing:.09em}
+body.app-shell .work-command-action strong{margin:5px 0 3px;font-size:1.08rem;color:#fff}
+body.app-shell .work-command-action>span{color:#d7e7dd;font-size:.78rem;line-height:1.45}
+body.app-shell .work-command-action .btn{width:100%;min-height:46px;margin-top:16px;background:#fff;color:#0b3b2e;border-color:#fff;box-shadow:none}
 body.app-shell .permission-note,body.app-shell .method-boundary-note,body.app-shell .inline-empty p{line-height:1.55}
-@media(max-width:900px){body.app-shell .page-content{padding-inline:16px}body.app-shell .work-center-head{gap:14px}body.app-shell .work-command{margin-top:14px}}
-@media(max-width:640px){body.app-shell .work-center-head .head-actions{width:100%}body.app-shell .work-center-head .period-chip{width:100%;justify-content:center}body.app-shell .work-command{border-radius:16px}}
-@media(prefers-reduced-motion:reduce){body.app-shell *,body.app-shell *::before,body.app-shell *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
+
+/* Pulso del inventario: lectura en 5 segundos. */
+body.app-shell .inventory-pulse{display:grid;grid-template-columns:minmax(220px,.8fr) minmax(360px,1.2fr) minmax(320px,1fr);gap:0;margin-bottom:18px;padding:0;overflow:hidden;background:#fff}
+body.app-shell .inventory-pulse>div{padding:22px}
+body.app-shell .inventory-pulse>div+div{border-left:1px solid var(--v212-app-line)}
+body.app-shell .inventory-pulse-total{display:flex;flex-direction:column;justify-content:center;background:linear-gradient(145deg,#0b3b2e,#144d3d);color:#fff}
+body.app-shell .inventory-pulse-total small{color:#c3d8cb;letter-spacing:.09em}
+body.app-shell .inventory-pulse-total strong{margin:6px 0 0;font-size:clamp(2rem,3vw,2.7rem);line-height:1;color:#fff;letter-spacing:-.045em}
+body.app-shell .inventory-pulse-total span{margin-top:3px;color:#d8e8df}
+body.app-shell .inventory-pulse-total a{margin-top:14px;color:#fff;font-size:.78rem;font-weight:760;text-decoration:underline;text-decoration-color:rgba(255,255,255,.28);text-underline-offset:4px}
+body.app-shell .inventory-pulse-scopes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;align-items:stretch}
+body.app-shell .inventory-pulse-scopes>div{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:13px;border-radius:14px;background:#f5f8f6;border:1px solid rgba(11,59,46,.07)}
+body.app-shell .inventory-pulse-scopes small{margin:5px 0 4px;color:#64776e}
+body.app-shell .inventory-pulse-scopes strong{font-size:1.2rem;color:#0b3b2e;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+body.app-shell .inventory-pulse-status{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:stretch}
+body.app-shell .inventory-pulse-status a{display:flex;flex-direction:column;justify-content:center;min-width:0;padding:12px;border-radius:14px;border:1px solid rgba(11,59,46,.07);background:#fbfcfb;transition:background .16s ease,border-color .16s ease}
+body.app-shell .inventory-pulse-status small{color:#718079;letter-spacing:.06em}
+body.app-shell .inventory-pulse-status strong{margin:4px 0 2px;color:#0b3b2e;font-size:1.05rem}
+body.app-shell .inventory-pulse-status span{color:#697970;font-size:.72rem;line-height:1.35}
+
+/* Recorrido y disclosures: escaneables en desktop, lineales en móvil. */
+body.app-shell .compact-guided-workspace{box-shadow:none;background:linear-gradient(180deg,#fff,#f9fbfa)}
+body.app-shell .guided-workspace-head{gap:20px;align-items:flex-end}
+body.app-shell .guided-workspace-head h2{margin-bottom:7px;letter-spacing:-.035em}
+body.app-shell .workspace-steps{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+body.app-shell .workspace-step{min-height:78px;border-radius:14px;border:1px solid rgba(11,59,46,.08);background:#fff;transition:border-color .16s ease,background .16s ease,transform .16s ease}
+body.app-shell .workspace-step>span{flex:0 0 34px;width:34px;height:34px;border-radius:11px;background:#eef5f0;color:#0b3b2e}
+body.app-shell .workspace-step.done{background:#f5faf6;border-color:rgba(46,125,91,.18)}
+body.app-shell .workspace-step.done>span{background:#dff0e4;color:#1d6b4f}
+body.app-shell .dashboard-disclosure{overflow:hidden}
+body.app-shell .dashboard-disclosure>summary{min-height:62px;padding:16px 20px;cursor:pointer;background:linear-gradient(180deg,#fff,#fafcfb)}
+body.app-shell .dashboard-disclosure>summary span{min-width:0}
+body.app-shell .dashboard-disclosure>summary strong{display:block;margin-top:3px;color:#0b3b2e}
+body.app-shell .dashboard-disclosure>summary b{white-space:nowrap}
+body.app-shell .dashboard-disclosure-body{border-top:1px solid var(--v212-app-line)}
+body.app-shell .dashboard-grid{grid-template-columns:minmax(0,1.55fr) minmax(260px,.8fr) minmax(230px,.65fr);gap:14px}
+body.app-shell .dashboard-bottom-grid{gap:14px}
+body.app-shell .chart-card,body.app-shell .scope-card,body.app-shell .focus-card,body.app-shell .sources-preview,body.app-shell .dashboard-tasks{box-shadow:none}
+body.app-shell .monthly-chart{min-width:0}
+
+/* Formularios y tablas: touch targets y densidad útil. */
+body.app-shell :is(input,select,textarea){min-height:44px;border-radius:11px}
+body.app-shell textarea{min-height:108px}
+body.app-shell .btn,body.app-shell button{min-height:42px}
+body.app-shell .responsive-table{border-radius:14px;scrollbar-width:thin}
+body.app-shell table{font-variant-numeric:tabular-nums}
+body.app-shell thead th{position:sticky;top:0;z-index:1;background:#f1f6f3}
+body.app-shell td,body.app-shell th{padding-block:12px}
+body.app-shell .inline-empty{padding:22px;border:1px dashed rgba(11,59,46,.17);border-radius:14px;background:#fafcfb}
+body.app-shell .flash{box-shadow:0 10px 28px rgba(11,59,46,.07)}
+
+/* Focus, hover y motion gobernados. */
+body.app-shell :is(a,button,input,select,textarea,summary):focus-visible{outline:3px solid rgba(45,120,185,.38);outline-offset:3px}
+@media(hover:hover){
+  body.app-shell .inventory-pulse-status a:hover{background:#f3f8f5;border-color:rgba(45,111,115,.18)}
+  body.app-shell .workspace-step:hover{transform:translateY(-2px);border-color:rgba(45,111,115,.20);background:#f9fbfa}
+}
+
+@media(max-width:1180px){
+  body.app-shell .inventory-pulse{grid-template-columns:1fr 1.55fr}
+  body.app-shell .inventory-pulse-status{grid-column:1/-1;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .inventory-pulse>div+div{border-left:1px solid var(--v212-app-line)}
+  body.app-shell .inventory-pulse-status{padding-top:16px}
+  body.app-shell .dashboard-grid{grid-template-columns:minmax(0,1.45fr) minmax(260px,.8fr)}
+  body.app-shell .focus-card{grid-column:1/-1}
+}
+@media(max-width:900px){
+  body.app-shell .page-content{padding-inline:16px}
+  body.app-shell .work-center-head{gap:14px;flex-direction:column}
+  body.app-shell .work-command{grid-template-columns:1fr;margin-top:14px}
+  body.app-shell .work-command-action{display:grid;grid-template-columns:1fr auto;gap:4px 14px;align-items:center}
+  body.app-shell .work-command-action .btn{grid-column:2;grid-row:1/4;width:auto;min-width:160px;margin-top:0}
+  body.app-shell .inventory-pulse{grid-template-columns:1fr}
+  body.app-shell .inventory-pulse>div+div{border-left:0;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .inventory-pulse-status{grid-column:auto}
+  body.app-shell .workspace-steps{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .dashboard-grid{grid-template-columns:1fr}
+  body.app-shell .focus-card{grid-column:auto}
+}
+@media(max-width:760px){
+  body.app-shell .sidebar{width:min(86vw,320px)}
+  body.app-shell .main-area{margin-left:0;width:100%}
+  body.app-shell .page-content{padding:20px 12px calc(104px + env(safe-area-inset-bottom))}
+  body.app-shell .topbar{min-height:64px;padding:8px 10px;gap:8px}
+  body.app-shell .topbar-title{font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body.app-shell .topbar-actions{overflow-x:auto;overscroll-behavior-inline:contain;scrollbar-width:none;padding-bottom:1px}
+  body.app-shell .topbar-actions::-webkit-scrollbar{display:none}
+  body.app-shell .version-pill{min-width:max-content}
+  body.app-shell .org-name{max-width:150px;min-width:max-content}
+  body.app-shell .work-center-head h1{font-size:2.15rem}
+  body.app-shell .card,body.app-shell .panel,body.app-shell .table-card,body.app-shell details{border-radius:16px}
+  body.app-shell .mobile-taskbar{left:8px;right:8px;bottom:8px;width:auto;height:auto;min-height:68px;padding:6px 6px calc(6px + env(safe-area-inset-bottom));border:1px solid rgba(11,59,46,.12);border-radius:18px;background:rgba(255,255,255,.96);backdrop-filter:blur(18px);box-shadow:0 16px 42px rgba(11,59,46,.16)}
+  body.app-shell .mobile-taskbar a,body.app-shell .mobile-taskbar button{min-width:0;min-height:54px;border-radius:12px}
+  body.app-shell .mobile-taskbar a.active{background:#edf5ef;color:#0b3b2e}
+  body.app-shell .mobile-taskbar span{font-size:1.05rem}
+  body.app-shell .mobile-taskbar small{max-width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+}
+@media(max-width:640px){
+  body.app-shell .work-center-head .head-actions{width:100%}
+  body.app-shell .work-center-head .period-chip{width:100%;justify-content:center}
+  body.app-shell .work-command{border-radius:18px;padding:20px}
+  body.app-shell .work-command-action{display:flex;align-items:stretch}
+  body.app-shell .work-command-action .btn{width:100%;min-width:0;margin-top:14px}
+  body.app-shell .inventory-pulse-scopes,body.app-shell .inventory-pulse-status{grid-template-columns:1fr}
+  body.app-shell .workspace-steps{grid-template-columns:1fr}
+  body.app-shell .guided-workspace-head{align-items:flex-start;flex-direction:column}
+  body.app-shell .dashboard-disclosure>summary{align-items:flex-start;gap:8px;flex-direction:column}
+  body.app-shell .dashboard-disclosure>summary b{white-space:normal}
+  body.app-shell .field-grid{grid-template-columns:1fr}
+  body.app-shell .bar-row{grid-template-columns:minmax(120px,1fr) 76px}
+  body.app-shell .bar-row>div{grid-column:1/-1;grid-row:2}
+  body.app-shell .bar-row strong{grid-column:2;text-align:right}
+}
+@media(max-width:480px){
+  body.app-shell .topbar-actions .version-pill span{display:none}
+  body.app-shell .topbar-actions .version-pill{padding-inline:10px}
+  body.app-shell .work-center-head .active-context{border-radius:12px;align-items:flex-start}
+  body.app-shell .inventory-pulse>div{padding:18px}
+}
+@media(prefers-reduced-motion:reduce){
+  body.app-shell *,body.app-shell *::before,body.app-shell *::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+  body.app-shell .nav-item:hover,body.app-shell .workspace-step:hover{transform:none!important}
+}
