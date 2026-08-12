@@ -2,7 +2,9 @@ name: Publicar vista previa en GitHub Pages
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - feature/v2-1-0-brand-provenance
     paths:
       - "site/**"
       - ".github/workflows/pages.yml"
