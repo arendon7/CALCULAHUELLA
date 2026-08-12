@@ -4,6 +4,7 @@
 @import url("./v1.4.css");
 @import url("./work-items.css");
 @import url("./v2.1-ui.css");
+@import url("./v2.1-core-workflows.css");
 
 /* V2.1 · Login: el activo canónico se conserva byte-a-byte sobre placa clara. */
 .login-page .login-brand-plate{
