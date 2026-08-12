@@ -28,8 +28,13 @@
       const cfg = window.CALCULA_TU_HUELLA_CONFIG || {};
       const base = String(cfg.appBaseUrl || "").replace(/\/$/, "");
       document.querySelectorAll("[data-app-link]").forEach(link => {
-        if (base) { link.href = `${base}/login`; link.removeAttribute("aria-disabled"); }
-        else { link.title = "La URL de la aplicación se configurará al desplegar el backend"; }
+        if (base) {
+          link.href = `${base}/login`;
+          link.removeAttribute("aria-disabled");
+        } else {
+          link.href = "#demo-app";
+          link.title = "Abrir la vista navegable de la plataforma en GitHub Pages";
+        }
       });
       await loadScript("app-runtime.js");
       await loadScript("preview-app.js");
