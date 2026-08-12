@@ -82,6 +82,34 @@
     });
   });
 
+  const qualityCard = shell.querySelector('[data-preview-quality-card]');
+  const qualityDecision = shell.querySelector('[data-preview-quality-decision]');
+  const qualityButtons = [...shell.querySelectorAll('[data-preview-quality-action]')];
+  const qualityCopy = {
+    improve: 'Mejora solicitada · el dato permanece abierto hasta recibir información de mayor calidad.',
+    accept: 'Aceptado con limitación · la decisión y su justificación deben permanecer visibles en el cierre.'
+  };
+  const applyQualityDecision = (decision) => {
+    if (!qualityDecision || !qualityCopy[decision]) return;
+    qualityDecision.textContent = qualityCopy[decision];
+    qualityCard?.classList.toggle('quality-needs-improvement', decision === 'improve');
+    qualityCard?.classList.toggle('quality-accepted-limitation', decision === 'accept');
+    qualityButtons.forEach(button => {
+      const selected = button.dataset.previewQualityAction === decision;
+      button.setAttribute('aria-pressed', String(selected));
+    });
+  };
+  if (qualityButtons.length) {
+    let savedDecision = '';
+    try { savedDecision = localStorage.getItem('cth-pages-preview-quality-decision') || ''; } catch (_) {}
+    if (qualityCopy[savedDecision]) applyQualityDecision(savedDecision);
+    qualityButtons.forEach(button => button.addEventListener('click', () => {
+      const decision = button.dataset.previewQualityAction;
+      applyQualityDecision(decision);
+      try { localStorage.setItem('cth-pages-preview-quality-decision', decision); } catch (_) {}
+    }));
+  }
+
   shell.querySelectorAll('[data-preview-download]').forEach(button => {
     button.addEventListener('click', () => {
       const original = button.textContent;
