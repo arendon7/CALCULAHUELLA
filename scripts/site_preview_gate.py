@@ -30,6 +30,7 @@ def _layout_state(page: Page) -> dict[str, object]:
           const prototype = document.querySelector('.craft-prototype-note');
           const er = experience?.getBoundingClientRect();
           const yr = years?.getBoundingClientRect();
+          const planWrap = document.querySelector('.plan-table-wrap');
           return {
             viewport: window.innerWidth,
             document_width: document.documentElement.scrollWidth,
@@ -45,6 +46,12 @@ def _layout_state(page: Page) -> dict[str, object]:
             dead_links: [...document.querySelectorAll('a[href="#"]')].length,
             price_section: Boolean(document.querySelector('#precios')),
             demo_section: Boolean(document.querySelector('#demo-app')),
+            scenarios_section: Boolean(document.querySelector('#escenarios')),
+            scenario_cards: document.querySelectorAll('#escenarios .scenario-card').length,
+            scenario_disclosure: document.querySelector('#escenarios .proof-disclosure')?.textContent || '',
+            plan_compare_rows: document.querySelectorAll('.plan-table tbody tr').length,
+            plan_internal_overflow: Boolean(planWrap && planWrap.scrollWidth > planWrap.clientWidth + 1),
+            footer_present: Boolean(document.querySelector('.site-footer-craft')),
             skip_link: Boolean(document.querySelector('.skip-link[href="#contenido"]')),
             experience_years_contained: Boolean(er && yr && yr.top >= er.top - 1 && yr.bottom <= er.bottom + 1),
             final_cta_after_diagnostic: Boolean(
@@ -73,6 +80,15 @@ def _assert_base_contract(page: Page, label: str) -> dict[str, object]:
         raise AssertionError(f"{label}: existen enlaces href=# sin destino: {state}")
     if not state["price_section"] or not state["demo_section"] or not state["skip_link"]:
         raise AssertionError(f"{label}: falta una superficie pública crítica: {state}")
+    if not state["scenarios_section"] or state["scenario_cards"] != 3:
+        raise AssertionError(f"{label}: escenarios demostrativos incompletos: {state}")
+    disclosure = str(state["scenario_disclosure"]).lower()
+    if "ficticios" not in disclosure or "producto" not in disclosure:
+        raise AssertionError(f"{label}: escenarios sin disclosure explícito: {state}")
+    if state["plan_compare_rows"] < 9:
+        raise AssertionError(f"{label}: comparación de planes insuficiente: {state}")
+    if not state["footer_present"]:
+        raise AssertionError(f"{label}: footer institucional ausente: {state}")
     if not state["experience_years_contained"]:
         raise AssertionError(f"{label}: el bloque de experiencia escapó de su sección: {state}")
     if not state["final_cta_after_diagnostic"] or not state["final_cta_before_prototype"]:
@@ -80,7 +96,7 @@ def _assert_base_contract(page: Page, label: str) -> dict[str, object]:
     return state
 
 
-def _assert_prices(page: Page) -> dict[str, str]:
+def _assert_prices(page: Page) -> dict[str, object]:
     text = page.locator("#precios").inner_text()
     expected = {
         "essential": "$1.300.000",
@@ -92,7 +108,11 @@ def _assert_prices(page: Page) -> dict[str, str]:
             raise AssertionError(f"Pricing: falta {key}={value}")
     if "COP / año" not in text:
         raise AssertionError("Pricing: falta la unidad anual COP")
-    return expected
+    comparison = page.locator('.plan-table').inner_text()
+    for phrase in ("Alcance 3", "Plan de reducción", "Preparación para revisión externa"):
+        if phrase not in comparison:
+            raise AssertionError(f"Pricing: comparación no contiene {phrase!r}")
+    return {"prices": expected, "comparison": "ok"}
 
 
 def _assert_diagnostic(page: Page) -> dict[str, str]:
@@ -111,7 +131,7 @@ def _assert_diagnostic(page: Page) -> dict[str, str]:
     return {"route": route, "price": price}
 
 
-def _assert_demo(page: Page) -> dict[str, str]:
+def _assert_demo(page: Page) -> dict[str, object]:
     calc = page.locator('[data-preview-view="calculo"]')
     calc.click()
     panel = page.locator('[data-preview-panel="calculo"]')
@@ -121,9 +141,43 @@ def _assert_demo(page: Page) -> dict[str, str]:
     role = page.locator('[data-preview-role-select]')
     role.select_option("Verificador")
     label = page.locator('[data-preview-role]').inner_text().strip()
+    focus_title = page.locator('[data-preview-role-focus-title]').inner_text().strip()
+    focus_text = page.locator('[data-preview-role-focus-text]').inner_text().strip()
     if label != "Verificador":
         raise AssertionError(f"Demo: selector de rol no actualizó la etiqueta: {label!r}")
-    return {"result": result, "role": label}
+    if "evidencia" not in focus_title.lower() or "trazabilidad" not in focus_title.lower():
+        raise AssertionError(f"Demo: foco de Verificador insuficiente: {focus_title!r}")
+    if "independencia" not in focus_text.lower():
+        raise AssertionError(f"Demo: foco de Verificador perdió truth lock: {focus_text!r}")
+
+    trace_open = page.locator('[data-preview-trace-open]')
+    trace_open.click()
+    dialog = page.locator('[data-preview-trace-dialog]')
+    if not dialog.is_visible():
+        raise AssertionError("Demo: diálogo de trazabilidad no abrió")
+    trace_steps = dialog.locator('.preview-trace-chain article').count()
+    if trace_steps != 6:
+        raise AssertionError(f"Demo: se esperaban 6 pasos de trazabilidad, hay {trace_steps}")
+    trace_text = dialog.inner_text()
+    for phrase in ("12.450 kWh", "Factura energía enero.pdf", "Factor", "Fórmula", "Revisión"):
+        if phrase not in trace_text:
+            raise AssertionError(f"Demo: traza incompleta, falta {phrase!r}")
+    page.locator('[data-preview-trace-close]').click()
+    if dialog.is_visible():
+        raise AssertionError("Demo: diálogo de trazabilidad no cerró")
+    return {"result": result, "role": label, "focus": focus_title, "trace_steps": trace_steps}
+
+
+def _assert_footer(page: Page) -> dict[str, str]:
+    footer = page.locator('.site-footer-craft')
+    text = footer.inner_text()
+    if "datos demostrativos" not in text.lower():
+        raise AssertionError("Footer: falta aviso de datos demostrativos")
+    if "verificación independiente" not in text.lower():
+        raise AssertionError("Footer: falta distinción de verificación independiente")
+    if not footer.locator('a[href="#diagnostico"]').is_visible():
+        raise AssertionError("Footer: diagnóstico no es descubrible")
+    return {"preview_disclosure": "ok", "verification_disclosure": "ok"}
 
 
 def _desktop(browser) -> dict[str, object]:
@@ -137,11 +191,12 @@ def _desktop(browser) -> dict[str, object]:
     prices = _assert_prices(page)
     diagnostic = _assert_diagnostic(page)
     demo = _assert_demo(page)
+    footer = _assert_footer(page)
     page.screenshot(path=str(ARTIFACT_DIR / "landing-desktop-1440.png"), full_page=True)
     if console_errors or page_errors:
         raise AssertionError(f"desktop browser errors: console={console_errors}, page={page_errors}")
     context.close()
-    return {"layout": layout, "prices": prices, "diagnostic": diagnostic, "demo": demo}
+    return {"layout": layout, "prices": prices, "diagnostic": diagnostic, "demo": demo, "footer": footer}
 
 
 def _mobile(browser) -> dict[str, object]:
@@ -164,11 +219,21 @@ def _mobile(browser) -> dict[str, object]:
     page.keyboard.press("Escape")
     if "open" in (panel.get_attribute("class") or ""):
         raise AssertionError("mobile: Escape no cerró el menú")
+    if not layout["plan_internal_overflow"]:
+        raise AssertionError(f"mobile: tabla comparativa debería usar scroll interno, no expandir página: {layout}")
+    page.locator('[data-preview-view="calculo"]').click()
+    page.locator('[data-preview-trace-open]').click()
+    dialog = page.locator('[data-preview-trace-dialog]')
+    if not dialog.is_visible():
+        raise AssertionError("mobile: diálogo de trazabilidad no abrió")
+    page.keyboard.press("Escape")
+    if dialog.is_visible():
+        raise AssertionError("mobile: Escape no cerró diálogo de trazabilidad")
     page.screenshot(path=str(ARTIFACT_DIR / "landing-mobile-390.png"), full_page=True)
     if console_errors or page_errors:
         raise AssertionError(f"mobile browser errors: console={console_errors}, page={page_errors}")
     context.close()
-    return {"layout": layout, "menu": "ok"}
+    return {"layout": layout, "menu": "ok", "trace_dialog": "ok"}
 
 
 def _reduced_motion(browser) -> dict[str, object]:
