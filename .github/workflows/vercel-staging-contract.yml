@@ -1,0 +1,58 @@
+name: V2.1 · Serverless staging runtime contract
+
+on:
+  push:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    paths:
+      - "api/**"
+      - "app/**"
+      - "migrations/**"
+      - "requirements*.txt"
+      - "scripts/vercel_staging_contract.py"
+      - "tests/test_vercel_staging_adapter.py"
+      - "vercel.json"
+      - ".github/workflows/vercel-staging-contract.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-staging-contract-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  runtime:
+    name: FastAPI serverless contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SERVERLESS_STAGING_ARTIFACT_DIR: serverless-staging-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y dependencias de gate
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-dev.txt
+
+      - name: Verificar contrato estático del adaptador
+        run: pytest -q tests/test_vercel_staging_adapter.py
+
+      - name: Ejecutar FastAPI desde api.index:app
+        run: python scripts/vercel_staging_contract.py
+
+      - name: Publicar evidencia serverless
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: serverless-staging-contract
+          path: serverless-staging-artifacts/
+          if-no-files-found: error
+          retention-days: 14
