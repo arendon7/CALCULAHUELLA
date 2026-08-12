@@ -29,28 +29,40 @@
 <section class="diagnostic-cta diagnostic-functional craft-diagnostic" id="diagnostico">
   <div class="container diagnostic-grid craft-diagnostic-grid">
     <div class="diagnostic-copy">
-      <h2>En cinco respuestas podemos estimar qué ruta tiene sentido.</h2>
-      <p>El diagnóstico es demostrativo: se calcula en tu navegador, no envía información al servidor y no reemplaza la revisión técnica del alcance definitivo.</p>
+      <h2>Cinco respuestas para estimar la ruta y cómo debería arrancar el primer año.</h2>
+      <p>No pedimos datos de contacto. La simulación combina sector, sedes, madurez de información y objetivo para estimar complejidad, fuentes probables, profundidad de trabajo y un plan anual orientativo.</p>
       <form class="diagnostic-form" data-diagnostic-form>
         <label>¿A qué se dedica la organización?<select name="sector" required><option value="">Selecciona el sector</option><option value="servicios">Servicios y oficinas</option><option value="industria">Industria o manufactura</option><option value="agro">Agroindustria</option><option value="logistica">Transporte y logística</option><option value="residuos">Gestión de residuos</option></select></label>
         <label>¿Cuántas sedes participan?<input max="100" min="1" name="sedes" required type="number" value="1" inputmode="numeric"></label>
         <label>¿Ya existe una medición anterior?<select name="primera" required><option value="si">No, sería la primera</option><option value="no">Sí, ya existe un inventario</option></select></label>
         <label>¿Cómo están hoy los datos?<select name="datos" required><option value="baja">Dispersos entre áreas y archivos</option><option value="media">Existen, pero requieren organización</option><option value="alta">Centralizados y relativamente completos</option></select></label>
         <label class="diagnostic-wide">¿Qué necesitas resolver primero?<select name="objetivo" required><option value="medir">Construir la primera huella</option><option value="cliente">Responder a cliente o licitación</option><option value="reducir">Gestionar un plan de reducción</option><option value="verificacion">Preparar revisión externa</option></select></label>
-        <button class="btn btn-light diagnostic-submit" type="submit">Ver mi ruta orientativa</button>
+        <button class="btn btn-light diagnostic-submit" type="submit">Construir mi ruta orientativa</button>
       </form>
-      <p class="diagnostic-privacy">Sin correo, teléfono ni registro. Solo usa estas respuestas para calcular el resultado en esta página.</p>
+      <p class="diagnostic-privacy">Se calcula y guarda únicamente en este navegador para que puedas retomar el resultado. No se envía a un servidor.</p>
     </div>
     <div aria-live="polite" class="diagnostic-result craft-diagnostic-result" data-diagnostic-result>
       <span class="diagnostic-result-status">Resultado orientativo</span>
-      <h3>Completa las cinco respuestas</h3>
+      <h3 data-result-heading>Completa las cinco respuestas</h3>
       <div><span>Nivel de madurez</span><b data-result-maturity>—</b></div>
       <div><span>Complejidad</span><b data-result-complexity>—</b></div>
       <div><span>Fuentes probables</span><b data-result-sources>—</b></div>
       <div><span>Áreas participantes</span><b data-result-areas>—</b></div>
       <div class="diagnostic-route-result"><span>Ruta sugerida</span><b data-result-route>—</b><small data-result-price>Precio de referencia aparecerá aquí</small></div>
-      <p data-result-note>Usaremos sector, sedes, estado de datos y objetivo para sugerir una ruta de trabajo.</p>
-      <a class="btn btn-primary diagnostic-demo-link" href="#demo-app">Explorar cómo se vería el trabajo</a>
+      <div class="diagnostic-reasons">
+        <span>Por qué esta ruta</span>
+        <ul data-result-why><li>El resultado explicará aquí las señales que más pesan en la recomendación.</li></ul>
+      </div>
+      <div class="diagnostic-year-snapshot">
+        <span>Foco del primer año</span>
+        <strong data-result-year-focus>La secuencia anual aparecerá después de calcular la ruta.</strong>
+        <small data-result-next>Primer paso: caracterizar la operación y sus fuentes.</small>
+      </div>
+      <p data-result-note>La recomendación no sustituye una delimitación técnica definitiva del inventario.</p>
+      <div class="diagnostic-result-actions">
+        <a class="btn btn-primary diagnostic-year-link" href="#primer-ano">Ver el primer año de esta ruta</a>
+        <a class="diagnostic-demo-link" href="#demo-app">Explorar la plataforma <span aria-hidden="true">↗</span></a>
+      </div>
     </div>
   </div>
 </section>
