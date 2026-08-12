@@ -10,7 +10,8 @@
     analisis: ['LECTURA DEL INVENTARIO', 'Entender qué explica la huella', 'Prioriza hotspots, variaciones y señales que requieren una decisión.'],
     reduccion: ['PLAN DE ACCIÓN', 'Convertir hotspots en reducción gestionable', 'Separa potencial, implementación, seguimiento y resultado observado.'],
     control: ['PUERTAS DE CALIDAD', 'Saber qué impide aprobar', 'Completitud, calidad, metodología y segregación se revisan antes del cierre.'],
-    informes: ['ENTREGABLES', 'Comunicar sin perder trazabilidad', 'Una misma versión controlada alimenta informes para distintos destinatarios.']
+    informes: ['ENTREGABLES', 'Comunicar sin perder trazabilidad', 'Una misma versión controlada alimenta informes para distintos destinatarios.'],
+    cierre: ['CIERRE DEL PERIODO', 'Cerrar solo cuando las condiciones estén cumplidas', 'Aprobaciones, entregables, snapshots y continuidad quedan visibles antes de bloquear el periodo.']
   };
 
   const roleFocus = {
