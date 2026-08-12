@@ -27,6 +27,10 @@ CORE_SURFACES = (
     ("calidad-datos", "/calidad-datos"),
     ("informes", "/reportes"),
     ("informacion", "/informacion"),
+    ("calculos", "/calculos"),
+    ("analisis", "/analisis"),
+    ("reduccion", "/reduccion"),
+    ("cierre-mensual", "/cierre-mensual"),
 )
 WEBKIT_STYLE_ATTR_WARNING = "Refused to apply a stylesheet because"
 
