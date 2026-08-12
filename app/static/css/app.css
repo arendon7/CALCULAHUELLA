@@ -7,6 +7,7 @@
 @import url("./v2.1-core-workflows.css");
 @import url("./v2.1-data-workflows.css");
 @import url("./v2.1-decision-workflows.css");
+@import url("./v2.1-assurance-workflows.css");
 
 /* V2.1 · Login: el activo canónico se conserva byte-a-byte sobre placa clara. */
 .login-page .login-brand-plate{
