@@ -1,0 +1,344 @@
+/* V2.1.5 · Assurance & Trust
+   Revisión → aprobación → aseguramiento → gobierno metodológico.
+   Prioriza estado, independencia, bloqueos, decisión y trazabilidad sin alterar contratos de negocio. */
+
+/* Control profesional: las puertas y la segregación de funciones dominan. */
+body.app-shell .control-kpis{
+  align-items:stretch;
+}
+body.app-shell .control-kpis .kpi-card.featured{
+  border-width:2px;
+  box-shadow:0 12px 30px rgba(15,23,42,.08);
+}
+body.app-shell .control-taskbar{
+  position:sticky;
+  top:var(--topbar-height,72px);
+  z-index:7;
+  background:rgba(248,250,252,.94);
+  backdrop-filter:blur(12px);
+  -webkit-backdrop-filter:blur(12px);
+}
+body.app-shell .v05-control-layout{
+  align-items:start;
+}
+body.app-shell .v05-control-layout > *{
+  min-width:0;
+}
+body.app-shell .v05-approval-panel{
+  position:sticky;
+  top:calc(var(--topbar-height,72px) + 82px);
+  border-width:2px;
+}
+body.app-shell .v05-approval-panel > small{
+  letter-spacing:.12em;
+}
+body.app-shell .v05-approval-panel .review-action-form + .review-action-form{
+  border-top:1px solid var(--border,#dbe3ea);
+  padding-top:18px;
+  margin-top:18px;
+}
+body.app-shell .observation-item{
+  min-width:0;
+  border-left-width:4px;
+}
+body.app-shell .observation-item:not(.closed-observation){
+  box-shadow:0 10px 28px rgba(15,23,42,.06);
+}
+body.app-shell .closed-observation{
+  opacity:.78;
+}
+body.app-shell .review-history-grid > *{
+  min-width:0;
+}
+
+/* Aseguramiento: independencia y hallazgos materiales antes que formularios. */
+body.app-shell .methodology-boundary{
+  border-width:2px;
+}
+body.app-shell .methodology-boundary > span{
+  letter-spacing:.12em;
+}
+body.app-shell .closure-status{
+  align-items:stretch;
+}
+body.app-shell .closure-status > *{
+  min-width:0;
+}
+body.app-shell .closure-status .method-metric.warning{
+  border-width:2px;
+}
+body.app-shell .action-panel{
+  border-style:dashed;
+  box-shadow:none;
+}
+body.app-shell .action-panel > summary{
+  min-height:56px;
+  cursor:pointer;
+}
+body.app-shell .action-panel[open]{
+  border-style:solid;
+  box-shadow:0 12px 30px rgba(15,23,42,.07);
+}
+body.app-shell #hallazgos .responsive-table,
+body.app-shell #fuentes .responsive-table{
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body.app-shell #hallazgos table,
+body.app-shell #fuentes table{
+  min-width:880px;
+}
+body.app-shell #hallazgos form{
+  min-width:260px;
+}
+body.app-shell #hallazgos textarea{
+  min-height:64px;
+}
+
+/* Portal del verificador: readiness y hallazgos preceden exportación. */
+body.app-shell .verification-banner{
+  border-width:2px;
+  box-shadow:0 10px 28px rgba(15,23,42,.05);
+}
+body.app-shell .verifier-hero{
+  display:grid;
+  grid-template-columns:repeat(4,minmax(0,1fr));
+  gap:0;
+  padding:0;
+  overflow:hidden;
+}
+body.app-shell .verifier-hero > div{
+  min-width:0;
+  padding:22px;
+}
+body.app-shell .verifier-hero > div + div{
+  border-left:1px solid var(--border,#dbe3ea);
+}
+body.app-shell .verification-layout{
+  align-items:start;
+}
+body.app-shell .verification-layout > *,
+body.app-shell .verification-main,
+body.app-shell .verification-side{
+  min-width:0;
+}
+body.app-shell .verification-side{
+  position:sticky;
+  top:calc(var(--topbar-height,72px) + 18px);
+}
+body.app-shell .verification-main > .card:first-child{
+  border-width:2px;
+}
+body.app-shell .finding-card{
+  min-width:0;
+  border-left-width:4px;
+}
+body.app-shell .finding-card:not(.severity-informativa){
+  box-shadow:0 10px 26px rgba(15,23,42,.05);
+}
+body.app-shell .finding-actions details[open]{
+  background:var(--surface-soft,#f8fafc);
+}
+body.app-shell .verification-main .table-wrap{
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body.app-shell .verification-main .table-wrap table{
+  min-width:760px;
+}
+body.app-shell .verification-side .download-row{
+  min-width:0;
+}
+body.app-shell .verification-side .download-row div{
+  min-width:0;
+}
+body.app-shell .verification-side .download-row strong,
+body.app-shell .verification-side .download-row small{
+  overflow-wrap:anywhere;
+}
+
+/* Cierre metodológico: readiness, balance y riesgos antes del detalle editable. */
+body.app-shell .closure-status .method-score{
+  min-width:min(300px,100%);
+  border-width:2px;
+}
+body.app-shell .method-balance-grid{
+  align-items:stretch;
+}
+body.app-shell .method-balance-grid > article{
+  min-width:0;
+}
+body.app-shell .methodology-policy-form{
+  max-width:980px;
+}
+body.app-shell .methodology-policy-form .table-actions{
+  position:sticky;
+  bottom:calc(var(--mobile-nav-height,0px) + 10px);
+  z-index:5;
+  padding:10px;
+  margin-inline:-10px;
+  border:1px solid var(--border,#dbe3ea);
+  border-radius:14px;
+  background:rgba(255,255,255,.96);
+  box-shadow:0 10px 30px rgba(15,23,42,.08);
+}
+body.app-shell .methodology-two-col > *{
+  min-width:0;
+}
+body.app-shell .methodology-next{
+  border-width:2px;
+  box-shadow:0 12px 32px rgba(15,23,42,.07);
+}
+body.app-shell .method-gate-grid > article.pending{
+  border-width:2px;
+}
+body.app-shell .recalculation-form{
+  max-width:100%;
+}
+body.app-shell #anio-base .responsive-table{
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body.app-shell #anio-base table{
+  min-width:980px;
+}
+
+/* Gobierno metodológico: versión vigente y snapshot como decisiones explícitas. */
+body.app-shell .two-column-grid > *{
+  min-width:0;
+}
+body.app-shell .two-column-grid > .panel{
+  border-radius:var(--radius-lg,18px);
+}
+body.app-shell .two-column-grid > .panel:first-child{
+  border-width:2px;
+}
+body.app-shell .settings-list article{
+  min-width:0;
+  align-items:center;
+}
+body.app-shell .settings-list article > div{
+  min-width:0;
+}
+body.app-shell .settings-list article strong,
+body.app-shell .settings-list article span,
+body.app-shell .settings-list article small{
+  overflow-wrap:anywhere;
+}
+body.app-shell .form-drawer{
+  margin-top:16px;
+  border-top:1px solid var(--border,#dbe3ea);
+  padding-top:14px;
+}
+body.app-shell .form-drawer > summary{
+  min-height:48px;
+  cursor:pointer;
+}
+body.app-shell .panel > .table-wrap{
+  max-width:100%;
+  min-width:0;
+  overflow-x:auto;
+  overscroll-behavior-inline:contain;
+}
+body.app-shell .panel > .table-wrap table{
+  min-width:820px;
+}
+
+@media(max-width:980px){
+  body.app-shell .v05-approval-panel,
+  body.app-shell .verification-side{
+    position:relative;
+    top:auto;
+  }
+  body.app-shell .verifier-hero{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body.app-shell .verifier-hero > div:nth-child(3){
+    border-left:0;
+    border-top:1px solid var(--border,#dbe3ea);
+  }
+  body.app-shell .verifier-hero > div:nth-child(4){
+    border-top:1px solid var(--border,#dbe3ea);
+  }
+}
+
+@media(max-width:760px){
+  body.app-shell .control-taskbar{
+    top:0;
+    margin-inline:-4px;
+    overflow-x:auto;
+    scroll-snap-type:x proximity;
+  }
+  body.app-shell .control-taskbar > a{
+    min-width:210px;
+    scroll-snap-align:start;
+  }
+  body.app-shell .verifier-hero{
+    grid-template-columns:1fr 1fr;
+  }
+  body.app-shell .verifier-hero > div{
+    padding:16px 14px;
+  }
+  body.app-shell .verifier-hero h2{
+    font-size:clamp(1.45rem,7vw,2rem);
+  }
+  body.app-shell .closure-status{
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+  body.app-shell .closure-status .method-score{
+    grid-column:1/-1;
+    min-width:0;
+  }
+  body.app-shell .methodology-policy-form .table-actions{
+    bottom:calc(var(--mobile-nav-height,64px) + env(safe-area-inset-bottom) + 8px);
+    display:grid;
+    grid-template-columns:1fr 1fr;
+  }
+  body.app-shell .methodology-policy-form .table-actions .btn{
+    min-height:44px;
+  }
+  body.app-shell .settings-list article{
+    align-items:flex-start;
+    gap:12px;
+  }
+  body.app-shell .settings-list article form,
+  body.app-shell .settings-list article .status-badge{
+    flex:0 0 auto;
+  }
+  body.app-shell .finding-head{
+    align-items:flex-start;
+  }
+}
+
+@media(max-width:460px){
+  body.app-shell .verifier-hero{
+    grid-template-columns:1fr;
+  }
+  body.app-shell .verifier-hero > div + div,
+  body.app-shell .verifier-hero > div:nth-child(3),
+  body.app-shell .verifier-hero > div:nth-child(4){
+    border-left:0;
+    border-top:1px solid var(--border,#dbe3ea);
+  }
+  body.app-shell .closure-status{
+    grid-template-columns:1fr;
+  }
+  body.app-shell .closure-status .method-score{
+    grid-column:auto;
+  }
+  body.app-shell .methodology-policy-form .table-actions{
+    grid-template-columns:1fr;
+  }
+}
+
+@media(prefers-reduced-motion:reduce){
+  body.app-shell .control-taskbar{
+    scroll-behavior:auto;
+  }
+}
