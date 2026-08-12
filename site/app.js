@@ -1,13 +1,24 @@
 (() => {
   const sections = [
     "hero-trust.html",
+    "value-depth.html",
     "problem-platform.html",
     "process-trace.html",
     "reports-decision.html",
+    "preview-app.html",
     "reduction-solutions.html",
+    "plans-trust.html",
     "experience-resources-diagnostic.html"
   ];
   const host = document.querySelector("[data-section-host]");
+  const loadScript = src => new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = src;
+    script.defer = true;
+    script.onload = resolve;
+    script.onerror = reject;
+    document.body.appendChild(script);
+  });
   const load = async () => {
     try {
       const responses = await Promise.all(sections.map(name => fetch(`sections/${name}`)));
@@ -20,10 +31,8 @@
         if (base) { link.href = `${base}/login`; link.removeAttribute("aria-disabled"); }
         else { link.title = "La URL de la aplicación se configurará al desplegar el backend"; }
       });
-      const runtime = document.createElement("script");
-      runtime.src = "app-runtime.js";
-      runtime.defer = true;
-      document.body.appendChild(runtime);
+      await loadScript("app-runtime.js");
+      await loadScript("preview-app.js");
     } catch (error) {
       host.setAttribute("aria-busy", "false");
       host.innerHTML = `<section class="diagnostic-cta"><div class="container diagnostic-shell"><div class="diagnostic-copy"><div class="eyebrow">ERROR DE CARGA</div><h1>No pudimos cargar la experiencia pública.</h1><p>Recarga la página o consulta la aplicación desplegada.</p></div></div></section>`;
