@@ -8,6 +8,7 @@ on:
       - "site/**"
       - "scripts/site_preview_gate.py"
       - "scripts/site_authority_gate.py"
+      - "scripts/site_journey_gate.py"
       - ".github/workflows/site-preview-qa.yml"
   workflow_dispatch:
 
@@ -58,6 +59,9 @@ jobs:
 
       - name: Validar autoridad metodológica SEO y acciones semánticas
         run: python scripts/site_authority_gate.py
+
+      - name: Validar diagnóstico primer año y cierre de preview
+        run: python scripts/site_journey_gate.py
 
       - name: Publicar evidencia visual
         if: always()
