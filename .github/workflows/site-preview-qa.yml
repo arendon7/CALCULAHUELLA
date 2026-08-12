@@ -1,0 +1,65 @@
+name: V2.1 · Landing Pages preview QA
+
+on:
+  push:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    paths:
+      - "site/**"
+      - "scripts/site_preview_gate.py"
+      - ".github/workflows/site-preview-qa.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: site-preview-qa-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  chromium:
+    name: Landing craft · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      SITE_PREVIEW_BASE_URL: http://127.0.0.1:8780
+      SITE_PREVIEW_ARTIFACT_DIR: site-preview-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar Chromium de prueba
+        run: |
+          python -m pip install --upgrade pip
+          pip install "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Servir GitHub Pages localmente
+        run: |
+          mkdir -p site-preview-artifacts
+          python -m http.server 8780 --directory site > site-preview-artifacts/server.log 2>&1 &
+          echo $! > site-preview-artifacts/server.pid
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8780/ > /dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat site-preview-artifacts/server.log
+          exit 1
+
+      - name: Validar landing desktop móvil e interacción
+        run: python scripts/site_preview_gate.py
+
+      - name: Publicar evidencia visual
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-preview-qa
+          path: site-preview-artifacts/
+          if-no-files-found: error
+          retention-days: 14
