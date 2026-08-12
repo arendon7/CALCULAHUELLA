@@ -9,6 +9,9 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect, text
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
 DATABASE_URL = os.environ["POSTGRES_LEGACY_DATABASE_URL"]
 ARTIFACT_DIR = Path(os.environ.get("SERVERLESS_STAGING_ARTIFACT_DIR", "serverless-staging-artifacts")).resolve()
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
