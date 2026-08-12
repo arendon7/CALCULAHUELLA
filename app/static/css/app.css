@@ -4,3 +4,28 @@
 @import url("./v1.4.css");
 @import url("./work-items.css");
 @import url("./v2.1-ui.css");
+
+/* V2.1 · Login: el activo canónico se conserva byte-a-byte sobre placa clara. */
+.login-page .login-brand-plate{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:max-content;
+  max-width:min(280px,72%);
+  padding:10px 14px;
+  border:1px solid rgba(255,255,255,.34);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:0 16px 38px rgba(0,0,0,.16);
+}
+.login-page .login-brand-plate .login-logo{
+  display:block;
+  width:min(220px,100%);
+  max-height:62px;
+  object-fit:contain;
+  filter:none;
+}
+@media(max-width:760px){
+  .login-page .login-brand-plate{max-width:220px;padding:8px 12px;border-radius:14px}
+  .login-page .login-brand-plate .login-logo{width:min(190px,100%)}
+}
