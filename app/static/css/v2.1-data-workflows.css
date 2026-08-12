@@ -27,7 +27,9 @@ body.app-shell .task-jumpbar>a>small{align-self:start;margin-top:2px;color:#7382
 body.app-shell .section-title-row{margin:24px 0 12px}
 body.app-shell .section-title-row>div{align-items:center}
 body.app-shell .section-number{display:grid;place-items:center;width:34px;height:34px;border-radius:11px;background:#0b3b2e;color:#fff;font-weight:850}
-body.app-shell .information-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.55fr);gap:16px;align-items:start}
+body.app-shell .information-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(280px,.55fr);gap:16px;align-items:start;min-width:0;max-width:100%}
+body.app-shell .information-layout>*{min-width:0;max-width:100%}
+body.app-shell .information-layout .responsive-table{width:100%;min-width:0;max-width:100%}
 body.app-shell .information-layout.wide-form-layout{grid-template-columns:minmax(0,1.8fr) minmax(300px,.62fr)}
 body.app-shell .information-layout>.sticky-form{position:sticky;top:158px;padding:18px;background:linear-gradient(180deg,#fff,#f8fbf9)}
 body.app-shell .task-focused-form .form-primary-fields{display:grid;gap:12px}
@@ -116,7 +118,8 @@ body.app-shell .row-editor>summary{min-height:36px;display:inline-flex;align-ite
 
 @media(max-width:900px){
   body.app-shell .task-jumpbar{top:64px;margin-inline:-2px;grid-auto-columns:minmax(160px,44vw)}
-  body.app-shell .information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:1fr}
+  body.app-shell .information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:1fr;width:100%;min-width:0;max-width:100%}
+  body.app-shell .information-layout>*{width:100%;min-width:0;max-width:100%}
   body.app-shell .information-layout>.sticky-form,body.app-shell .source-management-layout>aside{position:static}
   body.app-shell .first-inventory-route{grid-template-columns:1fr;gap:5px}
   body.app-shell .first-inventory-route>i{width:2px;height:16px;margin-left:25px}
