@@ -4,6 +4,7 @@
     "value-depth.html",
     "problem-platform.html",
     "process-trace.html",
+    "year-one.html",
     "reports-decision.html",
     "preview-app.html",
     "reduction-solutions.html",
