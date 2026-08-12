@@ -41,6 +41,14 @@ def test_hero_keeps_one_primary_journey_and_demo_as_tertiary_access() -> None:
 
 
 @pytest.mark.smoke
+def test_public_product_mockup_uses_the_exact_canonical_symbol() -> None:
+    hero = HERO.read_text(encoding="utf-8")
+    assert 'class="app-logo-mini"' in hero
+    assert "img/brand-symbol.svg" in hero
+    assert ">CTH<" not in hero
+
+
+@pytest.mark.smoke
 def test_public_report_preview_uses_exact_canonical_brand_surface() -> None:
     reports = REPORTS.read_text(encoding="utf-8")
     assert "logo-master.svg" not in reports
@@ -65,3 +73,30 @@ def test_coherence_layers_are_loaded_and_preserve_accessible_motion_and_focus() 
     assert ".public-v14-body .process-nav{grid-template-columns:repeat(4,minmax(0,1fr))}" in public_css
     assert "body.app-shell" in product_css
     assert ".work-center-head .head-actions .btn{display:none}" in product_css
+
+
+@pytest.mark.smoke
+def test_v212_mobile_and_brand_polish_are_fail_closed() -> None:
+    public_css = PUBLIC_CSS.read_text(encoding="utf-8")
+    product_css = PRODUCT_CSS.read_text(encoding="utf-8")
+
+    # Public pages avoid horizontal masking and collapse dense visual systems
+    # intentionally instead of hiding overflow defects.
+    assert "overflow-x:clip" in public_css
+    assert "overflow-x:hidden" not in public_css
+    assert "@media(max-width:620px)" in public_css
+    assert ".product-stage .app-side{display:none}" in public_css
+
+    # The authenticated shell must render the canonical coloured logo as-is,
+    # not visually manufacture an unapproved white/reversed variant.
+    assert ".sidebar .brand img{filter:none" in product_css
+
+    # Mobile product UI keeps task navigation reachable above device safe areas.
+    assert "env(safe-area-inset-bottom)" in product_css
+    assert ".mobile-taskbar" in product_css
+    assert "min-height:54px" in product_css
+
+    # The dashboard remains task-first and collapses density deliberately.
+    assert ".inventory-pulse{display:grid" in product_css
+    assert "@media(max-width:900px)" in product_css
+    assert ".workspace-steps{grid-template-columns:1fr}" in product_css
