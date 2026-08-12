@@ -9,8 +9,8 @@ from pathlib import Path
 INSTANCE_DIR = Path("/tmp/calcula-tu-huella")
 INSTANCE_DIR.mkdir(parents=True, exist_ok=True)
 
-_external_database = bool(os.environ.get("DATABASE_URL", "").strip())
 _raw_database_url = os.environ.get("DATABASE_URL", "").strip()
+_external_database = _raw_database_url.startswith(("postgresql://", "postgres://", "postgresql+psycopg://"))
 if _raw_database_url.startswith("postgresql://"):
     os.environ["DATABASE_URL"] = "postgresql+psycopg://" + _raw_database_url.removeprefix("postgresql://")
 elif _raw_database_url.startswith("postgres://"):
@@ -54,8 +54,8 @@ if _external_database:
             "Ejecuta la migración fuera del runtime serverless antes de desplegar."
         )
 else:
-    # El modo sin DATABASE_URL es explícitamente efímero y sí puede crear su
-    # propia SQLite en /tmp para UAT de navegación, CSRF y flujos públicos.
+    # SQLite, explícita o implícita, pertenece al modo efímero de UAT. Puede
+    # auto-inicializarse porque sus datos no se presentan como persistencia real.
     from app.database import init_db
 
     init_db()
