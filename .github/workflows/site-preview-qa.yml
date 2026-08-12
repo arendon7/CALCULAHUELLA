@@ -9,6 +9,7 @@ on:
       - "scripts/site_preview_gate.py"
       - "scripts/site_authority_gate.py"
       - "scripts/site_journey_gate.py"
+      - "scripts/site_route_handoff_gate.py"
       - ".github/workflows/site-preview-qa.yml"
   workflow_dispatch:
 
@@ -62,6 +63,9 @@ jobs:
 
       - name: Validar diagnóstico primer año y cierre de preview
         run: python scripts/site_journey_gate.py
+
+      - name: Validar ficha de ruta privacidad y handoff a aplicación
+        run: python scripts/site_route_handoff_gate.py
 
       - name: Publicar evidencia visual
         if: always()
