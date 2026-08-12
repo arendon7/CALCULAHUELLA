@@ -68,7 +68,7 @@ jobs:
           pytest -q tests/test_v200_postgres_schema_compatibility.py tests/test_v200_postgres_methodology_schema.py
 
       - name: Certificar upgrade legado sobre PostgreSQL 17
-        run: python scripts/postgres_legacy_migration_gate.py
+        run: python -m scripts.postgres_legacy_migration_gate
 
       - name: Ejecutar FastAPI desde api.index:app
         run: python scripts/vercel_staging_contract.py
