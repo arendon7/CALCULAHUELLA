@@ -65,7 +65,9 @@ def test_data_workflows_collapse_deliberately_on_mobile_without_masking_overflow
     css = DATA_CSS.read_text(encoding="utf-8")
     assert "@media(max-width:900px)" in css
     assert "@media(max-width:620px)" in css
-    assert ".information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:1fr}" in css
+    assert ".information-layout,body.app-shell .information-layout.wide-form-layout,body.app-shell .source-management-layout{grid-template-columns:1fr;width:100%;min-width:0;max-width:100%}" in css
+    assert ".information-layout>*{width:100%;min-width:0;max-width:100%}" in css
+    assert ".information-layout .responsive-table{width:100%;min-width:0;max-width:100%}" in css
     assert ".task-jumpbar{top:58px" in css
     assert "overflow-x:hidden" not in css
     assert "prefers-reduced-motion:reduce" in css
