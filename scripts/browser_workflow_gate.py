@@ -31,6 +31,11 @@ CORE_SURFACES = (
     ("analisis", "/analisis"),
     ("reduccion", "/reduccion"),
     ("cierre-mensual", "/cierre-mensual"),
+    ("control-profesional", "/control"),
+    ("aseguramiento", "/aseguramiento"),
+    ("verificacion", "/verificacion"),
+    ("cierre-metodologico", "/metodologia/cierre"),
+    ("gobierno-metodologico", "/gobierno-metodologico"),
 )
 WEBKIT_STYLE_ATTR_WARNING = "Refused to apply a stylesheet because"
 
