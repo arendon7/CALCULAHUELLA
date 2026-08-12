@@ -27,7 +27,7 @@ def _layout_state(page: Page) -> dict[str, object]:
           const years = experience?.querySelector('.experience-years');
           const diagnostic = document.querySelector('#diagnostico');
           const finalCta = document.querySelector('.craft-final-cta');
-          const prototype = document.querySelector('.craft-prototype-note');
+          const host = document.querySelector('[data-section-host]');
           const er = experience?.getBoundingClientRect();
           const yr = years?.getBoundingClientRect();
           const planWrap = document.querySelector('.plan-table-wrap');
@@ -52,16 +52,14 @@ def _layout_state(page: Page) -> dict[str, object]:
             plan_compare_rows: document.querySelectorAll('.plan-table tbody tr').length,
             plan_internal_overflow: Boolean(planWrap && planWrap.scrollWidth > planWrap.clientWidth + 1),
             footer_present: Boolean(document.querySelector('.site-footer-craft')),
+            prototype_note_present: Boolean(document.querySelector('.craft-prototype-note')),
             skip_link: Boolean(document.querySelector('.skip-link[href="#contenido"]')),
             experience_years_contained: Boolean(er && yr && yr.top >= er.top - 1 && yr.bottom <= er.bottom + 1),
             final_cta_after_diagnostic: Boolean(
               diagnostic && finalCta &&
               (diagnostic.compareDocumentPosition(finalCta) & Node.DOCUMENT_POSITION_FOLLOWING)
             ),
-            final_cta_before_prototype: Boolean(
-              finalCta && prototype &&
-              (finalCta.compareDocumentPosition(prototype) & Node.DOCUMENT_POSITION_FOLLOWING)
-            ),
+            final_cta_is_last_main_block: Boolean(host && finalCta && host.lastElementChild === finalCta),
           };
         }
         """
@@ -89,9 +87,11 @@ def _assert_base_contract(page: Page, label: str) -> dict[str, object]:
         raise AssertionError(f"{label}: comparación de planes insuficiente: {state}")
     if not state["footer_present"]:
         raise AssertionError(f"{label}: footer institucional ausente: {state}")
+    if state["prototype_note_present"]:
+        raise AssertionError(f"{label}: regresó la nota redundante de preview: {state}")
     if not state["experience_years_contained"]:
         raise AssertionError(f"{label}: el bloque de experiencia escapó de su sección: {state}")
-    if not state["final_cta_after_diagnostic"] or not state["final_cta_before_prototype"]:
+    if not state["final_cta_after_diagnostic"] or not state["final_cta_is_last_main_block"]:
         raise AssertionError(f"{label}: el CTA final no cierra el recorrido real: {state}")
     return state
 
