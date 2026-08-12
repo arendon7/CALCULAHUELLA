@@ -10,6 +10,7 @@
 @import url("./styles/v2.1-preview.css");
 @import url("./styles/v2.1-craft.css");
 @import url("./styles/v2.1-craft-polish.css");
+@import url("./styles/v2.1-conversion.css");
 
 /* Reset explícito de reglas heredadas que pertenecían al antiguo bloque visual. */
 .craft-experience .experience-years{
