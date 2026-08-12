@@ -11,6 +11,7 @@ on:
       - "requirements*.txt"
       - "scripts/vercel_staging_contract.py"
       - "tests/test_vercel_staging_adapter.py"
+      - "tests/test_migration_legacy_compat.py"
       - "vercel.json"
       - ".github/workflows/vercel-staging-contract.yml"
   workflow_dispatch:
@@ -42,8 +43,10 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt -r requirements-dev.txt
 
-      - name: Verificar contrato estático del adaptador
-        run: pytest -q tests/test_vercel_staging_adapter.py
+      - name: Verificar adaptador y compatibilidad Alembic
+        run: |
+          pytest -q tests/test_vercel_staging_adapter.py
+          pytest -q tests/test_migration_legacy_compat.py
 
       - name: Ejecutar FastAPI desde api.index:app
         run: python scripts/vercel_staging_contract.py
