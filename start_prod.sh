@@ -10,6 +10,15 @@ if [ -f .env ]; then
   set +a
 fi
 
+# Proveedores administrados como Render suelen entregar connection strings
+# PostgreSQL genéricos. El runtime productivo usa psycopg 3, por lo que normalizamos
+# el esquema en el borde de despliegue sin alterar la configuración de desarrollo.
+if [[ "${DATABASE_URL:-}" == postgresql://* ]]; then
+  export DATABASE_URL="postgresql+psycopg://${DATABASE_URL#postgresql://}"
+elif [[ "${DATABASE_URL:-}" == postgres://* ]]; then
+  export DATABASE_URL="postgresql+psycopg://${DATABASE_URL#postgres://}"
+fi
+
 source scripts/runtime_python.sh
 cth_runtime_python "$ROOT"
 PY="$CTH_RUNTIME_PYTHON"
