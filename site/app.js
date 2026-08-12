@@ -45,6 +45,7 @@
       });
       await loadScript("app-runtime.js");
       await loadScript("conversion-runtime.js");
+      await loadScript("preview-closure-runtime.js");
       await loadScript("preview-app.js");
     } catch (error) {
       host.setAttribute("aria-busy", "false");
