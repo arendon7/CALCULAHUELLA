@@ -1,0 +1,37 @@
+name: One-shot · Post-redeploy persistence
+
+on:
+  push:
+    branches:
+      - ops/post-redeploy-persistence-1cef2757
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Render staging · persistencia después de redeploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      STAGING_BASE_URL: https://calcula-tu-huella-arendon7-preview.onrender.com
+      POST_REDEPLOY_ARTIFACT_DIR: post-redeploy-artifacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar cliente HTTP
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install httpx==0.28.1
+      - name: Verificar persistencia post-redeploy
+        run: python -m scripts.verify_post_redeploy_persistence
+      - name: Publicar evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: post-redeploy-persistence-evidence
+          path: post-redeploy-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
