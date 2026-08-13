@@ -17,12 +17,8 @@ def test_pages_never_collects_contact_pii_or_posts_cross_origin() -> None:
     runtime = _text(PAGES_RUNTIME)
 
     for forbidden in (
-        'name="company_name"',
-        'name="contact_name"',
-        'name="email"',
-        'name="phone"',
-        'name="accept_privacy"',
-        "data-route-contact-form",
+        'name="company_name"', 'name="contact_name"', 'name="email"', 'name="phone"',
+        'name="accept_privacy"', "data-route-contact-form",
     ):
         assert forbidden not in section
 
@@ -36,13 +32,14 @@ def test_pages_never_collects_contact_pii_or_posts_cross_origin() -> None:
     assert "searchParams.set('objective'" in runtime
 
 
-def test_contact_pii_is_collected_only_same_origin_with_existing_csrf_contract() -> None:
+def test_contact_uses_one_route_with_get_and_post_same_origin() -> None:
     public_web = _text(PUBLIC_WEB)
     template = _text(PUBLIC_CONTACT)
     base = _text(PUBLIC_BASE)
 
-    assert '@app.get("/contacto", response_class=HTMLResponse)' in public_web
-    assert '@app.post("/contacto")' in public_web
+    assert '@app.api_route("/contacto", methods=["GET", "POST"], response_class=HTMLResponse)' in public_web
+    assert '@app.get("/contacto"' not in public_web
+    assert '@app.post("/contacto"' not in public_web
     assert 'method="post" action="/contacto"' in template
     assert 'name="_csrf_token" value="{{ request.state.csrf_token }}"' in template
     assert 'name="company_name"' in template

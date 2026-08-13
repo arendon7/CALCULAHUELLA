@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import secrets
 
-from fastapi import Depends, Form, HTTPException, Request
+from fastapi import Depends, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -46,6 +46,11 @@ def _query_sites(request: Request) -> int | None:
         return None
 
 
+def _clean_form_value(form, name: str, default: str = "") -> str:
+    value = form.get(name, default)
+    return str(value).strip() if value is not None else default
+
+
 def register_public_routes(app, templates, current_user) -> None:
     @app.get("/", response_class=HTMLResponse)
     def home(request: Request, session: Session = Depends(get_db)):
@@ -68,47 +73,42 @@ def register_public_routes(app, templates, current_user) -> None:
             },
         )
 
-    @app.get("/contacto", response_class=HTMLResponse)
-    def public_contact_form(request: Request):
-        route_context = {
-            "plan": _query_choice(request, "plan", _ALLOWED_CONTACT_PLANS),
-            "sector": _query_choice(request, "sector", _ALLOWED_SECTORS),
-            "sites": _query_sites(request),
-            "objective": _query_choice(request, "objective", _ALLOWED_OBJECTIVES),
-        }
-        return templates.TemplateResponse(
-            request=request,
-            name="public_contact.html",
-            context={
-                "user": current_user(request),
-                "app_settings": settings,
-                "route_context": route_context,
-                "contact_sent": request.query_params.get("estado") == "recibido",
-            },
-        )
+    @app.api_route("/contacto", methods=["GET", "POST"], response_class=HTMLResponse)
+    async def public_contact(request: Request, session: Session = Depends(get_db)):
+        if request.method == "GET":
+            route_context = {
+                "plan": _query_choice(request, "plan", _ALLOWED_CONTACT_PLANS),
+                "sector": _query_choice(request, "sector", _ALLOWED_SECTORS),
+                "sites": _query_sites(request),
+                "objective": _query_choice(request, "objective", _ALLOWED_OBJECTIVES),
+            }
+            return templates.TemplateResponse(
+                request=request,
+                name="public_contact.html",
+                context={
+                    "user": current_user(request),
+                    "app_settings": settings,
+                    "route_context": route_context,
+                    "contact_sent": request.query_params.get("estado") == "recibido",
+                },
+            )
 
-    @app.post("/contacto")
-    def public_contact_request(
-        request: Request,
-        company_name: str = Form(...),
-        contact_name: str = Form(...),
-        email: str = Form(...),
-        phone: str = Form(""),
-        sector: str = Form(""),
-        interest: str = Form("Quiero entender por dónde comenzar"),
-        message: str = Form(...),
-        accept_privacy: str | None = Form(None),
-        accept_commercial: str | None = Form(None),
-        session: Session = Depends(get_db),
-    ):
-        normalized_email = email.strip().lower()
-        normalized_interest = interest.strip()
-        normalized_sector = sector.strip()
+        form = await request.form()
+        company_name = _clean_form_value(form, "company_name")
+        contact_name = _clean_form_value(form, "contact_name")
+        normalized_email = _clean_form_value(form, "email").lower()
+        phone = _clean_form_value(form, "phone")
+        normalized_sector = _clean_form_value(form, "sector")
+        normalized_interest = _clean_form_value(form, "interest", "Quiero entender por dónde comenzar")
+        message = _clean_form_value(form, "message")
+        accept_privacy = _clean_form_value(form, "accept_privacy")
+        accept_commercial = _clean_form_value(form, "accept_commercial")
+
         if (
             "@" not in normalized_email
-            or len(company_name.strip()) < 2
-            or len(contact_name.strip()) < 2
-            or len(message.strip()) < 12
+            or len(company_name) < 2
+            or len(contact_name) < 2
+            or len(message) < 12
         ):
             raise HTTPException(
                 400,
@@ -123,12 +123,13 @@ def register_public_routes(app, templates, current_user) -> None:
             normalized_interest = "Quiero entender por dónde comenzar"
         if normalized_sector not in _ALLOWED_SECTORS:
             normalized_sector = "Por definir"
+
         lead = CommercialLead(
             public_token=secrets.token_urlsafe(24),
-            company_name=company_name.strip(),
-            contact_name=contact_name.strip(),
+            company_name=company_name,
+            contact_name=contact_name,
             email=normalized_email,
-            phone=phone.strip(),
+            phone=phone,
             sector=normalized_sector,
             city="",
             employees_band="Por definir",
@@ -141,7 +142,7 @@ def register_public_routes(app, templates, current_user) -> None:
                 f"Solicitud desde contacto público same-origin\n"
                 f"Autorización de privacidad: sí · versión {settings.legal_effective_date}\n"
                 f"Comunicaciones comerciales opcionales: {'sí' if accept_commercial == 'yes' else 'no'}\n\n"
-                f"{message.strip()}"
+                f"{message}"
             ),
             complexity_score=0,
             recommended_plan_code=_ALLOWED_CONTACT_PLANS.get(normalized_interest, ""),
