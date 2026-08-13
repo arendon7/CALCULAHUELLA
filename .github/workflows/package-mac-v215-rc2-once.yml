@@ -1,0 +1,216 @@
+name: One-shot · V2.1.5 Mac UAT RC2
+
+on:
+  push:
+    branches:
+      - ops/mac-rc2-1cef2757
+
+permissions:
+  contents: read
+  actions: read
+
+env:
+  BASE_ARTIFACT_ID: "9105414995"
+  BASE_INNER_SHA256: "6368dbd77f3286196e7167b554322b7ade8b9bf44784ae77b19542d94d7755dd"
+  BASE_SOURCE_COMMIT: "cef1168d8d8744600a660c90160a95bd442f10fd"
+  CANONICAL_SOURCE_COMMIT: "1cef27576d3e0639afb683c4b61054f30432d681"
+  RC_LINE: "V2.1.5"
+  PRODUCT_VERSION: "1.0.0"
+  RC_NUMBER: "RC2"
+
+jobs:
+  package-rc2:
+    name: Mac UAT · RC2 autocontenido
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Verificar que la rama operacional no altera la fuente canónica
+        run: |
+          set -euo pipefail
+          git cat-file -e "${CANONICAL_SOURCE_COMMIT}^{commit}"
+          git diff --quiet "$CANONICAL_SOURCE_COMMIT" HEAD -- . ':(exclude).github/**'
+          echo "Fuente de producto idéntica a ${CANONICAL_SOURCE_COMMIT}; solo difiere el workflow one-shot excluido del paquete."
+
+      - name: Preparar herramientas
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install -y zip unzip rsync jq
+
+      - name: Descargar y verificar runtime V2.0 certificado
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p .rc/base .rc/unpacked
+          gh api "/repos/${GITHUB_REPOSITORY}/actions/artifacts/${BASE_ARTIFACT_ID}/zip" > .rc/base-artifact.zip
+          unzip -q .rc/base-artifact.zip -d .rc/base
+          BASE_ZIP="$(find .rc/base -maxdepth 1 -type f -name 'Calcula_Tu_Huella_Mac_Autocontenida_*.zip' -print -quit)"
+          test -n "$BASE_ZIP"
+          ACTUAL_BASE_SHA="$(sha256sum "$BASE_ZIP" | awk '{print $1}')"
+          test "$ACTUAL_BASE_SHA" = "$BASE_INNER_SHA256"
+          unzip -q "$BASE_ZIP" -d .rc/unpacked
+          ROOT="$(find .rc/unpacked -mindepth 1 -maxdepth 1 -type d -print -quit)"
+          test -n "$ROOT"
+          test -d "$ROOT/runtime/arm64/python"
+          test -d "$ROOT/runtime/x86_64/python"
+          test -d "$ROOT/wheelhouse/arm64"
+          test -d "$ROOT/wheelhouse/x86_64"
+          echo "$ROOT" > .rc/root-path.txt
+
+      - name: Verificar compatibilidad del lock y contratos Mac
+        run: |
+          set -euo pipefail
+          ROOT="$(cat .rc/root-path.txt)"
+          CURRENT_LOCK_SHA="$(sha256sum requirements-lock.txt | awk '{print $1}')"
+          BASE_LOCK_SHA="$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["requirements_lock_sha256"])' .rc/base/RELEASE_MANIFEST.json)"
+          test "$CURRENT_LOCK_SHA" = "$BASE_LOCK_SHA"
+          test -f "$ROOT/BUILD_PROVENANCE.json"
+          test -f packaging/mac/1_INSTALAR_Y_ABRIR_DEMO.command
+          test -f packaging/mac/5_VERIFICAR_INSTALACION.command
+          /bin/bash -n packaging/mac/1_INSTALAR_Y_ABRIR_DEMO.command
+          /bin/bash -n packaging/mac/2_ABRIR_DEMO.command
+          /bin/bash -n packaging/mac/3_CERRAR_DEMO.command
+          /bin/bash -n packaging/mac/4_REINICIAR_DATOS_DEMO.command
+          /bin/bash -n packaging/mac/5_VERIFICAR_INSTALACION.command
+
+      - name: Superponer fuente certificada y regenerar procedencia
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$(cat .rc/root-path.txt)"
+          cp "$ROOT/BUILD_PROVENANCE.json" .rc/base-build-provenance.json
+
+          rm -rf "$ROOT/source"
+          mkdir -p "$ROOT/source"
+          rsync -a ./ "$ROOT/source/" \
+            --exclude '.git/' \
+            --exclude '.github/' \
+            --exclude '.rc/' \
+            --exclude 'tests/' \
+            --exclude 'packaging/' \
+            --exclude '__pycache__/' \
+            --exclude '*.pyc' \
+            --exclude '.venv/' \
+            --exclude 'instance/' \
+            --exclude '*.db' \
+            --exclude '.DS_Store'
+
+          cp packaging/mac/* "$ROOT/"
+          find "$ROOT" -name '*.command' -exec chmod +x {} +
+          SOURCE_COMMIT_TIME="$(git show -s --format=%cI "$CANONICAL_SOURCE_COMMIT")"
+          export ROOT SOURCE_COMMIT_TIME
+
+          python - <<'PY'
+          import json
+          import os
+          from pathlib import Path
+
+          root = Path(os.environ["ROOT"])
+          base = json.loads(Path(".rc/base-build-provenance.json").read_text(encoding="utf-8"))
+          payload = dict(base)
+          payload.update({
+              "schema_version": 2,
+              "product_version": os.environ["PRODUCT_VERSION"],
+              "source_commit": os.environ["CANONICAL_SOURCE_COMMIT"],
+              "source_ref": "feature/v2-1-0-brand-provenance",
+              "source_commit_time": os.environ["SOURCE_COMMIT_TIME"],
+              "release_candidate": {
+                  "line": os.environ["RC_LINE"],
+                  "number": os.environ["RC_NUMBER"],
+                  "purpose": "mac_real_uat",
+                  "base_runtime_artifact_id": os.environ["BASE_ARTIFACT_ID"],
+                  "base_runtime_source_commit": os.environ["BASE_SOURCE_COMMIT"],
+                  "base_package_sha256": os.environ["BASE_INNER_SHA256"],
+                  "runtime_and_wheelhouse_reused_unchanged": True,
+                  "operational_build_commit": os.environ["GITHUB_SHA"],
+              },
+          })
+          (root / "BUILD_PROVENANCE.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+          rm -f "$ROOT/MANIFEST_SHA256.txt"
+          (
+            cd "$ROOT"
+            find . -type f ! -name MANIFEST_SHA256.txt -print0 \
+              | sort -z \
+              | xargs -0 sha256sum > MANIFEST_SHA256.txt
+          )
+
+      - name: Construir RC2 determinista y manifest de entrega
+        shell: bash
+        run: |
+          set -euo pipefail
+          ROOT="$(cat .rc/root-path.txt)"
+          SHORT_SHA="${CANONICAL_SOURCE_COMMIT:0:12}"
+          VERSION_DIR="Calcula_Tu_Huella_Mac_Autocontenida_v1_0_0_V2_1_5_RC2_${SHORT_SHA}"
+          DEST=".rc/${VERSION_DIR}"
+          mv "$ROOT" "$DEST"
+
+          COMMIT_EPOCH="$(git show -s --format=%ct "$CANONICAL_SOURCE_COMMIT")"
+          find "$DEST" -exec touch -h -d "@${COMMIT_EPOCH}" {} +
+
+          (
+            cd .rc
+            find "$VERSION_DIR" -print | LC_ALL=C sort | zip -X -q -y "${VERSION_DIR}.zip" -@
+            find "$VERSION_DIR" -print | LC_ALL=C sort | zip -X -q -y "${VERSION_DIR}.rebuild.zip" -@
+          )
+          cmp ".rc/${VERSION_DIR}.zip" ".rc/${VERSION_DIR}.rebuild.zip"
+          rm ".rc/${VERSION_DIR}.rebuild.zip"
+
+          ZIP_SHA="$(sha256sum ".rc/${VERSION_DIR}.zip" | awk '{print $1}')"
+          ZIP_BYTES="$(stat -c '%s' ".rc/${VERSION_DIR}.zip")"
+          LOCK_SHA="$(sha256sum requirements-lock.txt | awk '{print $1}')"
+          printf '%s  %s\n' "$ZIP_SHA" "${VERSION_DIR}.zip" > ".rc/${VERSION_DIR}.zip.sha256"
+          export VERSION_DIR ZIP_SHA ZIP_BYTES LOCK_SHA
+
+          python - <<'PY'
+          import json
+          import os
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          payload = {
+              "schema_version": 2,
+              "artifact": f"{os.environ['VERSION_DIR']}.zip",
+              "artifact_sha256": os.environ["ZIP_SHA"],
+              "artifact_bytes": int(os.environ["ZIP_BYTES"]),
+              "product_version": os.environ["PRODUCT_VERSION"],
+              "ux_release_line": os.environ["RC_LINE"],
+              "release_candidate": os.environ["RC_NUMBER"],
+              "source_commit": os.environ["CANONICAL_SOURCE_COMMIT"],
+              "source_ref": "feature/v2-1-0-brand-provenance",
+              "operational_build_commit": os.environ["GITHUB_SHA"],
+              "workflow_run_id": os.environ["GITHUB_RUN_ID"],
+              "requirements_lock_sha256": os.environ["LOCK_SHA"],
+              "base_runtime_artifact_id": os.environ["BASE_ARTIFACT_ID"],
+              "base_runtime_source_commit": os.environ["BASE_SOURCE_COMMIT"],
+              "base_package_sha256": os.environ["BASE_INNER_SHA256"],
+              "runtime_and_wheelhouse_reused_unchanged": True,
+              "purpose": "mac_real_uat",
+              "built_utc": datetime.now(timezone.utc).isoformat(),
+          }
+          Path(".rc/RC_RELEASE_MANIFEST.json").write_text(
+              json.dumps(payload, indent=2, sort_keys=True) + "\n",
+              encoding="utf-8",
+          )
+          PY
+
+      - name: Publicar RC2 Mac para UAT real
+        uses: actions/upload-artifact@v4
+        with:
+          name: Calcula-Tu-Huella-Mac-V2.1.5-RC2-${{ env.CANONICAL_SOURCE_COMMIT }}
+          path: |
+            .rc/Calcula_Tu_Huella_Mac_Autocontenida_v1_0_0_V2_1_5_RC2_*.zip
+            .rc/Calcula_Tu_Huella_Mac_Autocontenida_v1_0_0_V2_1_5_RC2_*.zip.sha256
+            .rc/RC_RELEASE_MANIFEST.json
+          retention-days: 14
+          if-no-files-found: error
+          include-hidden-files: true
