@@ -16,6 +16,8 @@ services:
     envVars:
       - key: APP_ENV
         value: staging
+      - key: PORT
+        value: "8765"
       - key: DATABASE_URL
         fromDatabase:
           name: calcula-tu-huella-preview-db

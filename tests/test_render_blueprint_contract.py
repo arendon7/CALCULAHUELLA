@@ -3,6 +3,7 @@ from pathlib import Path
 
 BLUEPRINT = Path("render.yaml")
 CONFIG = Path("app/config.py")
+DOCKERFILE = Path("Dockerfile")
 
 
 def _text(path: Path) -> str:
@@ -33,6 +34,16 @@ def test_render_staging_pins_certified_postgresql_major() -> None:
     assert "fromDatabase:" in blueprint
     assert "name: calcula-tu-huella-preview-db" in blueprint
     assert "property: connectionString" in blueprint
+
+
+def test_render_staging_aligns_runtime_and_container_health_port() -> None:
+    blueprint = _text(BLUEPRINT)
+    dockerfile = _text(DOCKERFILE)
+
+    assert "- key: PORT\n        value: \"8765\"" in blueprint
+    assert "PORT=8765" in dockerfile
+    assert "EXPOSE 8765" in dockerfile
+    assert "127.0.0.1:8765/api/health" in dockerfile
 
 
 def test_render_staging_remains_explicitly_non_production() -> None:
