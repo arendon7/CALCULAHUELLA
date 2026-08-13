@@ -1,0 +1,37 @@
+name: One-shot · Authenticated Render UAT
+
+on:
+  push:
+    branches:
+      - ops/authenticated-uat-4a492b7b
+
+permissions:
+  contents: read
+
+jobs:
+  authenticated-uat:
+    name: Render staging · UAT autenticada y persistencia
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      STAGING_BASE_URL: https://calcula-tu-huella-arendon7-preview.onrender.com
+      REMOTE_UAT_ARTIFACT_DIR: remote-auth-uat-artifacts
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Instalar cliente HTTP
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install httpx==0.28.1
+      - name: Ejecutar UAT autenticada
+        run: python -m scripts.remote_authenticated_uat
+      - name: Publicar evidencia
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: authenticated-render-uat-evidence
+          path: remote-auth-uat-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
