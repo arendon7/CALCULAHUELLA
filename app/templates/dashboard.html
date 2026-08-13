@@ -3,37 +3,88 @@
 {% block page_label %}Centro de trabajo{% endblock %}
 {% block content %}
 <div class="page-head work-center-head">
-  <div><p class="breadcrumb">Inicio / Centro de trabajo</p><p class="active-context">Organización activa: <strong>{{ inventory.organization.trade_name }}</strong> · {{ inventory.organization.sector }}</p><h1>Hola, {{ user.name.split()[0] }}</h1><p>{{ role_profile.mission }}</p></div>
-  <div class="head-actions"><span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span><a class="btn btn-primary" href="/recorrido-inventario">Continuar proceso</a></div>
+  <div>
+    <p class="breadcrumb">Inicio / Centro de trabajo</p>
+    <p class="active-context">Organización activa: <strong>{{ inventory.organization.trade_name }}</strong> · {{ inventory.organization.sector }}</p>
+    <h1>Hola, {{ user.name.split()[0] }}</h1>
+    <p>{{ role_profile.mission }}</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <a class="btn btn-primary" href="/recorrido-inventario">Continuar proceso</a>
+  </div>
 </div>
 
-{% if demo_story %}
-<section class="demo-story card">
-  <div class="demo-story-copy"><small>CASO DEMOSTRATIVO · {{ demo_story.phase }}</small><h2>{{ demo_story.headline }}</h2><p>{{ demo_story.summary }}</p><div class="demo-story-highlights">{% for item in demo_story.highlights %}<span>✓ {{ item }}</span>{% endfor %}</div></div>
-  <div class="demo-story-action"><span>Estás viendo</span><strong>{{ inventory.organization.trade_name }}</strong><a class="btn btn-primary" href="{{ demo_story.route }}">{{ demo_story.action }} →</a>{% if user.can_manage_portfolio %}<a class="tiny-link" href="/entorno-demo">Cambiar caso demo</a>{% endif %}</div>
+<section class="work-command {% if user.role == 'Cliente' %}role-task{% else %}publication-{{ delivery.publication.tone }}{% endif %}" aria-labelledby="next-action-title">
+  <div class="work-command-main">
+    <span class="eyebrow">EMPIEZA AQUÍ · TU SIGUIENTE ACCIÓN</span>
+    {% if dashboard_action %}
+      <h2 id="next-action-title">{{ dashboard_action.name }}</h2>
+      <p>{{ dashboard_action.detail }}</p>
+      <div class="work-command-meta">
+        <span><b>Responsable:</b> {{ dashboard_action.owner }}</span>
+        <span><b>Se completa cuando:</b> {{ dashboard_action.acceptance }}</span>
+      </div>
+    {% else %}
+      <h2 id="next-action-title">No hay controles críticos pendientes</h2>
+      <p>Revisa la aprobación, las condiciones de publicación y la continuidad del plan de reducción.</p>
+    {% endif %}
+  </div>
+  <div class="work-command-action">
+    <small>SIGUIENTE PASO</small>
+    {% if dashboard_action and can_open_route(user, dashboard_action.href) %}
+      <strong>Continúa desde aquí</strong>
+      <span>Abre únicamente la tarea prioritaria; el resto del proceso seguirá disponible cuando la completes.</span>
+      <a class="btn btn-primary" href="{{ dashboard_action.href }}">{{ dashboard_action.action }} →</a>
+    {% elif dashboard_action %}
+      <strong>Acción asignada a otro rol</strong>
+      <span class="permission-note">Puedes consultar el estado, pero esta tarea debe completarla {{ dashboard_action.owner|lower }}.</span>
+    {% else %}
+      <strong>Revisar expediente</strong>
+      <span>Confirma que el inventario esté listo para cierre y uso de resultados.</span>
+      <a class="btn btn-primary" href="/entrega-profesional">Revisar expediente →</a>
+    {% endif %}
+    <span class="work-command-publication">Estado del resultado: <b>{{ delivery.publication.level }}</b></span>
+  </div>
 </section>
-{% endif %}
 
-{% if guided_setup.completion < 100 or not onboarding.ready %}
-<section class="setup-attention card">
-  <div class="setup-attention-score"><strong>{{ [guided_setup.completion, onboarding.score]|min }}%</strong><span>configuración</span></div>
-  <div><small>CONFIGURACIÓN PENDIENTE</small><h2>{{ onboarding.headline if not onboarding.ready else 'Completa la ruta sectorial recomendada' }}</h2><p>{% if not onboarding.ready and onboarding.next_step %}Siguiente: {{ onboarding.next_step.row.title }}. {{ onboarding.next_step.outcome }}{% else %}Confirma propósito, límites, fuentes, responsables y nivel de revisión antes de ampliar el inventario.{% endif %}</p></div>
-  <a class="btn btn-primary" href="{{ '/onboarding' if not onboarding.ready else '/onboarding/guiado' }}">Completar ahora</a>
+{% if demo_story or guided_setup.completion < 100 or not onboarding.ready %}
+<section class="dashboard-context-strip" aria-label="Contexto y preparación del trabajo">
+  {% if demo_story %}
+  <div class="demo-story dashboard-context-card">
+    <div class="dashboard-context-icon" aria-hidden="true">◎</div>
+    <div class="demo-story-copy">
+      <small>CASO DEMOSTRATIVO · {{ demo_story.phase }}</small>
+      <h2>{{ demo_story.headline }}</h2>
+      <p>{{ demo_story.summary }}</p>
+      <div class="demo-story-highlights">{% for item in demo_story.highlights %}<span>✓ {{ item }}</span>{% endfor %}</div>
+    </div>
+    <div class="demo-story-action">
+      <span>Estás viendo</span><strong>{{ inventory.organization.trade_name }}</strong>
+      <a class="tiny-link" href="{{ demo_story.route }}">{{ demo_story.action }} →</a>
+      {% if user.can_manage_portfolio %}<a class="tiny-link secondary-link" href="/entorno-demo">Cambiar caso demo</a>{% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+  {% if guided_setup.completion < 100 or not onboarding.ready %}
+  <div class="setup-attention dashboard-context-card">
+    <div class="setup-attention-score"><strong>{{ [guided_setup.completion, onboarding.score]|min }}%</strong><span>configuración</span></div>
+    <div>
+      <small>ANTES DE AVANZAR</small>
+      <h2>{{ onboarding.headline if not onboarding.ready else 'Completa la ruta sectorial recomendada' }}</h2>
+      <p>{% if not onboarding.ready and onboarding.next_step %}Siguiente: {{ onboarding.next_step.row.title }}. {{ onboarding.next_step.outcome }}{% else %}Confirma propósito, límites, fuentes, responsables y nivel de revisión antes de ampliar el inventario.{% endif %}</p>
+    </div>
+    <a class="btn btn-secondary" href="{{ '/onboarding' if not onboarding.ready else '/onboarding/guiado' }}">Completar configuración →</a>
+  </div>
+  {% endif %}
 </section>
 {% else %}
-<details class="inventory-context card">
-  <summary><span><small>Configuración inicial completa</small><strong>{{ guided_setup.sector.label }} · {{ guided_setup.scope.label }}</strong></span><b>Revisar contexto</b></summary>
+<details class="inventory-context card compact-inventory-context">
+  <summary><span><small>CONTEXTO DEL INVENTARIO</small><strong>{{ guided_setup.sector.label }} · {{ guided_setup.scope.label }}</strong></span><b>Configuración completa ✓</b></summary>
   <div class="inventory-context-body"><p>{{ guided_setup.objective.label }} · {{ guided_setup.starter_pack.name }} · {{ guided_setup.methodology.review_level }}.</p><div><a class="tiny-link" href="/onboarding">Ver puesta en marcha</a><a class="tiny-link" href="/onboarding/guiado#recomendacion">Revisar ruta sectorial</a></div></div>
 </details>
 {% endif %}
-
-<section class="work-command {% if user.role == 'Cliente' %}role-task{% else %}publication-{{ delivery.publication.tone }}{% endif %}">
-  <div class="work-command-main">
-    <span class="eyebrow">TU SIGUIENTE ACCIÓN</span>
-    {% if dashboard_action %}<h2>{{ dashboard_action.name }}</h2><p>{{ dashboard_action.detail }}</p><div class="work-command-meta"><span><b>Responsable:</b> {{ dashboard_action.owner }}</span><span><b>Se completa cuando:</b> {{ dashboard_action.acceptance }}</span></div>{% else %}<h2>No hay controles críticos pendientes</h2><p>Revisa la aprobación, las condiciones de publicación y la continuidad del plan de reducción.</p>{% endif %}
-  </div>
-  <div class="work-command-action"><small>ESTADO DE USO</small><strong>{{ delivery.publication.level }}</strong><span>{{ delivery.publication.audience }}</span>{% if dashboard_action and can_open_route(user, dashboard_action.href) %}<a class="btn btn-primary" href="{{ dashboard_action.href }}">{{ dashboard_action.action }} →</a>{% elif dashboard_action %}<span class="permission-note">Esta acción corresponde a otro rol</span>{% else %}<a class="btn btn-primary" href="/entrega-profesional">Revisar expediente →</a>{% endif %}</div>
-</section>
 
 <section class="inventory-pulse card" aria-label="Resumen del inventario">
   <div class="inventory-pulse-total"><small>HUELLA DEL PERIODO</small><strong>{{ total|number_es }}</strong><span>tCO₂e</span><a href="/calculos">Abrir resultados →</a></div>
@@ -49,9 +100,35 @@
   </div>
 </section>
 
-<section class="guided-workspace card compact-guided-workspace">
-  <div class="guided-workspace-head"><div><span class="eyebrow">RECORRIDO DEL INVENTARIO</span><h2>Seis etapas, una ruta clara</h2><p>Selecciona la etapa que corresponde a tu tarea. Las etapas terminadas siguen disponibles para consulta.</p></div><a class="tiny-link" href="/recorrido-inventario">Ver recorrido completo →</a></div>
-  <div class="workspace-steps">{% for step in workspace.milestones %}{% if can_open_route(user, step.href) %}<a href="{{ step.href }}" class="workspace-step {% if step.done %}done{% endif %}"><span>{{ '✓' if step.done else loop.index }}</span><div><strong>{{ step.name }}</strong><small>{{ step.detail }}</small></div></a>{% else %}<div class="workspace-step {% if step.done %}done{% endif %}"><span>{{ '✓' if step.done else loop.index }}</span><div><strong>{{ step.name }}</strong><small>{{ step.detail }} · otro rol</small></div></div>{% endif %}{% endfor %}</div>
+<section class="guided-workspace card compact-guided-workspace" aria-labelledby="journey-title">
+  <div class="guided-workspace-head">
+    <div>
+      <span class="eyebrow">TU RUTA DE TRABAJO</span>
+      <h2 id="journey-title">Del dato al informe, sin perder el hilo</h2>
+      <p>Las etapas completadas quedan disponibles para consulta. La etapa marcada como <strong>Ahora</strong> es el punto natural para continuar.</p>
+    </div>
+    <div class="journey-overview">
+      <strong>{{ workspace.score }}%</strong><span>{{ workspace.completed }} de {{ workspace.total }} etapas</span>
+      <a class="tiny-link" href="/recorrido-inventario">Ver recorrido completo →</a>
+    </div>
+  </div>
+  <div class="journey-progress" aria-label="Avance del recorrido: {{ workspace.score }}%"><i style="width:{{ workspace.score }}%"></i></div>
+  <div class="workspace-steps">
+    {% for step in workspace.milestones %}
+      {% set is_current = (not step.done and loop.index == workspace.completed + 1) %}
+      {% if can_open_route(user, step.href) %}
+      <a href="{{ step.href }}" class="workspace-step {% if step.done %}done{% elif is_current %}current{% endif %}" {% if is_current %}aria-current="step"{% endif %}>
+        <span>{{ '✓' if step.done else loop.index }}</span>
+        <div><small class="step-state">{{ 'Hecho' if step.done else 'Ahora' if is_current else 'Después' }}</small><strong>{{ step.name }}</strong><small>{{ step.detail }}</small></div>
+      </a>
+      {% else %}
+      <div class="workspace-step {% if step.done %}done{% elif is_current %}current{% endif %}">
+        <span>{{ '✓' if step.done else loop.index }}</span>
+        <div><small class="step-state">{{ 'Hecho' if step.done else 'Ahora' if is_current else 'Después' }}</small><strong>{{ step.name }}</strong><small>{{ step.detail }} · otro rol</small></div>
+      </div>
+      {% endif %}
+    {% endfor %}
+  </div>
 </section>
 
 <details class="dashboard-disclosure card">
@@ -64,18 +141,18 @@
 </details>
 
 <details class="dashboard-disclosure dashboard-analysis card">
-  <summary><span><small>ANÁLISIS DETALLADO</small><strong>Ver gráficos, fuentes y solicitudes</strong></span><b>{{ sources|length }} fuentes · {{ tasks|length }} pendientes</b></summary>
+  <summary><span><small>ANÁLISIS DETALLADO</small><strong>Gráficos, fuentes y solicitudes</strong></span><b>{{ sources|length }} fuentes · {{ tasks|length }} pendientes</b></summary>
   <div class="dashboard-disclosure-body">
-<div class="dashboard-grid">
-  <section class="card chart-card"><div class="card-head"><div><small>EVOLUCIÓN MENSUAL</small><h3>Emisiones calculadas</h3></div><span class="status-chip active">{{ inventory.status }}</span></div>{% if has_monthly_data %}<div class="monthly-chart" role="img" aria-label="Emisiones mensuales calculadas del inventario">{% for point in monthly_series %}<div class="monthly-column"><span class="monthly-value">{{ point.value|number_es(1) }}</span><i style="height:{{ point.height }}%"></i><small>{{ point.month }}</small></div>{% endfor %}</div>{% else %}<div class="empty-chart"><strong>Aún no hay resultados mensuales calculados.</strong><p>Primero registra datos, confirma unidades, aprueba factores y ejecuta el cálculo.</p><a href="/calculos">Revisar preparación del cálculo →</a></div>{% endif %}</section>
-  <section class="card scope-card"><div class="card-head"><div><small>DISTRIBUCIÓN</small><h3>Participación por alcance</h3></div></div><div class="donut-wrap"><div class="donut" style="--s1:{{ (scopes[1]/total*100)|round(1) if total else 0 }}%;--s2:{{ ((scopes[1]+scopes[2])/total*100)|round(1) if total else 0 }}%"><span>{{ total|number_es(0) }}<small>tCO₂e</small></span></div><ul class="legend"><li><i class="dot d1"></i><b>Alcance 1</b><span>{{ scopes[1]|number_es }}</span></li><li><i class="dot d2"></i><b>Alcance 2</b><span>{{ scopes[2]|number_es }}</span></li><li><i class="dot d3"></i><b>Alcance 3</b><span>{{ scopes[3]|number_es }}</span></li></ul></div></section>
-  <section class="card focus-card"><div class="card-head"><div><small>COBERTURA OPERATIVA</small><h3>Fuentes con información completa</h3></div></div><div class="progress-ring" style="--progress:{{ completeness }}"><span>{{ completeness }}%<small>cobertura de fuentes</small></span></div><p>La cobertura no equivale por sí sola a calidad: también deben revisarse soportes, factores e incertidumbre.</p><a href="/informacion">Revisar datos y evidencias →</a></section>
-</div>
+    <div class="dashboard-grid">
+      <section class="card chart-card"><div class="card-head"><div><small>EVOLUCIÓN MENSUAL</small><h3>Emisiones calculadas</h3></div><span class="status-chip active">{{ inventory.status }}</span></div>{% if has_monthly_data %}<div class="monthly-chart" role="img" aria-label="Emisiones mensuales calculadas del inventario">{% for point in monthly_series %}<div class="monthly-column"><span class="monthly-value">{{ point.value|number_es(1) }}</span><i style="height:{{ point.height }}%"></i><small>{{ point.month }}</small></div>{% endfor %}</div>{% else %}<div class="empty-chart"><strong>Aún no hay resultados mensuales calculados.</strong><p>Primero registra datos, confirma unidades, aprueba factores y ejecuta el cálculo.</p><a href="/calculos">Revisar preparación del cálculo →</a></div>{% endif %}</section>
+      <section class="card scope-card"><div class="card-head"><div><small>DISTRIBUCIÓN</small><h3>Participación por alcance</h3></div></div><div class="donut-wrap"><div class="donut" style="--s1:{{ (scopes[1]/total*100)|round(1) if total else 0 }}%;--s2:{{ ((scopes[1]+scopes[2])/total*100)|round(1) if total else 0 }}%"><span>{{ total|number_es(0) }}<small>tCO₂e</small></span></div><ul class="legend"><li><i class="dot d1"></i><b>Alcance 1</b><span>{{ scopes[1]|number_es }}</span></li><li><i class="dot d2"></i><b>Alcance 2</b><span>{{ scopes[2]|number_es }}</span></li><li><i class="dot d3"></i><b>Alcance 3</b><span>{{ scopes[3]|number_es }}</span></li></ul></div></section>
+      <section class="card focus-card"><div class="card-head"><div><small>COBERTURA OPERATIVA</small><h3>Fuentes con información completa</h3></div></div><div class="progress-ring" style="--progress:{{ completeness }}"><span>{{ completeness }}%<small>cobertura de fuentes</small></span></div><p>La cobertura no equivale por sí sola a calidad: también deben revisarse soportes, factores e incertidumbre.</p><a href="/informacion">Revisar datos y evidencias →</a></section>
+    </div>
 
-<div class="dashboard-bottom-grid">
-  <section class="card sources-preview"><div class="card-head"><div><small>FOCOS PRINCIPALES</small><h3>Fuentes de mayor contribución</h3></div><a href="/inventarios/{{ inventory.id }}/fuentes">Ver todas →</a></div><div class="source-bars">{% for source in sources[:5] %}<a href="/fuentes/{{source.id}}" class="bar-row"><span>{{source.name}}</span><div><i style="width: {{ (source.emissions / source_max * 100)|round }}%"></i></div><strong>{{source.emissions|number_es}} t</strong></a>{% else %}<div class="inline-empty"><strong>No hay fuentes calculadas.</strong><p>Configura las fuentes relevantes del sector antes de interpretar focos.</p></div>{% endfor %}</div></section>
-  <section class="card task-card dashboard-tasks"><div class="card-head"><div><small>INFORMACIÓN PENDIENTE</small><h3>Solicitudes activas</h3></div><span class="counter">{{ tasks|length }}</span></div>{% if tasks %}<ul>{% for task in tasks %}<li class="{% if task.status == 'En revisión' %}warning-li{% endif %}"><b>{{ task.title }}</b><small>{{ task.requested_to }} · vence {{ task.due_date.strftime('%d/%m/%Y') }}</small></li>{% endfor %}</ul>{% else %}<div class="inline-empty"><strong>Sin solicitudes operativas abiertas.</strong><p>Usa Mensajes y requerimientos para documentar dudas, decisiones o bloqueos.</p></div>{% endif %}<a href="/soporte">Gestionar conversaciones →</a></section>
-</div>
+    <div class="dashboard-bottom-grid">
+      <section class="card sources-preview"><div class="card-head"><div><small>FOCOS PRINCIPALES</small><h3>Fuentes de mayor contribución</h3></div><a href="/inventarios/{{ inventory.id }}/fuentes">Ver todas →</a></div><div class="source-bars">{% for source in sources[:5] %}<a href="/fuentes/{{source.id}}" class="bar-row"><span>{{source.name}}</span><div><i style="width: {{ (source.emissions / source_max * 100)|round }}%"></i></div><strong>{{source.emissions|number_es}} t</strong></a>{% else %}<div class="inline-empty"><strong>No hay fuentes calculadas.</strong><p>Configura las fuentes relevantes del sector antes de interpretar focos.</p></div>{% endfor %}</div></section>
+      <section class="card task-card dashboard-tasks"><div class="card-head"><div><small>INFORMACIÓN PENDIENTE</small><h3>Solicitudes activas</h3></div><span class="counter">{{ tasks|length }}</span></div>{% if tasks %}<ul>{% for task in tasks %}<li class="{% if task.status == 'En revisión' %}warning-li{% endif %}"><b>{{ task.title }}</b><small>{{ task.requested_to }} · vence {{ task.due_date.strftime('%d/%m/%Y') }}</small></li>{% endfor %}</ul>{% else %}<div class="inline-empty"><strong>Sin solicitudes operativas abiertas.</strong><p>Usa Mensajes y requerimientos para documentar dudas, decisiones o bloqueos.</p></div>{% endif %}<a href="/soporte">Gestionar conversaciones →</a></section>
+    </div>
   </div>
 </details>
 {% endblock %}
