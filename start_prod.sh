@@ -10,6 +10,18 @@ if [ -f .env ]; then
   set +a
 fi
 
+# El preview de Render tiene una PostgreSQL administrada y aislada declarada en
+# render.yaml. Si alguien reemplaza DATABASE_URL manualmente por una URL externa,
+# fallamos con un diagnóstico explícito antes de entrar a Alembic/SQLAlchemy.
+if [[ "${APP_ENV:-production}" == "staging" \
+  && "${RENDER_PREVIEW_DB_ONLY:-0}" == "1" \
+  && "${DATABASE_URL:-}" == *"supabase.com"* ]]; then
+  echo "ERROR: Render preview database drift detected." >&2
+  echo "DATABASE_URL must come from calcula-tu-huella-preview-db in render.yaml." >&2
+  echo "Sync the Render Blueprint instead of overriding DATABASE_URL manually." >&2
+  exit 78
+fi
+
 # Proveedores administrados como Render suelen entregar connection strings
 # PostgreSQL genéricos. El runtime productivo usa psycopg 3, por lo que normalizamos
 # el esquema en el borde de despliegue sin alterar la configuración de desarrollo.
