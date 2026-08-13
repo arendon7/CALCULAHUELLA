@@ -74,7 +74,9 @@ def test_v049_public_contact_creates_traceable_commercial_request():
     with SessionLocal() as session:
         lead = session.scalar(select(CommercialLead).where(CommercialLead.email == "ana@example.com"))
         assert lead is not None
-        assert lead.source == "Landing pública V1.0"
+        # V1.6 también registra la procedencia en la autoridad same-origin,
+        # en lugar de atribuir el lead a la landing estática histórica.
+        assert lead.source == "Contacto público same-origin"
         assert lead.recommended_plan_code == "EMPRESARIAL"
         assert "movilidad contratada" in lead.notes
         assert "Autorización de privacidad: sí" in lead.notes
