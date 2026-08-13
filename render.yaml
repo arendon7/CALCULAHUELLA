@@ -22,6 +22,8 @@ services:
         fromDatabase:
           name: calcula-tu-huella-preview-db
           property: connectionString
+      - key: RENDER_PREVIEW_DB_ONLY
+        value: "1"
       - key: SESSION_SECRET
         generateValue: true
       - key: SESSION_HTTPS_ONLY
