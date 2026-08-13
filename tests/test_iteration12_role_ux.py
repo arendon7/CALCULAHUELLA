@@ -57,7 +57,10 @@ def test_iteration12_dashboard_integrates_status_and_mobile_actions() -> None:
         assert 'class="mobile-taskbar"' in page.text
         assert "Configuración inicial completa" in page.text
         assert "Continuar recorrido" in page.text
-
+        assert "EMPIEZA AQUÍ · TU SIGUIENTE ACCIÓN" in page.text
+        assert "TU RUTA DE TRABAJO" in page.text
+        assert 'class="journey-progress"' in page.text
+        assert "Del dato al informe, sin perder el hilo" in page.text
 
 
 def test_iteration12_client_receives_an_action_the_client_can_complete() -> None:
@@ -68,7 +71,9 @@ def test_iteration12_client_receives_an_action_the_client_can_complete() -> None
         assert "Atender solicitudes de información" in page.text
         assert "Abrir pendientes" in page.text
         assert "Responsable de información" in page.text
+        assert "Continúa desde aquí" in page.text
         assert "Resolver revisión" not in page.text
+
 
 def test_iteration12_information_defaults_to_twelve_recent_records() -> None:
     with TestClient(app) as client:
