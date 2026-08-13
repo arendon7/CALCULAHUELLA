@@ -4,6 +4,8 @@ from pathlib import Path
 BLUEPRINT = Path("render.yaml")
 CONFIG = Path("app/config.py")
 DOCKERFILE = Path("Dockerfile")
+START_PROD = Path("start_prod.sh")
+RUNTIME_PYTHON = Path("scripts/runtime_python.sh")
 
 
 def _text(path: Path) -> str:
@@ -44,6 +46,20 @@ def test_render_staging_aligns_runtime_and_container_health_port() -> None:
     assert "PORT=8765" in dockerfile
     assert "EXPOSE 8765" in dockerfile
     assert "127.0.0.1:8765/api/health" in dockerfile
+
+
+def test_render_container_explicitly_selects_the_python_image_runtime() -> None:
+    dockerfile = _text(DOCKERFILE)
+    start_prod = _text(START_PROD)
+    runtime_python = _text(RUNTIME_PYTHON)
+
+    # start_prod shares the strict runtime selector with the self-contained Mac
+    # package. Docker therefore must opt in to the Python installed by its pinned
+    # base image instead of falling through to the Mac-only .venv default.
+    assert "CTH_PYTHON_BIN=/usr/local/bin/python" in dockerfile
+    assert 'source scripts/runtime_python.sh' in start_prod
+    assert 'cth_runtime_python "$ROOT"' in start_prod
+    assert 'local candidate="${CTH_PYTHON_BIN:-$root/.venv/bin/python}"' in runtime_python
 
 
 def test_render_staging_remains_explicitly_non_production() -> None:
