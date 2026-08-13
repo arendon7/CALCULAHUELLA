@@ -1,0 +1,49 @@
+name: V2.1 · Remote staging live gate
+
+on:
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: URL HTTPS del staging ya aprovisionado
+        required: true
+        default: https://calcula-tu-huella-arendon7-preview.onrender.com
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  remote-staging-contract:
+    name: Contrato remoto no destructivo
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    env:
+      STAGING_BASE_URL: ${{ inputs.base_url }}
+      REMOTE_STAGING_ARTIFACT_DIR: remote-staging-artifacts
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar cliente HTTP pinneado
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install httpx==0.28.1
+
+      - name: Certificar staging remoto sin mutar datos
+        run: python -m scripts.remote_staging_contract
+
+      - name: Publicar evidencia remota
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: remote-staging-live-evidence
+          path: remote-staging-artifacts/
+          if-no-files-found: warn
+          retention-days: 14
