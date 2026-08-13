@@ -13,6 +13,9 @@ BASE_URL = os.environ.get("STAGING_BASE_URL", DEFAULT_BASE_URL).rstrip("/")
 ARTIFACT_DIR = Path(os.environ.get("REMOTE_STAGING_ARTIFACT_DIR", "remote-staging-artifacts")).resolve()
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 EVIDENCE_PATH = ARTIFACT_DIR / "remote-staging-evidence.json"
+STARTUP_TIMEOUT_SECONDS = float(os.environ.get("REMOTE_STAGING_STARTUP_TIMEOUT_SECONDS", "120"))
+REQUEST_TIMEOUT_SECONDS = float(os.environ.get("REMOTE_STAGING_REQUEST_TIMEOUT_SECONDS", "20"))
+POLL_INTERVAL_SECONDS = float(os.environ.get("REMOTE_STAGING_POLL_INTERVAL_SECONDS", "3"))
 
 
 def _assert_safe_target() -> None:
@@ -30,6 +33,43 @@ def _timed_get(client: httpx.Client, path: str) -> tuple[httpx.Response, int]:
     return response, elapsed_ms
 
 
+def _wait_for_staging_health(client: httpx.Client) -> tuple[httpx.Response, dict[str, object]]:
+    started = time.perf_counter()
+    deadline = started + STARTUP_TIMEOUT_SECONDS
+    attempts = 0
+    last_error = "sin respuesta"
+
+    while True:
+        attempts += 1
+        request_started = time.perf_counter()
+        try:
+            response = client.get("/api/health", timeout=REQUEST_TIMEOUT_SECONDS)
+            request_ms = round((time.perf_counter() - request_started) * 1000)
+            if response.status_code == 200:
+                payload = response.json()
+                if payload.get("status") == "ok" and payload.get("environment") == "staging":
+                    return response, {
+                        "status": 200,
+                        "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                        "last_request_ms": request_ms,
+                        "attempts": attempts,
+                        "payload": payload,
+                    }
+                last_error = f"payload inesperado: {payload!r}"
+            else:
+                last_error = f"HTTP {response.status_code}: {response.text[:300]}"
+        except (httpx.TimeoutException, httpx.TransportError) as exc:
+            last_error = f"{type(exc).__name__}: {exc}"
+
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            raise AssertionError(
+                f"/api/health no quedó sano en {STARTUP_TIMEOUT_SECONDS:.0f}s "
+                f"después de {attempts} intento(s). Último resultado: {last_error}"
+            )
+        time.sleep(min(POLL_INTERVAL_SECONDS, remaining))
+
+
 def _csrf_headers(token: str) -> dict[str, str]:
     return {"x-csrf-token": token}
 
@@ -38,14 +78,9 @@ def main() -> None:
     _assert_safe_target()
     evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v2"}
 
-    with httpx.Client(base_url=BASE_URL, timeout=20, follow_redirects=False) as client:
-        health, health_ms = _timed_get(client, "/api/health")
-        if health.status_code != 200:
-            raise AssertionError(f"/api/health respondió {health.status_code}: {health.text[:500]}")
-        payload = health.json()
-        if payload.get("status") != "ok" or payload.get("environment") != "staging":
-            raise AssertionError(f"/api/health no reporta staging sano: {payload!r}")
-        evidence["health"] = {"status": 200, "elapsed_ms": health_ms, "payload": payload}
+    with httpx.Client(base_url=BASE_URL, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=False) as client:
+        _, health_evidence = _wait_for_staging_health(client)
+        evidence["health"] = health_evidence
 
         for path, marker, key in (
             ("/", "Calcula", "landing"),
