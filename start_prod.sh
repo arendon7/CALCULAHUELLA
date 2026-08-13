@@ -10,9 +10,17 @@ if [ -f .env ]; then
   set +a
 fi
 
-# El preview de Render tiene una PostgreSQL administrada y aislada declarada en
-# render.yaml. Si alguien reemplaza DATABASE_URL manualmente por una URL externa,
-# fallamos con un diagnóstico explícito antes de entrar a Alembic/SQLAlchemy.
+# El preview de Render puede recibir su conexión administrada en una variable
+# dedicada. En staging esa fuente tiene precedencia sobre cualquier DATABASE_URL
+# heredada o configurada manualmente en el servicio.
+if [[ "${APP_ENV:-production}" == "staging" \
+  && "${RENDER_PREVIEW_DB_ONLY:-0}" == "1" \
+  && -n "${RENDER_DATABASE_URL:-}" ]]; then
+  export DATABASE_URL="$RENDER_DATABASE_URL"
+fi
+
+# Si todavía no existe el binding dedicado, conservamos el guard anterior para
+# diagnosticar una DATABASE_URL externa antes de entrar a Alembic/SQLAlchemy.
 if [[ "${APP_ENV:-production}" == "staging" \
   && "${RENDER_PREVIEW_DB_ONLY:-0}" == "1" \
   && "${DATABASE_URL:-}" == *"supabase.com"* ]]; then
