@@ -74,6 +74,23 @@ def _csrf_headers(token: str) -> dict[str, str]:
     return {"x-csrf-token": token}
 
 
+def _assert_secure_csrf_cookie() -> dict[str, object]:
+    # Usa un cliente limpio para comprobar la primera emisión de la cookie. Si se
+    # reutiliza un cliente que ya tiene cth_csrf, el middleware correctamente no
+    # vuelve a enviar Set-Cookie y la prueba produciría un falso negativo.
+    with httpx.Client(base_url=BASE_URL, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=False) as probe:
+        response = probe.get("/")
+        if response.status_code != 200:
+            raise AssertionError(f"La landing para probe CSRF respondió {response.status_code}")
+        token = probe.cookies.get("cth_csrf")
+        if not token or len(token) < 24:
+            raise AssertionError("La landing remota no emitió una cookie CSRF válida")
+        set_cookie = response.headers.get("set-cookie", "").lower()
+        if "secure" not in set_cookie:
+            raise AssertionError("La cookie CSRF del staging HTTPS no está marcada Secure")
+        return {"issued": True, "secure": True}
+
+
 def main() -> None:
     _assert_safe_target()
     evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v2"}
@@ -81,6 +98,7 @@ def main() -> None:
     with httpx.Client(base_url=BASE_URL, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=False) as client:
         _, health_evidence = _wait_for_staging_health(client)
         evidence["health"] = health_evidence
+        evidence["csrf_cookie"] = _assert_secure_csrf_cookie()
 
         for path, marker, key in (
             ("/", "Calcula", "landing"),
@@ -100,14 +118,11 @@ def main() -> None:
                 if 'method="post" action="/contacto"' not in body or 'name="_csrf_token"' not in body:
                     raise AssertionError("/contacto no expone el formulario same-origin con CSRF esperado")
 
-        home = client.get("/")
-        csrf_token = home.cookies.get("cth_csrf") or client.cookies.get("cth_csrf")
+        if not client.cookies.get("cth_csrf"):
+            client.get("/")
+        csrf_token = client.cookies.get("cth_csrf")
         if not csrf_token or len(csrf_token) < 24:
-            raise AssertionError("La landing remota no emitió una cookie CSRF válida")
-        set_cookie = home.headers.get("set-cookie", "").lower()
-        if "secure" not in set_cookie:
-            raise AssertionError("La cookie CSRF del staging HTTPS no está marcada Secure")
-        evidence["csrf_cookie"] = {"issued": True, "secure": True}
+            raise AssertionError("El cliente principal no conserva una cookie CSRF válida")
 
         contact_payload = {
             "company_name": "Remote staging gate",
