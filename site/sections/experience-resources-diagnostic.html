@@ -49,15 +49,8 @@
       <div><span>Fuentes probables</span><b data-result-sources>—</b></div>
       <div><span>Áreas participantes</span><b data-result-areas>—</b></div>
       <div class="diagnostic-route-result"><span>Ruta sugerida</span><b data-result-route>—</b><small data-result-price>Precio de referencia aparecerá aquí</small></div>
-      <div class="diagnostic-reasons">
-        <span>Por qué esta ruta</span>
-        <ul data-result-why><li>El resultado explicará aquí las señales que más pesan en la recomendación.</li></ul>
-      </div>
-      <div class="diagnostic-year-snapshot">
-        <span>Foco del primer año</span>
-        <strong data-result-year-focus>La secuencia anual aparecerá después de calcular la ruta.</strong>
-        <small data-result-next>Primer paso: caracterizar la operación y sus fuentes.</small>
-      </div>
+      <div class="diagnostic-reasons"><span>Por qué esta ruta</span><ul data-result-why><li>El resultado explicará aquí las señales que más pesan en la recomendación.</li></ul></div>
+      <div class="diagnostic-year-snapshot"><span>Foco del primer año</span><strong data-result-year-focus>La secuencia anual aparecerá después de calcular la ruta.</strong><small data-result-next>Primer paso: caracterizar la operación y sus fuentes.</small></div>
       <p data-result-note>La recomendación no sustituye una delimitación técnica definitiva del inventario.</p>
       <div class="diagnostic-result-actions">
         <a class="btn btn-primary diagnostic-year-link" href="#primer-ano">Ver el primer año de esta ruta</a>
@@ -77,12 +70,7 @@
     <article class="route-card-sheet" data-route-card-sheet>
       <header><img src="assets/logo.svg" alt="Calcula tu Huella"><div><small>RESULTADO DEL DIAGNÓSTICO</small><strong data-brief-route>—</strong><span data-brief-price>—</span></div></header>
       <div class="route-card-facts">
-        <div><span>Sector</span><strong data-brief-sector>—</strong></div>
-        <div><span>Sedes</span><strong data-brief-sites>—</strong></div>
-        <div><span>Madurez</span><strong data-brief-maturity>—</strong></div>
-        <div><span>Complejidad</span><strong data-brief-complexity>—</strong></div>
-        <div><span>Fuentes probables</span><strong data-brief-sources>—</strong></div>
-        <div><span>Áreas participantes</span><strong data-brief-areas>—</strong></div>
+        <div><span>Sector</span><strong data-brief-sector>—</strong></div><div><span>Sedes</span><strong data-brief-sites>—</strong></div><div><span>Madurez</span><strong data-brief-maturity>—</strong></div><div><span>Complejidad</span><strong data-brief-complexity>—</strong></div><div><span>Fuentes probables</span><strong data-brief-sources>—</strong></div><div><span>Áreas participantes</span><strong data-brief-areas>—</strong></div>
       </div>
       <section><small>POR QUÉ ESTA RUTA</small><ul data-brief-reasons></ul></section>
       <section><small>FOCO DEL PRIMER AÑO</small><p data-brief-year>—</p><strong data-brief-next>—</strong></section>
@@ -91,43 +79,22 @@
 
     <aside class="route-card-side">
       <div><span>Conservar la ficha</span><h3>Llévala a una conversación sin volver a explicar todo desde cero.</h3><p>La ficha no incluye nombre, correo, teléfono ni otra información de contacto.</p></div>
-      <div class="route-card-actions">
-        <button type="button" data-route-copy>Copiar resumen</button>
-        <button type="button" data-route-share>Compartir ficha</button>
-        <button type="button" data-route-print>Imprimir / guardar PDF</button>
-      </div>
+      <div class="route-card-actions"><button type="button" data-route-copy>Copiar resumen</button><button type="button" data-route-share>Compartir ficha</button><button type="button" data-route-print>Imprimir / guardar PDF</button></div>
       <p class="route-card-status" data-route-card-status role="status" aria-live="polite"></p>
 
       <div class="route-app-bridge" data-route-app-bridge hidden>
         <span>Aplicación web conectada</span>
         <h3>Continúa con el diagnóstico oficial o solicita revisión técnica.</h3>
-        <div class="route-app-actions">
-          <a class="btn btn-primary" data-route-app-diagnostic>Continuar diagnóstico completo</a>
-          <button type="button" data-route-contact-open>Solicitar revisión</button>
-        </div>
+        <p>La ficha transfiere únicamente plan, sector, sedes y objetivo. Los datos personales se solicitan después, dentro de la aplicación.</p>
+        <div class="route-app-actions"><a class="btn btn-primary" data-route-app-diagnostic>Continuar diagnóstico completo</a><a class="btn btn-secondary" href="#" data-route-contact-open>Solicitar revisión</a></div>
+        <small>GitHub Pages no envía PII ni realiza POST al backend. <a href="#" data-contact-privacy target="_blank" rel="noopener noreferrer">Privacidad</a></small>
       </div>
       <div class="route-app-offline" data-route-app-offline>
         <strong>Pages está funcionando en modo preview.</strong>
-        <p>La ficha se puede copiar, compartir o guardar ahora. El envío directo al equipo se habilita cuando la aplicación web pública esté conectada.</p>
+        <p>La ficha se puede copiar, compartir o guardar ahora. El handoff a contacto se habilita cuando la aplicación web pública esté conectada y certificada.</p>
       </div>
     </aside>
   </div>
-
-  <section class="route-contact" data-route-contact hidden>
-    <div class="route-contact-copy"><span>Solicitud real · aplicación web</span><h3>Enviar esta ruta para revisión técnica</h3><p>Solo al enviar este formulario tus datos personales saldrán de GitHub Pages hacia la aplicación configurada.</p></div>
-    <form data-route-contact-form>
-      <label>Empresa<input name="company_name" required minlength="2" autocomplete="organization"></label>
-      <label>Nombre de contacto<input name="contact_name" required minlength="2" autocomplete="name"></label>
-      <label>Correo<input name="email" required type="email" autocomplete="email"></label>
-      <label>Teléfono <span>opcional</span><input name="phone" autocomplete="tel"></label>
-      <input type="hidden" name="sector" data-contact-sector>
-      <input type="hidden" name="interest" data-contact-interest>
-      <label class="route-contact-wide">Mensaje<textarea name="message" required minlength="12" rows="6" data-contact-message></textarea></label>
-      <label class="route-consent route-contact-wide"><input type="checkbox" name="accept_privacy" value="yes" required><span>Autorizo el tratamiento de estos datos para responder mi solicitud. <a data-contact-privacy target="_blank" rel="noopener noreferrer">Ver política de privacidad</a>.</span></label>
-      <label class="route-consent route-contact-wide"><input type="checkbox" name="accept_commercial" value="yes"><span>Acepto recibir comunicaciones comerciales relacionadas con el servicio. Es opcional.</span></label>
-      <div class="route-contact-submit route-contact-wide"><button class="btn btn-primary" type="submit">Enviar solicitud</button><button type="button" data-route-contact-cancel>Cancelar</button></div>
-    </form>
-  </section>
 </dialog>
 
 <div class="route-card-print-surface" data-route-print-surface aria-hidden="true"></div>

@@ -36,23 +36,22 @@ def _csrf_headers(token: str) -> dict[str, str]:
 
 def main() -> None:
     _assert_safe_target()
-    evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v1"}
+    evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v2"}
 
     with httpx.Client(base_url=BASE_URL, timeout=20, follow_redirects=False) as client:
         health, health_ms = _timed_get(client, "/api/health")
         if health.status_code != 200:
             raise AssertionError(f"/api/health respondió {health.status_code}: {health.text[:500]}")
         payload = health.json()
-        if payload.get("status") != "ok":
-            raise AssertionError(f"/api/health no reporta status=ok: {payload!r}")
-        if payload.get("environment") != "staging":
-            raise AssertionError(f"/api/health no reporta environment=staging: {payload!r}")
+        if payload.get("status") != "ok" or payload.get("environment") != "staging":
+            raise AssertionError(f"/api/health no reporta staging sano: {payload!r}")
         evidence["health"] = {"status": 200, "elapsed_ms": health_ms, "payload": payload}
 
         for path, marker, key in (
             ("/", "Calcula", "landing"),
             ("/login", "login", "login"),
             ("/diagnostico", "diagn", "diagnostic"),
+            ("/contacto?plan=Huella%20Esencial&sector=Servicios%20y%20oficinas&sites=1&objective=Construir%20la%20primera%20huella", "Solicitar revisión", "contact"),
             ("/legal/privacidad", "priv", "privacy"),
         ):
             response, elapsed_ms = _timed_get(client, path)
@@ -61,6 +60,10 @@ def main() -> None:
             if marker.casefold() not in response.text.casefold():
                 raise AssertionError(f"{path} no contiene el marcador semántico esperado: {marker!r}")
             evidence[key] = {"status": 200, "elapsed_ms": elapsed_ms}
+            if key == "contact":
+                body = response.text
+                if 'method="post" action="/contacto"' not in body or 'name="_csrf_token"' not in body:
+                    raise AssertionError("/contacto no expone el formulario same-origin con CSRF esperado")
 
         home = client.get("/")
         csrf_token = home.cookies.get("cth_csrf") or client.cookies.get("cth_csrf")
@@ -76,30 +79,21 @@ def main() -> None:
             "contact_name": "Remote staging gate",
             "email": "remote-gate@example.test",
             "phone": "",
-            "sector": "Servicios",
+            "sector": "Servicios y oficinas",
             "interest": "Huella Esencial",
             "message": "Validación no destructiva del contrato remoto.",
             "accept_privacy": "yes",
         }
-
         rejected_csrf = client.post("/contacto", data=contact_payload)
         if rejected_csrf.status_code != 403:
-            raise AssertionError(
-                f"/contacto sin header CSRF debía fallar 403, obtuvo {rejected_csrf.status_code}"
-            )
+            raise AssertionError(f"/contacto sin header CSRF debía fallar 403, obtuvo {rejected_csrf.status_code}")
         evidence["contact_without_csrf"] = 403
 
         no_privacy = dict(contact_payload)
         no_privacy.pop("accept_privacy")
-        rejected_privacy = client.post(
-            "/contacto",
-            data=no_privacy,
-            headers=_csrf_headers(str(csrf_token)),
-        )
+        rejected_privacy = client.post("/contacto", data=no_privacy, headers=_csrf_headers(str(csrf_token)))
         if rejected_privacy.status_code != 400:
-            raise AssertionError(
-                f"/contacto sin consentimiento debía fallar 400, obtuvo {rejected_privacy.status_code}"
-            )
+            raise AssertionError(f"/contacto sin consentimiento debía fallar 400, obtuvo {rejected_privacy.status_code}")
         evidence["contact_without_privacy"] = 400
 
         invalid_login = client.post(
@@ -108,9 +102,7 @@ def main() -> None:
             headers=_csrf_headers(str(csrf_token)),
         )
         if invalid_login.status_code not in {400, 429}:
-            raise AssertionError(
-                f"Login inválido no fue rechazado de forma controlada: {invalid_login.status_code}"
-            )
+            raise AssertionError(f"Login inválido no fue rechazado de forma controlada: {invalid_login.status_code}")
         evidence["invalid_login"] = invalid_login.status_code
 
     EVIDENCE_PATH.write_text(json.dumps(evidence, ensure_ascii=False, indent=2), encoding="utf-8")

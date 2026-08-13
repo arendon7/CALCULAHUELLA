@@ -9,8 +9,6 @@
   const appOffline = dialog.querySelector('[data-route-app-offline]');
   const appDiagnostic = dialog.querySelector('[data-route-app-diagnostic]');
   const contactOpen = dialog.querySelector('[data-route-contact-open]');
-  const contactSection = dialog.querySelector('[data-route-contact]');
-  const contactForm = dialog.querySelector('[data-route-contact-form]');
   const contactPrivacy = dialog.querySelector('[data-contact-privacy]');
   const status = dialog.querySelector('[data-route-card-status]');
   const printSurface = document.querySelector('[data-route-print-surface]');
@@ -28,11 +26,7 @@
     reducir: 'Gestionar un plan de reducción',
     verificacion: 'Preparar revisión externa'
   };
-  const interestMap = {
-    'Huella Esencial': 'Huella Esencial',
-    'Gestión de Carbono': 'Gestión de Carbono',
-    'Gestión Avanzada': 'Gestión Avanzada y Verificación'
-  };
+  const allowedRoutes = new Set(['Huella Esencial', 'Gestión de Carbono', 'Gestión Avanzada']);
 
   let current = null;
 
@@ -54,11 +48,22 @@
         price: String(parsed.price || ''),
         reasons: Array.isArray(parsed.reasons) ? parsed.reasons.slice(0, 4).map(String) : []
       };
-      if (!interestMap[safe.route] || !sectorLabels[safe.sector]) return null;
+      if (!allowedRoutes.has(safe.route) || !sectorLabels[safe.sector]) return null;
       return safe;
     } catch (_) {
       return null;
     }
+  };
+
+  const contactUrl = result => {
+    if (!appBaseUrl || !result) return '';
+    const url = new URL(`${appBaseUrl}/contacto`);
+    url.searchParams.set('plan', result.route);
+    url.searchParams.set('sector', sectorLabels[result.sector]);
+    url.searchParams.set('sites', String(result.sedes));
+    const objective = objectiveLabels[result.objetivo];
+    if (objective) url.searchParams.set('objective', objective);
+    return url.toString();
   };
 
   const setText = (selector, text) => {
@@ -73,27 +78,14 @@
     const yearFocus = document.querySelector('[data-result-year-focus]')?.textContent?.trim() || '';
     const next = document.querySelector('[data-result-next]')?.textContent?.trim() || '';
     return [
-      'CALCULA TU HUELLA · FICHA DE RUTA ORIENTATIVA',
-      '',
-      `Ruta sugerida: ${result.route}`,
-      `Precio estándar de referencia: ${result.price}`,
-      `Sector: ${sectorLabels[result.sector]}`,
-      `Sedes: ${result.sedes}`,
-      `Madurez: ${result.maturity}`,
-      `Complejidad: ${result.complexity}`,
-      `Fuentes probables: ${result.sources}`,
-      `Áreas participantes: ${result.areas}`,
-      `Objetivo: ${objectiveLabels[result.objetivo] || 'Por definir'}`,
-      '',
-      'Por qué esta ruta:',
-      reasons,
-      '',
-      'Foco del primer año:',
-      yearFocus,
-      next,
-      '',
-      'Resultado orientativo. El alcance y precio definitivos dependen de materialidad, fuentes reales, evidencia y requerimientos específicos. No constituye certificación ni verificación independiente.',
-      '',
+      'CALCULA TU HUELLA · FICHA DE RUTA ORIENTATIVA', '',
+      `Ruta sugerida: ${result.route}`, `Precio estándar de referencia: ${result.price}`,
+      `Sector: ${sectorLabels[result.sector]}`, `Sedes: ${result.sedes}`,
+      `Madurez: ${result.maturity}`, `Complejidad: ${result.complexity}`,
+      `Fuentes probables: ${result.sources}`, `Áreas participantes: ${result.areas}`,
+      `Objetivo: ${objectiveLabels[result.objetivo] || 'Por definir'}`, '',
+      'Por qué esta ruta:', reasons, '', 'Foco del primer año:', yearFocus, next, '',
+      'Resultado orientativo. El alcance y precio definitivos dependen de materialidad, fuentes reales, evidencia y requerimientos específicos. No constituye certificación ni verificación independiente.', '',
       'https://arendon7.github.io/CALCULAHUELLA/'
     ].join('\n');
   };
@@ -119,17 +111,7 @@
         return item;
       }));
     }
-
-    if (contactForm) {
-      const sector = contactForm.querySelector('[data-contact-sector]');
-      const interest = contactForm.querySelector('[data-contact-interest]');
-      const message = contactForm.querySelector('[data-contact-message]');
-      if (sector) sector.value = sectorLabels[result.sector];
-      if (interest) interest.value = interestMap[result.route];
-      if (message) {
-        message.value = `Quiero revisar la ruta orientativa ${result.route}.\n\n${briefText(result)}`;
-      }
-    }
+    if (contactOpen && appBaseUrl) contactOpen.href = contactUrl(result);
   };
 
   const syncAvailability = () => {
@@ -139,24 +121,12 @@
     if (result) renderBrief(result);
   };
 
-  const setStatus = message => {
-    if (status) status.textContent = message;
-  };
-
+  const setStatus = message => { if (status) status.textContent = message; };
   const copyText = async text => {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
+    if (navigator.clipboard?.writeText) return navigator.clipboard.writeText(text);
     const area = document.createElement('textarea');
-    area.value = text;
-    area.setAttribute('readonly', '');
-    area.style.position = 'fixed';
-    area.style.opacity = '0';
-    document.body.append(area);
-    area.select();
-    document.execCommand('copy');
-    area.remove();
+    area.value = text; area.setAttribute('readonly', ''); area.style.position = 'fixed'; area.style.opacity = '0';
+    document.body.append(area); area.select(); document.execCommand('copy'); area.remove();
   };
 
   if (appBaseUrl) {
@@ -164,10 +134,6 @@
     if (appOffline) appOffline.hidden = true;
     if (appDiagnostic) appDiagnostic.href = `${appBaseUrl}/diagnostico`;
     if (contactPrivacy) contactPrivacy.href = `${appBaseUrl}/legal/privacidad`;
-    if (contactForm) {
-      contactForm.method = 'post';
-      contactForm.action = `${appBaseUrl}/contacto`;
-    }
   } else {
     if (appBridge) appBridge.hidden = true;
     if (appOffline) appOffline.hidden = false;
@@ -176,12 +142,9 @@
   openButton.addEventListener('click', () => {
     const result = readDiagnostic();
     if (!result) return;
-    renderBrief(result);
-    setStatus('');
-    if (typeof dialog.showModal === 'function') dialog.showModal();
-    else dialog.setAttribute('open', '');
+    renderBrief(result); setStatus('');
+    if (typeof dialog.showModal === 'function') dialog.showModal(); else dialog.setAttribute('open', '');
   });
-
   dialog.querySelector('[data-route-card-close]')?.addEventListener('click', () => dialog.close());
   dialog.addEventListener('click', event => {
     if (event.target !== dialog) return;
@@ -189,70 +152,33 @@
     const inside = event.clientX >= rect.left && event.clientX <= rect.right && event.clientY >= rect.top && event.clientY <= rect.bottom;
     if (!inside) dialog.close();
   });
-
   dialog.querySelector('[data-route-copy]')?.addEventListener('click', async () => {
     if (!current) return;
-    try {
-      await copyText(briefText(current));
-      setStatus('Resumen copiado. No incluye datos personales.');
-    } catch (_) {
-      setStatus('No fue posible copiar automáticamente. Usa Imprimir / guardar PDF.');
-    }
+    try { await copyText(briefText(current)); setStatus('Resumen copiado. No incluye datos personales.'); }
+    catch (_) { setStatus('No fue posible copiar automáticamente. Usa Imprimir / guardar PDF.'); }
   });
-
   dialog.querySelector('[data-route-share]')?.addEventListener('click', async () => {
     if (!current) return;
     const text = briefText(current);
     try {
       if (navigator.share) {
-        await navigator.share({
-          title: `Calcula tu Huella · ${current.route}`,
-          text,
-          url: 'https://arendon7.github.io/CALCULAHUELLA/#diagnostico'
-        });
+        await navigator.share({ title: `Calcula tu Huella · ${current.route}`, text, url: 'https://arendon7.github.io/CALCULAHUELLA/#diagnostico' });
         setStatus('Ficha compartida desde el dispositivo.');
-      } else {
-        await copyText(text);
-        setStatus('Tu navegador no ofrece compartir: copiamos la ficha al portapapeles.');
-      }
-    } catch (error) {
-      if (error?.name !== 'AbortError') setStatus('No se completó el envío. Puedes copiar o imprimir la ficha.');
-    }
+      } else { await copyText(text); setStatus('Tu navegador no ofrece compartir: copiamos la ficha al portapapeles.'); }
+    } catch (error) { if (error?.name !== 'AbortError') setStatus('No se completó el envío. Puedes copiar o imprimir la ficha.'); }
   });
-
   dialog.querySelector('[data-route-print]')?.addEventListener('click', () => {
     if (!current || !printSurface) return;
-    const sheet = dialog.querySelector('[data-route-card-sheet]');
-    if (!sheet) return;
-    printSurface.replaceChildren(sheet.cloneNode(true));
-    document.body.classList.add('route-card-printing');
-    printSurface.setAttribute('aria-hidden', 'false');
-    window.print();
+    const sheet = dialog.querySelector('[data-route-card-sheet]'); if (!sheet) return;
+    printSurface.replaceChildren(sheet.cloneNode(true)); document.body.classList.add('route-card-printing');
+    printSurface.setAttribute('aria-hidden', 'false'); window.print();
   });
   window.addEventListener('afterprint', () => {
     document.body.classList.remove('route-card-printing');
-    if (printSurface) {
-      printSurface.setAttribute('aria-hidden', 'true');
-      printSurface.replaceChildren();
-    }
+    if (printSurface) { printSurface.setAttribute('aria-hidden', 'true'); printSurface.replaceChildren(); }
   });
-
-  contactOpen?.addEventListener('click', () => {
-    if (!appBaseUrl || !contactSection || !current) return;
-    renderBrief(current);
-    contactSection.hidden = false;
-    contactSection.scrollIntoView({ block: 'nearest' });
-    contactForm?.querySelector('input[name="company_name"]')?.focus();
-  });
-  dialog.querySelector('[data-route-contact-cancel]')?.addEventListener('click', () => {
-    if (contactSection) contactSection.hidden = true;
-    contactOpen?.focus();
-  });
-
-  /* conversion-runtime detiene el submit en fase capture; esperamos al siguiente tick y leemos su resultado autorizado. */
   document.addEventListener('submit', event => {
     if (event.target?.matches?.('[data-diagnostic-form]')) setTimeout(syncAvailability, 0);
   }, true);
-
   syncAvailability();
 })();
