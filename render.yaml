@@ -45,11 +45,13 @@ services:
       - key: STRUCTURED_LOGGING
         value: "true"
 
-# Base persistente para el preview. Los documentos cargados siguen siendo efímeros
-# hasta conectar S3/Supabase Storage; los datos transaccionales sí viven en Postgres.
+# Base persistente y aislada para UAT. Se fija PostgreSQL 17 porque es la versión
+# sobre la que se certificaron migraciones legacy→head, restore y runtime V2.1.
+# Los documentos cargados siguen siendo efímeros hasta conectar almacenamiento externo.
 databases:
   - name: calcula-tu-huella-preview-db
     plan: free
     region: virginia
+    postgresMajorVersion: "17"
     databaseName: calculatuhuella_preview
     user: calculatuhuella_preview
