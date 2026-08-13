@@ -33,3 +33,118 @@
   .login-page .login-brand-plate{max-width:220px;padding:8px 12px;border-radius:14px}
   .login-page .login-brand-plate .login-logo{width:min(190px,100%)}
 }
+
+/* V2.1 · Centro de trabajo: una acción, contexto compacto y recorrido legible. */
+body.app-shell .dashboard-context-strip{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+  margin:0 0 18px;
+}
+body.app-shell .dashboard-context-strip>div:only-child{grid-column:1/-1}
+body.app-shell .dashboard-context-card{
+  min-width:0;
+  margin:0;
+  padding:16px 18px;
+  border:1px solid var(--v212-app-line);
+  border-radius:16px;
+  background:#fff;
+  box-shadow:none;
+}
+body.app-shell .demo-story.dashboard-context-card{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  gap:14px;
+  align-items:center;
+  border-style:solid;
+  background:linear-gradient(135deg,#fff,#f7faf8);
+}
+body.app-shell .dashboard-context-icon{
+  display:grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  background:#e9f3ed;
+  color:#23634a;
+  font-weight:800;
+}
+body.app-shell .dashboard-context-card h2{margin:2px 0 4px;font-size:1rem;letter-spacing:-.02em}
+body.app-shell .dashboard-context-card p{margin:0;color:var(--v212-app-muted);font-size:.78rem;line-height:1.5}
+body.app-shell .dashboard-context-card small{color:#6d7d75;font-size:.65rem;letter-spacing:.08em}
+body.app-shell .dashboard-context-card .demo-story-highlights{display:flex;gap:8px;flex-wrap:wrap;margin-top:7px}
+body.app-shell .dashboard-context-card .demo-story-highlights span{font-size:.68rem;color:#45665a}
+body.app-shell .dashboard-context-card .demo-story-action{
+  min-width:150px;
+  display:flex;
+  flex-direction:column;
+  align-items:flex-start;
+  gap:2px;
+  padding-left:14px;
+  border-left:1px solid var(--v212-app-line);
+}
+body.app-shell .dashboard-context-card .demo-story-action strong{color:#0b3b2e;font-size:.82rem}
+body.app-shell .dashboard-context-card .demo-story-action .tiny-link{margin-top:4px}
+body.app-shell .dashboard-context-card .secondary-link{opacity:.72}
+body.app-shell .setup-attention.dashboard-context-card{
+  display:grid;
+  grid-template-columns:auto minmax(0,1fr) auto;
+  align-items:center;
+  gap:14px;
+  border-left:3px solid #ca9a6c;
+  background:linear-gradient(135deg,#fff,#fbf8f3);
+}
+body.app-shell .setup-attention.dashboard-context-card .setup-attention-score{
+  width:70px;height:58px;display:flex;flex-direction:column;align-items:center;justify-content:center;border-radius:13px;
+}
+body.app-shell .setup-attention.dashboard-context-card .setup-attention-score strong{font-size:1.15rem}
+body.app-shell .setup-attention.dashboard-context-card .setup-attention-score span{font-size:.62rem}
+body.app-shell .setup-attention.dashboard-context-card .btn{white-space:nowrap;margin:0}
+body.app-shell .compact-inventory-context{margin:0 0 18px;box-shadow:none}
+body.app-shell .compact-inventory-context>summary{min-height:52px;padding:12px 16px}
+body.app-shell .work-command{margin-top:6px;margin-bottom:14px}
+body.app-shell .work-command-action{min-height:100%}
+body.app-shell .work-command-publication{
+  width:100%;margin-top:11px;padding-top:10px;border-top:1px solid rgba(255,255,255,.15);color:#c9ddd2!important;font-size:.68rem!important;
+}
+body.app-shell .work-command-publication b{color:#fff}
+body.app-shell .guided-workspace-head{align-items:center}
+body.app-shell .journey-overview{min-width:150px;display:flex;flex-direction:column;align-items:flex-end;text-align:right}
+body.app-shell .journey-overview>strong{color:#0b3b2e;font-size:1.55rem;line-height:1;letter-spacing:-.04em}
+body.app-shell .journey-overview>span{margin:4px 0 7px;color:#708077;font-size:.7rem}
+body.app-shell .journey-progress{height:6px;margin:4px 0 14px;overflow:hidden;border-radius:999px;background:#e9f0ec}
+body.app-shell .journey-progress i{display:block;height:100%;max-width:100%;border-radius:inherit;background:linear-gradient(90deg,#2d6f73,#63a26f)}
+body.app-shell .workspace-step{position:relative;align-items:flex-start}
+body.app-shell .workspace-step.current{
+  border-color:rgba(45,111,115,.46);background:linear-gradient(135deg,#f2f8f5,#fff);box-shadow:0 9px 22px rgba(45,111,115,.09);transform:translateY(-1px)
+}
+body.app-shell .workspace-step.current>span{background:#2d6f73;color:#fff}
+body.app-shell .workspace-step .step-state{display:block;margin:0 0 2px;color:#7b8982;font-size:.58rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase}
+body.app-shell .workspace-step.current .step-state{color:#2d6f73}
+body.app-shell .workspace-step.done .step-state{color:#35785a}
+body.app-shell .workspace-step:not(.done):not(.current){opacity:.76}
+
+@media(max-width:1120px){
+  body.app-shell .dashboard-context-strip{grid-template-columns:1fr}
+  body.app-shell .dashboard-context-strip>div:only-child{grid-column:auto}
+  body.app-shell .demo-story.dashboard-context-card,body.app-shell .setup-attention.dashboard-context-card{grid-template-columns:auto minmax(0,1fr)}
+  body.app-shell .dashboard-context-card .demo-story-action,body.app-shell .setup-attention.dashboard-context-card .btn{grid-column:2}
+  body.app-shell .dashboard-context-card .demo-story-action{padding-left:0;border-left:0}
+}
+@media(max-width:760px){
+  body.app-shell .work-center-head{gap:12px}
+  body.app-shell .work-center-head .head-actions{width:100%}
+  body.app-shell .work-center-head .period-chip{width:100%;justify-content:center}
+  body.app-shell .work-command{grid-template-columns:1fr;padding:20px}
+  body.app-shell .work-command-action{padding:16px}
+  body.app-shell .dashboard-context-strip{gap:9px}
+  body.app-shell .demo-story.dashboard-context-card,body.app-shell .setup-attention.dashboard-context-card{grid-template-columns:1fr;padding:15px}
+  body.app-shell .dashboard-context-icon{display:none}
+  body.app-shell .dashboard-context-card .demo-story-action,body.app-shell .setup-attention.dashboard-context-card .btn{grid-column:1}
+  body.app-shell .dashboard-context-card .demo-story-action{min-width:0;padding-top:8px;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .setup-attention.dashboard-context-card .setup-attention-score{width:64px;height:52px}
+  body.app-shell .guided-workspace-head{align-items:flex-start}
+  body.app-shell .journey-overview{width:100%;align-items:flex-start;text-align:left}
+  body.app-shell .workspace-steps{grid-template-columns:1fr}
+  body.app-shell .workspace-step{min-height:70px}
+}
