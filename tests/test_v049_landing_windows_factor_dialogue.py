@@ -68,7 +68,9 @@ def test_v049_public_contact_creates_traceable_commercial_request():
             follow_redirects=False,
         )
         assert response.status_code == 303
-        assert response.headers["location"] == "/?contacto=recibido#contacto"
+        # El lead V0.49 se conserva, pero V1.6 formalizó el handoff same-origin
+        # en la autoridad canónica /contacto para mantener PII y CSRF en backend.
+        assert response.headers["location"] == "/contacto?estado=recibido"
     with SessionLocal() as session:
         lead = session.scalar(select(CommercialLead).where(CommercialLead.email == "ana@example.com"))
         assert lead is not None
