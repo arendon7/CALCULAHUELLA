@@ -133,6 +133,7 @@
     if (appBridge) appBridge.hidden = false;
     if (appOffline) appOffline.hidden = true;
     if (appDiagnostic) appDiagnostic.href = `${appBaseUrl}/diagnostico`;
+    if (contactOpen) contactOpen.href = `${appBaseUrl}/contacto`;
     if (contactPrivacy) contactPrivacy.href = `${appBaseUrl}/legal/privacidad`;
   } else {
     if (appBridge) appBridge.hidden = true;
