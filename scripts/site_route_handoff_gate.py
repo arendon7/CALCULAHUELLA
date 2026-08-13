@@ -3,12 +3,16 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+from urllib.parse import parse_qs, urlparse
 
 from playwright.sync_api import Page, Route, sync_playwright
 
 BASE_URL = os.environ.get("SITE_PREVIEW_BASE_URL", "http://127.0.0.1:8780").rstrip("/")
+APP_BASE_URL = "https://calcula-tu-huella-arendon7-preview.onrender.com"
 ARTIFACT_DIR = Path(os.environ.get("SITE_PREVIEW_ARTIFACT_DIR", "site-preview-artifacts")).resolve()
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
+CONFIG_PATH = Path("site/config.js")
+PII_FIELDS = ("company_name", "contact_name", "email", "phone")
 
 
 def _clear(page: Page) -> None:
@@ -33,28 +37,7 @@ def _fill_essential(page: Page) -> None:
         raise AssertionError("La ruta base de handoff dejó de ser Huella Esencial")
 
 
-def _privacy_safe_pages(browser) -> dict[str, object]:
-    context = browser.new_context(viewport={"width": 1440, "height": 1000})
-    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE_URL)
-    page = context.new_page()
-    posts: list[str] = []
-    page.on("request", lambda request: posts.append(request.url) if request.method == "POST" else None)
-    page.add_init_script("window.print = () => { window.__cthPrinted = true; };")
-    _clear(page)
-
-    open_button = page.locator('[data-route-card-open]')
-    if not open_button.is_disabled():
-        raise AssertionError("La ficha de ruta debe iniciar deshabilitada sin diagnóstico")
-
-    _fill_essential(page)
-    page.wait_for_timeout(80)
-    if open_button.is_disabled():
-        raise AssertionError("La ficha no se habilitó después del diagnóstico")
-    open_button.click()
-
-    dialog = page.locator('[data-route-card-dialog]')
-    if not dialog.is_visible():
-        raise AssertionError("La ficha de ruta no abrió")
+def _assert_brief(dialog) -> dict[str, str]:
     observed = {
         "route": dialog.locator('[data-brief-route]').inner_text().strip(),
         "price": dialog.locator('[data-brief-price]').inner_text().strip(),
@@ -69,13 +52,118 @@ def _privacy_safe_pages(browser) -> dict[str, object]:
     }
     if observed != expected:
         raise AssertionError(f"Ficha inesperada: {observed}")
+    return observed
 
+
+def _storage_without_pii(page: Page) -> list[str]:
+    storage = page.evaluate(
+        """
+        () => Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]))
+        """
+    )
+    serialized = json.dumps(storage, ensure_ascii=False).lower()
+    forbidden = ("company_name", "contact_name", '"email"', '"phone"', "correo:", "teléfono:")
+    if any(term in serialized for term in forbidden):
+        raise AssertionError(f"Pages persistió PII en localStorage: {storage}")
+    return sorted(storage)
+
+
+def _assert_no_pii_form(dialog) -> None:
+    if dialog.locator('[data-route-contact-form]').count():
+        raise AssertionError("Pages no debe contener un formulario POST de contacto")
+    for field in PII_FIELDS:
+        if dialog.locator(f'[name="{field}"]').count():
+            raise AssertionError(f"Pages no debe solicitar PII: {field}")
+
+
+def _offline_contract(browser) -> dict[str, object]:
+    context = browser.new_context(viewport={"width": 1280, "height": 900})
+    page = context.new_page()
+    posts: list[str] = []
+    page.on("request", lambda request: posts.append(request.url) if request.method == "POST" else None)
+
+    def blank_config(route: Route) -> None:
+        route.fulfill(
+            status=200,
+            content_type="application/javascript",
+            body='window.CALCULA_TU_HUELLA_CONFIG = { appBaseUrl: "" };',
+        )
+
+    page.route("**/config.js", blank_config)
+    _clear(page)
+    _fill_essential(page)
+    page.locator('[data-route-card-open]').click()
+    dialog = page.locator('[data-route-card-dialog]')
     if not dialog.locator('[data-route-app-offline]').is_visible():
-        raise AssertionError("Pages debe declarar modo preview cuando appBaseUrl está vacío")
+        raise AssertionError("Sin appBaseUrl debe mantenerse el aviso de preview")
     if dialog.locator('[data-route-app-bridge]').is_visible():
-        raise AssertionError("Pages no debe mostrar handoff a una app no configurada")
-    if dialog.locator('[data-route-contact]').is_visible():
-        raise AssertionError("Pages no debe pedir PII en la ficha inicial")
+        raise AssertionError("Sin appBaseUrl no debe aparecer el bridge")
+    _assert_no_pii_form(dialog)
+    if posts:
+        raise AssertionError(f"El modo offline generó POST inesperados: {posts}")
+    storage_keys = _storage_without_pii(page)
+    context.close()
+    return {"posts": posts, "storage_keys": storage_keys}
+
+
+def _connected_contract(browser) -> dict[str, object]:
+    config = CONFIG_PATH.read_text(encoding="utf-8")
+    if APP_BASE_URL not in config:
+        raise AssertionError("site/config.js no apunta al staging Render certificado")
+
+    context = browser.new_context(viewport={"width": 1440, "height": 1000})
+    context.grant_permissions(["clipboard-read", "clipboard-write"], origin=BASE_URL)
+    page = context.new_page()
+    posts: list[str] = []
+    page.on("request", lambda request: posts.append(request.url) if request.method == "POST" else None)
+    page.add_init_script("window.print = () => { window.__cthPrinted = true; };")
+    _clear(page)
+
+    open_button = page.locator('[data-route-card-open]')
+    if not open_button.is_disabled():
+        raise AssertionError("La ficha debe iniciar deshabilitada sin diagnóstico")
+    _fill_essential(page)
+    page.wait_for_timeout(80)
+    if open_button.is_disabled():
+        raise AssertionError("La ficha no se habilitó después del diagnóstico")
+    open_button.click()
+
+    dialog = page.locator('[data-route-card-dialog]')
+    if not dialog.is_visible():
+        raise AssertionError("La ficha de ruta no abrió")
+    brief = _assert_brief(dialog)
+    if not dialog.locator('[data-route-app-bridge]').is_visible():
+        raise AssertionError("El staging configurado no habilitó el bridge")
+    if dialog.locator('[data-route-app-offline]').is_visible():
+        raise AssertionError("El aviso offline siguió visible con staging certificado")
+
+    diagnosis_href = dialog.locator('[data-route-app-diagnostic]').get_attribute("href")
+    privacy_href = dialog.locator('[data-contact-privacy]').get_attribute("href")
+    contact = dialog.locator('[data-route-contact-open]')
+    contact_href = contact.get_attribute("href") or ""
+    if diagnosis_href != f"{APP_BASE_URL}/diagnostico":
+        raise AssertionError(f"Handoff de diagnóstico inesperado: {diagnosis_href}")
+    if privacy_href != f"{APP_BASE_URL}/legal/privacidad":
+        raise AssertionError(f"Handoff de privacidad inesperado: {privacy_href}")
+    if contact.evaluate("el => el.tagName") != "A":
+        raise AssertionError("Solicitar revisión debe ser una navegación GET, no un formulario")
+
+    parsed = urlparse(contact_href)
+    expected_origin = urlparse(APP_BASE_URL)
+    if (parsed.scheme, parsed.netloc, parsed.path) != (expected_origin.scheme, expected_origin.netloc, "/contacto"):
+        raise AssertionError(f"Destino de contacto inesperado: {contact_href}")
+    params = parse_qs(parsed.query, keep_blank_values=True)
+    expected_params = {
+        "plan": ["Huella Esencial"],
+        "sector": ["Servicios y oficinas"],
+        "sites": ["1"],
+        "objective": ["Construir la primera huella"],
+    }
+    if params != expected_params:
+        raise AssertionError(f"El handoff GET transfirió parámetros inesperados: {params}")
+    if any(key in params for key in PII_FIELDS):
+        raise AssertionError(f"El handoff GET contiene PII: {params}")
+    _assert_no_pii_form(dialog)
 
     dialog.locator('[data-route-copy]').click()
     page.wait_for_timeout(80)
@@ -85,10 +173,9 @@ def _privacy_safe_pages(browser) -> dict[str, object]:
     clipboard = page.evaluate("navigator.clipboard.readText()")
     required_copy = ("Huella Esencial", "$1.300.000 COP / año", "Servicios y oficinas")
     if not all(value in clipboard for value in required_copy):
-        raise AssertionError("El resumen copiado perdió datos esenciales de la ficha")
-    pii_terms = ("company_name", "contact_name", "email", "phone", "correo:", "teléfono:")
-    if any(term.lower() in clipboard.lower() for term in pii_terms):
-        raise AssertionError("La ficha copiada contiene campos o etiquetas PII")
+        raise AssertionError("El resumen copiado perdió datos esenciales")
+    if any(term in clipboard.lower() for term in ("company_name", "contact_name", "correo:", "teléfono:")):
+        raise AssertionError("La ficha copiada contiene etiquetas PII")
 
     dialog.locator('[data-route-print]').click()
     page.wait_for_timeout(50)
@@ -96,86 +183,25 @@ def _privacy_safe_pages(browser) -> dict[str, object]:
     printing_class = page.evaluate("document.body.classList.contains('route-card-printing')")
     print_text = page.locator('[data-route-print-surface]').inner_text()
     if not printed or not printing_class or "Huella Esencial" not in print_text:
-        raise AssertionError("El flujo imprimir/guardar PDF no preparó una ficha aislada")
+        raise AssertionError("El flujo imprimir/guardar PDF no preparó la ficha")
     page.evaluate("window.dispatchEvent(new Event('afterprint'))")
     if page.evaluate("document.body.classList.contains('route-card-printing')"):
-        raise AssertionError("El estado de impresión no se limpió después de afterprint")
+        raise AssertionError("El estado de impresión no se limpió")
 
-    storage = page.evaluate(
-        """
-        () => Object.fromEntries(Object.keys(localStorage).map(key => [key, localStorage.getItem(key)]))
-        """
-    )
-    serialized = json.dumps(storage, ensure_ascii=False).lower()
-    forbidden_storage = ("company_name", "contact_name", '"email"', '"phone"')
-    if any(term in serialized for term in forbidden_storage):
-        raise AssertionError(f"Pages persistió PII en localStorage: {storage}")
+    storage_keys = _storage_without_pii(page)
     if posts:
-        raise AssertionError(f"Pages generó POST sin app pública ni consentimiento: {posts}")
-
-    dialog.locator('[data-route-card-close]').click()
+        raise AssertionError(f"Pages generó POST cross-origin o silencioso: {posts}")
     page.screenshot(path=str(ARTIFACT_DIR / "route-handoff-desktop.png"), full_page=True)
     context.close()
-    return {"brief": observed, "posts": posts, "storage_keys": sorted(storage)}
-
-
-def _connected_contract(browser) -> dict[str, object]:
-    context = browser.new_context(viewport={"width": 1280, "height": 900})
-    page = context.new_page()
-
-    def config_route(route: Route) -> None:
-        route.fulfill(
-            status=200,
-            content_type="application/javascript",
-            body='window.CALCULA_TU_HUELLA_CONFIG = { appBaseUrl: "https://app.example.test" };',
-        )
-
-    page.route("**/config.js", config_route)
-    _clear(page)
-    _fill_essential(page)
-    page.wait_for_timeout(80)
-    page.locator('[data-route-card-open]').click()
-    dialog = page.locator('[data-route-card-dialog]')
-
-    if not dialog.locator('[data-route-app-bridge]').is_visible():
-        raise AssertionError("Una appBaseUrl configurada no habilitó el bridge")
-    if dialog.locator('[data-route-app-offline]').is_visible():
-        raise AssertionError("El aviso offline siguió visible con app configurada")
-
-    diagnosis_href = dialog.locator('[data-route-app-diagnostic]').get_attribute("href")
-    privacy_href = dialog.locator('[data-contact-privacy]').get_attribute("href")
-    form_action = dialog.locator('[data-route-contact-form]').get_attribute("action")
-    form_method = (dialog.locator('[data-route-contact-form]').get_attribute("method") or "").lower()
-    expected = {
-        "diagnosis": "https://app.example.test/diagnostico",
-        "privacy": "https://app.example.test/legal/privacidad",
-        "contact": "https://app.example.test/contacto",
-        "method": "post",
-    }
-    observed = {
+    return {
+        "brief": brief,
         "diagnosis": diagnosis_href,
         "privacy": privacy_href,
-        "contact": form_action,
-        "method": form_method,
+        "contact_get": contact_href,
+        "contact_params": params,
+        "posts": posts,
+        "storage_keys": storage_keys,
     }
-    if observed != expected:
-        raise AssertionError(f"Contrato de handoff a app divergente: {observed}")
-
-    dialog.locator('[data-route-contact-open]').click()
-    contact = dialog.locator('[data-route-contact]')
-    if not contact.is_visible():
-        raise AssertionError("Solicitar revisión no mostró formulario")
-    if contact.locator('input[name="accept_privacy"][required]').count() != 1:
-        raise AssertionError("El formulario real perdió consentimiento de privacidad obligatorio")
-    if contact.locator('input[name="interest"]').input_value() != "Huella Esencial":
-        raise AssertionError("El handoff perdió el plan recomendado esperado por /contacto")
-    if contact.locator('input[name="sector"]').input_value() != "Servicios y oficinas":
-        raise AssertionError("El handoff perdió el sector del diagnóstico")
-    if not contact.locator('[data-contact-message]').input_value().startswith("Quiero revisar la ruta orientativa Huella Esencial"):
-        raise AssertionError("El mensaje real no incorpora el contexto del diagnóstico")
-
-    context.close()
-    return observed
 
 
 def _mobile(browser) -> dict[str, object]:
@@ -187,6 +213,8 @@ def _mobile(browser) -> dict[str, object]:
     page.locator('[data-route-card-open]').click()
     dialog = page.locator('[data-route-card-dialog]')
     page.wait_for_timeout(100)
+    if not dialog.locator('[data-route-app-bridge]').is_visible():
+        raise AssertionError("El bridge conectado desapareció en móvil")
     metrics = dialog.evaluate(
         """
         el => ({
@@ -213,8 +241,8 @@ def main() -> None:
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
         evidence = {
-            "pages_privacy_boundary": _privacy_safe_pages(browser),
-            "connected_app_contract": _connected_contract(browser),
+            "offline_fallback": _offline_contract(browser),
+            "connected_staging_contract": _connected_contract(browser),
             "mobile": _mobile(browser),
         }
         browser.close()
