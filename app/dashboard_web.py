@@ -17,12 +17,36 @@ from .pilot_execution import guided_workspace
 from .product_experience import demo_story_for, journey_detail, normalize_view_mode
 
 
+CLIENT_DATA_GATE_CODES = {"activity", "evidence"}
+
+
+def _client_handoff_action(base_action: dict[str, Any]) -> dict[str, Any]:
+    next_name = str(base_action.get("name") or "Continuar el proceso")
+    next_owner = str(base_action.get("owner") or "el siguiente responsable")
+    return {
+        "code": "handoff",
+        "name": "Datos entregados · relevo en curso",
+        "detail": (
+            f"Tu trabajo de datos está al día. El siguiente control es «{next_name}» "
+            f"y corresponde a {next_owner.lower()}."
+        ),
+        "owner": next_owner,
+        "acceptance": str(
+            base_action.get("acceptance")
+            or "El siguiente responsable completa el control pendiente y el proceso avanza."
+        ),
+        "href": "/recorrido-inventario",
+        "action": "Ver estado del proceso",
+        "handoff": True,
+    }
+
+
 def resolve_dashboard_action(
     role: str,
     tasks: list[DataRequest],
     delivery: dict[str, Any],
 ) -> dict[str, Any] | None:
-    """Keep Cliente on data work only while data work is genuinely pending."""
+    """Keep Cliente on data work while pending, then expose an explicit handoff."""
     base_action = delivery.get("next_action")
     if role != "Cliente":
         return base_action
@@ -48,7 +72,11 @@ def resolve_dashboard_action(
             "href": "/captura-guiada",
             "action": "Continuar captura",
         }
-    return base_action
+    if not base_action:
+        return None
+    if base_action.get("code") in CLIENT_DATA_GATE_CODES:
+        return base_action
+    return _client_handoff_action(base_action)
 
 
 def register_dashboard_routes(
