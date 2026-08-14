@@ -48,7 +48,7 @@
 </section>
 
 {% if delivery.blockers %}
-<section class="delivery-alert delivery-alert-blocked"><div><strong>La emisión final está bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) requieren cierre antes de presentar el resultado como definitivo.</p></div>{% if can_open_route(user, delivery.blockers[0].href) %}<a href="{{ delivery.blockers[0].href }}">Atender primero: {{ delivery.blockers[0].name }} →</a>{% else %}<span class="permission-note">Control asignado a {{ delivery.blockers[0].owner }}</span>{% endif %}</section>
+<section class="delivery-alert delivery-alert-blocked"><div><strong>La emisión final está bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) requieren cierre antes de presentar el resultado como definitivo. Aun así, puedes generar versiones de trabajo para revisión interna.</p></div>{% if can_open_route(user, delivery.blockers[0].href) %}<a href="{{ delivery.blockers[0].href }}">Atender primero: {{ delivery.blockers[0].name }} →</a>{% else %}<span class="permission-note">Control asignado a {{ delivery.blockers[0].owner }}</span>{% endif %}</section>
 {% elif delivery.critical_pending %}
 <section class="delivery-alert delivery-alert-warning"><div><strong>Existen controles críticos en progreso</strong><p>La aprobación por sí sola no habilita la publicación final mientras una puerta crítica permanezca incompleta.</p></div>{% if can_open_route(user, delivery.critical_pending[0].href) %}<a href="{{ delivery.critical_pending[0].href }}">Continuar: {{ delivery.critical_pending[0].name }} →</a>{% else %}<span class="permission-note">Control asignado a {{ delivery.critical_pending[0].owner }}</span>{% endif %}</section>
 {% elif not delivery.approved %}
@@ -126,13 +126,13 @@
 </details>
 
 <section class="card delivery-documents">
-  <div class="card-head"><div><small>PAQUETE DE ENTREGA</small><h3>Cuatro documentos autocontenidos y trazables</h3></div><a href="/reportes">Ver historial de versiones →</a></div>
+  <div class="card-head"><div><small>PAQUETE DE ENTREGA</small><h3>Cinco documentos autocontenidos y trazables</h3></div><a href="/reportes">Ver historial de versiones →</a></div>
   <div class="deliverable-grid">
     {% for item in delivery.deliverables %}
     <article class="deliverable-card delivery-document-card">
       <div class="delivery-document-head"><span class="doc-icon">{{ '◆' if item.code=='ficha' else '▤' }}</span><span class="status-chip {{ 'complete' if item.status=='Listo' else 'progressing' }}">{{ item.status }}</span></div>
       <div><small>{{ item.format }}</small><h3>{{ item.title }}</h3><p>{{ item.description }}</p><em>{{ item.condition }}</em></div>
-      {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary" {% if item.status=='Bloqueado' %}disabled title="Completa los controles requeridos"{% endif %}>Generar {{ item.format }}</button></form>{% endif %}
+      {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary" data-document-mode="{{ 'final' if item.status=='Listo' and delivery.publication.can_share_external else 'working' }}">Generar {{ item.format }}{% if not (item.status=='Listo' and delivery.publication.can_share_external) %} de trabajo{% endif %}</button></form>{% endif %}
     </article>
     {% endfor %}
   </div>
