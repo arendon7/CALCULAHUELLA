@@ -47,7 +47,7 @@ def test_v046_delivery_page_api_and_reports_page_load():
         login(client)
         response = client.get("/entrega-profesional")
         assert response.status_code == 200
-        assert "Dirección ejecutiva del inventario" in response.text
+        assert "NIVEL DE PUBLICACIÓN" in response.text
         assert "OCHO PUERTAS DE CONTROL" in response.text
         assert "V0.55" in response.text
 
