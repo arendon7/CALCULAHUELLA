@@ -22,6 +22,7 @@ def test_v218_client_with_open_request_stays_on_information_work() -> None:
         _delivery(
             "Listo",
             {
+                "code": "calculation",
                 "name": "Revisar cálculo",
                 "href": "/calculos",
             },
@@ -41,6 +42,7 @@ def test_v218_client_with_incomplete_activity_data_stays_on_capture() -> None:
         _delivery(
             "En progreso",
             {
+                "code": "calculation",
                 "name": "Revisar cálculo",
                 "href": "/calculos",
             },
@@ -53,8 +55,25 @@ def test_v218_client_with_incomplete_activity_data_stays_on_capture() -> None:
     assert action["action"] == "Continuar captura"
 
 
-def test_v218_client_hands_off_to_canonical_action_when_activity_gate_is_ready() -> None:
+def test_v218_client_keeps_canonical_evidence_work_after_activity_is_ready() -> None:
     base_action = {
+        "code": "evidence",
+        "name": "Vincular soportes",
+        "detail": "Falta cobertura documental.",
+        "owner": "Responsables de información",
+        "acceptance": "Cobertura documental mínima de 80%.",
+        "href": "/captura-guiada",
+        "action": "Vincular soportes",
+    }
+
+    action = resolve_dashboard_action("Cliente", [], _delivery("Listo", base_action))
+
+    assert action == base_action
+
+
+def test_v218_client_gets_explicit_handoff_when_next_gate_belongs_to_technical_role() -> None:
+    base_action = {
+        "code": "review",
         "name": "Resolver revisión metodológica",
         "detail": "La captura ya terminó; corresponde continuar el control técnico.",
         "owner": "Revisor metodológico",
@@ -65,12 +84,26 @@ def test_v218_client_hands_off_to_canonical_action_when_activity_gate_is_ready()
 
     action = resolve_dashboard_action("Cliente", [], _delivery("Listo", base_action))
 
-    assert action == base_action
-    assert action["href"] != "/captura-guiada"
+    assert action is not None
+    assert action["code"] == "handoff"
+    assert action["name"] == "Datos entregados · relevo en curso"
+    assert "Resolver revisión metodológica" in action["detail"]
+    assert "revisor metodológico" in action["detail"]
+    assert action["owner"] == "Revisor metodológico"
+    assert action["href"] == "/recorrido-inventario"
+    assert action["action"] == "Ver estado del proceso"
+    assert action["handoff"] is True
+
+
+def test_v218_client_without_pending_gate_has_no_forced_capture_or_handoff() -> None:
+    action = resolve_dashboard_action("Cliente", [], _delivery("Listo", None))
+
+    assert action is None
 
 
 def test_v218_non_client_always_keeps_canonical_action() -> None:
     base_action = {
+        "code": "calculation",
         "name": "Completar factores",
         "href": "/calculos",
     }
