@@ -81,14 +81,23 @@ def register_dashboard_routes(
                     "action": "Abrir pendientes",
                 }
             else:
-                dashboard_action = {
-                    "name": "Completar datos y evidencias",
-                    "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
-                    "owner": "Responsable de información",
-                    "acceptance": "Fuentes del periodo completas y soportes vinculados.",
-                    "href": "/captura-guiada",
-                    "action": "Continuar captura",
-                }
+                collection_complete = next(
+                    (
+                        bool(milestone.get("done"))
+                        for milestone in workspace.get("milestones", [])
+                        if milestone.get("name") == "Recolectar"
+                    ),
+                    False,
+                )
+                if not collection_complete:
+                    dashboard_action = {
+                        "name": "Completar datos y evidencias",
+                        "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
+                        "owner": "Responsable de información",
+                        "acceptance": "Fuentes del periodo completas y soportes vinculados.",
+                        "href": "/captura-guiada",
+                        "action": "Continuar captura",
+                    }
         onboarding_rows = list(session.scalars(select(CustomerOnboardingItem).where(
             CustomerOnboardingItem.organization_id == int(user["organization_id"])
         ).order_by(CustomerOnboardingItem.display_order)))
