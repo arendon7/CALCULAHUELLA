@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from .calculations import recalculate_inventory, source_calculation_summary
 from .database import add_audit, get_db
+from .inventory_context import inventory_metrics
 
 
 def register_calculation_routes(
@@ -31,6 +32,7 @@ def register_calculation_routes(
             total_calculations += len(summary["calculations"])
             total_alerts += int(summary["alerts"])
             total_errors += int(summary["errors"])
+        metrics = inventory_metrics(inventory)
         return templates.TemplateResponse(
             request=request,
             name="calculations.html",
@@ -44,6 +46,7 @@ def register_calculation_routes(
                 total_calculations=total_calculations,
                 total_alerts=total_alerts,
                 total_errors=total_errors,
+                **metrics,
             ),
         )
 
