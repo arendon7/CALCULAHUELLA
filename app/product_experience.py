@@ -171,13 +171,6 @@ CORE_SECTIONS: tuple[dict[str, object], ...] = (
                 "✓",
                 any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
             ),
-            _item(
-                "Cierre mensual",
-                "/cierre-mensual",
-                "period_close",
-                "▣",
-                any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
-            ),
         ),
     },
     {
@@ -238,6 +231,13 @@ ADVANCED_SECTIONS: tuple[dict[str, object], ...] = (
         "items": (
             _item("Matriz del piloto", "/piloto-greenatics", "greenatics_pilot", "♻", any_capability=("view_methodology", "provide_data", "manage_sources")),
             _item("Ejecución del piloto", "/piloto-greenatics/ejecucion", "greenatics_pilot_execution", "▶", any_capability=("view_methodology", "provide_data", "manage_sources")),
+            _item(
+                "Cierre mensual del piloto",
+                "/cierre-mensual",
+                "period_close",
+                "▣",
+                any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
+            ),
         ),
     },
 )
