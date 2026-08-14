@@ -78,7 +78,12 @@ def test_v215_methodology_closure_keeps_truth_boundaries_and_approval_controls()
     assert "Preparación metodológica" in template
     assert "Aprobar política" in template
     assert "PUERTAS DE CIERRE" in template
+    assert "Siguiente decisión metodológica" in template
+    assert 'id="puertas-cierre"' in template
     assert "Alcance 2" in template
+    assert "Metodología / Cierre V0.32" not in template
+    assert "V0.32 ·" not in template
+    assert template.index("PUERTAS DE CIERRE") < template.index("DECISIONES VERSIONADAS")
     assert ".methodology-policy-form .table-actions" in css
     assert "#anio-base .responsive-table" in css
 
@@ -89,6 +94,8 @@ def test_v215_methodology_governance_preserves_version_and_snapshot_traceability
     assert "Versiones metodológicas" in template
     assert "Congelar configuración" in template
     assert "Snapshots por inventario" in template
+    assert "Política de cierre metodológico" in template
+    assert "{{ row.snapshot_name }}" not in template
     assert "content_hash" in template
     assert ".settings-list article" in css
     assert ".panel > .table-wrap" in css
