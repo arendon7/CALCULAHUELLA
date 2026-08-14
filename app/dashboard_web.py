@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Any
+
 from fastapi import Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
@@ -13,6 +15,40 @@ from .guided_onboarding import load_profile as load_guided_profile, decision_pla
 from .onboarding_experience import onboarding_summary
 from .pilot_execution import guided_workspace
 from .product_experience import demo_story_for, journey_detail, normalize_view_mode
+
+
+def resolve_dashboard_action(
+    role: str,
+    tasks: list[DataRequest],
+    delivery: dict[str, Any],
+) -> dict[str, Any] | None:
+    """Keep Cliente on data work only while data work is genuinely pending."""
+    base_action = delivery.get("next_action")
+    if role != "Cliente":
+        return base_action
+    if tasks:
+        return {
+            "name": "Atender solicitudes de información",
+            "detail": f"Tienes {len(tasks)} requerimiento(s) activo(s). Completa los datos o soportes solicitados antes de la revisión técnica.",
+            "owner": "Responsable de información",
+            "acceptance": "Solicitudes respondidas y evidencias vinculadas al periodo correcto.",
+            "href": "/informacion#solicitudes",
+            "action": "Abrir pendientes",
+        }
+    activity_gate = next(
+        (gate for gate in delivery.get("gates", []) if gate.get("code") == "activity"),
+        None,
+    )
+    if not activity_gate or activity_gate.get("status") != "Listo":
+        return {
+            "name": "Completar datos y evidencias",
+            "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
+            "owner": "Responsable de información",
+            "acceptance": "Fuentes del periodo completas y soportes vinculados.",
+            "href": "/captura-guiada",
+            "action": "Continuar captura",
+        }
+    return base_action
 
 
 def register_dashboard_routes(
@@ -69,31 +105,7 @@ def register_dashboard_routes(
         ))
         workspace = guided_workspace(session, user, inventory)
         delivery = professional_delivery_summary(session, inventory)
-        dashboard_action = delivery["next_action"]
-        if str(user["role"]) == "Cliente":
-            if tasks:
-                dashboard_action = {
-                    "name": "Atender solicitudes de información",
-                    "detail": f"Tienes {len(tasks)} requerimiento(s) activo(s). Completa los datos o soportes solicitados antes de la revisión técnica.",
-                    "owner": "Responsable de información",
-                    "acceptance": "Solicitudes respondidas y evidencias vinculadas al periodo correcto.",
-                    "href": "/informacion#solicitudes",
-                    "action": "Abrir pendientes",
-                }
-            else:
-                activity_gate = next(
-                    (gate for gate in delivery.get("gates", []) if gate.get("code") == "activity"),
-                    None,
-                )
-                if not activity_gate or activity_gate.get("status") != "Listo":
-                    dashboard_action = {
-                        "name": "Completar datos y evidencias",
-                        "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
-                        "owner": "Responsable de información",
-                        "acceptance": "Fuentes del periodo completas y soportes vinculados.",
-                        "href": "/captura-guiada",
-                        "action": "Continuar captura",
-                    }
+        dashboard_action = resolve_dashboard_action(str(user["role"]), tasks, delivery)
         onboarding_rows = list(session.scalars(select(CustomerOnboardingItem).where(
             CustomerOnboardingItem.organization_id == int(user["organization_id"])
         ).order_by(CustomerOnboardingItem.display_order)))
