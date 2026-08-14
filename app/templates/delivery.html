@@ -1,24 +1,42 @@
 {% extends "base.html" %}
-{% block title %}Cierre y entrega · Calcula tu Huella{% endblock %}
-{% block page_label %}Cierre y entrega{% endblock %}
+{% block title %}Cierre e informes · Calcula tu Huella{% endblock %}
+{% block page_label %}Cierre e informes{% endblock %}
 {% block content %}
 <div class="page-head delivery-heading">
   <div>
-    <p class="breadcrumb">{{ inventory.name }} / Decisión, cierre y documentos</p>
-    <h1>Dirección ejecutiva del inventario</h1>
-    <p>Conecta resultado, confianza, controles pendientes, responsables y regla de publicación antes de comunicar la huella.</p>
+    <p class="breadcrumb">{{ inventory.name }} / Cierre e informes</p>
+    <h1>Cierre e informes</h1>
+    <p>Confirma primero si el resultado puede usarse o compartirse, resuelve el siguiente control y después profundiza en puertas, narrativa y documentos.</p>
   </div>
-  <span class="phase-label">V0.55 · narrativa controlada</span>
+  <span class="phase-label">Control de publicación</span>
 </div>
 
-<section class="delivery-hero card">
+<section class="work-command delivery-command publication-{{ delivery.publication.tone }}" aria-label="Decisión de uso y publicación">
+  <div class="work-command-main">
+    <span class="eyebrow">CONTROL DE USO Y PUBLICACIÓN</span>
+    <h2>{{ 'El resultado está habilitado para entrega controlada' if delivery.publication.can_share_external else 'El resultado todavía requiere uso controlado' }}</h2>
+    <p>{{ delivery.publication.message }}</p>
+    <div class="work-command-meta">
+      <span><b>Confianza:</b> {{ delivery.decision.confidence_label }} · {{ delivery.decision.confidence_score }}%</span>
+      <span><b>Puertas listas:</b> {{ delivery.metrics.ready_gates }}/8</span>
+      <span><b>Evidencia:</b> {{ delivery.metrics.evidence_coverage }}%</span>
+    </div>
+  </div>
+  <div class="work-command-action">
+    <small>NIVEL DE PUBLICACIÓN</small>
+    <strong>{{ delivery.publication.level }}</strong>
+    <span>{{ delivery.publication.audience }}</span>
+    {% if delivery.next_action and can_open_route(user, delivery.next_action.href) %}<a class="btn btn-primary" href="{{ delivery.next_action.href }}">{{ delivery.next_action.action }} →</a>{% elif delivery.next_action %}<span class="permission-note">Siguiente control: {{ delivery.next_action.name }} · {{ delivery.next_action.owner }}</span>{% else %}<a class="btn btn-primary" href="/reportes">Abrir documentos →</a>{% endif %}
+  </div>
+</section>
+
+<section class="delivery-hero card delivery-readiness">
   <div class="delivery-score" aria-label="Preparación para entrega {{ delivery.score }} por ciento">
     <div class="delivery-score-ring" style="--score:{{ delivery.score }}"><strong>{{ delivery.score }}%</strong><span>alistamiento</span></div>
     <div>
-      <small>ESTADO DEL INVENTARIO</small>
+      <small>ALISTAMIENTO DEL INVENTARIO</small>
       <h2>{{ delivery.status }}</h2>
       <p>{{ delivery.narrative.conclusion }}</p>
-      {% if delivery.next_action and can_open_route(user, delivery.next_action.href) %}<a class="btn btn-primary" href="{{ delivery.next_action.href }}">{{ delivery.next_action.action }}</a>{% elif delivery.next_action %}<span class="permission-note">Acción asignada a otro rol</span>{% else %}<a class="btn btn-primary" href="/reportes">Emitir documentos</a>{% endif %}
     </div>
   </div>
   <div class="delivery-kpis">
@@ -27,23 +45,6 @@
     <article><small>EVIDENCIA</small><strong>{{ delivery.metrics.evidence_coverage }}%</strong><span>soporte documental</span></article>
     <article><small>COBERTURA</small><strong>{{ delivery.metrics.coverage_ratio }}%</strong><span>{{ delivery.metrics.covered_sources }}/{{ delivery.metrics.included_sources }} fuentes</span></article>
   </div>
-</section>
-
-<section class="publication-control publication-{{ delivery.publication.tone }}" aria-label="Control de publicación">
-  <div class="publication-status"><small>NIVEL DE PUBLICACIÓN</small><strong>{{ delivery.publication.level }}</strong><span>{{ delivery.publication.audience }}</span></div>
-  <div><p>{{ delivery.publication.message }}</p><small>{{ delivery.publication.notice }}</small></div>
-  <span class="publication-icon">{{ '✓' if delivery.publication.can_share_external else '!' }}</span>
-</section>
-
-<section class="card decision-room">
-  <div class="card-head"><div><small>SALA DE DECISIÓN</small><h3>Qué significa el resultado y qué debe ocurrir ahora</h3></div><span class="status-chip {{ 'complete' if delivery.publication.can_share_external else 'progressing' }}">{{ 'Compartible externamente' if delivery.publication.can_share_external else 'Uso controlado' }}</span></div>
-  <div class="decision-room-grid">
-    <article class="decision-primary"><small>DECISIÓN PRINCIPAL</small><h2>{{ delivery.decision.primary_decision }}</h2><p>{{ delivery.narrative.headline }}</p></article>
-    <article><small>FOCO DOMINANTE</small>{% if delivery.decision.top_source %}<strong>{{ delivery.decision.top_source.name }}</strong><p>{{ delivery.decision.top_source.share }}% del total · alcance {{ delivery.decision.top_source.scope }}</p>{% else %}<strong>Sin resultado calculado</strong><p>Completa la cuantificación para identificar focos.</p>{% endif %}</article>
-    <article><small>CONCENTRACIÓN</small><strong>{{ delivery.decision.top_three_share }}%</strong><p>participación de las tres fuentes principales</p></article>
-    <article><small>COBERTURA DE LA META</small><strong>{{ delivery.metrics.reduction_coverage }}%</strong><span>brecha {{ delivery.metrics.reduction_gap|number_es }} tCO₂e/año</span></article>
-  </div>
-  <div class="decision-recommendations"><h4>Recomendaciones inmediatas</h4><ol>{% for item in delivery.decision.recommendations %}<li>{{ item }}</li>{% endfor %}</ol></div>
 </section>
 
 {% if delivery.blockers %}
@@ -56,9 +57,28 @@
 <section class="delivery-alert delivery-alert-ready"><div><strong>Inventario habilitado para entrega controlada</strong><p>La aprobación está registrada y las puertas críticas están listas. Revisa cada versión antes de compartirla.</p></div><a href="/reportes">Generar documentos →</a></section>
 {% endif %}
 
-<div class="delivery-main-grid">
-  <section class="card">
-    <div class="card-head"><div><small>OCHO PUERTAS DE CONTROL</small><h3>Recorrido integral del inventario</h3></div><span class="counter">{{ delivery.metrics.ready_gates }}/8</span></div>
+<section class="card decision-room">
+  <div class="card-head"><div><small>SALA DE DECISIÓN</small><h3>Qué significa el resultado</h3></div><span class="status-chip {{ 'complete' if delivery.publication.can_share_external else 'progressing' }}">{{ 'Compartible externamente' if delivery.publication.can_share_external else 'Uso controlado' }}</span></div>
+  <div class="decision-room-grid">
+    <article class="decision-primary"><small>DECISIÓN PRINCIPAL</small><h2>{{ delivery.decision.primary_decision }}</h2><p>{{ delivery.narrative.headline }}</p></article>
+    <article><small>FOCO DOMINANTE</small>{% if delivery.decision.top_source %}<strong>{{ delivery.decision.top_source.name }}</strong><p>{{ delivery.decision.top_source.share }}% del total · alcance {{ delivery.decision.top_source.scope }}</p>{% else %}<strong>Sin resultado calculado</strong><p>Completa la cuantificación para identificar focos.</p>{% endif %}</article>
+    <article><small>CONCENTRACIÓN</small><strong>{{ delivery.decision.top_three_share }}%</strong><p>participación de las tres fuentes principales</p></article>
+    <article><small>COBERTURA DE LA META</small><strong>{{ delivery.metrics.reduction_coverage }}%</strong><span>brecha {{ delivery.metrics.reduction_gap|number_es }} tCO₂e/año</span></article>
+  </div>
+  <div class="decision-recommendations"><h4>Recomendaciones inmediatas</h4><ol>{% for item in delivery.decision.recommendations %}<li>{{ item }}</li>{% endfor %}</ol></div>
+</section>
+
+{% if delivery.next_action %}
+<section class="card next-decision">
+  <div><small>SIGUIENTE ACCIÓN DE CIERRE</small><h3>{{ delivery.next_action.name }}</h3><p>{{ delivery.next_action.detail }}</p><div class="work-command-meta"><span><b>Responsable:</b> {{ delivery.next_action.owner }}</span><span><b>Se considera terminado cuando:</b> {{ delivery.next_action.acceptance }}</span></div></div>
+  {% if can_open_route(user, delivery.next_action.href) %}<a class="btn btn-primary" href="{{ delivery.next_action.href }}">{{ delivery.next_action.action }} →</a>{% else %}<span class="permission-note">Acción asignada a {{ delivery.next_action.owner }}</span>{% endif %}
+</section>
+{% endif %}
+
+<details class="dashboard-disclosure delivery-gates-disclosure card">
+  <summary><span><small>CONTROL METODOLÓGICO</small><strong>OCHO PUERTAS DE CONTROL</strong></span><b>{{ delivery.metrics.ready_gates }}/8 listas</b></summary>
+  <div class="dashboard-disclosure-body">
+    <div class="card-head"><div><small>RECORRIDO INTEGRAL DEL INVENTARIO</small><h3>Estado, responsable y criterio de cierre</h3></div><span class="counter">{{ delivery.metrics.ready_gates }}/8</span></div>
     <div class="delivery-gates">
       {% for gate in delivery.gates %}
       <article class="delivery-gate gate-{{ 'ready' if gate.status=='Listo' else 'blocked' if gate.status=='Bloqueado' else 'progress' }}">
@@ -73,25 +93,12 @@
       </article>
       {% endfor %}
     </div>
-  </section>
+  </div>
+</details>
 
-  <aside class="card delivery-next">
-    <small>SIGUIENTE DECISIÓN</small>
-    {% if delivery.next_action %}<h3>{{ delivery.next_action.name }}</h3><p>{{ delivery.next_action.detail }}</p>{% if can_open_route(user, delivery.next_action.href) %}<a class="btn btn-primary" href="{{ delivery.next_action.href }}">{{ delivery.next_action.action }}</a>{% else %}<span class="permission-note">Acción asignada a {{ delivery.next_action.owner }}</span>{% endif %}{% else %}<h3>Emitir y aprobar</h3><p>Las puertas operativas están listas. Genera la versión documental y registra su aprobación.</p><a class="btn btn-primary" href="/reportes">Abrir documentos</a>{% endif %}
-    <hr>
-    <dl>
-      <div><dt>Cálculos válidos</dt><dd>{{ delivery.metrics.calculation_count }}</dd></div>
-      <div><dt>Observaciones abiertas</dt><dd>{{ delivery.metrics.open_observations }}</dd></div>
-      <div><dt>Hallazgos bloqueantes</dt><dd>{{ delivery.metrics.blocking_observations }}</dd></div>
-      <div><dt>Preparación de reducción</dt><dd>{{ delivery.metrics.reduction_readiness }}%</dd></div>
-      <div><dt>Estado formal</dt><dd>{{ inventory.status }}</dd></div>
-    </dl>
-  </aside>
-</div>
-
+{% if delivery.action_plan %}
 <section class="card closure-plan">
   <div class="card-head"><div><small>PLAN PRIORIZADO DE CIERRE</small><h3>Qué falta, quién responde y cómo se considera terminado</h3></div><span class="counter">{{ delivery.action_plan|length }}</span></div>
-  {% if delivery.action_plan %}
   <div class="closure-plan-list">
     {% for item in delivery.action_plan %}
     {% if can_open_route(user, item.href) %}<a href="{{ item.href }}" class="closure-plan-item">{% else %}<div class="closure-plan-item">{% endif %}
@@ -103,16 +110,20 @@
     {% if can_open_route(user, item.href) %}</a>{% else %}</div>{% endif %}
     {% endfor %}
   </div>
-  {% else %}<div class="empty-state"><strong>No hay actividades pendientes.</strong><p>Mantén el expediente, la aprobación y la versión documental bajo control.</p></div>{% endif %}
 </section>
+{% else %}
+<section class="card closure-plan"><div class="empty-state"><strong>No hay actividades pendientes.</strong><p>Mantén el expediente, la aprobación y la versión documental bajo control.</p></div></section>
+{% endif %}
 
-<section class="card delivery-narrative">
-  <div class="card-head"><div><small>LECTURA EXPLICABLE</small><h3>Conclusiones, hallazgos y limitaciones</h3></div><span class="status-chip {{ 'complete' if delivery.release_ready else 'progressing' }}">{{ delivery.publication.level }}</span></div>
-  <div class="delivery-narrative-grid">
-    <div><h4>Conclusión principal</h4><p class="narrative-headline">{{ delivery.narrative.headline }}</p><h4>Hallazgos relevantes</h4><ul>{% for item in delivery.narrative.findings %}<li>{{ item }}</li>{% endfor %}</ul></div>
-    <div class="limitations-box"><h4>Limitaciones y cautelas</h4><ul>{% for item in delivery.narrative.limitations %}<li>{{ item }}</li>{% endfor %}</ul><p><strong>Control profesional:</strong> esta lectura se genera desde los datos disponibles y no sustituye revisión experta ni verificación independiente.</p></div>
+<details class="dashboard-disclosure delivery-narrative card">
+  <summary><span><small>LECTURA EXPLICABLE</small><strong>Conclusiones, hallazgos y limitaciones</strong></span><b>{{ delivery.publication.level }}</b></summary>
+  <div class="dashboard-disclosure-body">
+    <div class="delivery-narrative-grid">
+      <div><h4>Conclusión principal</h4><p class="narrative-headline">{{ delivery.narrative.headline }}</p><h4>Hallazgos relevantes</h4><ul>{% for item in delivery.narrative.findings %}<li>{{ item }}</li>{% endfor %}</ul></div>
+      <div class="limitations-box"><h4>Limitaciones y cautelas</h4><ul>{% for item in delivery.narrative.limitations %}<li>{{ item }}</li>{% endfor %}</ul><p><strong>Control profesional:</strong> esta lectura se genera desde los datos disponibles y no sustituye revisión experta ni verificación independiente.</p></div>
+    </div>
   </div>
-</section>
+</details>
 
 <section class="card delivery-documents">
   <div class="card-head"><div><small>PAQUETE DE ENTREGA</small><h3>Cuatro documentos autocontenidos y trazables</h3></div><a href="/reportes">Ver historial de versiones →</a></div>
