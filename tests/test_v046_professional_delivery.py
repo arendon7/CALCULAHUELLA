@@ -7,7 +7,7 @@ from fastapi.testclient import TestClient
 from openpyxl import load_workbook
 from sqlalchemy import select
 
-from app.database import Base, ENGINE, Inventory, SessionLocal, init_db
+from app.database import Base, ENGINE, Inventory, ReportArtifact, SessionLocal, init_db
 from app.delivery_readiness import professional_delivery_summary
 from app.main import app
 from app.product_experience import CORE_SECTIONS, navigation_for
@@ -61,6 +61,38 @@ def test_v046_delivery_page_api_and_reports_page_load():
         assert "Informe controlado · expediente trazable" in reports.text
         assert "ALISTAMIENTO" in reports.text
         assert "PUBLICACIÓN" in reports.text
+
+
+def test_v046_working_versions_remain_available_before_final_publication():
+    with SessionLocal() as session:
+        inventory = session.scalar(select(Inventory).where(Inventory.id == 1))
+        inventory.status = "En preparación"
+        session.commit()
+
+    with TestClient(app) as client:
+        login(client)
+        delivery_page = client.get("/entrega-profesional")
+        reports_page = client.get("/reportes")
+        assert delivery_page.status_code == 200
+        assert reports_page.status_code == 200
+        assert delivery_page.text.count('data-document-mode="working"') == 5
+        assert reports_page.text.count('data-document-mode="working"') == 5
+        assert "Cinco documentos autocontenidos y trazables" in delivery_page.text
+        assert "Completa los controles requeridos" not in delivery_page.text
+        assert "no quedan habilitadas para emisión final" in reports_page.text
+        assert "no sustituye la aprobación o cierre del inventario" in reports_page.text
+
+        generated = client.post(
+            "/reportes/generar",
+            data={"inventory_id": 1, "report_type": "ficha"},
+            follow_redirects=False,
+        )
+        assert generated.status_code == 303
+
+    with SessionLocal() as session:
+        artifact = session.scalar(select(ReportArtifact).order_by(ReportArtifact.id.desc()))
+        assert artifact is not None
+        assert artifact.status == "Borrador"
 
 
 def test_v046_navigation_exposes_professional_delivery():
