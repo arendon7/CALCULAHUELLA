@@ -14,6 +14,11 @@ from .pilot_execution import guided_workspace
 from .product_experience import demo_story_for, journey_detail, normalize_view_mode
 
 
+# "Completado" es el estado canónico del formulario actual. Las variantes
+# históricas se excluyen también para que datos antiguos no reaparezcan como trabajo pendiente.
+CLOSED_DATA_REQUEST_STATUSES = ("Completado", "Completada", "Cerrado", "Cerrada")
+
+
 def register_dashboard_routes(
     app, templates, common_context, require_user, set_flash, get_inventory, inventory_metrics
 ) -> None:
@@ -62,7 +67,7 @@ def register_dashboard_routes(
             select(DataRequest)
             .where(
                 DataRequest.inventory_id == inventory.id,
-                DataRequest.status.notin_(["Completada", "Cerrada"]),
+                DataRequest.status.notin_(CLOSED_DATA_REQUEST_STATUSES),
             )
             .order_by(DataRequest.due_date)
         ))
