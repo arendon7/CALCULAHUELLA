@@ -93,11 +93,22 @@ def test_source_map_keeps_assisted_setup_materiality_and_next_step_visible() -> 
 
 
 @pytest.mark.smoke
-def test_source_detail_keeps_traceability_before_methodological_depth() -> None:
+def test_source_detail_orients_next_task_from_real_source_state() -> None:
     template = SOURCE.read_text(encoding="utf-8")
     css = DATA_CSS.read_text(encoding="utf-8")
-    assert 'class="calculation-notice notice-success"' in template
-    assert 'data-default-task="datos"' in template
+    assert "namespace(pending=0, applied_records=0, missing_records=0)" in template
+    assert "['Propuesto','Requiere ajuste']" in template
+    assert "['Aprobado','Seleccionado']" in template
+    assert 'data-source-focus="{{ focus.task }}"' in template
+    assert 'data-default-task="{{ focus.task }}"' in template
+    assert "CORREGIR CÁLCULO" in template
+    assert "DECISIÓN METODOLÓGICA" in template
+    assert "VALIDAR ALERTAS" in template
+    assert "RESULTADO TRAZABLE" in template
+    assert "Cadena de trazabilidad" in template
+    assert "Trazabilidad completa" not in template
+    assert 'data-default-task="datos"' not in template
+    assert 'class="calculation-notice notice-success"' not in template
     assert 'id="datos-actividad"' in template
     assert 'id="conversacion-tecnica"' in template
     assert ".source-config-panel" in css
