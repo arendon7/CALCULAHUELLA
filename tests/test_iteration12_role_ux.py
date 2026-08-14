@@ -5,7 +5,7 @@ import re
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from app.database import EmissionSource, SessionLocal
+from app.database import DataRequest, EmissionSource, Inventory, SessionLocal
 from app.demo_environment import demo_environment_summary
 from app.main import app
 from app.product_experience import navigation_for
@@ -73,6 +73,27 @@ def test_iteration12_client_receives_an_action_the_client_can_complete() -> None
         assert "Responsable de información" in page.text
         assert "Continúa desde aquí" in page.text
         assert "Resolver revisión" not in page.text
+
+
+def test_iteration12_completed_requests_do_not_drive_client_next_action() -> None:
+    with SessionLocal() as session:
+        inventory = session.scalar(
+            select(Inventory).where(Inventory.organization_id == 1).order_by(Inventory.start_date.desc(), Inventory.id.desc())
+        )
+        assert inventory is not None
+        requests = list(session.scalars(select(DataRequest).where(DataRequest.inventory_id == inventory.id)))
+        assert requests
+        for item in requests:
+            item.status = "Completado"
+        session.commit()
+
+    with TestClient(app) as client:
+        login(client, "cliente@calculatuhuella.local")
+        page = client.get("/dashboard")
+        assert page.status_code == 200
+        assert "Atender solicitudes de información" not in page.text
+        assert "Completar datos y evidencias" in page.text
+        assert "Continuar captura" in page.text
 
 
 def test_iteration12_information_defaults_to_twelve_recent_records() -> None:
