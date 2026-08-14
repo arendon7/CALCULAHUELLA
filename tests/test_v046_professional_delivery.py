@@ -111,9 +111,10 @@ def test_v046_read_only_roles_receive_consultation_not_generation_language(email
         assert reports.status_code == 200
         assert "Consulta el estado de publicación, las versiones disponibles y su trazabilidad" in reports.text
         assert "Entregables para consulta" in reports.text
+        assert "El equipo responsable puede preparar versiones de trabajo" in reports.text
         assert "Genera la ficha ejecutiva" not in reports.text
         assert 'action="/reportes/generar"' not in reports.text
-        assert 'href="/control"' not in reports.text
+        assert "Ir a revisión →" not in reports.text
 
 
 def test_v046_navigation_exposes_professional_delivery():
