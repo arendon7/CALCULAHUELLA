@@ -1,10 +1,10 @@
 {% extends "base.html" %}
 {% block title %}Cierre metodológico · Calcula tu Huella{% endblock %}
-{% block page_label %}Metodología / Cierre V0.32{% endblock %}
+{% block page_label %}Metodología / Cierre{% endblock %}
 {% block content %}
 <div class="page-head">
   <div><p class="breadcrumb">{{ inventory.name }} / Metodología</p><h1>Cierre metodológico</h1><p>Separa el inventario físico de partidas informativas, documenta incertidumbre y controla el recalculo del año base.</p></div>
-  <span class="release-chip">V0.32 · {{ summary.readiness_score }}% preparado</span>
+  <span class="release-chip">{{ summary.readiness_score }}% preparado · {{ summary.policy.status }}</span>
 </div>
 
 <section class="methodology-core-status closure-status">
@@ -15,9 +15,17 @@
   <div class="method-metric"><b>{{ summary.scope2.unclassified|length }}</b><span>fuentes A2 sin método</span></div>
 </section>
 
+{% set pending_gates = summary.readiness|selectattr('status', 'equalto', 'Pendiente')|list %}
+{% set next_gate = pending_gates[0] if pending_gates else none %}
+<section class="card methodology-next" id="puertas-cierre">
+  <div class="card-head"><div><small>PUERTAS DE CIERRE</small><h3>Preparación para aprobación metodológica</h3></div><span class="status-badge {% if pending_gates %}warning{% else %}success{% endif %}">{{ pending_gates|length }} pendiente{{ 's' if pending_gates|length != 1 else '' }}</span></div>
+  {% if next_gate %}<div class="report-notice"><strong>Siguiente decisión metodológica · {{ next_gate.name }}</strong><p>{{ next_gate.detail }}</p></div>{% else %}<div class="report-notice"><strong>Puertas metodológicas completas</strong><p>Los controles internos de preparación están resueltos. Esto no equivale por sí solo a certificación o verificación independiente.</p></div>{% endif %}
+  <div class="method-gate-grid">{% for gate in summary.readiness %}<article class="{% if gate.status == 'Aprobado' %}passed{% else %}pending{% endif %}"><span>{{ '✓' if gate.status == 'Aprobado' else '!' }}</span><div><strong>{{ gate.name }}</strong><p>{{ gate.detail }}</p></div><b>{{ gate.status }}</b></article>{% endfor %}</div>
+</section>
+
 <div class="calculation-notice methodology-boundary">
   <span>PRINCIPIO DE PRESENTACIÓN</span>
-  <p><strong>Emisiones brutas, CO₂ biogénico, remociones, emisiones evitadas y compensaciones no se netean automáticamente.</strong><small>La V0.32 conserva cada partida en un bloque separado y exige una política aprobada antes del cierre formal.</small></p>
+  <p><strong>Emisiones brutas, CO₂ biogénico, remociones, emisiones evitadas y compensaciones no se netean automáticamente.</strong><small>El cierre conserva cada partida en un bloque separado y exige una política aprobada antes del cierre formal.</small></p>
 </div>
 
 <section class="card" id="balance">
@@ -92,10 +100,5 @@
     <label>Total anterior<input name="previous_total_tco2e" type="number" min="0" step="any" required></label><label>Total recalculado<input name="recalculated_total_tco2e" type="number" min="0" step="any" required></label><label>Umbral %<input name="threshold_percentage" type="number" min="0.01" step="0.01" value="{{ summary.policy.base_year_recalculation_threshold }}" required></label><label class="wide">Descripción<input name="description" required></label><button class="btn btn-primary">Evaluar</button>
   </form>{% endif %}
   {% if summary.recalculations %}<div class="responsive-table"><table><thead><tr><th>Fecha</th><th>Evento</th><th>Anterior</th><th>Recalculado</th><th>Cambio</th><th>Decisión</th><th>Estado</th><th>Revisión</th></tr></thead><tbody>{% for item in summary.recalculations %}<tr><td>{{ item.event_date }}</td><td><strong>{{ item.trigger_type }}</strong><small class="table-sub">{{ item.description }}</small></td><td>{{ item.previous_total_tco2e|number_es(3) }}</td><td>{{ item.recalculated_total_tco2e|number_es(3) }}</td><td>{{ item.change_percentage|number_es(2) }}%</td><td>{{ item.decision }}</td><td><span class="status-badge {% if item.status == 'Aprobado' %}success{% elif item.status == 'Rechazado' %}danger{% else %}warning{% endif %}">{{ item.status }}</span></td><td>{% if user.can_review %}<form method="post" action="/metodologia/cierre/recalculos/{{ item.id }}/revisar" class="factor-review-form"><select name="decision">{% for option in ['Evaluar','Recalcular','No recalcular'] %}<option {% if item.decision == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select><select name="status">{% for option in ['Pendiente','Aprobado','Rechazado'] %}<option {% if item.status == option %}selected{% endif %}>{{ option }}</option>{% endfor %}</select><button class="tiny-button">Guardar</button></form>{% else %}{{ item.reviewed_by or 'Pendiente' }}{% endif %}</td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>No hay eventos evaluados.</strong><p>Registra cambios estructurales, errores materiales o cambios metodológicos que puedan alterar el año base.</p></div>{% endif %}
-</section>
-
-<section class="card methodology-next">
-  <div><small>PUERTAS DE CIERRE</small><h3>Preparación para aprobación metodológica</h3></div>
-  <div class="method-gate-grid">{% for gate in summary.readiness %}<article class="{% if gate.status == 'Aprobado' %}passed{% else %}pending{% endif %}"><span>{{ '✓' if gate.status == 'Aprobado' else '!' }}</span><div><strong>{{ gate.name }}</strong><p>{{ gate.detail }}</p></div><b>{{ gate.status }}</b></article>{% endfor %}</div>
 </section>
 {% endblock %}
