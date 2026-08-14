@@ -12,9 +12,9 @@
 </div>
 
 {% if delivery.blockers %}
-<div class="delivery-alert delivery-alert-blocked"><div><strong>Versión final bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) deben cerrarse. Puedes generar documentos de trabajo, pero conservarán estado de borrador.</p></div><a href="/entrega-profesional">Ver controles pendientes →</a></div>
+<div class="delivery-alert delivery-alert-blocked"><div><strong>Versión final bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) deben cerrarse. Puedes generar versiones de trabajo, pero no quedan habilitadas para emisión final mientras esos controles sigan pendientes.</p></div><a href="/entrega-profesional">Ver controles pendientes →</a></div>
 {% elif not delivery.approved %}
-<div class="delivery-alert delivery-alert-warning"><div><strong>Emisión condicionada</strong><p>El inventario aún no está aprobado o cerrado. Los documentos se generarán como borrador técnico.</p></div><a href="/control">Ir a revisión →</a></div>
+<div class="delivery-alert delivery-alert-warning"><div><strong>Emisión condicionada</strong><p>El inventario aún no está aprobado o cerrado. Puedes generar versiones de trabajo para revisión interna, sin presentarlas como entrega final.</p></div><a href="/control">Ir a revisión →</a></div>
 {% else %}
 <div class="delivery-alert delivery-alert-ready"><div><strong>Habilitado para entrega controlada</strong><p>La aprobación está registrada. Revisa la versión generada antes de compartirla.</p></div><a href="/entrega-profesional">Ver resumen de entrega →</a></div>
 {% endif %}
@@ -27,11 +27,11 @@
       <article class="deliverable-card delivery-document-card">
         <div class="delivery-document-head"><span class="doc-icon">▤</span><span class="status-chip {{ 'complete' if item.status=='Listo' else 'progressing' }}">{{ item.status }}</span></div>
         <div><small>{{ item.format }}</small><h3>{{ item.title }}</h3><p>{{ item.description }}</p><em>{{ item.condition }}</em></div>
-        {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary">Generar {{ item.format }}</button></form>{% endif %}
+        {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary" data-document-mode="{{ 'final' if item.status=='Listo' and delivery.publication.can_share_external else 'working' }}">Generar {{ item.format }}{% if not (item.status=='Listo' and delivery.publication.can_share_external) %} de trabajo{% endif %}</button></form>{% endif %}
       </article>
       {% endfor %}
     </div>
-    <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación.</p></div>
+    <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación. La aprobación del archivo controla su versión documental; no sustituye la aprobación o cierre del inventario ni habilita por sí sola la publicación externa.</p></div>
   </section>
 
   <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen actual</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div><a href="/entrega-profesional">Revisar las ocho puertas →</a></aside>
@@ -39,6 +39,6 @@
 
 <section class="card report-history">
   <div class="card-head"><div><small>HISTORIAL</small><h3>Documentos generados</h3></div><span class="counter">{{ artifacts|length }}</span></div>
-  {% if artifacts %}<div class="responsive-table"><table><thead><tr><th>Tipo</th><th>Versión</th><th>Estado</th><th>Generado por</th><th>Fecha</th><th>Tamaño</th><th>Integridad</th><th>Acciones</th></tr></thead><tbody>{% for item in artifacts %}<tr><td><strong>{{ item.report_type }}</strong></td><td>{{ item.version }}</td><td><span class="status-chip {{ 'complete' if item.status=='Aprobado' else 'progressing' }}">{{ item.status }}</span></td><td>{{ item.generated_by }}</td><td>{{ item.generated_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ item.file_size|bytes }}</td><td><code>{{ item.sha256[:12] }}…</code></td><td><div class="table-actions"><a class="btn btn-outline" href="/reportes/{{ item.id }}/descargar">Descargar</a>{% if user.can_approve and item.status!='Aprobado' %}<form action="/reportes/{{ item.id }}/aprobar" method="post"><button class="btn btn-primary">Aprobar</button></form>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Aún no hay documentos generados.</strong><p>Selecciona uno de los entregables anteriores.</p></div>{% endif %}
+  {% if artifacts %}<div class="responsive-table"><table><thead><tr><th>Tipo</th><th>Versión</th><th>Estado</th><th>Generado por</th><th>Fecha</th><th>Tamaño</th><th>Integridad</th><th>Acciones</th></tr></thead><tbody>{% for item in artifacts %}<tr><td><strong>{{ item.report_type }}</strong></td><td>{{ item.version }}</td><td><span class="status-chip {{ 'complete' if item.status=='Aprobado' else 'progressing' }}">{{ item.status }}</span></td><td>{{ item.generated_by }}</td><td>{{ item.generated_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ item.file_size|bytes }}</td><td><code>{{ item.sha256[:12] }}…</code></td><td><div class="table-actions"><a class="btn btn-outline" href="/reportes/{{ item.id }}/descargar">Descargar</a>{% if user.can_approve and item.status!='Aprobado' %}<form action="/reportes/{{ item.id }}/aprobar" method="post"><button class="btn btn-primary">Aprobar documento</button></form>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Aún no hay documentos generados.</strong><p>Selecciona uno de los entregables anteriores.</p></div>{% endif %}
 </section>
 {% endblock %}
