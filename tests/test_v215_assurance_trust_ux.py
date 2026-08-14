@@ -58,6 +58,14 @@ def test_v215_verification_prioritizes_readiness_findings_and_reproducible_packa
     assert "HALLAZGOS EXTERNOS" in template
     assert "PAQUETE DE ASEGURAMIENTO" in template
     assert "Exportación reproducible" in template
+    assert "PRIORIDAD DE VERIFICACIÓN" in template
+    assert "Resolver bloqueos de calidad antes de concluir" in template
+    assert "Resolver hallazgos materiales abiertos" in template
+    assert "Generar el paquete reproducible para iniciar la revisión" in template
+    assert 'id="puertas"' in template
+    assert 'id="hallazgos"' in template
+    assert 'id="paquete"' in template
+    assert "Funcional · V0.8" not in template
     assert ".verification-side" in css
     assert ".finding-card" in css
     assert ".verification-main .table-wrap" in css
