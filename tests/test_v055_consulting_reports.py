@@ -138,6 +138,8 @@ def test_v055_reports_page_exposes_five_deliverables():
         login(client)
         response = client.get("/reportes")
         assert response.status_code == 200
-        assert "V0.55 · informe explicable" in response.text
+        assert "Informe controlado · expediente trazable" in response.text
+        assert "ALISTAMIENTO" in response.text
+        assert "PUBLICACIÓN" in response.text
         assert "Informe de consultoría editable" in response.text
         assert response.text.count('name="report_type"') >= 5
