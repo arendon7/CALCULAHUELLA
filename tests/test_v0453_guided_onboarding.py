@@ -64,4 +64,5 @@ def test_public_and_authenticated_guided_surfaces_render():
         assert onboarding.status_code == 200
         assert "Seis actividades, un resultado operativo" in onboarding.text
         assert dashboard.status_code == 200
-        assert "Configuración inicial" in dashboard.text
+        assert "CONTEXTO DEL INVENTARIO" in dashboard.text
+        assert "Configuración completa ✓" in dashboard.text
