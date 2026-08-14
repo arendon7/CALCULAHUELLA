@@ -81,15 +81,11 @@ def register_dashboard_routes(
                     "action": "Abrir pendientes",
                 }
             else:
-                collection_complete = next(
-                    (
-                        bool(milestone.get("done"))
-                        for milestone in workspace.get("milestones", [])
-                        if milestone.get("name") == "Recolectar"
-                    ),
-                    False,
+                activity_gate = next(
+                    (gate for gate in delivery.get("gates", []) if gate.get("code") == "activity"),
+                    None,
                 )
-                if not collection_complete:
+                if not activity_gate or activity_gate.get("status") != "Listo":
                     dashboard_action = {
                         "name": "Completar datos y evidencias",
                         "detail": "Revisa los periodos pendientes y conserva un soporte verificable para cada valor relevante.",
