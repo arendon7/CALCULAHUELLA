@@ -62,7 +62,7 @@ def test_v047_page_and_api_make_shareability_explicit():
         assert "PLAN PRIORIZADO DE CIERRE" in page.text
         dashboard = client.get("/dashboard")
         assert dashboard.status_code == 200
-        assert "ESTADO DE USO" in dashboard.text
+        assert "Estado del resultado:" in dashboard.text
         payload = client.get("/api/entrega-profesional/resumen").json()
         assert payload["publication"]["level"]
         assert payload["decision"]["primary_decision"]
