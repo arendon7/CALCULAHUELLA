@@ -61,7 +61,7 @@ def test_complete_navigation_preserves_advanced_capabilities() -> None:
     assert "Biblioteca Colombia" in advanced
     assert "Organización" in internal
     assert "Operación y seguridad" in internal
-    assert "Consolidación V1.0" in internal
+    assert "Gobierno de release" in internal
 
 
 def test_dashboard_switches_between_essential_and_complete_view() -> None:
