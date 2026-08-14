@@ -79,7 +79,8 @@ def test_v027_page_is_available_and_shows_blockers():
         _login(client)
         page = client.get("/cierre-mensual?period=2026-01")
         assert page.status_code == 200
-        assert "Cierre mensual del inventario" in page.text
+        assert "Cierre mensual del piloto" in page.text
+        assert "Piloto Greenatics" in page.text
         assert "Bloqueos" in page.text
 
 
