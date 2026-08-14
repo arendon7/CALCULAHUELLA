@@ -49,7 +49,7 @@ def test_v046_delivery_page_api_and_reports_page_load():
         assert response.status_code == 200
         assert "NIVEL DE PUBLICACIÓN" in response.text
         assert "OCHO PUERTAS DE CONTROL" in response.text
-        assert "V0.55" in response.text
+        assert "Control de publicación" in response.text
 
         payload = client.get("/api/entrega-profesional/resumen")
         assert payload.status_code == 200
@@ -58,8 +58,9 @@ def test_v046_delivery_page_api_and_reports_page_load():
 
         reports = client.get("/reportes")
         assert reports.status_code == 200
-        assert "V0.55 · informe explicable" in reports.text
+        assert "Informe controlado · expediente trazable" in reports.text
         assert "ALISTAMIENTO" in reports.text
+        assert "PUBLICACIÓN" in reports.text
 
 
 def test_v046_navigation_exposes_professional_delivery():
