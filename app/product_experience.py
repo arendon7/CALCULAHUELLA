@@ -269,7 +269,7 @@ INTERNAL_SECTIONS: tuple[dict[str, object], ...] = (
             _item("Administración SaaS", "/administracion-saas", "saas_admin", "▣", any_capability=("manage_saas",)),
             _item("Alistamiento comercial", "/alistamiento", "readiness", "◆", any_capability=("manage_readiness",)),
             _item("Mapa del producto", "/modulos", "modules", "◫", any_capability=("manage_org", "view_methodology")),
-            _item("Consolidación V1.0", "/consolidacion", "consolidation", "◆", any_capability=("view_consolidation", "manage_consolidation")),
+            _item("Gobierno de release", "/consolidacion", "consolidation", "◆", any_capability=("view_consolidation", "manage_consolidation")),
         ),
     },
 )
