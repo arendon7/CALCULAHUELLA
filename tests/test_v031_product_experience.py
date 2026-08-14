@@ -71,7 +71,8 @@ def test_dashboard_switches_between_essential_and_complete_view() -> None:
         assert essential.status_code == 200
         assert "Mostrar vista completa" in essential.text
         assert "Herramientas avanzadas" not in essential.text
-        assert "RECORRIDO DEL INVENTARIO" in essential.text
+        assert "TU RUTA DE TRABAJO" in essential.text
+        assert "Del dato al informe, sin perder el hilo" in essential.text
 
         response = client.post(
             "/preferencias/vista",
