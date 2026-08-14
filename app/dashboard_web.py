@@ -5,6 +5,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from .data_request_status import CLOSED_DATA_REQUEST_STATUSES
 from .database import get_db
 from .db.models import CustomerOnboardingItem, DataRequest, Inventory
 from .delivery_readiness import professional_delivery_summary
@@ -12,11 +13,6 @@ from .guided_onboarding import load_profile as load_guided_profile, decision_pla
 from .onboarding_experience import onboarding_summary
 from .pilot_execution import guided_workspace
 from .product_experience import demo_story_for, journey_detail, normalize_view_mode
-
-
-# "Completado" es el estado canónico del formulario actual. Las variantes
-# históricas se excluyen también para que datos antiguos no reaparezcan como trabajo pendiente.
-CLOSED_DATA_REQUEST_STATUSES = ("Completado", "Completada", "Cerrado", "Cerrada")
 
 
 def register_dashboard_routes(
@@ -67,7 +63,7 @@ def register_dashboard_routes(
             select(DataRequest)
             .where(
                 DataRequest.inventory_id == inventory.id,
-                DataRequest.status.notin_(CLOSED_DATA_REQUEST_STATUSES),
+                DataRequest.status.notin_(tuple(CLOSED_DATA_REQUEST_STATUSES)),
             )
             .order_by(DataRequest.due_date)
         ))
