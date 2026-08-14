@@ -74,6 +74,8 @@ def test_v055_workshop_page_and_api_load():
         assert page.status_code == 200
         assert "Taller de informe" in page.text
         assert "Resultado relacionado con la escala de operación" in page.text
+        assert "Preparación editorial · revisión humana" in page.text
+        assert "V0.55 · informes de consultoría" not in page.text
         assert "Generar Word editable" in page.text
         api = client.get("/api/reportes/consultoria")
         assert api.status_code == 200
@@ -81,6 +83,34 @@ def test_v055_workshop_page_and_api_load():
         assert payload["version"] == "1.0.0"
         assert payload["inventory_id"] == 1
         assert len(payload["chapters"]) == 7
+
+
+def test_v055_workshop_marks_editable_word_as_working_before_external_publication():
+    with SessionLocal() as session:
+        inventory = session.scalar(select(Inventory).where(Inventory.id == 1))
+        inventory.status = "En preparación"
+        session.commit()
+
+    with TestClient(app) as client:
+        login(client)
+        page = client.get("/reportes/consultoria")
+        assert page.status_code == 200
+        assert 'data-document-mode="working"' in page.text
+        assert "Generar Word editable de trabajo" in page.text
+        assert "Preparación editorial · revisión humana" in page.text
+
+        generated = client.post(
+            "/reportes/generar",
+            data={"inventory_id": 1, "report_type": "editable"},
+            follow_redirects=False,
+        )
+        assert generated.status_code == 303
+
+    with SessionLocal() as session:
+        artifact = session.scalar(select(ReportArtifact).order_by(ReportArtifact.id.desc()))
+        assert artifact is not None
+        assert artifact.report_type == "Informe de consultoría editable"
+        assert artifact.status == "Borrador"
 
 
 def test_v055_editable_docx_is_valid_and_substantive(tmp_path: Path):
