@@ -3,17 +3,42 @@
 {% block page_label %}Gestión / Análisis{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><p class="breadcrumb">{{ inventory.name }} / Gestión</p><h1>Análisis de resultados</h1><p>Emisiones, intensidad, calidad, evolución y comparación histórica del inventario activo.</p></div>
+  <div><p class="breadcrumb">{{ inventory.name }} / Gestión</p><h1>Análisis de resultados</h1><p>Huella bruta, intensidad, calidad, evolución y comparación histórica del inventario activo.</p></div>
   <span class="phase-label">Lectura ejecutiva · inventario activo</span>
 </div>
 
 <div class="kpi-grid five">
-  <article class="kpi-card featured"><span class="kpi-icon">◌</span><div><small>EMISIONES TOTALES</small><strong>{{ total|number_es }}</strong><p>tCO₂e</p></div></article>
+  <article class="kpi-card featured"><span class="kpi-icon">◌</span><div><small>HUELLA BRUTA</small><strong>{{ total|number_es }}</strong><p>tCO₂e · sin netear</p></div></article>
   <article class="kpi-card"><span class="kpi-icon green">↘</span><div><small>INTENSIDAD PRODUCTIVA</small><strong>{{ (intensity_production or 0)|number_es(4) }}</strong><p>tCO₂e / t</p></div></article>
   <article class="kpi-card"><span class="kpi-icon blue">▥</span><div><small>PRODUCCIÓN</small><strong>{{ (indicators.get('Producción').value if indicators.get('Producción') else 0)|number_es(0) }}</strong><p>toneladas</p></div></article>
   <article class="kpi-card"><span class="kpi-icon lime">✓</span><div><small>CALIDAD DE DATOS</small><strong>{{ quality.score }}%</strong><p>{{ quality.evidence_coverage }}% con evidencia</p></div></article>
   <article class="kpi-card"><span class="kpi-icon blue">↔</span><div><small>VARIACIÓN ANUAL</small><strong>{% if history.total_change is not none %}{{ '%+.1f'|format(history.total_change) }}%{% else %}N/D{% endif %}</strong><p>frente al inventario anterior</p></div></article>
 </div>
+
+{% set hotspot = sources_summary[0] if sources_summary else none %}
+<section class="work-command analysis-command" aria-labelledby="analysis-action-title">
+  <div class="work-command-main">
+    <span class="eyebrow">DEL HALLAZGO A LA ACCIÓN</span>
+    {% if hotspot %}
+      <h2 id="analysis-action-title">Prioriza {{ hotspot.name }}</h2>
+      <p>Es la fuente material principal y concentra {{ hotspot.share }}% de la huella bruta. Contrasta este foco con las medidas existentes antes de ampliar el portafolio.</p>
+      <div class="work-command-meta">
+        <span><b>Alcance:</b> {{ hotspot.scope }}</span>
+        <span><b>Calidad global:</b> {{ quality.score }}%</span>
+        <span><b>Portafolio:</b> {{ reduction.actions|length }} acciones · {{ reduction.expected_reduction|number_es }} tCO₂e esperadas</span>
+      </div>
+    {% else %}
+      <h2 id="analysis-action-title">Completa el cálculo antes de priorizar</h2>
+      <p>No hay una fuente de emisión bruta disponible para convertir en foco material de reducción.</p>
+    {% endif %}
+  </div>
+  <div class="work-command-action">
+    <small>SIGUIENTE DECISIÓN</small>
+    <strong>{% if hotspot %}Contrastar hotspot y portafolio{% else %}Revisar reducción{% endif %}</strong>
+    <span>Revisa metas, cobertura, brecha y acciones sin netear remociones, emisiones evitadas ni compensaciones contra la huella bruta.</span>
+    <a class="btn btn-primary" href="/reduccion">Abrir reducción →</a>
+  </div>
+</section>
 
 <div class="analysis-grid">
   <section class="card">
