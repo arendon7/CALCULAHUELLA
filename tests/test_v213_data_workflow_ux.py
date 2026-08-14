@@ -3,6 +3,10 @@ from __future__ import annotations
 from pathlib import Path
 
 import pytest
+from fastapi.testclient import TestClient
+
+from app.data_request_status import is_data_request_open
+from app.main import app
 
 ROOT = Path(__file__).resolve().parents[1]
 APP_CSS = ROOT / "app" / "static" / "css" / "app.css"
@@ -11,6 +15,15 @@ BROWSER_GATE = ROOT / "scripts" / "browser_workflow_gate.py"
 INFORMATION = ROOT / "app" / "templates" / "information.html"
 SOURCES = ROOT / "app" / "templates" / "sources.html"
 SOURCE = ROOT / "app" / "templates" / "source.html"
+
+
+def _login(client: TestClient, email: str) -> None:
+    response = client.post(
+        "/login",
+        data={"email": email, "password": "Demo2026!"},
+        follow_redirects=False,
+    )
+    assert response.status_code == 303
 
 
 @pytest.mark.smoke
@@ -25,12 +38,45 @@ def test_v213_data_workflow_layer_loads_after_core_workflows() -> None:
 def test_information_keeps_task_first_navigation_and_guided_capture_entry() -> None:
     template = INFORMATION.read_text(encoding="utf-8")
     css = DATA_CSS.read_text(encoding="utf-8")
+    assert 'class="work-command information-command"' in template
+    assert 'data-default-task="{{ information_focus.task }}"' in template
     assert 'href="/captura-guiada"' in template
+    assert "{{ open_requests|length }}" in template
     for target in ('data-task-target="datos"', 'data-task-target="solicitudes"', 'data-task-target="evidencias"'):
         assert target in template
     assert ".task-jumpbar{position:sticky" in css
     assert ".request-list>article{position:relative;display:grid" in css
     assert ".information-layout>.sticky-form{position:sticky" in css
+
+
+@pytest.mark.smoke
+def test_data_request_status_semantics_cover_current_and_legacy_closed_values() -> None:
+    for status in ("Completado", "Completada", "Cerrado", "Cerrada"):
+        assert is_data_request_open(status) is False
+    for status in ("Pendiente", "En preparación", "Cargado", "En revisión", "Devuelto"):
+        assert is_data_request_open(status) is True
+
+
+@pytest.mark.smoke
+def test_client_information_opens_requests_when_work_is_pending() -> None:
+    with TestClient(app) as client:
+        _login(client, "cliente@calculatuhuella.local")
+        page = client.get("/informacion")
+        assert page.status_code == 200
+        assert 'data-default-task="solicitudes"' in page.text
+        assert "RESPONDE LO PENDIENTE" in page.text
+        assert "Abrir solicitudes" in page.text
+
+
+@pytest.mark.smoke
+def test_reviewer_information_prioritizes_evidence_review() -> None:
+    with TestClient(app) as client:
+        _login(client, "revisor@calculatuhuella.local")
+        page = client.get("/informacion")
+        assert page.status_code == 200
+        assert 'data-default-task="evidencias"' in page.text
+        assert "REVISA LA EVIDENCIA" in page.text
+        assert "Revisar evidencias" in page.text
 
 
 @pytest.mark.smoke
