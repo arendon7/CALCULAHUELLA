@@ -13,6 +13,9 @@ from app.main import app
 from app.pilot_execution import guided_workspace
 from app.reporting import create_report_artifact, generate_decision_brief_pdf
 
+ROOT = Path(__file__).resolve().parents[1]
+DELIVERY_TEMPLATE = ROOT / "app" / "templates" / "delivery.html"
+
 
 @pytest.fixture(autouse=True)
 def fresh_database():
@@ -52,21 +55,46 @@ def test_v047_guided_journey_includes_reduction_as_its_own_stage():
         assert workspace["total"] == 6
 
 
+def test_v047_delivery_template_prioritizes_publication_action_and_readiness():
+    template = DELIVERY_TEMPLATE.read_text(encoding="utf-8")
+    assert 'class="work-command delivery-command' in template
+    assert "CONTROL DE USO Y PUBLICACIÓN" in template
+    assert "NIVEL DE PUBLICACIÓN" in template
+    assert 'class="delivery-hero card delivery-readiness"' in template
+    assert 'class="card decision-room"' in template
+    assert 'class="dashboard-disclosure delivery-gates-disclosure card"' in template
+    assert 'class="dashboard-disclosure delivery-narrative card"' in template
+    assert "OCHO PUERTAS DE CONTROL" in template
+    assert template.index("CONTROL DE USO Y PUBLICACIÓN") < template.index("delivery-readiness")
+    assert template.index("delivery-readiness") < template.index("decision-room")
+    assert template.index("decision-room") < template.index("delivery-gates-disclosure")
+
+
 def test_v047_page_and_api_make_shareability_explicit():
     with TestClient(app) as client:
         login(client)
         page = client.get("/entrega-profesional")
         assert page.status_code == 200
+        assert "CONTROL DE USO Y PUBLICACIÓN" in page.text
         assert "SALA DE DECISIÓN" in page.text
         assert "NIVEL DE PUBLICACIÓN" in page.text
+        assert "OCHO PUERTAS DE CONTROL" in page.text
         assert "PLAN PRIORIZADO DE CIERRE" in page.text
-        dashboard = client.get("/dashboard")
-        assert dashboard.status_code == 200
-        assert "Estado del resultado:" in dashboard.text
+
         payload = client.get("/api/entrega-profesional/resumen").json()
         assert payload["publication"]["level"]
         assert payload["decision"]["primary_decision"]
         assert isinstance(payload["action_plan"], list)
+        assert payload["publication"]["level"] in page.text
+        assert payload["decision"]["primary_decision"] in page.text
+        if payload["publication"]["can_share_external"]:
+            assert "El resultado está habilitado para entrega controlada" in page.text
+        else:
+            assert "El resultado todavía requiere uso controlado" in page.text
+
+        dashboard = client.get("/dashboard")
+        assert dashboard.status_code == 200
+        assert "Estado del resultado:" in dashboard.text
 
 
 def test_v047_decision_brief_is_generated_and_registered(tmp_path: Path):
