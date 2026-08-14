@@ -55,8 +55,8 @@ def test_iteration12_dashboard_integrates_status_and_mobile_actions() -> None:
         assert page.status_code == 200
         assert 'class="inventory-pulse card"' in page.text
         assert 'class="mobile-taskbar"' in page.text
-        assert "Configuración completa ✓" in page.text
-        assert "Continuar recorrido" in page.text
+        assert "HUELLA DEL PERIODO" in page.text
+        assert "Continuar proceso" in page.text
         assert "EMPIEZA AQUÍ · TU SIGUIENTE ACCIÓN" in page.text
         assert "TU RUTA DE TRABAJO" in page.text
         assert 'class="journey-progress"' in page.text
