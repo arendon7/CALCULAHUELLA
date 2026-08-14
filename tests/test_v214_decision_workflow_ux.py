@@ -72,15 +72,36 @@ def test_v214_calculation_uses_same_canonical_gross_total_as_dashboard() -> None
 
 
 @pytest.mark.smoke
-def test_v214_analysis_keeps_hotspots_and_executive_reading_above_history() -> None:
+def test_v214_analysis_keeps_decision_hotspots_and_executive_reading_above_history() -> None:
     template = ANALYSIS.read_text(encoding="utf-8")
     css = DECISION_CSS.read_text(encoding="utf-8")
+    assert 'class="work-command analysis-command"' in template
+    assert "DEL HALLAZGO A LA ACCIÓN" in template
+    assert "HUELLA BRUTA" in template
+    assert "sin netear" in template
+    assert 'href="/reduccion"' in template
     assert 'class="analysis-grid"' in template
     assert 'class="card insight-panel"' in template
     assert 'class="card history-card"' in template
+    assert template.index("analysis-command") < template.index("analysis-grid")
+    assert template.index("analysis-grid") < template.index("history-card")
     assert ".analysis-grid .insight-panel" in css
     assert ".rank-list>article{display:grid" in css
     assert ".analysis-grid .insight-panel{order:-1}" in css
+
+
+@pytest.mark.smoke
+def test_v214_analysis_handoff_to_reduction_is_navigable() -> None:
+    with TestClient(app) as client:
+        _login(client)
+        analysis = client.get("/analisis")
+        assert analysis.status_code == 200
+        assert "DEL HALLAZGO A LA ACCIÓN" in analysis.text
+        assert "Abrir reducción" in analysis.text
+        assert "sin netear" in analysis.text
+        reduction = client.get("/reduccion")
+        assert reduction.status_code == 200
+        assert "DECISIÓN PRINCIPAL" in reduction.text
 
 
 @pytest.mark.smoke
