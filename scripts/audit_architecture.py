@@ -22,8 +22,8 @@ BASELINE = {
 # absorbed silently into BASELINE.
 APPROVED_GROWTH = {
     "total_routes": {
-        "allowance": 2,
-        "reason": "ADR-002 · V2.38B-C explicit inventory-scoped Analysis and Reduction routes",
+        "allowance": 3,
+        "reason": "ADR-002 · V2.38B-D1 explicit inventory-scoped Analysis, Reduction and Reports routes",
     },
 }
 
