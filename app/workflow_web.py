@@ -116,6 +116,7 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
                 .order_by(Inventory.start_date.desc(), Inventory.id.desc())
             )
         )
+        inventory_by_id = {inventory.id: inventory for inventory in inventories}
         actions = {item.id: actions_for_item(item, user) for item in items}
         return templates.TemplateResponse(
             request=request,
@@ -135,6 +136,7 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
                 statuses=STATUSES,
                 work_types=WORK_ITEM_TYPES,
                 inventories=inventories,
+                inventory_by_id=inventory_by_id,
                 selected_status=status,
                 selected_stage=stage,
                 selected_scope=selected_scope,
