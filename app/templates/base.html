@@ -92,7 +92,11 @@
       <button class="icon-button mobile-only" id="menuButton" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú">☰</button>
       <div class="topbar-title" aria-live="polite">{% block page_label %}Calcula tu Huella{% endblock %}</div>
       <div class="topbar-actions">
-        <a class="version-pill" href="/entrega-profesional" aria-label="Estado del inventario: {{ inventory.status if inventory is defined else 'ver estado' }}"><span>Inventario</span><b>{{ inventory.status if inventory is defined else 'Ver estado' }}</b></a>
+        {% if inventory is defined %}
+        <a class="version-pill" href="/inventarios/{{ inventory.id }}" aria-label="Periodo mostrado: {{ inventory.start_date.strftime('%d/%m/%Y') }} a {{ inventory.end_date.strftime('%d/%m/%Y') }}. Estado: {{ inventory.status }}"><span>Periodo mostrado</span><b>{{ inventory.base_year }} · {{ inventory.status }}</b></a>
+        {% else %}
+        <a class="version-pill" href="/inventario" aria-label="Abrir periodo por defecto"><span>Periodo</span><b>Ver por defecto</b></a>
+        {% endif %}
         <button class="icon-button" type="button" data-open-tour title="Recorrido guiado" aria-label="Iniciar recorrido guiado">✦</button>
         <button class="icon-button" type="button" data-open-context-help title="Ayuda de esta página" aria-label="Abrir ayuda de esta página">?</button>
         <button class="icon-button plain-language-button" type="button" data-open-glossary title="Términos en lenguaje claro" aria-label="Abrir diccionario de términos en lenguaje claro">Aa</button>
@@ -148,7 +152,7 @@
     <div class="dialog-body" id="context-help-description">
       {% if active == 'dashboard' %}
       <p>Empieza por <strong>Tu siguiente acción</strong>. El resumen de emisiones y el recorrido muestran avance; los análisis detallados están plegados para no distraer.</p>
-      <ol><li>Confirma la empresa y el periodo activos.</li><li>Abre la acción prioritaria asignada a tu rol.</li><li>Consulta controles metodológicos solo cuando necesites profundizar.</li></ol>
+      <ol><li>Confirma la empresa y el periodo mostrado.</li><li>Abre la acción prioritaria asignada a tu rol.</li><li>Consulta controles metodológicos solo cuando necesites profundizar.</li></ol>
       {% elif active in ['information', 'guided_capture'] %}
       <p>Esta zona reúne datos de actividad y sus soportes. Registra primero el periodo, el valor y la unidad; después confirma origen, evidencia e incertidumbre.</p>
       <ol><li>Usa Captura guiada para registros individuales.</li><li>Evita duplicar periodos ya existentes.</li><li>Asocia una evidencia verificable siempre que esté disponible.</li></ol>
@@ -207,7 +211,7 @@
     <div class="tour-progress" aria-hidden="true"><i data-tour-progress></i></div>
     <div class="dialog-body tour-body">
       <section data-tour-step tabindex="-1">
-        <span class="tour-icon" aria-hidden="true">1</span><small>CONTEXTO ACTIVO</small><h3>Trabajas sobre {{ org.trade_name or org.name }}</h3><p>La empresa y el periodo activos determinan todos los datos, cálculos y documentos que ves. Confírmalos antes de registrar información.</p>
+        <span class="tour-icon" aria-hidden="true">1</span><small>CONTEXTO DE TRABAJO</small><h3>Trabajas sobre {{ org.trade_name or org.name }}</h3><p>La empresa y, cuando corresponde, el periodo mostrado determinan los datos, cálculos y documentos que ves. En las rutas generales, el contexto por defecto es el periodo más reciente.</p>
       </section>
       <section data-tour-step tabindex="-1" hidden>
         <span class="tour-icon" aria-hidden="true">2</span><small>NAVEGACIÓN POR ROL</small><h3>Tu menú está pensado para {{ user.role }}</h3><p>{{ role_profile.mission }} La vista esencial muestra únicamente las decisiones habituales; la vista completa conserva las herramientas especializadas.</p>
