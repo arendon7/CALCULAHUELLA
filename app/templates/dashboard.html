@@ -100,12 +100,17 @@
   </div>
 </section>
 
-<section class="guided-workspace card compact-guided-workspace" aria-labelledby="journey-title">
+{% set role_focused_journey = user.role in ['Cliente', 'Verificador'] %}
+<section class="guided-workspace card compact-guided-workspace" aria-labelledby="journey-title" {% if role_focused_journey %}data-role-focused-journey="true"{% endif %}>
   <div class="guided-workspace-head">
     <div>
       <span class="eyebrow">TU RUTA DE TRABAJO</span>
       <h2 id="journey-title">Del dato al informe, sin perder el hilo</h2>
+      {% if role_focused_journey %}
+      <p>Ves aquí las etapas que puedes consultar o completar con tu rol. El recorrido integral permanece disponible para entender el proceso completo.</p>
+      {% else %}
       <p>Las etapas completadas quedan disponibles para consulta. La etapa marcada como <strong>Ahora</strong> es el punto natural para continuar.</p>
+      {% endif %}
     </div>
     <div class="journey-overview">
       <strong>{{ workspace.score }}%</strong><span>{{ workspace.completed }} de {{ workspace.total }} etapas</span>
@@ -116,12 +121,13 @@
   <div class="workspace-steps">
     {% for step in workspace.milestones %}
       {% set is_current = (not step.done and loop.index == workspace.completed + 1) %}
-      {% if can_open_route(user, step.href) %}
+      {% set can_open_step = can_open_route(user, step.href) %}
+      {% if can_open_step %}
       <a href="{{ step.href }}" class="workspace-step {% if step.done %}done{% elif is_current %}current{% endif %}" {% if is_current %}aria-current="step"{% endif %}>
         <span>{{ '✓' if step.done else loop.index }}</span>
-        <div><small class="step-state">{{ 'Hecho' if step.done else 'Ahora' if is_current else 'Después' }}</small><strong>{{ step.name }}</strong><small>{{ step.detail }}</small></div>
+        <div><small class="step-state">{{ 'Hecho' if step.done else 'Ahora' if is_current else 'Pendiente' if role_focused_journey else 'Después' }}</small><strong>{{ step.name }}</strong><small>{{ step.detail }}</small></div>
       </a>
-      {% else %}
+      {% elif not role_focused_journey %}
       <div class="workspace-step {% if step.done %}done{% elif is_current %}current{% endif %}">
         <span>{{ '✓' if step.done else loop.index }}</span>
         <div><small class="step-state">{{ 'Hecho' if step.done else 'Ahora' if is_current else 'Después' }}</small><strong>{{ step.name }}</strong><small>{{ step.detail }} · otro rol</small></div>
@@ -129,6 +135,9 @@
       {% endif %}
     {% endfor %}
   </div>
+  {% if role_focused_journey %}
+  <div class="method-boundary-note"><strong>Proceso compartido:</strong> las etapas de otros roles siguen formando parte del inventario; no se eliminan ni se omiten del recorrido completo.</div>
+  {% endif %}
 </section>
 
 <details class="dashboard-disclosure card">
