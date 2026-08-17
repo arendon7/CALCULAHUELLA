@@ -22,8 +22,8 @@ BASELINE = {
 # absorbed silently into BASELINE.
 APPROVED_GROWTH = {
     "total_routes": {
-        "allowance": 3,
-        "reason": "ADR-002 · V2.38B-D1 explicit inventory-scoped Analysis, Reduction and Reports routes",
+        "allowance": 4,
+        "reason": "ADR-002 · V2.38B-D2 explicit inventory-scoped Analysis, Reduction, Reports and Delivery routes",
     },
 }
 
@@ -131,9 +131,7 @@ def markdown(data: dict[str, object]) -> str:
         "",
     ]
     for key, approval in APPROVED_GROWTH.items():
-        rows.append(
-            f"- `{key}`: +{approval['allowance']} sobre baseline · {approval['reason']}"
-        )
+        rows.append(f"- `{key}`: +{approval['allowance']} sobre baseline · {approval['reason']}")
     rows.extend(["", "## Archivos con más rutas", ""])
     for path, count in data["top_route_files"]:
         rows.append(f"- `{path}`: {count}")
