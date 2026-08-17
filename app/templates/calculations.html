@@ -5,13 +5,16 @@
 <div class="page-head">
   <div>
     <p class="breadcrumb">{{ inventory.name }} / Resultados</p>
-    <h1>Resultados del inventario</h1>
+    <h1>Resultados del periodo</h1>
     <p>Lee primero la huella bruta del periodo y su distribución por alcance. La salud del motor y la trazabilidad quedan disponibles para revisar cómo se construyó el resultado.</p>
   </div>
-  {% if user.can_view_methodology %}<form method="post" action="/inventarios/{{ inventory.id }}/recalcular"><button class="btn btn-outline">↻ Recalcular</button></form>{% endif %}
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    {% if user.can_view_methodology %}<form method="post" action="/inventarios/{{ inventory.id }}/recalcular"><button class="btn btn-outline">↻ Recalcular</button></form>{% endif %}
+  </div>
 </div>
 
-<section class="inventory-pulse card calculation-result-pulse" aria-label="Resultado del inventario">
+<section class="inventory-pulse card calculation-result-pulse" aria-label="Resultado del periodo">
   <div class="inventory-pulse-total">
     <small>HUELLA BRUTA DEL PERIODO</small>
     <strong>{{ total|number_es }}</strong>
