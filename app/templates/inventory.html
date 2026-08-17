@@ -12,13 +12,14 @@
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Ver resultados</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reduccion">Ver reducción</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reportes">Ver informes</a>
     {% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">⚙ Configurar</a>{% elif inventory.locked %}<a class="btn btn-outline" href="/inventarios">Ver periodos</a>{% endif %}
     <a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/fuentes">{{ 'Gestionar fuentes' if user.can_manage_sources else 'Ver fuentes' }}</a>
   </div>
 </div>
 
 <section class="card architecture-note period-context-note" data-explicit-period-context>
-  <div><span>↳</span><p><strong>Estás consultando un periodo específico.</strong><small>Esta ficha, sus fuentes, Resultados, Análisis y Reducción conservan el contexto de {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}. Las rutas generales continúan usando el periodo más reciente por defecto.</small></p></div>
+  <div><span>↳</span><p><strong>Estás consultando un periodo específico.</strong><small>Esta ficha, sus fuentes, Resultados, Análisis, Reducción e Informes conservan el contexto de {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}. Las rutas generales continúan usando el periodo más reciente por defecto.</small></p></div>
   <div class="table-actions"><a href="/inventarios">Ver periodos</a><a href="/inventario">Ir al periodo por defecto →</a></div>
 </section>
 
