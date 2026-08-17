@@ -9,9 +9,10 @@
     <p>Conecta la meta climática con medidas cuantificadas, decisiones de inversión, responsables y seguimiento de ejecución.</p>
   </div>
   <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
     <a class="btn btn-outline" href="/escenarios">Comparar escenarios</a>
     <a class="btn btn-outline" href="/reduccion/exportar.xlsx">Exportar control</a>
-    <span class="phase-label">V0.55 · recomendaciones explicables</span>
+    <span class="phase-label">Decisiones cuantificadas · seguimiento de ejecución</span>
   </div>
 </div>
 
@@ -30,7 +31,7 @@
 </section>
 
 <section class="reduction-kpis">
-  <article class="card metric-card"><small>EMISIONES BASE</small><h2>{{ portfolio.baseline|number_es }} tCO₂e</h2><p>Inventario incluido en el análisis.</p></article>
+  <article class="card metric-card"><small>EMISIONES BASE</small><h2>{{ portfolio.baseline|number_es }} tCO₂e</h2><p>Huella bruta del periodo usada para dimensionar el portafolio.</p></article>
   <article class="card metric-card"><small>REDUCCIÓN REQUERIDA</small><h2>{{ portfolio.required_reduction|number_es }} tCO₂e/año</h2><p>{% if portfolio.primary_target %}Meta {{ portfolio.primary_target.target_year }} · {{ portfolio.primary_target.reduction_percent|number_es(1) }}%{% else %}Aún no existe una meta activa.{% endif %}</p></article>
   <article class="card metric-card"><small>COBERTURA DEL PORTAFOLIO</small><h2>{{ portfolio.coverage_percent|number_es(1) }}%</h2><div class="progress"><i style="width:{{ [portfolio.coverage_percent,100]|min }}%"></i></div><p>Brecha: {{ portfolio.gap|number_es }} tCO₂e/año.</p></article>
   <article class="card metric-card"><small>INVERSIÓN / AHORRO</small><h2>${{ (portfolio.investment/1000000)|number_es(0) }} M</h2><p>${{ (portfolio.annual_savings/1000000)|number_es(0) }} M/año · retorno {{ portfolio.payback_years|number_es(2) if portfolio.payback_years else 'N/D' }} años.</p></article>
