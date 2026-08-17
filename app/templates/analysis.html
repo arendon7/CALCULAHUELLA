@@ -3,8 +3,15 @@
 {% block page_label %}Gestión / Análisis{% endblock %}
 {% block content %}
 <div class="page-head">
-  <div><p class="breadcrumb">{{ inventory.name }} / Gestión</p><h1>Análisis de resultados</h1><p>Huella bruta, intensidad, calidad, evolución y comparación histórica del inventario activo.</p></div>
-  <span class="phase-label">Lectura ejecutiva · inventario activo</span>
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Gestión</p>
+    <h1>Análisis de resultados</h1>
+    <p>Huella bruta, intensidad, calidad, evolución y comparación histórica del periodo mostrado.</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <span class="phase-label">Lectura ejecutiva · contexto por periodo</span>
+  </div>
 </div>
 
 <div class="kpi-grid five">
