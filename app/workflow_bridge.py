@@ -246,7 +246,7 @@ def sync_data_request(
         )
     )
     before = _snapshot(existing)
-    item, _ = _base_sync_data_request(
+    item, base_changed = _base_sync_data_request(
         session,
         request_record,
         organization_id=organization_id,
@@ -260,7 +260,7 @@ def sync_data_request(
         item.assignee_role = "Cliente"
     if item.status_code == "closed" and item.closed_at is None:
         item.closed_at = request_record.completed_at or datetime.now(UTC)
-    return item, before is None or before != _snapshot(item)
+    return item, base_changed or before is None or before != _snapshot(item)
 
 
 def _sync_data_requests_only(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
