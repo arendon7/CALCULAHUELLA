@@ -57,6 +57,10 @@ def _key(value: str | None) -> str:
     return _normalized(value).casefold()
 
 
+def _inventory_route(inventory_id: int | None) -> str:
+    return f"/inventarios/{inventory_id}" if inventory_id is not None else "/inventario"
+
+
 def _assignment(value: str | None, default_role: str) -> tuple[str, str, str]:
     target = _normalized(value)
     if "@" in target:
@@ -198,6 +202,36 @@ def _upsert(session: Session, spec: WorkSourceSpec, actor_email: str) -> tuple[W
     for field, value in values.items():
         if getattr(item, field) != value:
             setattr(item, field, value)
+
+    link_changed = False
+    origin_link = session.scalar(
+        select(WorkItemLink).where(
+            WorkItemLink.work_item_id == item.id,
+            WorkItemLink.entity_type == spec.entity_type,
+            WorkItemLink.entity_id == spec.entity_id,
+            WorkItemLink.relationship_type == "origin",
+        )
+    )
+    if origin_link is None:
+        session.add(
+            WorkItemLink(
+                work_item_id=item.id,
+                entity_type=spec.entity_type,
+                entity_id=spec.entity_id,
+                relationship_type="origin",
+                label=spec.title,
+                route=spec.source_route,
+            )
+        )
+        link_changed = True
+    else:
+        if origin_link.route != spec.source_route:
+            origin_link.route = spec.source_route
+            link_changed = True
+        if origin_link.label != spec.title:
+            origin_link.label = spec.title
+            link_changed = True
+
     if item.status_code != spec.status_code:
         previous = item.status_code
         item.status_code = spec.status_code
@@ -220,7 +254,7 @@ def _upsert(session: Session, spec: WorkSourceSpec, actor_email: str) -> tuple[W
         item.next_action = spec.next_action
     if spec.status_code != "closed" and item.closed_at is not None:
         item.closed_at = None
-    return item, before != _snapshot(item)
+    return item, link_changed or before != _snapshot(item)
 
 
 def _observation_status(value: str) -> str:
@@ -335,7 +369,7 @@ def _sync_review_observations(session: Session, organization_id: int, actor_emai
             due_date=record.due_date,
             acceptance_criteria="Responder la observación con corrección, evidencia y explicación suficiente para su revisión.",
             next_action=_next_action(status),
-            source_route="/control",
+            source_route=_inventory_route(record.inventory_id),
             closed_at=record.closed_at,
         )
         _, item_changed = _upsert(session, spec, actor_email)
@@ -411,7 +445,7 @@ def _sync_period_closes(session: Session, organization_id: int, actor_email: str
             due_date=record.period_end,
             acceptance_criteria="Resolver bloqueadores, confirmar cobertura y registrar el cierre o devolución del periodo.",
             next_action=_next_action(status),
-            source_route="/cierre-mensual",
+            source_route=_inventory_route(record.inventory_id),
             closed_at=record.closed_at,
         )
         _, item_changed = _upsert(session, spec, actor_email)
@@ -447,7 +481,7 @@ def _sync_reports(session: Session, organization_id: int, actor_email: str) -> d
             due_date=None,
             acceptance_criteria="Confirmar integridad, versión, nivel de uso y autorización antes de publicar o entregar.",
             next_action=_next_action(status),
-            source_route="/reportes",
+            source_route=_inventory_route(record.inventory_id),
             closed_at=record.approved_at if status == "closed" else None,
         )
         _, item_changed = _upsert(session, spec, actor_email)
@@ -484,7 +518,7 @@ def _sync_reduction_actions(session: Session, organization_id: int, actor_email:
             due_date=record.target_date,
             acceptance_criteria="Registrar avance, evidencia de implementación, resultados observados y decisión de continuidad.",
             next_action=_next_action(status),
-            source_route="/reduccion",
+            source_route=_inventory_route(record.inventory_id),
             closed_at=record.updated_at if status == "closed" else None,
         )
         _, item_changed = _upsert(session, spec, actor_email)
