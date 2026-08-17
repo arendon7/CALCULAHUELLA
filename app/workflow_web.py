@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from urllib.parse import urlencode
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
@@ -21,6 +22,10 @@ from .workflow_service import (
     visible_work_items,
     work_item_summary,
 )
+
+
+STATUS_CODES = {item.code for item in STATUSES}
+STAGE_CODES = {item.code for item in CANONICAL_STAGES}
 
 
 def _work_navigation_item() -> dict[str, object]:
@@ -77,9 +82,35 @@ def _filter_items_by_inventory(items: list[WorkItem], inventory_filter: str) -> 
     if selected == "transversal":
         return [item for item in items if item.inventory_id is None]
     if selected.isdigit():
-        inventory_id = int(selected)
-        return [item for item in items if item.inventory_id == inventory_id]
+        selected_id = int(selected)
+        return [item for item in items if item.inventory_id == selected_id]
     return []
+
+
+def _work_queue_url(
+    *,
+    status: str = "",
+    stage: str = "",
+    scope: str = "",
+    inventory_id: str = "",
+    work_item_id: int | None = None,
+) -> str:
+    params: dict[str, str] = {}
+    if status in STATUS_CODES:
+        params["status"] = status
+    if stage in STAGE_CODES:
+        params["stage"] = stage
+    if scope in {"mine", "all"}:
+        params["scope"] = scope
+    selected_inventory = inventory_id.strip()
+    if selected_inventory == "transversal" or selected_inventory.isdigit():
+        params["inventory_id"] = selected_inventory
+    url = "/mi-trabajo"
+    if params:
+        url = f"{url}?{urlencode(params)}"
+    if work_item_id is not None:
+        url = f"{url}#tarea-{work_item_id}"
+    return url
 
 
 def register_workflow_routes(app, templates, common_context, require_user) -> None:
@@ -208,6 +239,10 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
     @app.post("/mi-trabajo/sincronizar")
     def work_items_sync(
         request: Request,
+        return_status: str = Form(""),
+        return_stage: str = Form(""),
+        return_scope: str = Form(""),
+        return_inventory_id: str = Form(""),
         session: Session = Depends(get_db),
         user: dict = Depends(require_user),
     ):
@@ -223,7 +258,15 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
             request,
             f"Sincronización terminada: {result['total']} solicitudes revisadas y {result['changed']} tareas actualizadas.",
         )
-        return RedirectResponse("/mi-trabajo?scope=all", status_code=303)
+        return RedirectResponse(
+            _work_queue_url(
+                status=return_status,
+                stage=return_stage,
+                scope=return_scope,
+                inventory_id=return_inventory_id,
+            ),
+            status_code=303,
+        )
 
     @app.post("/mi-trabajo/{work_item_id}/accion")
     def work_item_action(
@@ -232,6 +275,10 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
         action: str = Form(...),
         comment: str = Form(""),
         expected_version: int = Form(...),
+        return_status: str = Form(""),
+        return_stage: str = Form(""),
+        return_scope: str = Form(""),
+        return_inventory_id: str = Form(""),
         session: Session = Depends(get_db),
         user: dict = Depends(require_user),
     ):
@@ -259,7 +306,16 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
         except WorkflowServiceError as exc:
             session.rollback()
             _set_flash(request, str(exc), "error")
-        return RedirectResponse("/mi-trabajo", status_code=303)
+        return RedirectResponse(
+            _work_queue_url(
+                status=return_status,
+                stage=return_stage,
+                scope=return_scope,
+                inventory_id=return_inventory_id,
+                work_item_id=item.id,
+            ),
+            status_code=303,
+        )
 
     @app.get("/api/mi-trabajo")
     def work_items_api(
