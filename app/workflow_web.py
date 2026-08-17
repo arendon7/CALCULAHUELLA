@@ -70,6 +70,18 @@ def _parse_optional_date(value: str) -> date | None:
         raise WorkflowServiceError("La fecha límite no tiene un formato válido.") from exc
 
 
+def _filter_items_by_inventory(items: list[WorkItem], inventory_filter: str) -> list[WorkItem]:
+    selected = inventory_filter.strip()
+    if not selected:
+        return items
+    if selected == "transversal":
+        return [item for item in items if item.inventory_id is None]
+    if selected.isdigit():
+        inventory_id = int(selected)
+        return [item for item in items if item.inventory_id == inventory_id]
+    return []
+
+
 def register_workflow_routes(app, templates, common_context, require_user) -> None:
     _install_work_navigation()
 
@@ -79,6 +91,7 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
         status: str = "",
         stage: str = "",
         scope: str = "all",
+        inventory_id: str = "",
         session: Session = Depends(get_db),
         user: dict = Depends(require_user),
     ):
@@ -117,6 +130,10 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
             )
         )
         inventory_by_id = {inventory.id: inventory for inventory in inventories}
+        selected_inventory_filter = inventory_id.strip()
+        if selected_inventory_filter.isdigit() and int(selected_inventory_filter) not in inventory_by_id:
+            selected_inventory_filter = "__invalid__"
+        items = _filter_items_by_inventory(items, selected_inventory_filter)
         actions = {item.id: actions_for_item(item, user) for item in items}
         return templates.TemplateResponse(
             request=request,
@@ -140,6 +157,7 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
                 selected_status=status,
                 selected_stage=stage,
                 selected_scope=selected_scope,
+                selected_inventory_filter=selected_inventory_filter,
                 can_view_all=can_view_all,
                 can_create="manage_workflow" in capabilities,
                 sync_result=sync_result,
@@ -246,6 +264,7 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
     @app.get("/api/mi-trabajo")
     def work_items_api(
         scope: str = "mine",
+        inventory_id: str = "",
         session: Session = Depends(get_db),
         user: dict = Depends(require_user),
     ):
@@ -262,13 +281,17 @@ def register_workflow_routes(app, templates, common_context, require_user) -> No
         )
         selected_scope = "all" if scope == "all" and can_view_all else "mine"
         items = visible_work_items(session, user, scope=selected_scope)
+        selected_inventory_filter = inventory_id.strip()
+        items = _filter_items_by_inventory(items, selected_inventory_filter)
         return JSONResponse(
             {
                 "scope": selected_scope,
+                "inventory_filter": selected_inventory_filter,
                 "summary": work_item_summary(items),
                 "items": [
                     {
                         "id": item.id,
+                        "inventory_id": item.inventory_id,
                         "title": item.title,
                         "stage": item.stage_code,
                         "type": item.work_type,
