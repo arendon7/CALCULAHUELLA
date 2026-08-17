@@ -37,14 +37,7 @@ def register_data_quality_routes(app, templates, common_context, require_user, s
         if not _can_view(user):
             raise HTTPException(403, "Tu rol no puede consultar la calidad de datos")
         summary = data_quality_summary(session, int(user["organization_id"]), batch_id)
-        context = common_context(
-            request,
-            session,
-            user,
-            "data_quality",
-            summary=summary,
-            can_manage=_can_manage(user),
-        )
+        selected_inventory = None
         selected = summary.get("selected")
         if selected is not None and selected.inventory_id is not None:
             selected_inventory = session.scalar(
@@ -53,8 +46,15 @@ def register_data_quality_routes(app, templates, common_context, require_user, s
                     Inventory.organization_id == int(user["organization_id"]),
                 )
             )
-            if selected_inventory is not None:
-                context["inventory"] = selected_inventory
+        context = common_context(
+            request,
+            session,
+            user,
+            "data_quality",
+            summary=summary,
+            can_manage=_can_manage(user),
+            selected_inventory=selected_inventory,
+        )
         return templates.TemplateResponse(
             request=request,
             name="data_quality.html",
