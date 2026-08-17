@@ -9,6 +9,7 @@
     <p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ inventory.methodology }}</p>
   </div>
   <div class="head-actions">
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/informacion">Ver datos</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Ver resultados</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reduccion">Ver reducción</a>
@@ -20,7 +21,7 @@
 </div>
 
 <section class="card architecture-note period-context-note" data-explicit-period-context>
-  <div><span>↳</span><p><strong>Estás consultando un periodo específico.</strong><small>Esta ficha, sus fuentes, Resultados, Análisis, Reducción, Informes y Cierre conservan el contexto de {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}. Las rutas generales continúan usando el periodo más reciente por defecto.</small></p></div>
+  <div><span>↳</span><p><strong>Estás consultando un periodo específico.</strong><small>Esta ficha, sus fuentes, Datos y evidencias, Resultados, Análisis, Reducción, Informes y Cierre conservan el contexto de {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}. Las rutas generales continúan usando el periodo más reciente por defecto.</small></p></div>
   <div class="table-actions"><a href="/inventarios">Ver periodos</a><a href="/inventario">Ir al periodo por defecto →</a></div>
 </section>
 
