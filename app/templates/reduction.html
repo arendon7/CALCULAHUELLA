@@ -10,11 +10,21 @@
   </div>
   <div class="head-actions">
     <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    {% if scoped_workspace %}
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Ver resultados</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
+    {% else %}
     <a class="btn btn-outline" href="/escenarios">Comparar escenarios</a>
     <a class="btn btn-outline" href="/reduccion/exportar.xlsx">Exportar control</a>
     <span class="phase-label">Decisiones cuantificadas · seguimiento de ejecución</span>
+    {% endif %}
   </div>
 </div>
+
+{% if scoped_workspace %}
+<div class="method-boundary-note scoped-workspace-notice"><strong>Consulta explícita del periodo:</strong> este portafolio pertenece al expediente {{ inventory.name }}. La vista conserva metas, medidas y seguimiento del periodo sin cambiar el contexto por defecto ni habilitar edición, escenarios o exportaciones de otro periodo.</div>
+{% endif %}
 
 <section class="reduction-command card">
   <div class="reduction-command-main">
