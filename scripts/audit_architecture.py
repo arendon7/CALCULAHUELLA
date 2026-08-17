@@ -17,6 +17,16 @@ BASELINE = {
     "orm_tables": 124,
 }
 
+# Keep the historical debt baseline immutable. Intentional architectural growth
+# is recorded separately and must point to a reviewed decision instead of being
+# absorbed silently into BASELINE.
+APPROVED_GROWTH = {
+    "total_routes": {
+        "allowance": 1,
+        "reason": "ADR-002 · V2.38B explicit inventory-scoped Analysis route",
+    },
+}
+
 ROUTE_PATTERN = re.compile(r'@(?:app|router)\.(get|post|put|patch|delete)\(\s*[fru]*[\'"]([^\'"]+)')
 TABLE_PATTERN = re.compile(r'__tablename__\s*=\s*[\'"]([^\'"]+)')
 
@@ -91,12 +101,18 @@ def snapshot() -> dict[str, object]:
     }
 
 
+def approved_limit(key: str, baseline: int) -> int:
+    approval = APPROVED_GROWTH.get(key, {})
+    return baseline + int(approval.get("allowance", 0))
+
+
 def regressions(data: dict[str, object]) -> list[str]:
     failures: list[str] = []
-    for key, limit in BASELINE.items():
+    for key, baseline in BASELINE.items():
         current = int(data[key])
+        limit = approved_limit(key, baseline)
         if current > limit:
-            failures.append(f"{key}: {current} > baseline {limit}")
+            failures.append(f"{key}: {current} > approved limit {limit} (baseline {baseline})")
     return failures
 
 
@@ -111,9 +127,14 @@ def markdown(data: dict[str, object]) -> str:
         f"- Rutas HTTP: {data['total_routes']}",
         f"- Tablas ORM: {data['orm_tables']}",
         "",
-        "## Archivos con más rutas",
+        "## Crecimiento arquitectónico aprobado",
         "",
     ]
+    for key, approval in APPROVED_GROWTH.items():
+        rows.append(
+            f"- `{key}`: +{approval['allowance']} sobre baseline · {approval['reason']}"
+        )
+    rows.extend(["", "## Archivos con más rutas", ""])
     for path, count in data["top_route_files"]:
         rows.append(f"- `{path}`: {count}")
     rows.extend(["", "## Hotspots de `main.py`", ""])
@@ -125,7 +146,7 @@ def markdown(data: dict[str, object]) -> str:
 def main() -> int:
     parser = argparse.ArgumentParser(description="Audit architectural concentration without changing product semantics.")
     parser.add_argument("--json", action="store_true", help="Print JSON instead of Markdown.")
-    parser.add_argument("--enforce", action="store_true", help="Fail if V1.5.5 architectural debt grows.")
+    parser.add_argument("--enforce", action="store_true", help="Fail if V1.5.5 architectural debt grows beyond approved exceptions.")
     args = parser.parse_args()
 
     data = snapshot()
