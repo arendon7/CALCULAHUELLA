@@ -64,7 +64,7 @@ def test_v235_legacy_ticket_query_resolves_to_real_detail_and_keeps_period_conte
                     session.commit()
 
 
-def test_v235_selected_quality_batch_propagates_its_inventory_to_the_shell() -> None:
+def test_v235_selected_quality_batch_keeps_global_shell_neutral_and_labels_local_period() -> None:
     with SessionLocal() as session:
         user = session.scalar(select(AppUser).where(AppUser.email == "consultor@calculatuhuella.local"))
         assert user is not None
@@ -80,6 +80,10 @@ def test_v235_selected_quality_batch_propagates_its_inventory_to_the_shell() -> 
         batch_id = batch.id
         inventory_id = batch.inventory_id
         batch_code = batch.code
+        inventory = session.get(Inventory, inventory_id)
+        assert inventory is not None
+        inventory_name = inventory.name
+        period_range = f"{inventory.start_date.strftime('%d/%m/%Y')} – {inventory.end_date.strftime('%d/%m/%Y')}"
 
     with TestClient(app) as client:
         login(client)
@@ -90,5 +94,12 @@ def test_v235_selected_quality_batch_propagates_its_inventory_to_the_shell() -> 
     soup = BeautifulSoup(response.text, "html.parser")
     pill = soup.select_one(".topbar .version-pill")
     assert pill is not None
-    assert pill.get("href") == f"/inventarios/{inventory_id}"
-    assert "Periodo mostrado" in pill.get_text(" ", strip=True)
+    assert pill.get("href") == "/inventario"
+    assert "Ver por defecto" in pill.get_text(" ", strip=True)
+    context = soup.select_one("[data-selected-batch-context]")
+    assert context is not None
+    context_text = context.get_text(" ", strip=True)
+    assert inventory_name in context_text
+    assert period_range in context_text
+    assert "los KPI superiores resumen el centro de calidad" in context_text
+    assert context.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
