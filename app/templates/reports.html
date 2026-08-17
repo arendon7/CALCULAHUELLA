@@ -3,10 +3,20 @@
 {% block page_label %}Informes y entregables{% endblock %}
 {% block content %}
 {% set can_prepare_documents = user.can_manage_inventory or user.can_review %}
-<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Entregables</p><h1>Documentos controlados para decisión y verificación</h1><p>{% if can_prepare_documents %}Genera la ficha ejecutiva, los informes y la memoria de cálculo desde un mismo expediente trazable.{% else %}Consulta el estado de publicación, las versiones disponibles y su trazabilidad desde un mismo expediente controlado.{% endif %}</p></div><span class="phase-label">Informe controlado · expediente trazable</span></div>
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Entregables</p>
+    <h1>Documentos controlados para decisión y verificación</h1>
+    <p>{% if can_prepare_documents %}Genera la ficha ejecutiva, los informes y la memoria de cálculo desde un mismo expediente trazable.{% else %}Consulta el estado de publicación, las versiones disponibles y su trazabilidad desde un mismo expediente controlado.{% endif %}</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <span class="phase-label">Informe controlado · expediente trazable</span>
+  </div>
+</div>
 
 <div class="report-summary-strip">
-  <div><small>EMISIONES</small><strong>{{ total|number_es }} tCO₂e</strong></div>
+  <div><small>HUELLA BRUTA</small><strong>{{ total|number_es }} tCO₂e</strong></div>
   <div><small>ALISTAMIENTO</small><strong>{{ delivery.score }}%</strong></div>
   <div><small>CALIDAD</small><strong>{{ quality.score }}%</strong></div>
   <div><small>PUBLICACIÓN</small><strong>{{ delivery.publication.level }}</strong></div>
@@ -35,7 +45,7 @@
     <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación. La aprobación del archivo controla su versión documental; no sustituye la aprobación o cierre del inventario ni habilita por sí sola la publicación externa.</p></div>
   </section>
 
-  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen actual</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div><a href="/entrega-profesional">Revisar las ocho puertas →</a></aside>
+  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen del periodo</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div><a href="/entrega-profesional">Revisar las ocho puertas →</a></aside>
 </div>
 
 <section class="card report-history">
