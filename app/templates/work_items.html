@@ -43,6 +43,13 @@
             {% for option in stages %}<option value="{{ option.code }}" {% if selected_stage == option.code %}selected{% endif %}>{{ loop.index }}. {{ option.label }}</option>{% endfor %}
           </select>
         </label>
+        <label>Periodo
+          <select name="inventory_id" data-work-period-filter>
+            <option value="" {% if not selected_inventory_filter %}selected{% endif %}>Todos los periodos</option>
+            <option value="transversal" {% if selected_inventory_filter == 'transversal' %}selected{% endif %}>Trabajo transversal</option>
+            {% for inventory in inventories %}<option value="{{ inventory.id }}" {% if selected_inventory_filter == inventory.id|string %}selected{% endif %}>{{ inventory.name }} · {{ inventory.start_date.strftime('%d/%m/%Y') }}–{{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ 'por defecto' if loop.first else 'histórico' }}</option>{% endfor %}
+          </select>
+        </label>
         {% if can_view_all %}
         <label>Alcance
           <select name="scope">
