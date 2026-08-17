@@ -11,6 +11,7 @@
   <div class="head-actions">
     <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
     {% if scoped_workspace %}
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
     <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
     <a class="btn btn-outline" href="/inventarios">Ver periodos</a>
     {% elif user.can_view_methodology %}
