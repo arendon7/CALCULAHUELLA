@@ -1,72 +1,36 @@
 <!doctype html>
-<html lang="es-CO">
+<html lang="es">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="color-scheme" content="light">
-  <meta name="theme-color" content="#0f2d4d">
+  <meta name="csrf-token" content="{{ csrf_token }}">
   <title>{% block title %}Calcula tu Huella{% endblock %}</title>
-  <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
-  <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
-  <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
+  <link rel="icon" type="image/svg+xml" href="/static/img/brand-symbol.svg">
+  <link rel="stylesheet" href="/static/css/app.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/css/v2.1-core-workflows.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/css/v2.1-decision-workflows.css?v={{ app_version }}">
+  <link rel="stylesheet" href="/static/css/v2.1-assurance-workflows.css?v={{ app_version }}">
 </head>
-<body class="app-shell" data-active-module="{{ active }}" data-role="{{ user.role }}">
-  <div class="skip-links" aria-label="Accesos rápidos">
-    <a class="skip-link" href="#contenido-aplicacion">Saltar al contenido</a>
-    <a class="skip-link" href="#navegacion-principal">Saltar a navegación</a>
-  </div>
-  <div class="sr-only" id="live-region" aria-live="polite" aria-atomic="true"></div>
-
-  <aside class="sidebar" id="sidebar" aria-label="Navegación de la aplicación" tabindex="-1">
-    <a class="brand" href="/dashboard" aria-label="Ir al centro de trabajo de Calcula tu Huella"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
-
-    <div class="workspace-identity" aria-label="Perfil de trabajo actual">
-      <small>{{ 'VISTA ESENCIAL' if navigation.mode == 'essential' else 'VISTA COMPLETA' }}</small>
-      <strong>{{ role_profile.name }}</strong>
-      <span>{{ role_profile.focus }}</span>
-    </div>
-
-    {% if navigation.mode == 'complete' %}
-    <label class="nav-search" for="navSearch">
-      <span aria-hidden="true">⌕</span><span class="sr-only">Buscar módulo</span><input id="navSearch" type="search" placeholder="Buscar módulo" autocomplete="off" aria-describedby="nav-search-help">
-      <small class="sr-only" id="nav-search-help">Filtra las opciones visibles del menú mientras escribes.</small>
-    </label>
-    {% endif %}
-
-    <div id="navegacion-principal">
-    {% for section in navigation.core %}
-    <nav class="nav-group{% if not loop.first %} compact-nav{% endif %}" aria-label="{{ section['label'] }}">
-      <p class="nav-label">{{ section["label"] }}</p>
-      {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+<body class="app-shell">
+  <a class="skip-link" href="#aplicacion">Saltar al contenido</a>
+  <aside class="sidebar" id="sidebar" aria-label="Navegación principal">
+    <a class="brand" href="/dashboard" aria-label="Calcula tu Huella · Inicio">
+      <img src="/static/img/brand-primary.svg" alt="Calcula tu Huella">
+    </a>
+    <nav class="side-nav" aria-label="Módulos de la plataforma">
+      {% for section in navigation.sections %}
+      <section class="nav-section">
+        <small>{{ section.label }}</small>
+        {% for item in section.items %}
+        <a class="nav-item {% if active_page == item.active %}active{% endif %}" href="{{ item.href }}" {% if active_page == item.active %}aria-current="page"{% endif %}>
+          <span aria-hidden="true">{{ item.icon }}</span>{{ item.label }}
+        </a>
+        {% endfor %}
+      </section>
+      {% endfor %}
     </nav>
-    {% endfor %}
 
-    {% if navigation.mode == 'complete' and navigation.advanced %}
-    <details class="nav-disclosure">
-      <summary>Herramientas avanzadas <span aria-hidden="true">⌄</span></summary>
-      {% for section in navigation.advanced %}
-      <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
-        {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
-      </nav>
-      {% endfor %}
-    </details>
-    {% endif %}
-
-    {% if navigation.mode == 'complete' and navigation.internal %}
-    <details class="nav-disclosure internal-disclosure">
-      <summary>Administración interna <span aria-hidden="true">⌄</span></summary>
-      {% for section in navigation.internal %}
-      <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
-        {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
-      </nav>
-      {% endfor %}
-    </details>
-    {% endif %}
-    </div>
-
-    {% if navigation.has_complete_view %}
+    {% if navigation.can_toggle %}
     <form action="/preferencias/vista" method="post" class="view-mode-form">
       <input type="hidden" name="mode" value="{{ 'complete' if navigation.mode == 'essential' else 'essential' }}">
       <input type="hidden" name="return_url" value="{{ request.url.path }}">
@@ -92,7 +56,7 @@
       <button class="icon-button mobile-only" id="menuButton" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú">☰</button>
       <div class="topbar-title" aria-live="polite">{% block page_label %}Calcula tu Huella{% endblock %}</div>
       <div class="topbar-actions">
-        {% if inventory is defined %}
+        {% if inventory is defined and inventory %}
         <a class="version-pill" href="/inventarios/{{ inventory.id }}" aria-label="Periodo mostrado: {{ inventory.start_date.strftime('%d/%m/%Y') }} a {{ inventory.end_date.strftime('%d/%m/%Y') }}. Estado: {{ inventory.status }}"><span>Periodo mostrado</span><b>{{ inventory.base_year }} · {{ inventory.status }}</b></a>
         {% else %}
         <a class="version-pill" href="/inventario" aria-label="Abrir periodo por defecto"><span>Periodo</span><b>Ver por defecto</b></a>
@@ -113,118 +77,61 @@
               <form action="/portafolio/cambiar/{{ option.id }}" method="post"><button class="org-option" type="submit"><span><strong>{{ option.trade_name or option.name }}</strong><small>{{ option.role }}</small></span><b aria-hidden="true">→</b></button></form>
               {% endif %}
             {% endfor %}
-            <a href="/portafolio">Ver portafolio completo</a>
           </div>
         </details>
-        {% elif user.can_manage_portfolio %}<a class="org-name" href="/portafolio" title="Cambiar organización">{{ org.trade_name or org.name }}</a>{% else %}<span class="org-name" title="Organización activa">{{ org.trade_name or org.name }}</span>{% endif %}
+        {% endif %}
       </div>
     </header>
-    <div class="page-content" id="contenido-aplicacion" tabindex="-1">
-      {% if flash %}<div class="flash flash-{{ flash.level }}" role="{{ 'alert' if flash.level in ['error','warning'] else 'status' }}" aria-live="{{ 'assertive' if flash.level == 'error' else 'polite' }}" tabindex="-1">{{ flash.message }}</div>{% endif %}
-      {% if inventory is defined and inventory.locked %}
-      <div class="locked-banner" role="status"><span aria-hidden="true">🔒</span><div><strong>Inventario cerrado e inmutable</strong><small>Los datos, evidencias, factores y cálculos de la versión {{ inventory.version }} están bloqueados. Para corregirlos debe crearse una nueva versión desde Control.</small></div></div>
-      {% endif %}
-      <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" tabindex="-1" hidden></div>
+
+    {% if flash %}
+    <div class="flash flash-{{ flash.level }}" role="status"><span>{{ flash.message }}</span><button type="button" aria-label="Cerrar mensaje" onclick="this.parentElement.remove()">×</button></div>
+    {% endif %}
+
+    <div class="content-wrap">
       {% block content %}{% endblock %}
     </div>
   </main>
 
-  {% if navigation.mode == 'essential' %}
-  <nav class="mobile-taskbar" aria-label="Navegación principal móvil">
-    {% set mobile_nav = namespace(count=0) %}
-    {% for section in navigation.core %}
-      {% for item in section["items"] %}
-        {% if mobile_nav.count < 4 %}
-        <a href="{{ item['href'] }}" class="{% if active == item['active'] %}active{% endif %}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span><small>{{ item["label"]|replace('Centro de trabajo','Inicio')|replace('Continuar mi recorrido','Recorrido')|replace('Continuar recorrido','Recorrido')|replace('Prioridades de revisión','Recorrido')|replace('Plan de verificación','Recorrido')|replace('Portafolio de empresas','Empresas') }}</small></a>
-        {% set mobile_nav.count = mobile_nav.count + 1 %}
-        {% endif %}
-      {% endfor %}
-    {% endfor %}
-    <button type="button" data-open-mobile-menu aria-label="Abrir todas las opciones"><span aria-hidden="true">☰</span><small>Más</small></button>
-  </nav>
+  <dialog class="context-help-dialog" id="contextHelpDialog">
+    <form method="dialog" class="context-help-card">
+      <button class="dialog-close" aria-label="Cerrar ayuda">×</button>
+      <span class="eyebrow">AYUDA DE ESTA PÁGINA</span>
+      <h2>{{ page_help.title }}</h2>
+      <p>{{ page_help.purpose }}</p>
+      <div class="context-help-grid">
+        <div><small>QUÉ REVISAR</small><p>{{ page_help.check }}</p></div>
+        <div><small>SIGUIENTE PASO</small><p>{{ page_help.next }}</p></div>
+      </div>
+      <a class="btn btn-outline" href="/guia">Consultar proceso completo</a>
+    </form>
+  </dialog>
+
+  <dialog class="glossary-dialog" id="glossaryDialog">
+    <form method="dialog" class="glossary-card">
+      <button class="dialog-close" aria-label="Cerrar diccionario">×</button>
+      <span class="eyebrow">LENGUAJE CLARO</span>
+      <h2>Términos esenciales</h2>
+      <div class="glossary-list">
+        {% for term in glossary_terms %}
+        <div><strong>{{ term.term }}</strong><p>{{ term.explanation }}</p></div>
+        {% endfor %}
+      </div>
+    </form>
+  </dialog>
+
+  {% if welcome_tour %}
+  <dialog class="welcome-tour-dialog" id="welcomeTourDialog" data-tour-role="{{ user.role|lower }}" data-tour-version="{{ welcome_tour.version }}">
+    <div class="welcome-tour-card">
+      <button class="dialog-close" type="button" data-tour-skip aria-label="Cerrar recorrido">×</button>
+      <span class="eyebrow">RECORRIDO GUIADO · {{ user.role|upper }}</span>
+      <h2 data-tour-title>{{ welcome_tour.steps[0].title }}</h2>
+      <p data-tour-body>{{ welcome_tour.steps[0].body }}</p>
+      <div class="tour-progress" aria-label="Progreso del recorrido"><i style="width:25%"></i></div>
+      <div class="tour-actions"><button class="btn btn-outline" type="button" data-tour-skip>Omitir</button><button class="btn btn-primary" type="button" data-tour-next>Siguiente</button></div>
+    </div>
+  </dialog>
   {% endif %}
 
-  <dialog class="access-dialog context-help-dialog" id="contextHelpDialog" aria-labelledby="context-help-title" aria-describedby="context-help-description">
-    <div class="dialog-head">
-      <div><small>AYUDA CONTEXTUAL</small><h2 id="context-help-title">Cómo usar esta página</h2></div>
-      <button class="dialog-close" type="button" data-close-dialog aria-label="Cerrar ayuda">×</button>
-    </div>
-    <div class="dialog-body" id="context-help-description">
-      {% if active == 'dashboard' %}
-      <p>Empieza por <strong>Tu siguiente acción</strong>. El resumen de emisiones y el recorrido muestran avance; los análisis detallados están plegados para no distraer.</p>
-      <ol><li>Confirma la empresa y el periodo mostrado.</li><li>Abre la acción prioritaria asignada a tu rol.</li><li>Consulta controles metodológicos solo cuando necesites profundizar.</li></ol>
-      {% elif active in ['information', 'guided_capture'] %}
-      <p>Esta zona reúne datos de actividad y sus soportes. Registra primero el periodo, el valor y la unidad; después confirma origen, evidencia e incertidumbre.</p>
-      <ol><li>Usa Captura guiada para registros individuales.</li><li>Evita duplicar periodos ya existentes.</li><li>Asocia una evidencia verificable siempre que esté disponible.</li></ol>
-      {% elif active in ['sources', 'source'] %}
-      <p>Aquí defines qué emite, dónde ocurre y cómo se calcula. Una fuente solo debe incluirse cuando corresponda al límite del inventario.</p>
-      <ol><li>Confirma alcance, categoría y sede.</li><li>Revisa unidad esperada y responsable.</li><li>Documenta la selección del factor antes de aprobarla.</li></ol>
-      {% elif active == 'inventory_journey' %}
-      <p>El recorrido organiza el inventario en seis etapas. Abre la etapa actual y completa la acción asignada antes de avanzar.</p>
-      <ol><li>Las etapas terminadas siguen disponibles para consulta.</li><li>Las acciones de otros roles se muestran como contexto, no como tarea propia.</li><li>El cierre exige que las puertas de calidad estén listas.</li></ol>
-      {% elif active in ['calculations', 'analysis', 'reports', 'delivery'] %}
-      <p>Estas vistas interpretan resultados ya calculados. Revisa primero cobertura y alertas antes de usar cifras en informes o decisiones.</p>
-      <ol><li>Distingue emisiones brutas, remociones y emisiones evitadas.</li><li>Verifica unidades, factores y versión GWP.</li><li>No publiques resultados con controles críticos abiertos.</li></ol>
-      {% elif active in ['methodology', 'factor_library', 'methodology_governance', 'colombia_library'] %}
-      <p>Estas herramientas son metodológicas. Los cambios pueden afectar trazabilidad y resultados, por lo que requieren justificación y revisión profesional.</p>
-      <ol><li>Prioriza fuentes oficiales y vigentes.</li><li>Comprueba representatividad geográfica y temporal.</li><li>Conserva el pasaporte y la evidencia documental.</li></ol>
-      {% else %}
-      <p>Completa la tarea principal de la página y deja las opciones avanzadas para cuando sean necesarias. Los estados y avisos indican qué puede editarse y qué requiere otro rol.</p>
-      <ol><li>Lee el título y la instrucción principal.</li><li>Completa únicamente los campos obligatorios.</li><li>Revisa el mensaje de confirmación antes de continuar.</li></ol>
-      {% endif %}
-      <div class="context-role-note"><strong>Tu enfoque como {{ user.role }}:</strong> {{ role_profile.focus }}</div>
-    </div>
-    <div class="dialog-actions"><button class="btn btn-outline" type="button" data-open-glossary>Ver términos claros</button><a class="btn btn-outline" href="/guia">Abrir guía completa</a><button class="btn btn-primary" type="button" data-close-dialog>Entendido</button></div>
-  </dialog>
-
-  <dialog class="access-dialog glossary-dialog" id="plainLanguageDialog" aria-labelledby="plain-language-title" aria-describedby="plain-language-description">
-    <div class="dialog-head">
-      <div><small>LENGUAJE CLARO</small><h2 id="plain-language-title">Diccionario rápido de la huella</h2></div>
-      <button class="dialog-close" type="button" data-close-dialog aria-label="Cerrar diccionario">×</button>
-    </div>
-    <div class="dialog-body" id="plain-language-description">
-      <p>Busca un término. Las definiciones explican su uso dentro de la plataforma y no sustituyen la decisión metodológica profesional.</p>
-      <label class="glossary-search" for="plainLanguageSearch"><span>Buscar término</span><input id="plainLanguageSearch" type="search" placeholder="Ejemplo: incertidumbre" autocomplete="off" data-glossary-search></label>
-      <div class="glossary-result-status" role="status" aria-live="polite" data-glossary-status>10 términos disponibles.</div>
-      <dl class="plain-glossary" data-glossary-list>
-        <div data-glossary-item><dt>Fuente de emisión</dt><dd>Actividad, equipo o proceso que libera gases de efecto invernadero, por ejemplo una caldera, un vehículo o el consumo de electricidad.</dd></div>
-        <div data-glossary-item><dt>Dato de actividad</dt><dd>Cantidad medida que describe una operación: litros de combustible, kilovatios-hora, toneladas transportadas o kilómetros recorridos.</dd></div>
-        <div data-glossary-item><dt>Factor de emisión</dt><dd>Valor que convierte un dato de actividad en emisiones. Debe representar bien la tecnología, el lugar, el periodo y la unidad del dato.</dd></div>
-        <div data-glossary-item><dt>CO₂ equivalente (CO₂e)</dt><dd>Unidad común para sumar distintos gases según su efecto climático. No significa que todo lo emitido sea dióxido de carbono.</dd></div>
-        <div data-glossary-item><dt>GWP</dt><dd>Potencial de calentamiento global. Es el multiplicador usado para expresar cada gas en CO₂e según una versión científica definida.</dd></div>
-        <div data-glossary-item><dt>Alcance 1, 2 y 3</dt><dd>Clasificación del origen de las emisiones: directas de la empresa, energía comprada y cadena de valor, respectivamente.</dd></div>
-        <div data-glossary-item><dt>Materialidad</dt><dd>Importancia de una fuente para el inventario. Considera magnitud, riesgo, interés de usuarios y capacidad de influir en decisiones.</dd></div>
-        <div data-glossary-item><dt>Incertidumbre</dt><dd>Rango de variación posible del dato o cálculo. Un porcentaje alto indica que conviene mejorar medición, soporte o representatividad.</dd></div>
-        <div data-glossary-item><dt>Evidencia o soporte</dt><dd>Documento que permite comprobar el dato: factura, medición, registro operativo, certificado, archivo o imagen.</dd></div>
-        <div data-glossary-item><dt>Inventario cerrado</dt><dd>Versión aprobada que ya no puede editarse. Cualquier corrección debe realizarse en una nueva versión para conservar la trazabilidad.</dd></div>
-      </dl>
-      <div class="glossary-empty" data-glossary-empty hidden>No encontramos ese término. Prueba con una palabra más corta.</div>
-    </div>
-    <div class="dialog-actions"><a class="btn btn-outline" href="/guia#glosario">Abrir glosario completo</a><button class="btn btn-primary" type="button" data-close-dialog>Volver a la tarea</button></div>
-  </dialog>
-
-  <dialog class="access-dialog tour-dialog" id="welcomeTourDialog" aria-labelledby="tour-title" data-tour-storage-key="cth-tour-v14-{{ user.role|lower|replace(' ', '-') }}">
-    <div class="dialog-head">
-      <div><small>PRIMER INGRESO</small><h2 id="tour-title">Ubícate en menos de un minuto</h2></div>
-      <button class="dialog-close" type="button" data-tour-skip aria-label="Omitir recorrido">×</button>
-    </div>
-    <div class="tour-progress" aria-hidden="true"><i data-tour-progress></i></div>
-    <div class="dialog-body tour-body">
-      <section data-tour-step tabindex="-1">
-        <span class="tour-icon" aria-hidden="true">1</span><small>CONTEXTO DE TRABAJO</small><h3>Trabajas sobre {{ org.trade_name or org.name }}</h3><p>La empresa y, cuando corresponde, el periodo mostrado determinan los datos, cálculos y documentos que ves. En las rutas generales, el contexto por defecto es el periodo más reciente.</p>
-      </section>
-      <section data-tour-step tabindex="-1" hidden>
-        <span class="tour-icon" aria-hidden="true">2</span><small>NAVEGACIÓN POR ROL</small><h3>Tu menú está pensado para {{ user.role }}</h3><p>{{ role_profile.mission }} La vista esencial muestra únicamente las decisiones habituales; la vista completa conserva las herramientas especializadas.</p>
-      </section>
-      <section data-tour-step tabindex="-1" hidden>
-        <span class="tour-icon" aria-hidden="true">3</span><small>PRIORIDAD DE TRABAJO</small><h3>Empieza siempre por la siguiente acción</h3><p>En el centro de trabajo encontrarás una tarea prioritaria, su responsable y el criterio para considerarla terminada. Esto evita recorrer módulos sin propósito.</p>
-      </section>
-      <section data-tour-step tabindex="-1" hidden>
-        <span class="tour-icon" aria-hidden="true">4</span><small>AYUDA DISPONIBLE</small><h3>Abre “?” cuando necesites contexto</h3><p>La ayuda explica la función de la página, el orden recomendado y los controles ambientales principales. Puedes reiniciar este recorrido desde el botón ✦ y abrir el diccionario “Aa” para traducir términos técnicos.</p>
-      </section>
-    </div>
-    <div class="tour-status" data-tour-status aria-live="polite">Paso 1 de 4</div>
-    <div class="dialog-actions tour-actions"><button class="btn btn-outline" type="button" data-tour-back hidden>Anterior</button><button class="btn btn-outline" type="button" data-tour-skip>Omitir</button><button class="btn btn-primary" type="button" data-tour-next>Siguiente</button><button class="btn btn-primary" type="button" data-tour-finish hidden>Empezar</button></div>
-  </dialog>
+  <script src="/static/js/app.js?v={{ app_version }}" defer></script>
 </body>
 </html>
