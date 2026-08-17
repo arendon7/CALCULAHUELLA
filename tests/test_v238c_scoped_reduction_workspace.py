@@ -58,7 +58,7 @@ def test_v238c_scoped_reduction_keeps_period_and_has_no_mutation_controls() -> N
     assert inventory_name in response.text
     assert period in response.text
     assert "Consulta explícita del periodo" in response.text
-    assert "no cambiar el contexto por defecto" in response.text
+    assert "sin cambiar el contexto por defecto" in response.text
 
     soup = BeautifulSoup(response.text, "html.parser")
     pill = soup.select_one(".topbar .version-pill")
