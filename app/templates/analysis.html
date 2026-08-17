@@ -52,7 +52,7 @@
     <small>SIGUIENTE DECISIÓN</small>
     <strong>{% if hotspot %}Contrastar hotspot y portafolio{% else %}Revisar reducción{% endif %}</strong>
     <span>Revisa metas, cobertura, brecha y acciones sin netear remociones, emisiones evitadas ni compensaciones contra la huella bruta.</span>
-    {% if scoped_workspace %}<a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">Continuar en el expediente →</a>{% else %}<a class="btn btn-primary" href="/reduccion">Abrir reducción →</a>{% endif %}
+    {% if scoped_workspace %}<a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/reduccion">Abrir reducción →</a>{% else %}<a class="btn btn-primary" href="/reduccion">Abrir reducción →</a>{% endif %}
   </div>
 </section>
 
