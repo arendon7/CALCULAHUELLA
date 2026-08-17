@@ -6,9 +6,10 @@
   <div>
     <p class="breadcrumb">{{ inventory.name }} / Información</p>
     <h1>Datos y evidencias</h1>
-    <p>Consulta el historial consolidado, gestiona solicitudes y conserva cada soporte. La plataforma prioriza la tarea que corresponde a tu rol y al estado actual del inventario.</p>
+    <p>Consulta el historial consolidado, gestiona solicitudes y conserva cada soporte. La plataforma prioriza la tarea que corresponde a tu rol y al estado del periodo que estás trabajando.</p>
   </div>
   <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
     <details class="head-action-menu">
       <summary class="btn btn-outline">Otras formas de carga</summary>
       <div><a href="/informacion/plantilla.xlsx">Descargar plantilla sectorial</a><a href="/informacion/importar">Importar archivo Excel</a></div>
