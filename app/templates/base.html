@@ -8,6 +8,7 @@
   <title>{% block title %}Calcula tu Huella{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/inventory-dossier.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
 </head>
 <body class="app-shell" data-active-module="{{ active }}" data-role="{{ user.role }}">
@@ -46,7 +47,7 @@
       <summary>Herramientas avanzadas <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.advanced %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
+        <p class="nav-label">{{ section['label'] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
@@ -58,7 +59,7 @@
       <summary>Administración interna <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.internal %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
+        <p class="nav-label">{{ section['label'] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
@@ -125,6 +126,26 @@
       <div class="locked-banner" role="status"><span aria-hidden="true">🔒</span><div><strong>Inventario cerrado e inmutable</strong><small>Los datos, evidencias, factores y cálculos de la versión {{ inventory.version }} están bloqueados. Para corregirlos debe crearse una nueva versión desde Control.</small></div></div>
       {% endif %}
       <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" tabindex="-1" hidden></div>
+      {% if inventory is defined and inventory %}
+        {% set dossier_root = '/inventarios/' ~ inventory.id %}
+        {% set dossier_nav = [
+          {'href': dossier_root, 'label': 'Ficha', 'detail': 'Contexto y límites', 'icon': '1'},
+          {'href': dossier_root ~ '/informacion', 'label': 'Datos', 'detail': 'Actividad y evidencia', 'icon': '2'},
+          {'href': dossier_root ~ '/calculos', 'label': 'Resultados', 'detail': 'Huella y trazabilidad', 'icon': '3'},
+          {'href': dossier_root ~ '/analisis', 'label': 'Análisis', 'detail': 'Lectura e intensidad', 'icon': '4'},
+          {'href': dossier_root ~ '/reduccion', 'label': 'Reducción', 'detail': 'Metas y medidas', 'icon': '5'},
+          {'href': dossier_root ~ '/reportes', 'label': 'Informes', 'detail': 'Versiones documentales', 'icon': '6'},
+          {'href': dossier_root ~ '/entrega-profesional', 'label': 'Cierre', 'detail': 'Uso y publicación', 'icon': '7'}
+        ] %}
+        {% set dossier_paths = [dossier_root, dossier_root ~ '/informacion', dossier_root ~ '/calculos', dossier_root ~ '/analisis', dossier_root ~ '/reduccion', dossier_root ~ '/reportes', dossier_root ~ '/entrega-profesional'] %}
+        {% if request.url.path in dossier_paths %}
+        <nav class="task-jumpbar inventory-dossier-nav" aria-label="Vistas del expediente del periodo" data-inventory-dossier-nav>
+          {% for item in dossier_nav %}
+          <a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}" {% if request.url.path == item.href %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item.icon }}</span><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></a>
+          {% endfor %}
+        </nav>
+        {% endif %}
+      {% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>
