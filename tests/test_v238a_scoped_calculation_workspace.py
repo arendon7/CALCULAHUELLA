@@ -40,9 +40,9 @@ def test_v238a_inventory_record_exposes_scoped_results() -> None:
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
-    link = soup.select_one(f'a[href="/inventarios/{inventory_id}/calculos"]')
-    assert link is not None
-    assert "Ver resultados" in link.get_text(" ", strip=True)
+    links = soup.select(f'a[href="/inventarios/{inventory_id}/calculos"]')
+    assert links
+    assert any("Ver resultados" in link.get_text(" ", strip=True) for link in links)
     assert inventory_name in response.text
 
 
