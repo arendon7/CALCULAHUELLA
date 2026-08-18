@@ -61,17 +61,17 @@ def _origin_link_snapshot(
 ) -> tuple[str, str] | None:
     if work_item_id is None:
         return None
-    link = session.scalar(
-        select(WorkItemLink).where(
+    row = session.execute(
+        select(WorkItemLink.route, WorkItemLink.label).where(
             WorkItemLink.work_item_id == work_item_id,
             WorkItemLink.entity_type == "DataRequest",
             WorkItemLink.entity_id == request_id,
             WorkItemLink.relationship_type == "origin",
         )
-    )
-    if link is None:
+    ).first()
+    if row is None:
         return None
-    return (str(link.route or ""), str(link.label or ""))
+    return (str(row[0] or ""), str(row[1] or ""))
 
 
 def _status_label(item: WorkItem) -> str:
