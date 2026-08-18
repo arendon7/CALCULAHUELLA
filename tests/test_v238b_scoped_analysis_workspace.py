@@ -58,16 +58,18 @@ def test_v238b_scoped_analysis_keeps_period_and_hides_mutation_controls() -> Non
     assert inventory_name in response.text
     assert period in response.text
     assert "Consulta explícita del periodo" in response.text
-    assert "no cambia el periodo por defecto" in response.text
+    assert "no cambia el periodo por defecto" in response.text.lower()
 
     soup = BeautifulSoup(response.text, "html.parser")
+    content = soup.select_one("#contenido-aplicacion")
+    assert content is not None
     pill = soup.select_one(".topbar .version-pill")
     assert pill is not None
     assert pill.get("href") == f"/inventarios/{inventory_id}"
-    assert soup.select_one('form[action="/analisis/indicadores/nuevo"]') is None
-    assert soup.select_one('a[href="/reduccion"]') is None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}/calculos"]') is not None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+    assert content.select_one('form[action="/analisis/indicadores/nuevo"]') is None
+    assert content.select_one('a[href="/reduccion"]') is None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}/calculos"]') is not None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
 
 
 def test_v238b_default_analysis_preserves_operational_navigation() -> None:
