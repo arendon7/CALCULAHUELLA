@@ -21,6 +21,19 @@ CORE_SURFACE_VIEWPORTS = (
     ("desktop-1440", 1440, 900),
     ("mobile-390", 390, 844),
 )
+HISTORICAL_DOSSIER_VIEWPORTS = (
+    ("desktop-1440", 1440, 900),
+    ("mobile-390", 390, 844),
+)
+HISTORICAL_DOSSIER_SUFFIXES = (
+    "",
+    "/informacion",
+    "/calculos",
+    "/analisis",
+    "/reduccion",
+    "/reportes",
+    "/entrega-profesional",
+)
 CORE_SURFACES = (
     ("inventarios", "/inventarios"),
     ("captura-guiada", "/captura-guiada"),
@@ -251,6 +264,125 @@ def _core_surface_visual_evidence(page: Page) -> list[dict[str, object]]:
     return evidence
 
 
+def _historical_dossier_contract(page: Page) -> dict[str, object]:
+    page.set_viewport_size({"width": 1440, "height": 900})
+    page.goto(f"{BASE_URL}/inventarios", wait_until="networkidle")
+    _close_transient_dialogs(page)
+
+    historical = page.locator(
+        '.inventory-card.historical-context .card-actions a.btn-primary[href^="/inventarios/"]'
+    ).first
+    if historical.count() != 1:
+        raise AssertionError("El seed demo no expone un periodo histórico navegable en /inventarios.")
+    dossier_root = historical.get_attribute("href") or ""
+    if not dossier_root.startswith("/inventarios/") or dossier_root.count("/") != 2:
+        raise AssertionError(f"Ruta histórica inesperada: {dossier_root!r}")
+
+    expected_hrefs = [f"{dossier_root}{suffix}" for suffix in HISTORICAL_DOSSIER_SUFFIXES]
+    viewport_evidence: list[dict[str, object]] = []
+
+    for label, width, height in HISTORICAL_DOSSIER_VIEWPORTS:
+        page.set_viewport_size({"width": width, "height": height})
+        page.goto(f"{BASE_URL}{dossier_root}", wait_until="networkidle")
+        _close_transient_dialogs(page)
+
+        dossier = page.locator("[data-inventory-dossier-nav]")
+        if dossier.count() != 1:
+            raise AssertionError(f"El expediente histórico no expone su navegación en {label}.")
+        hrefs = dossier.locator("a[href]").evaluate_all("nodes => nodes.map(node => node.getAttribute('href'))")
+        if hrefs != expected_hrefs:
+            raise AssertionError(f"Rutas del expediente alteradas en {label}: {hrefs}")
+
+        current = dossier.locator('a[aria-current="page"]')
+        if current.count() != 1 or current.get_attribute("href") != dossier_root:
+            raise AssertionError(f"La ficha histórica no queda marcada como vista actual en {label}.")
+
+        period_pill = page.locator(f'.version-pill[href="{dossier_root}"]')
+        if period_pill.count() != 1:
+            raise AssertionError(f"La barra de contexto no conserva el periodo histórico en {label}.")
+
+        metrics = dossier.evaluate(
+            """
+            (nav) => ({
+              clientWidth: nav.clientWidth,
+              scrollWidth: nav.scrollWidth,
+              links: [...nav.querySelectorAll('a')].map((link) => {
+                const rect = link.getBoundingClientRect();
+                return {
+                  href: link.getAttribute('href'),
+                  visible: rect.width > 0 && rect.height > 0,
+                  left: Math.round(rect.left * 10) / 10,
+                  right: Math.round(rect.right * 10) / 10,
+                };
+              }),
+            })
+            """
+        )
+        nav_overflow = int(metrics["scrollWidth"]) - int(metrics["clientWidth"])
+        if nav_overflow > 1:
+            raise AssertionError(f"La navegación histórica desborda horizontalmente en {label}: {metrics}")
+        if width <= 720:
+            hidden = [row for row in metrics["links"] if not row["visible"]]
+            outside = [
+                row
+                for row in metrics["links"]
+                if float(row["left"]) < -1 or float(row["right"]) > width + 1
+            ]
+            if hidden or outside:
+                raise AssertionError(
+                    f"Las siete vistas históricas no permanecen visibles en móvil: hidden={hidden}; outside={outside}"
+                )
+
+        result_link = dossier.locator(f'a[href="{dossier_root}/calculos"]')
+        result_link.click()
+        page.wait_for_load_state("networkidle")
+        if page.url != f"{BASE_URL}{dossier_root}/calculos":
+            raise AssertionError(f"Resultados perdió el periodo histórico en {label}: {page.url}")
+
+        preserving = page.locator('#navegacion-principal a[data-period-preserving="true"]')
+        preserving_hrefs = preserving.evaluate_all("nodes => nodes.map(node => node.getAttribute('href'))")
+        if not preserving_hrefs or any(not href.startswith(f"{dossier_root}/") for href in preserving_hrefs):
+            raise AssertionError(
+                f"El menú global expone enlaces que pierden el periodo histórico en {label}: {preserving_hrefs}"
+            )
+
+        if width > 720:
+            information = page.locator(
+                f'#navegacion-principal a[data-period-preserving="true"][href="{dossier_root}/informacion"]'
+            )
+            if information.count() != 1:
+                raise AssertionError("El menú lateral no ofrece Datos preservando el periodo histórico.")
+            information.click()
+            page.wait_for_load_state("networkidle")
+            if page.url != f"{BASE_URL}{dossier_root}/informacion":
+                raise AssertionError(f"El menú lateral perdió el periodo histórico: {page.url}")
+
+        screenshot_name = None
+        if BROWSER_NAME == "chromium":
+            screenshot = ARTIFACT_DIR / f"historical-dossier-{label}.png"
+            page.screenshot(path=str(screenshot), full_page=True)
+            screenshot_name = screenshot.name
+
+        viewport_evidence.append(
+            {
+                "label": label,
+                "width": width,
+                "height": height,
+                "dossier_root": dossier_root,
+                "hrefs": hrefs,
+                "period_preserving_hrefs": preserving_hrefs,
+                "navigation_overflow_px": nav_overflow,
+                "screenshot": screenshot_name,
+            }
+        )
+
+    return {
+        "dossier_root": dossier_root,
+        "expected_hrefs": expected_hrefs,
+        "viewports": viewport_evidence,
+    }
+
+
 def _known_webkit_style_warning(text: str) -> bool:
     return (
         BROWSER_NAME == "webkit"
@@ -269,6 +401,7 @@ def main() -> int:
         "base_url": BASE_URL,
         "viewports": [],
         "core_surfaces": [],
+        "historical_dossier": {},
     }
 
     with sync_playwright() as playwright:
@@ -298,6 +431,7 @@ def main() -> int:
             result["viewports"].append(_viewport_contract(page, label, width, height))
 
         result["core_surfaces"] = _core_surface_visual_evidence(page)
+        result["historical_dossier"] = _historical_dossier_contract(page)
         result["console_errors"] = console_errors
         result["known_engine_warnings"] = known_engine_warnings
         result["page_errors"] = page_errors
