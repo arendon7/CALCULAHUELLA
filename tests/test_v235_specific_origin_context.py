@@ -77,7 +77,7 @@ def test_v235_selected_quality_batch_keeps_global_shell_neutral_and_labels_local
     created_execution_id: int | None = None
     created_pilot_id: int | None = None
     reused_execution_id: int | None = None
-    restore_inventory_id: int | None = None
+    restore_unbound_execution = False
     with SessionLocal() as session:
         user = session.scalar(select(AppUser).where(AppUser.email == "consultor@calculatuhuella.local"))
         assert user is not None
@@ -124,7 +124,7 @@ def test_v235_selected_quality_batch_keeps_global_shell_neutral_and_labels_local
                 assert execution_inventory.organization_id == user.organization_id
                 inventory = execution_inventory
             else:
-                restore_inventory_id = execution.inventory_id
+                restore_unbound_execution = True
                 execution.inventory_id = inventory.id
                 session.flush()
 
@@ -180,10 +180,10 @@ def test_v235_selected_quality_batch_keeps_global_shell_neutral_and_labels_local
                 if created_execution is not None:
                     session.delete(created_execution)
                     session.flush()
-            elif reused_execution_id is not None and restore_inventory_id is not None:
+            elif reused_execution_id is not None and restore_unbound_execution:
                 reused_execution = session.get(PilotExecution, reused_execution_id)
                 if reused_execution is not None:
-                    reused_execution.inventory_id = restore_inventory_id
+                    reused_execution.inventory_id = None
                     session.flush()
             if created_pilot_id is not None:
                 created_pilot = session.get(PilotProject, created_pilot_id)
