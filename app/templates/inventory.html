@@ -9,20 +9,15 @@
     <p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ inventory.methodology }}</p>
   </div>
   <div class="head-actions">
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/informacion">Ver datos</a>
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Ver resultados</a>
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reduccion">Ver reducción</a>
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reportes">Ver informes</a>
-    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/entrega-profesional">Ver cierre</a>
-    {% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">⚙ Configurar</a>{% elif inventory.locked %}<a class="btn btn-outline" href="/inventarios">Ver periodos</a>{% endif %}
+    <a class="btn btn-outline" href="/inventarios">Ver periodos</a>
+    {% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">⚙ Configurar</a>{% endif %}
     <a class="btn btn-primary" href="/inventarios/{{ inventory.id }}/fuentes">{{ 'Gestionar fuentes' if user.can_manage_sources else 'Ver fuentes' }}</a>
   </div>
 </div>
 
 <section class="card architecture-note period-context-note" data-explicit-period-context>
-  <div><span>↳</span><p><strong>Estás consultando un periodo específico.</strong><small>Esta ficha, sus fuentes, Datos y evidencias, Resultados, Análisis, Reducción, Informes y Cierre conservan el contexto de {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}. Las rutas generales continúan usando el periodo más reciente por defecto.</small></p></div>
-  <div class="table-actions"><a href="/inventarios">Ver periodos</a><a href="/inventario">Ir al periodo por defecto →</a></div>
+  <div><span>↳</span><p><strong>Expediente del periodo · contexto fijado por URL.</strong><small>La barra del expediente conserva {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }} al pasar por Ficha, Datos, Resultados, Análisis, Reducción, Informes y Cierre. Las rutas generales de la aplicación continúan resolviendo el periodo más reciente por defecto.</small></p></div>
+  <div class="table-actions"><a href="/inventarios">Ver periodos y contexto por defecto</a><a href="/recorrido-inventario">Abrir recorrido por defecto →</a></div>
 </section>
 
 <div class="kpi-grid five">
@@ -41,7 +36,7 @@
   <section class="card table-card" id="fuentes"><div class="card-head"><div><small>FUENTES DEL PERIODO</small><h3>Fuentes de emisión <span class="counter">{{sources|length}} fuentes</span></h3></div><a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/fuentes">{{ 'Gestionar fuentes' if user.can_manage_sources else 'Ver fuentes' }}</a></div><div class="responsive-table"><table><thead><tr><th>Fuente</th><th>Sede</th><th>Alcance</th><th>Materialidad</th><th>Progreso</th><th>Estado</th><th>tCO₂e</th><th></th></tr></thead><tbody>{% for source in sources %}<tr><td><a class="source-name" href="/fuentes/{{source.id}}"><span class="source-icon">{% if source.icon=='bolt' %}ϟ{% elif source.icon=='fuel' %}▣{% elif source.icon=='truck' %}▰{% elif source.icon=='snow' %}❄{% elif source.icon=='waste' %}♲{% else %}⌁{% endif %}</span>{{source.name}}</a></td><td>{{ source.facility.name if source.facility else 'Corporativo' }}</td><td>Alcance {{source.scope}}</td><td><span class="materiality materiality-{{ source.materiality|lower }}">{{ source.materiality }}</span></td><td><div class="progress compact"><i class="{% if source.progress < 50 %}warning{% endif %}" style="width:{{source.progress}}%"></i></div><small>{{source.progress}}%</small></td><td><span class="status-chip {{'complete' if source.status=='Completado' else 'progressing' if source.status=='En progreso' else 'pending'}}">{{source.status}}</span></td><td>{{source.emissions|number_es if source.emissions else '—'}}</td><td><a href="/fuentes/{{source.id}}">›</a></td></tr>{% endfor %}</tbody></table></div></section>
   <aside class="side-stack">
     <section class="card"><div class="card-head"><div><small>LÍMITES</small><h3>Sedes incluidas</h3></div><span class="counter">{{ inventory.facility_links|selectattr('included')|list|length }}</span></div><div class="facility-mini-list">{% for link in inventory.facility_links if link.included %}<div><span>▥</span><p><strong>{{ link.facility.name }}</strong><small>{{ link.facility.facility_type }} · {{ link.inclusion_percentage|round|int }}%</small></p></div>{% else %}<p><small>No hay sedes incluidas en este periodo.</small></p>{% endfor %}</div></section>
-    <section class="card"><div class="card-head"><div><small>ETAPA DEL PERIODO</small><h3>{{ inventory.current_stage }}</h3></div></div><p><strong>Consulta el estado registrado para este expediente.</strong></p><p><small>Esta ficha no presume decisiones pendientes ni cambia el contexto por defecto. Para continuar el flujo general, vuelve primero al periodo por defecto.</small></p><a class="btn btn-outline" href="/inventario">Ir al periodo por defecto</a></section>
+    <section class="card"><div class="card-head"><div><small>ETAPA DEL PERIODO</small><h3>{{ inventory.current_stage }}</h3></div></div><p><strong>Estado registrado en este expediente.</strong></p><p><small>La etapa corresponde únicamente al periodo mostrado. Para seguir el flujo canónico de trabajo usa el recorrido por defecto; para revisar este expediente conserva la barra superior.</small></p><a class="btn btn-outline" href="/recorrido-inventario">Abrir recorrido por defecto</a></section>
   </aside>
 </div>
 {% endblock %}
