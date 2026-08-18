@@ -13,6 +13,10 @@
     <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
     {% if can_create %}
     <form method="post" action="/mi-trabajo/sincronizar">
+      <input type="hidden" name="return_status" value="{{ selected_status }}">
+      <input type="hidden" name="return_stage" value="{{ selected_stage }}">
+      <input type="hidden" name="return_scope" value="{{ selected_scope }}">
+      <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
       <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
     </form>
     {% endif %}
@@ -109,6 +113,10 @@
           <form class="work-action-form" method="post" action="/mi-trabajo/{{ item.id }}/accion">
             <input type="hidden" name="action" value="{{ action }}">
             <input type="hidden" name="expected_version" value="{{ item.version }}">
+            <input type="hidden" name="return_status" value="{{ selected_status }}">
+            <input type="hidden" name="return_stage" value="{{ selected_stage }}">
+            <input type="hidden" name="return_scope" value="{{ selected_scope }}">
+            <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
             {% if action in reason_actions %}<input name="comment" required placeholder="Describe el motivo de esta decisión">{% else %}<input name="comment" placeholder="Comentario opcional para la trazabilidad">{% endif %}
             <button class="btn {% if action in ['submit','accept_delivery','close'] %}btn-primary{% else %}btn-secondary{% endif %}" type="submit">{{ action_labels[action] }}</button>
           </form>
