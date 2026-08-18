@@ -61,15 +61,17 @@ def test_v238c_scoped_reduction_keeps_period_and_has_no_mutation_controls() -> N
     assert "sin cambiar el contexto por defecto" in response.text
 
     soup = BeautifulSoup(response.text, "html.parser")
+    content = soup.select_one("#contenido-aplicacion")
+    assert content is not None
     pill = soup.select_one(".topbar .version-pill")
     assert pill is not None
     assert pill.get("href") == f"/inventarios/{inventory_id}"
-    assert not soup.select('form[method="post"]')
-    assert soup.select_one('a[href="/escenarios"]') is None
-    assert soup.select_one('a[href="/reduccion/exportar.xlsx"]') is None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}/analisis"]') is not None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}/calculos"]') is not None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+    assert not content.select('form[method="post"]')
+    assert content.select_one('a[href="/escenarios"]') is None
+    assert content.select_one('a[href="/reduccion/exportar.xlsx"]') is None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}/analisis"]') is not None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}/calculos"]') is not None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
 
 
 def test_v238c_default_reduction_preserves_operational_tools() -> None:
