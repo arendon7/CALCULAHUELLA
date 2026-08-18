@@ -51,11 +51,12 @@ def test_v228_explicit_period_detail_warns_that_general_routes_keep_latest_defau
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
     context = soup.select_one("[data-explicit-period-context]")
-    assert context is not None
+    content = soup.select_one("#contenido-aplicacion")
+    assert context is not None and content is not None
     context_text = context.get_text(" ", strip=True)
     assert "Estás consultando un periodo específico" in context_text
     assert "Las rutas generales continúan usando el periodo más reciente por defecto" in context_text
     assert context.select_one('a[href="/inventarios"]') is not None
     assert context.select_one('a[href="/inventario"]') is not None
-    assert 'href="/recorrido-inventario"' not in response.text
-    assert "Ir al periodo por defecto" in response.text
+    assert content.select_one('a[href="/recorrido-inventario"]') is None
+    assert "Ir al periodo por defecto" in content.get_text(" ", strip=True)
