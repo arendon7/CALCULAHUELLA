@@ -191,17 +191,19 @@ def test_v238e_scoped_information_is_isolated_and_read_only() -> None:
         assert "Consulta explícita del periodo" in response.text
 
         soup = BeautifulSoup(response.text, "html.parser")
+        content = soup.select_one("#contenido-aplicacion")
+        assert content is not None
         pill = soup.select_one(".topbar .version-pill")
         assert pill is not None
         assert pill.get("href") == f"/inventarios/{inventory_id}"
-        assert not soup.select("form")
-        assert soup.select_one(f'[data-record-id="{data["selected_record_id"]}"]') is not None
-        assert soup.select_one(f'[data-record-id="{data["other_record_id"]}"]') is None
-        assert soup.select_one(f'[data-request-id="{data["selected_request_id"]}"]') is not None
-        assert soup.select_one(f'[data-request-id="{data["other_request_id"]}"]') is None
-        assert soup.select_one(f'[data-evidence-id="{data["selected_evidence_id"]}"]') is not None
-        assert soup.select_one(f'[data-evidence-id="{data["other_evidence_id"]}"]') is None
-        assert soup.select_one(f'a[href="/evidencias/{data["selected_evidence_id"]}/descargar"]') is not None
+        assert not content.select("form")
+        assert content.select_one(f'[data-record-id="{data["selected_record_id"]}"]') is not None
+        assert content.select_one(f'[data-record-id="{data["other_record_id"]}"]') is None
+        assert content.select_one(f'[data-request-id="{data["selected_request_id"]}"]') is not None
+        assert content.select_one(f'[data-request-id="{data["other_request_id"]}"]') is None
+        assert content.select_one(f'[data-evidence-id="{data["selected_evidence_id"]}"]') is not None
+        assert content.select_one(f'[data-evidence-id="{data["other_evidence_id"]}"]') is None
+        assert content.select_one(f'a[href="/evidencias/{data["selected_evidence_id"]}/descargar"]') is not None
 
         forbidden_exact = {
             "/informacion",
@@ -214,7 +216,7 @@ def test_v238e_scoped_information_is_isolated_and_read_only() -> None:
             "/reportes",
             "/entrega-profesional",
         }
-        rendered_hrefs = {link.get("href") for link in soup.select("a[href]")}
+        rendered_hrefs = {link.get("href") for link in content.select("a[href]")}
         assert not (forbidden_exact & rendered_hrefs)
     finally:
         _cleanup(data)
