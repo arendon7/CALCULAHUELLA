@@ -105,7 +105,12 @@ def test_v238d1_scoped_reports_are_isolated_to_requested_inventory() -> None:
         assert content.select_one(f'a[href="/inventarios/{inventory_id}/reduccion"]') is not None
         assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
         assert content.select_one(f'a[href="/reportes/{artifact_ids[0]}/descargar"]') is not None
-        assert "no equivale a verificación independiente" in response.text
+        content_text = content.get_text(" ", strip=True).lower()
+        assert "revisión o aprobación interna" in content_text
+        assert (
+            "no equivale a verificación independiente" in content_text
+            or "tampoco equivale a verificación independiente" in content_text
+        )
     finally:
         _cleanup_artifacts(artifact_ids)
 
