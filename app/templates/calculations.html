@@ -74,14 +74,16 @@
 <section class="card" id="trazabilidad-calculo">
   <div class="card-head"><div><small>TRAZABILIDAD POR FUENTE</small><h3>Qué sostiene cada resultado</h3><p>Abre una fuente para inspeccionar sus datos, decisiones de factor, GWP y memoria de cálculo.</p></div><span class="counter">{{ source_rows|length }}</span></div>
   <div class="responsive-table"><table><thead><tr><th>Fuente</th><th>Datos de actividad</th><th>Factores por defecto</th><th>Componentes calculados</th><th>Control</th><th>Resultado</th><th>Cadena</th></tr></thead><tbody>
-  {% for row in source_rows %}<tr>
-    <td><a class="table-link" href="/fuentes/{{ row.source.id }}">{{ row.source.name }}</a><small class="table-sub">Alcance {{ row.source.scope }} · {{ row.source.category }}</small></td>
+  {% for row in source_rows %}
+    {% set source_trace_href = '/inventarios/' ~ inventory.id ~ '/fuentes/' ~ row.source.id if scoped_workspace else '/fuentes/' ~ row.source.id %}
+  <tr>
+    <td><a class="table-link" href="{{ source_trace_href }}" {% if scoped_workspace %}data-scoped-source-link="true"{% endif %}>{{ row.source.name }}</a><small class="table-sub">Alcance {{ row.source.scope }} · {{ row.source.category }}</small></td>
     <td>{{ row.source.activity_records|length }} registros</td>
     <td><strong>{{ row.assignments }}</strong></td>
     <td>{{ row.summary.calculations|length }}</td>
     <td>{% if row.summary.errors %}<span class="calc-state state-error">{{ row.summary.errors }} errores</span>{% elif row.summary.alerts %}<span class="calc-state state-alert">{{ row.summary.alerts }} alertas</span>{% else %}<span class="calc-state state-ok">Sin alertas</span>{% endif %}</td>
     <td><strong>{{ row.source.emissions|number_es(3) }} tCO₂e</strong></td>
-    <td><a class="btn btn-outline btn-small" href="/fuentes/{{ row.source.id }}">Ver dato → factor → resultado</a></td>
+    <td><a class="btn btn-outline btn-small" href="{{ source_trace_href }}" {% if scoped_workspace %}data-scoped-source-link="true"{% endif %}>Ver dato → factor → resultado</a></td>
   </tr>{% endfor %}
   </tbody></table></div>
 </section>
