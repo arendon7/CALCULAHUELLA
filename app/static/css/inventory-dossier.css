@@ -28,14 +28,36 @@ body.app-shell .inventory-dossier-nav>a[aria-current="page"]>strong{
   }
 }
 
+/* V2.43 · En móvil todas las vistas del expediente permanecen visibles.
+   Evita un carrusel horizontal cuyo paso activo podría iniciar fuera del viewport. */
 @media(max-width:720px){
   body.app-shell .inventory-dossier-nav{
-    grid-auto-flow:column;
-    grid-template-columns:none;
-    grid-auto-columns:minmax(158px,72vw);
-    overflow-x:auto;
-    overscroll-behavior-inline:contain;
-    scroll-snap-type:x proximity;
+    grid-auto-flow:unset;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-auto-columns:unset;
+    overflow-x:visible;
+    overscroll-behavior-inline:auto;
+    scroll-snap-type:none;
+    gap:7px;
+    padding:7px;
   }
-  body.app-shell .inventory-dossier-nav>a{scroll-snap-align:start}
+  body.app-shell .inventory-dossier-nav>a{
+    grid-template-columns:1fr;
+    justify-items:center;
+    align-content:center;
+    gap:5px;
+    min-height:58px;
+    padding:7px 5px;
+    text-align:center;
+  }
+  body.app-shell .inventory-dossier-nav>a>span{
+    grid-row:auto;
+  }
+  body.app-shell .inventory-dossier-nav>a>strong{
+    line-height:1.15;
+    overflow-wrap:anywhere;
+  }
+  body.app-shell .inventory-dossier-nav>a>small{
+    display:none;
+  }
 }
