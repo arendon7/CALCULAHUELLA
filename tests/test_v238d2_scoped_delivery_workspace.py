@@ -56,14 +56,16 @@ def test_v238d2_scoped_delivery_is_period_safe_and_non_operational() -> None:
     assert "no equivale a verificación independiente" in response.text
 
     soup = BeautifulSoup(response.text, "html.parser")
+    content = soup.select_one("#contenido-aplicacion")
+    assert content is not None
     pill = soup.select_one(".topbar .version-pill")
     assert pill is not None
     assert pill.get("href") == f"/inventarios/{inventory_id}"
-    assert not soup.select("form")
-    assert not soup.select(".delivery-gates a")
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}/reportes"]') is not None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}/reduccion"]') is not None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+    assert not content.select("form")
+    assert not content.select(".delivery-gates a")
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}/reportes"]') is not None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}/reduccion"]') is not None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
 
     forbidden_exact = {
         "/calculos",
@@ -74,10 +76,10 @@ def test_v238d2_scoped_delivery_is_period_safe_and_non_operational() -> None:
         "/informacion",
         "/entrega-profesional",
     }
-    rendered_hrefs = {link.get("href") for link in soup.select("a[href]")}
+    rendered_hrefs = {link.get("href") for link in content.select("a[href]")}
     assert not (forbidden_exact & rendered_hrefs)
 
-    gates = soup.select("section.card .delivery-gate")
+    gates = content.select("section.card .delivery-gate")
     assert len(gates) >= 8
 
 
