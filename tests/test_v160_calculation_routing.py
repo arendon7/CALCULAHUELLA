@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 CALCULATION_ROUTES = {
     ("GET", "/calculos"),
+    ("GET", "/inventarios/{inventory_id}/calculos"),
     ("POST", "/inventarios/{inventory_id}/recalcular"),
 }
 
@@ -33,7 +34,8 @@ def test_v160_calculation_routes_have_dedicated_http_authority():
     assert '@app.get("/calculos"' not in main_source
     assert '@app.post("/inventarios/{inventory_id}/recalcular"' not in main_source
     assert "register_calculation_routes(" in main_source
-    assert module_source.count("@app.") == 2
+    assert module_source.count("@app.") == 3
+    assert '@app.get("/inventarios/{inventory_id}/calculos"' in module_source
     assert "recalculate_inventory" in module_source
     assert "source_calculation_summary" in module_source
     assert "def recalculate_inventory(" not in module_source
@@ -42,10 +44,11 @@ def test_v160_calculation_routes_have_dedicated_http_authority():
 
 def test_v160_calculation_route_contract_is_unique_and_complete():
     actual = []
+    relevant = {path for _, path in CALCULATION_ROUTES}
     for route in app.routes:
         path = getattr(route, "path", None)
         methods = getattr(route, "methods", set()) or set()
-        if path == "/calculos" or path == "/inventarios/{inventory_id}/recalcular":
+        if path in relevant:
             actual.extend((method, path) for method in methods if method in {"GET", "POST"})
     assert set(actual) == CALCULATION_ROUTES
     assert len(actual) == len(CALCULATION_ROUTES)
