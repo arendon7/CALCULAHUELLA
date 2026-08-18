@@ -65,41 +65,59 @@ def test_v235_legacy_ticket_query_resolves_to_real_detail_and_keeps_period_conte
 
 
 def test_v235_selected_quality_batch_keeps_global_shell_neutral_and_labels_local_period() -> None:
+    batch_id: int | None = None
     with SessionLocal() as session:
         user = session.scalar(select(AppUser).where(AppUser.email == "consultor@calculatuhuella.local"))
         assert user is not None
-        batch = session.scalar(
-            select(DataImportBatch)
-            .where(
-                DataImportBatch.organization_id == user.organization_id,
-                DataImportBatch.inventory_id.is_not(None),
-            )
-            .order_by(DataImportBatch.id.desc())
+        inventory = session.scalar(
+            select(Inventory)
+            .where(Inventory.organization_id == user.organization_id)
+            .order_by(Inventory.start_date.desc(), Inventory.id.desc())
         )
-        assert batch is not None
-        batch_id = batch.id
-        inventory_id = batch.inventory_id
-        batch_code = batch.code
-        inventory = session.get(Inventory, inventory_id)
         assert inventory is not None
+        batch = DataImportBatch(
+            organization_id=user.organization_id,
+            inventory_id=inventory.id,
+            code="V235-QUALITY-CONTEXT",
+            filename="v235-quality-context.xlsx",
+            file_hash="2" * 64,
+            status="Validado",
+            total_rows=1,
+            valid_rows=1,
+            quality_score=100,
+            uploaded_by=user.email,
+        )
+        session.add(batch)
+        session.commit()
+        batch_id = batch.id
+        inventory_id = inventory.id
+        batch_code = batch.code
         inventory_name = inventory.name
         period_range = f"{inventory.start_date.strftime('%d/%m/%Y')} – {inventory.end_date.strftime('%d/%m/%Y')}"
 
-    with TestClient(app) as client:
-        login(client)
-        response = client.get(f"/calidad-datos?batch_id={batch_id}")
+    try:
+        with TestClient(app) as client:
+            login(client)
+            response = client.get(f"/calidad-datos?batch_id={batch_id}")
 
-    assert response.status_code == 200
-    assert batch_code in response.text
-    soup = BeautifulSoup(response.text, "html.parser")
-    pill = soup.select_one(".topbar .version-pill")
-    assert pill is not None
-    assert pill.get("href") == "/inventario"
-    assert "Ver por defecto" in pill.get_text(" ", strip=True)
-    context = soup.select_one("[data-selected-batch-context]")
-    assert context is not None
-    context_text = context.get_text(" ", strip=True)
-    assert inventory_name in context_text
-    assert period_range in context_text
-    assert "los KPI superiores resumen el centro de calidad" in context_text
-    assert context.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+        assert response.status_code == 200
+        assert batch_code in response.text
+        soup = BeautifulSoup(response.text, "html.parser")
+        pill = soup.select_one(".topbar .version-pill")
+        assert pill is not None
+        assert pill.get("href") == "/inventario"
+        assert "Ver por defecto" in pill.get_text(" ", strip=True)
+        context = soup.select_one("[data-selected-batch-context]")
+        assert context is not None
+        context_text = context.get_text(" ", strip=True)
+        assert inventory_name in context_text
+        assert period_range in context_text
+        assert "los KPI superiores resumen el centro de calidad" in context_text
+        assert context.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+    finally:
+        if batch_id is not None:
+            with SessionLocal() as session:
+                persisted = session.get(DataImportBatch, batch_id)
+                if persisted is not None:
+                    session.delete(persisted)
+                    session.commit()
