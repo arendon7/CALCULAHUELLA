@@ -58,8 +58,8 @@ def test_v219_inventory_detail_never_invents_pending_decisions_for_client() -> N
         assert "Confirmar relevancia de transporte contratado" not in side_text
         assert "Documentar el tratamiento de fuentes inferiores al 5%" not in side_text
         assert "ETAPA DEL PERIODO" in side_text
-        assert "Consulta el estado registrado para este expediente" in side_text
-        assert "Esta ficha no presume decisiones pendientes" in side_text
+        assert "Estado registrado en este expediente" in side_text
+        assert "La etapa corresponde únicamente al periodo mostrado" in side_text
 
 
 def test_v219_inventory_detail_preserves_source_management_for_consultant() -> None:
