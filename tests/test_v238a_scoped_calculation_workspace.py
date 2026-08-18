@@ -42,7 +42,7 @@ def test_v238a_inventory_record_exposes_scoped_results() -> None:
     soup = BeautifulSoup(response.text, "html.parser")
     links = soup.select(f'a[href="/inventarios/{inventory_id}/calculos"]')
     assert links
-    assert any("Ver resultados" in link.get_text(" ", strip=True) for link in links)
+    assert any("Resultados" in link.get_text(" ", strip=True) for link in links)
     assert inventory_name in response.text
 
 
