@@ -46,7 +46,7 @@
       <summary>Herramientas avanzadas <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.advanced %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section['label'] }}</p>
+        <p class="nav-label">{{ section["label"] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
@@ -58,7 +58,7 @@
       <summary>Administración interna <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.internal %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section['label'] }}</p>
+        <p class="nav-label">{{ section["label"] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
