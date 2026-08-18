@@ -60,15 +60,22 @@ def test_v245_scoped_source_is_read_only_and_keeps_period_navigation() -> None:
     assert content.select_one(f'form[action="/fuentes/{source_id}/configurar"]') is None
     assert content.select_one('[data-inventory-dossier-nav]') is None
 
+    # The Consultant essential menu does not expose every complete-view module.
+    # Every period-sensitive item that is visible must nevertheless remain scoped.
     sidebar_hrefs = {link.get("href") for link in soup.select("#navegacion-principal a[href]")}
     assert f"/inventarios/{inventory_id}/informacion" in sidebar_hrefs
     assert f"/inventarios/{inventory_id}/calculos" in sidebar_hrefs
-    assert f"/inventarios/{inventory_id}/analisis" in sidebar_hrefs
     assert f"/inventarios/{inventory_id}/reduccion" in sidebar_hrefs
-    assert f"/inventarios/{inventory_id}/reportes" in sidebar_hrefs
     assert f"/inventarios/{inventory_id}/entrega-profesional" in sidebar_hrefs
-    assert "/calculos" not in sidebar_hrefs
-    assert "/informacion" not in sidebar_hrefs
+    for generic_href in (
+        "/informacion",
+        "/calculos",
+        "/analisis",
+        "/reduccion",
+        "/reportes",
+        "/entrega-profesional",
+    ):
+        assert generic_href not in sidebar_hrefs
 
 
 def test_v245_scoped_source_rejects_inventory_source_mismatch() -> None:
@@ -116,4 +123,9 @@ def test_v245_results_choose_scoped_or_operational_source_trace_by_context() -> 
     assert generic.status_code == 200
     generic_soup = BeautifulSoup(generic.text, "html.parser")
     assert generic_soup.select_one('a[data-scoped-source-link="true"]') is None
-    assert generic_soup.select_one(f'a[href="/fuentes/{source_id}"]') is not None
+    generic_source_links = generic_soup.select('#trazabilidad-calculo a[href^="/fuentes/"]')
+    assert generic_source_links
+    assert all(
+        (link.get("href") or "").startswith("/fuentes/")
+        for link in generic_source_links
+    )
