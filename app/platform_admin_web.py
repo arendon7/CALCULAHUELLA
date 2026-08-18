@@ -14,6 +14,9 @@ from .notifications import notify_roles, process_pending_notifications
 from .storage import storage
 
 
+INTERNAL_PLATFORM_SETTING_PREFIX = "runtime_internal_"
+
+
 def register_platform_admin_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash
 ) -> None:
@@ -26,7 +29,15 @@ def register_platform_admin_routes(
                 OrganizationMembership.active.is_(True),
             ).order_by(AppUser.name)
         ))
-        settings_rows = list(session.scalars(select(PlatformSetting).where(PlatformSetting.organization_id == int(user["organization_id"])).order_by(PlatformSetting.key)))
+        settings_rows = [
+            row
+            for row in session.scalars(
+                select(PlatformSetting)
+                .where(PlatformSetting.organization_id == int(user["organization_id"]))
+                .order_by(PlatformSetting.key)
+            )
+            if not row.key.startswith(INTERNAL_PLATFORM_SETTING_PREFIX)
+        ]
         notification_stats = {
             "total": session.scalar(select(func.count(Notification.id)).where(Notification.organization_id == int(user["organization_id"]))) or 0,
             "pending": session.scalar(select(func.count(Notification.id)).where(Notification.organization_id == int(user["organization_id"]), Notification.status.in_(["Pendiente", "Error"]))) or 0,
@@ -52,6 +63,8 @@ def register_platform_admin_routes(
         clean_key = re.sub(r"[^a-z0-9_]+", "_", key.strip().lower()).strip("_")
         if not clean_key:
             raise HTTPException(400, "Clave inválida")
+        if clean_key.startswith(INTERNAL_PLATFORM_SETTING_PREFIX):
+            raise HTTPException(400, "Clave reservada para el runtime")
         row = session.scalar(select(PlatformSetting).where(PlatformSetting.organization_id == int(user["organization_id"]), PlatformSetting.key == clean_key))
         if not row:
             row = PlatformSetting(organization_id=int(user["organization_id"]), key=clean_key)

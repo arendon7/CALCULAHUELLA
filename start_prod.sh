@@ -49,13 +49,17 @@ export PORT="${PORT:-8765}"
 export OPEN_BROWSER=0
 
 # La base transaccional y sus migraciones sí son requisitos de arranque y
-# fallan cerrado antes de iniciar el proceso web.
+# fallan cerrado antes de iniciar el proceso web. Alembic se ejecuta SIEMPRE;
+# solo la reconciliación idempotente posterior puede cachearse por release.
+STARTUP_PREREQ_STARTED=$SECONDS
+MIGRATION_STARTED=$SECONDS
 "$PY" -m alembic upgrade head
-"$PY" - <<'PYCODE'
-from app.database import init_db
-init_db()
-print("Esquema e inicialización verificados.")
-PYCODE
+echo "Migraciones verificadas en $((SECONDS - MIGRATION_STARTED))s."
+
+BOOTSTRAP_STARTED=$SECONDS
+"$PY" scripts/runtime_bootstrap.py
+echo "Bootstrap runtime verificado en $((SECONDS - BOOTSTRAP_STARTED))s."
+echo "Prerequisitos de arranque completados en $((SECONDS - STARTUP_PREREQ_STARTED))s."
 
 # No ejecutar probes de red u object storage antes de abrir el puerto. La
 # disponibilidad estricta se expone después del bind en /api/ready;
