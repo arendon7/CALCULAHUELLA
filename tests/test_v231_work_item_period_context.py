@@ -86,7 +86,7 @@ def test_v231_work_creation_selector_labels_default_historical_and_transversal_c
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
-    selector = soup.select_one('select[name="inventory_id"]')
+    selector = soup.select_one('.work-create-form select[name="inventory_id"]')
     assert selector is not None
     labels = [option.get_text(" ", strip=True) for option in selector.select("option")]
     assert labels[0] == "Trabajo transversal · sin periodo específico"
