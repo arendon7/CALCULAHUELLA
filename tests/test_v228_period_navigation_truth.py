@@ -54,9 +54,9 @@ def test_v228_explicit_period_detail_warns_that_general_routes_keep_latest_defau
     content = soup.select_one("#contenido-aplicacion")
     assert context is not None and content is not None
     context_text = context.get_text(" ", strip=True)
-    assert "Estás consultando un periodo específico" in context_text
-    assert "Las rutas generales continúan usando el periodo más reciente por defecto" in context_text
+    assert "Expediente del periodo · contexto fijado por URL" in context_text
+    assert "Las rutas generales de la aplicación continúan resolviendo el periodo más reciente por defecto" in context_text
     assert context.select_one('a[href="/inventarios"]') is not None
-    assert context.select_one('a[href="/inventario"]') is not None
-    assert content.select_one('a[href="/recorrido-inventario"]') is None
-    assert "Ir al periodo por defecto" in content.get_text(" ", strip=True)
+    assert context.select_one('a[href="/recorrido-inventario"]') is not None
+    assert "Ver periodos y contexto por defecto" in context_text
+    assert "Abrir recorrido por defecto" in context_text
