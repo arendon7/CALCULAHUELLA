@@ -57,7 +57,8 @@ def test_v219_inventory_detail_never_invents_pending_decisions_for_client() -> N
         assert "Decisiones pendientes" not in side_text
         assert "Confirmar relevancia de transporte contratado" not in side_text
         assert "Documentar el tratamiento de fuentes inferiores al 5%" not in side_text
-        assert "ETAPA ACTUAL" in side_text
+        assert "ETAPA DEL PERIODO" in side_text
+        assert "Consulta el estado registrado para este expediente" in side_text
         assert "Esta ficha no presume decisiones pendientes" in side_text
 
 
