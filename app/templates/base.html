@@ -18,6 +18,23 @@
   </div>
   <div class="sr-only" id="live-region" aria-live="polite" aria-atomic="true"></div>
 
+  {% if inventory is defined and inventory %}
+    {% set nav_dossier_root = '/inventarios/' ~ inventory.id %}
+    {% set nav_dossier_paths = [nav_dossier_root, nav_dossier_root ~ '/informacion', nav_dossier_root ~ '/calculos', nav_dossier_root ~ '/analisis', nav_dossier_root ~ '/reduccion', nav_dossier_root ~ '/reportes', nav_dossier_root ~ '/entrega-profesional'] %}
+    {% set nav_dossier_href_by_active = {
+      'information': nav_dossier_root ~ '/informacion',
+      'calculations': nav_dossier_root ~ '/calculos',
+      'analysis': nav_dossier_root ~ '/analisis',
+      'reduction': nav_dossier_root ~ '/reduccion',
+      'reports': nav_dossier_root ~ '/reportes',
+      'delivery': nav_dossier_root ~ '/entrega-profesional'
+    } %}
+    {% set in_dossier_workspace = request.url.path in nav_dossier_paths %}
+  {% else %}
+    {% set nav_dossier_href_by_active = {} %}
+    {% set in_dossier_workspace = false %}
+  {% endif %}
+
   <aside class="sidebar" id="sidebar" aria-label="Navegación de la aplicación" tabindex="-1">
     <a class="brand" href="/dashboard" aria-label="Ir al centro de trabajo de Calcula tu Huella"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
 
@@ -38,7 +55,11 @@
     {% for section in navigation.core %}
     <nav class="nav-group{% if not loop.first %} compact-nav{% endif %}" aria-label="{{ section['label'] }}">
       <p class="nav-label">{{ section["label"] }}</p>
-      {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+      {% for item in section["items"] %}
+        {% set period_preserving = in_dossier_workspace and item['active'] in nav_dossier_href_by_active %}
+        {% set resolved_href = nav_dossier_href_by_active[item['active']] if period_preserving else item['href'] %}
+        <a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ resolved_href }}" {% if period_preserving %}data-period-preserving="true" aria-label="{{ item['label'] }} · mantener periodo mostrado"{% endif %} {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>
+      {% endfor %}
     </nav>
     {% endfor %}
 
@@ -127,7 +148,7 @@
       {% endif %}
       <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" tabindex="-1" hidden></div>
       {% if inventory is defined and inventory %}
-        {% set dossier_root = '/inventarios/' ~ inventory.id %}
+        {% set dossier_root = nav_dossier_root %}
         {% set dossier_nav = [
           {'href': dossier_root, 'label': 'Ficha', 'detail': 'Contexto y límites', 'icon': '1'},
           {'href': dossier_root ~ '/informacion', 'label': 'Datos', 'detail': 'Actividad y evidencia', 'icon': '2'},
@@ -137,8 +158,7 @@
           {'href': dossier_root ~ '/reportes', 'label': 'Informes', 'detail': 'Versiones documentales', 'icon': '6'},
           {'href': dossier_root ~ '/entrega-profesional', 'label': 'Cierre', 'detail': 'Uso y publicación', 'icon': '7'}
         ] %}
-        {% set dossier_paths = [dossier_root, dossier_root ~ '/informacion', dossier_root ~ '/calculos', dossier_root ~ '/analisis', dossier_root ~ '/reduccion', dossier_root ~ '/reportes', dossier_root ~ '/entrega-profesional'] %}
-        {% if request.url.path in dossier_paths %}
+        {% if in_dossier_workspace %}
         <nav class="task-jumpbar inventory-dossier-nav" aria-label="Vistas del expediente del periodo" data-inventory-dossier-nav>
           {% for item in dossier_nav %}
           <a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}" {% if request.url.path == item.href %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item.icon }}</span><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></a>
@@ -156,7 +176,9 @@
     {% for section in navigation.core %}
       {% for item in section["items"] %}
         {% if mobile_nav.count < 4 %}
-        <a href="{{ item['href'] }}" class="{% if active == item['active'] %}active{% endif %}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span><small>{{ item["label"]|replace('Centro de trabajo','Inicio')|replace('Continuar mi recorrido','Recorrido')|replace('Continuar recorrido','Recorrido')|replace('Prioridades de revisión','Recorrido')|replace('Plan de verificación','Recorrido')|replace('Portafolio de empresas','Empresas') }}</small></a>
+        {% set period_preserving = in_dossier_workspace and item['active'] in nav_dossier_href_by_active %}
+        {% set resolved_href = nav_dossier_href_by_active[item['active']] if period_preserving else item['href'] %}
+        <a href="{{ resolved_href }}" class="{% if active == item['active'] %}active{% endif %}" {% if period_preserving %}data-period-preserving="true" aria-label="{{ item['label'] }} · mantener periodo mostrado"{% endif %} {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span><small>{{ item["label"]|replace('Centro de trabajo','Inicio')|replace('Continuar mi recorrido','Recorrido')|replace('Continuar recorrido','Recorrido')|replace('Prioridades de revisión','Recorrido')|replace('Plan de verificación','Recorrido')|replace('Portafolio de empresas','Empresas') }}</small></a>
         {% set mobile_nav.count = mobile_nav.count + 1 %}
         {% endif %}
       {% endfor %}
