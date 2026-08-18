@@ -271,6 +271,11 @@ def sync_data_request(
         existing.id if existing is not None else None,
         request_record.id,
     )
+    expected_origin = (
+        f"/inventarios/{request_record.inventory_id}",
+        request_record.title.strip(),
+    )
+    origin_needs_repair = existing is not None and origin_before != expected_origin
     item, base_changed = _base_sync_data_request(
         session,
         request_record,
@@ -285,8 +290,7 @@ def sync_data_request(
         item.assignee_role = "Cliente"
     if item.status_code == "closed" and item.closed_at is None:
         item.closed_at = request_record.completed_at or datetime.now(UTC)
-    origin_after = _origin_link_snapshot(session, item.id, request_record.id)
-    return item, base_changed or before is None or before != _snapshot(item) or origin_before != origin_after
+    return item, base_changed or origin_needs_repair or before is None or before != _snapshot(item)
 
 
 def _sync_data_requests_only(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
