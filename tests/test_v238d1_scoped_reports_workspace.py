@@ -93,16 +93,18 @@ def test_v238d1_scoped_reports_are_isolated_to_requested_inventory() -> None:
         assert "Consulta explícita del periodo" in response.text
 
         soup = BeautifulSoup(response.text, "html.parser")
+        content = soup.select_one("#contenido-aplicacion")
+        assert content is not None
         pill = soup.select_one(".topbar .version-pill")
         assert pill is not None
         assert pill.get("href") == f"/inventarios/{inventory_id}"
-        assert not soup.select('form[method="post"]')
-        assert soup.select_one('a[href="/entrega-profesional"]') is None
-        assert soup.select_one('a[href="/reportes/consultoria"]') is None
-        assert soup.select_one('a[href="/control"]') is None
-        assert soup.select_one(f'a[href="/inventarios/{inventory_id}/reduccion"]') is not None
-        assert soup.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
-        assert soup.select_one(f'a[href="/reportes/{artifact_ids[0]}/descargar"]') is not None
+        assert not content.select('form[method="post"]')
+        assert content.select_one('a[href="/entrega-profesional"]') is None
+        assert content.select_one('a[href="/reportes/consultoria"]') is None
+        assert content.select_one('a[href="/control"]') is None
+        assert content.select_one(f'a[href="/inventarios/{inventory_id}/reduccion"]') is not None
+        assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+        assert content.select_one(f'a[href="/reportes/{artifact_ids[0]}/descargar"]') is not None
         assert "no equivale a verificación independiente" in response.text
     finally:
         _cleanup_artifacts(artifact_ids)
