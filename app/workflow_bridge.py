@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import workflow_service as _workflow_service
-from .database import DataRequest, Inventory, WorkItem
+from .database import DataRequest, Inventory, WorkItem, WorkItemLink
 from .notifications import create_notification, notify_roles
 from .workflow_domain import STATUS_BY_CODE
 from .workflow_integrations import mirror_source_from_work_item, sync_specialized_work_items
@@ -52,6 +52,26 @@ def _snapshot(item: WorkItem | None) -> tuple[object, ...] | None:
         item.closed_at,
         item.version,
     )
+
+
+def _origin_link_snapshot(
+    session: Session,
+    work_item_id: int | None,
+    request_id: int,
+) -> tuple[str, str] | None:
+    if work_item_id is None:
+        return None
+    link = session.scalar(
+        select(WorkItemLink).where(
+            WorkItemLink.work_item_id == work_item_id,
+            WorkItemLink.entity_type == "DataRequest",
+            WorkItemLink.entity_id == request_id,
+            WorkItemLink.relationship_type == "origin",
+        )
+    )
+    if link is None:
+        return None
+    return (str(link.route or ""), str(link.label or ""))
 
 
 def _status_label(item: WorkItem) -> str:
@@ -246,6 +266,11 @@ def sync_data_request(
         )
     )
     before = _snapshot(existing)
+    origin_before = _origin_link_snapshot(
+        session,
+        existing.id if existing is not None else None,
+        request_record.id,
+    )
     item, base_changed = _base_sync_data_request(
         session,
         request_record,
@@ -260,7 +285,8 @@ def sync_data_request(
         item.assignee_role = "Cliente"
     if item.status_code == "closed" and item.closed_at is None:
         item.closed_at = request_record.completed_at or datetime.now(UTC)
-    return item, base_changed or before is None or before != _snapshot(item)
+    origin_after = _origin_link_snapshot(session, item.id, request_record.id)
+    return item, base_changed or before is None or before != _snapshot(item) or origin_before != origin_after
 
 
 def _sync_data_requests_only(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:
