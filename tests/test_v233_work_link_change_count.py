@@ -4,12 +4,13 @@ import pytest
 from sqlalchemy import select
 
 from app.database import AppUser, DataRequest, Inventory, SessionLocal, WorkItemLink
-from app.workflow_bridge import sync_data_request
+from app.workflow_bridge import sync_data_request as sync_data_request_bridge
+from app.workflow_service import sync_data_request as sync_data_request_service
 
 
 @pytest.mark.smoke
 def test_v233_link_only_repair_is_reported_as_a_sync_change() -> None:
-    """A persisted stale origin link must be repaired and counted as a sync change."""
+    """A persisted stale origin link must be repaired and counted by service and bridge."""
     with SessionLocal() as session:
         user = session.scalar(select(AppUser).where(AppUser.email == "consultor@calculatuhuella.local"))
         assert user is not None
@@ -21,7 +22,7 @@ def test_v233_link_only_repair_is_reported_as_a_sync_change() -> None:
         )
         assert request_record is not None
 
-        item, _ = sync_data_request(
+        item, _ = sync_data_request_bridge(
             session,
             request_record,
             organization_id=user.organization_id,
@@ -48,24 +49,24 @@ def test_v233_link_only_repair_is_reported_as_a_sync_change() -> None:
         item_id = item.id
         origin_id = origin.id
 
-    # Simulate the real compatibility case: a stale route already persisted by
-    # an older release, not an in-memory mutation inside the same unit of work.
-    with SessionLocal() as session:
-        origin = session.get(WorkItemLink, origin_id)
-        assert origin is not None
-        assert origin.route == expected_route
-        origin.route = "/informacion"
-        session.commit()
+    def persist_stale_origin() -> None:
+        with SessionLocal() as session:
+            origin = session.get(WorkItemLink, origin_id)
+            assert origin is not None
+            origin.route = "/informacion"
+            session.commit()
 
+    # First prove the domain service itself repairs and counts a stale persisted link.
+    persist_stale_origin()
     with SessionLocal() as session:
         request_record = session.get(DataRequest, request_id)
-        assert request_record is not None
         stale_origin = session.get(WorkItemLink, origin_id)
+        assert request_record is not None
         assert stale_origin is not None
         assert stale_origin.work_item_id == item_id
         assert stale_origin.route == "/informacion"
 
-        repaired_item, changed = sync_data_request(
+        repaired_item, service_changed = sync_data_request_service(
             session,
             request_record,
             organization_id=organization_id,
@@ -74,6 +75,28 @@ def test_v233_link_only_repair_is_reported_as_a_sync_change() -> None:
         session.flush()
 
         assert repaired_item.source_route == expected_route
-        assert changed is True
         assert stale_origin.route == expected_route
+        assert service_changed is True
+        session.commit()
+
+    # Then prove the compatibility bridge preserves that changed signal as well.
+    persist_stale_origin()
+    with SessionLocal() as session:
+        request_record = session.get(DataRequest, request_id)
+        stale_origin = session.get(WorkItemLink, origin_id)
+        assert request_record is not None
+        assert stale_origin is not None
+        assert stale_origin.route == "/informacion"
+
+        repaired_item, bridge_changed = sync_data_request_bridge(
+            session,
+            request_record,
+            organization_id=organization_id,
+            actor_email=actor_email,
+        )
+        session.flush()
+
+        assert repaired_item.source_route == expected_route
+        assert stale_origin.route == expected_route
+        assert bridge_changed is True
         session.rollback()
