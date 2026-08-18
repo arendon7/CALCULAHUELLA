@@ -32,10 +32,11 @@ def _marker_value() -> str | None:
 def test_v246_startup_keeps_alembic_fail_closed_before_cached_bootstrap() -> None:
     text = (ROOT / "start_prod.sh").read_text(encoding="utf-8")
     migration = text.index('"$PY" -m alembic upgrade head')
-    bootstrap = text.index('"$PY" scripts/runtime_bootstrap.py')
+    bootstrap = text.index('"$PY" -m scripts.runtime_bootstrap')
     server = text.index('exec "$PY" -m uvicorn app.main:app')
 
     assert migration < bootstrap < server
+    assert '"$PY" scripts/runtime_bootstrap.py' not in text
     assert "check_ready.py" in text
     assert "FORCE_RUNTIME_BOOTSTRAP" not in text  # override is consumed only by the Python runtime helper
 

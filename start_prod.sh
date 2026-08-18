@@ -57,7 +57,7 @@ MIGRATION_STARTED=$SECONDS
 echo "Migraciones verificadas en $((SECONDS - MIGRATION_STARTED))s."
 
 BOOTSTRAP_STARTED=$SECONDS
-"$PY" scripts/runtime_bootstrap.py
+"$PY" -m scripts.runtime_bootstrap
 echo "Bootstrap runtime verificado en $((SECONDS - BOOTSTRAP_STARTED))s."
 echo "Prerequisitos de arranque completados en $((SECONDS - STARTUP_PREREQ_STARTED))s."
 
