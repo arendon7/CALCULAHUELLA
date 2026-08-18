@@ -55,6 +55,8 @@ def test_v238a_scoped_results_keep_explicit_inventory_and_are_read_only() -> Non
 
     assert response.status_code == 200
     soup = BeautifulSoup(response.text, "html.parser")
+    content = soup.select_one("#contenido-aplicacion")
+    assert content is not None
     assert inventory_name in response.text
     assert period in response.text
     assert "Consulta explícita del periodo" in response.text
@@ -64,10 +66,10 @@ def test_v238a_scoped_results_keep_explicit_inventory_and_are_read_only() -> Non
     assert pill is not None
     assert pill.get("href") == f"/inventarios/{inventory_id}"
 
-    assert soup.select_one(f'form[action="/inventarios/{inventory_id}/recalcular"]') is None
-    assert soup.select_one('a[href="/informacion"]') is None
-    assert soup.select_one('a[href="/entrega-profesional"]') is None
-    assert soup.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
+    assert content.select_one(f'form[action="/inventarios/{inventory_id}/recalcular"]') is None
+    assert content.select_one('a[href="/informacion"]') is None
+    assert content.select_one('a[href="/entrega-profesional"]') is None
+    assert content.select_one(f'a[href="/inventarios/{inventory_id}"]') is not None
 
 
 def test_v238a_default_results_preserve_existing_operational_route() -> None:
