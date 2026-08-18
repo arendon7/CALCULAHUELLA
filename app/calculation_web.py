@@ -8,6 +8,7 @@ from .calculations import recalculate_inventory, source_calculation_summary
 from .database import add_audit, get_db
 from .inventory_context import inventory_metrics
 from .scoped_information_web import register_scoped_information_routes
+from .scoped_source_web import register_scoped_source_routes
 
 
 def register_calculation_routes(
@@ -23,6 +24,13 @@ def register_calculation_routes(
     # ADR-002 composes the explicit historical workspace here without touching
     # the large operational Information router or introducing hidden session state.
     register_scoped_information_routes(
+        app,
+        templates,
+        common_context,
+        require_user,
+        get_inventory,
+    )
+    register_scoped_source_routes(
         app,
         templates,
         common_context,
