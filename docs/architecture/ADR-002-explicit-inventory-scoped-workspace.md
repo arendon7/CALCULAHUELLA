@@ -13,7 +13,7 @@ Calcula tu Huella conserva múltiples inventarios por organización. La autorida
 - `/inventarios/{inventory_id}` permite consultar un expediente explícito;
 - consultar un periodo histórico **no cambia** el periodo por defecto global.
 
-Esta arquitectura evita un estado oculto de “inventario activo”, pero limita la profundidad de la consulta histórica: hoy varias superficies generales —resultados, análisis, reducción, informes y cierre— resuelven el periodo más reciente aunque el usuario venga de un expediente histórico.
+Esta arquitectura evita un estado oculto de “inventario activo”, pero limita la profundidad de la consulta histórica: varias superficies generales —resultados, análisis, reducción, informes y cierre— resuelven el periodo más reciente aunque el usuario venga de un expediente histórico.
 
 La solución no será introducir una selección global persistente ni una variable de sesión ambigua. Se implementará un workspace explícitamente parametrizado por inventario.
 
@@ -40,7 +40,8 @@ Las rutas generales existentes se conservarán como experiencia operacional del 
 7. **Inventario cerrado = inmutable.** Un periodo cerrado nunca se vuelve editable por entrar a una ruta explícita.
 8. **Sin duplicar servicios.** Los handlers general y explícito deben delegar en las mismas funciones de dominio y construcción de contexto.
 9. **Trazabilidad visible.** Topbar, breadcrumb, periodo y enlaces siguientes deben mantener el mismo `inventory_id` durante una consulta explícita.
-10. **Salida inequívoca.** Toda vista histórica debe ofrecer `Ver periodos` e `Ir al periodo por defecto`.
+10. **Salida inequívoca.** Toda vista histórica debe ofrecer `Ver periodos` e `Ir al periodo por defecto` cuando abandone deliberadamente el expediente.
+11. **Drill-down histórico también explícito.** Si una vista histórica abre un recurso hijo necesario para auditar el resultado —por ejemplo una fuente de emisión— ese recurso debe conservar `inventory_id`; no se reutilizará una superficie operativa editable si ello puede escapar al periodo por defecto o exponer mutaciones no autorizadas por este workspace.
 
 ## 3. Matriz de rutas objetivo
 
@@ -50,12 +51,22 @@ Las rutas generales existentes se conservarán como experiencia operacional del 
 | Fuentes | periodo por defecto / navegación general | `/inventarios/{id}/fuentes` | Existente |
 | Datos y evidencias | `/informacion` | `/inventarios/{id}/informacion` | Lectura histórica |
 | Resultados | `/calculos` | `/inventarios/{id}/calculos` | Lectura histórica |
+| Trazabilidad de fuente desde Resultados | `/fuentes/{source_id}` | `/inventarios/{id}/fuentes/{source_id}` | Lectura histórica, GET-only |
 | Análisis | `/analisis` | `/inventarios/{id}/analisis` | Lectura histórica |
 | Reducción | `/reduccion` | `/inventarios/{id}/reduccion` | Lectura histórica |
 | Informes | `/reportes` | `/inventarios/{id}/reportes` | Lectura histórica |
 | Cierre y entrega | `/entrega-profesional` | `/inventarios/{id}/entrega-profesional` | Lectura histórica |
 
 La existencia de una fila en esta matriz **no autoriza por sí sola** una operación de escritura histórica.
+
+### 3.1 Presupuesto arquitectónico aprobado
+
+El baseline histórico del gate de deuda permanece inmutable. ADR-002 autoriza únicamente el crecimiento necesario para el workspace explícito:
+
+- cinco rutas scoped incorporadas en V2.38B-E para Análisis, Reducción, Informes, Cierre/Entrega e Información, sobre la ruta scoped de Resultados que ya formaba parte del baseline operativo del ciclo;
+- **una ruta adicional V2.45** para `/inventarios/{inventory_id}/fuentes/{source_id}`, necesaria para auditar dato → factor → GWP → resultado sin salir del periodo histórico.
+
+Por tanto, el presupuesto aprobado en `scripts/audit_architecture.py` queda en **+6 rutas sobre el baseline de 344**, con límite total de **350**. Esta autorización es específica de ADR-002 y **no** habilita crecimiento genérico de endpoints.
 
 ## 4. Resolución de inventario
 
@@ -75,6 +86,15 @@ inventory = get_inventory(session, user)
 
 Por tanto, la ausencia de `inventory_id` continúa significando **periodo más reciente por defecto**, no “último periodo que el usuario abrió”.
 
+Para recursos hijos, además de resolver el inventario explícito, el handler debe comprobar pertenencia al mismo expediente. En V2.45, por ejemplo, una fuente solo puede abrirse si se cumple simultáneamente:
+
+```text
+source.id == source_id
+source.inventory_id == inventory.id
+```
+
+Un `source_id` válido perteneciente a otro inventario debe responder como recurso no encontrado dentro del expediente solicitado.
+
 ## 5. Contrato de navegación
 
 Dentro de una ruta explícita, todo enlace que permanezca en la misma superficie funcional debe conservar el inventario.
@@ -88,7 +108,15 @@ Ejemplo:
   → /inventarios/17/reportes
 ```
 
-No se permitirá que un CTA aparentemente contextual salte a `/analisis`, `/reduccion` o `/reportes` sin advertencia, porque esas rutas generales resolverían el periodo por defecto.
+El mismo principio aplica al drill-down:
+
+```text
+/inventarios/17/calculos
+  → /inventarios/17/fuentes/42
+  → /inventarios/17/calculos
+```
+
+No se permitirá que un CTA aparentemente contextual salte a `/analisis`, `/reduccion`, `/reportes` o `/fuentes/42` sin advertencia, porque esas rutas generales pertenecen al flujo operacional del periodo por defecto y pueden ser editables.
 
 Los enlaces que deliberadamente abandonen el contexto histórico deben nombrarlo de forma explícita:
 
@@ -104,11 +132,13 @@ Toda vista explícita debe mostrar, como mínimo:
 - rango exacto de fechas;
 - estado del inventario;
 - indicador `Periodo mostrado` en el shell;
-- una señal de `Consulta histórica` cuando no sea el periodo por defecto;
+- una señal de `Consulta histórica` o `Consulta explícita del periodo`;
 - acceso al expediente explícito;
-- acceso a la lista de periodos.
+- acceso a la lista de periodos o retorno inequívoco a la vista scoped de origen.
 
 No se usará el texto “inventario activo” ni “periodo activo”.
+
+Una vista hija de trazabilidad puede omitir la barra principal de siete vistas si no pretende presentarse como una de ellas, pero su navegación global debe seguir resolviendo al mismo `inventory_id` y su retorno debe conducir a la vista scoped de origen.
 
 ## 7. Escritura y bloqueo
 
@@ -125,6 +155,21 @@ Antes de permitir una mutación desde una vista explícita deben cumplirse los s
 7. existe un test de no-fuga hacia el periodo por defecto.
 
 Si alguno de estos contratos no existe, la vista histórica será de solo lectura y deberá indicarlo.
+
+### 7.1 V2.45 · fuente histórica de solo lectura
+
+La ruta `/inventarios/{inventory_id}/fuentes/{source_id}` queda deliberadamente limitada a **GET**. Su propósito es reproducir la trazabilidad de un resultado histórico, no operar la fuente.
+
+Debe cumplir:
+
+- pertenencia `source.inventory_id == inventory_id`;
+- reutilización de los datos persistidos y de `source_calculation_summary`;
+- exposición de datos, evidencia, decisiones de factor, GWP, fórmula congelada y resultado;
+- ausencia de formularios de configuración, selección/revisión de factor, edición de datos o recálculo;
+- navegación global preservando `inventory_id`;
+- mantenimiento de `/fuentes/{source_id}` como superficie operativa separada para el periodo por defecto y los roles autorizados.
+
+No se crea un segundo motor de cálculo ni un segundo estado de factores.
 
 ## 8. Publicación y documentos
 
@@ -163,6 +208,12 @@ Cada nueva ruta explícita deberá demostrar al menos:
 7. comportamiento de inventario cerrado;
 8. paridad semántica con la ruta general cuando el `inventory_id` explícito coincide con el periodo por defecto.
 
+Para recursos hijos scoped se añade:
+
+9. rechazo del cruce entre un inventario válido y un recurso perteneciente a otro inventario;
+10. ausencia de controles de mutación cuando la fase se declare de solo lectura;
+11. conservación explícita del contexto al volver a la superficie padre.
+
 ## 11. Orden de implementación
 
 La implementación será incremental para reducir riesgo:
@@ -187,12 +238,17 @@ Crear vistas explícitas para artefactos y readiness, separando consulta de gene
 
 Exponer registros, solicitudes y evidencias del periodo explícito. La carga/edición se habilitará solo después de verificar todos los POSTs y redirects.
 
+### V2.45 · Drill-down histórico de fuente
+
+Extender Resultados scoped con `/inventarios/{id}/fuentes/{source_id}` para inspeccionar, en modo lectura, la cadena dato → evidencia → factor → GWP → fórmula → resultado. La ruta operativa `/fuentes/{source_id}` no cambia y no se reutiliza desde el workspace histórico.
+
 ## 12. Consecuencias
 
 ### Positivas
 
 - elimina ambigüedad entre periodo histórico y periodo por defecto;
 - permite auditoría longitudinal real;
+- permite profundizar desde un resultado hasta su fuente sin escapar a una superficie editable;
 - hace más útil la plataforma para organizaciones con varios años de inventario;
 - evita introducir estado global oculto;
 - mejora trazabilidad de enlaces, tareas y documentos;
@@ -200,19 +256,20 @@ Exponer registros, solicitudes y evidencias del periodo explícito. La carga/edi
 
 ### Costos
 
-- aumenta el número de rutas;
+- aumenta de forma explícitamente presupuestada el número de rutas;
 - obliga a factorizar handlers que hoy resuelven implícitamente el periodo más reciente;
 - requiere revisar redirects, CTAs y formularios por superficie;
-- exige tests de aislamiento por organización y periodo.
+- exige tests de aislamiento por organización, periodo y recurso hijo.
 
-Estos costos se aceptan porque son preferibles a una selección global implícita que pueda mezclar expedientes.
+Estos costos se aceptan porque son preferibles a una selección global implícita que pueda mezclar expedientes o a reutilizar una superficie operativa editable dentro de una consulta histórica.
 
 ## 13. Criterio de cierre del ADR
 
 La decisión se considera completamente implementada cuando:
 
 - todas las superficies de la matriz que hayan sido habilitadas disponen de rutas explícitas;
-- ningún enlace contextual histórico salta silenciosamente al periodo por defecto;
-- los tests de aislamiento por organización y periodo están verdes;
+- ningún enlace contextual histórico, incluido un drill-down de trazabilidad, salta silenciosamente al periodo por defecto;
+- los tests de aislamiento por organización, periodo y recurso hijo están verdes;
 - la ruta general continúa representando únicamente el periodo más reciente por defecto;
+- las rutas históricas declaradas read-only no exponen mutaciones;
 - no existe estado de sesión denominado o equivalente a “inventario activo”.
