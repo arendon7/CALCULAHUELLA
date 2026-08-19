@@ -42,9 +42,13 @@ def test_v254_get_and_post_use_same_whitelist_and_canonical_code():
     assert 'recommended_plan_code=plan_code' in public_web
 
 
-def test_v254_contact_handoff_does_not_expand_query_or_pii_surface():
+def test_v254_contact_handoff_preserves_published_pages_aliases_without_expanding_query_or_pii():
     runtime = _text(PAGES_RUNTIME)
     contact = _text(CONTACT)
+
+    assert "allowedRoutes = new Set(['Huella Esencial', 'Gestión de Carbono', 'Gestión Avanzada'])" in runtime
+    for legacy in ("Huella Esencial", "Gestión de Carbono", "Gestión Avanzada"):
+        assert legacy in runtime
 
     for key in ("plan", "sector", "sites", "objective"):
         assert f"searchParams.set('{key}'" in runtime
