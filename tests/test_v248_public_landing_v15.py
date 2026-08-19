@@ -58,6 +58,8 @@ def test_v248_pricing_uses_service_plan_authority_and_preserves_verification_bou
         "plan.includes_verification_portal",
     ):
         assert token in pricing
+    assert "plan.description" not in pricing
+    assert "Operación multiempresa, alcance 3 avanzado, integraciones, gobierno ampliado y soporte prioritario." in pricing
     assert 'id="precios"' in pricing
     assert "no equivalen a verificación independiente" in pricing
     assert "tercero verificador" in pricing

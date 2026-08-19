@@ -11,7 +11,10 @@
         <div class="v15-plan-top">
           <span class="v15-plan-label">{{ 'RECOMENDADO' if plan.code == 'EMPRESARIAL' else plan.code }}</span>
           <h3>{{ plan.name }}</h3>
-          <p>{{ plan.description }}</p>
+          {% if plan.code == 'ESENCIAL' %}<p>Primera huella para una operación acotada, con alcances 1 y 2 y una ruta ordenada de datos, evidencias e informe.</p>
+          {% elif plan.code == 'EMPRESARIAL' %}<p>Gestión anual para varias sedes, alcance 3 priorizado, informes técnicos y mayor coordinación entre responsables.</p>
+          {% elif plan.code == 'CORPORATIVO' %}<p>Operación multiempresa, alcance 3 avanzado, integraciones, gobierno ampliado y soporte prioritario.</p>
+          {% else %}<p>Capacidades de plataforma configuradas según el alcance definido para tu organización.</p>{% endif %}
         </div>
         <div class="v15-price">
           {% if plan.monthly_fee and plan.monthly_fee > 0 %}
