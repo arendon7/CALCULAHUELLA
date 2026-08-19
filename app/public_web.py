@@ -30,6 +30,29 @@ _ALLOWED_OBJECTIVES = {
     "Preparar revisión externa",
 }
 
+FAIR_DISCOUNT_PERCENT = 30
+
+
+def _fair_offer(plan: ServicePlan) -> dict[str, object]:
+    """Build the public annual Feria offer without mutating billing semantics.
+
+    The current campaign intentionally reuses the approved 390/990/2490
+    commercial reference tiers as annual base values. ``ServicePlan`` keeps
+    its historical monthly/annual fields unchanged for subscriptions and
+    billing; only the public campaign presentation is transformed here.
+    """
+
+    regular_annual_fee = int(plan.monthly_fee or 0)
+    promo_annual_fee = round(
+        regular_annual_fee * (100 - FAIR_DISCOUNT_PERCENT) / 100
+    )
+    return {
+        "plan": plan,
+        "regular_annual_fee": regular_annual_fee,
+        "promo_annual_fee": promo_annual_fee,
+        "discount_percent": FAIR_DISCOUNT_PERCENT,
+    }
+
 
 def _query_choice(request: Request, name: str, allowed: set[str] | dict[str, str], fallback: str = "") -> str:
     value = request.query_params.get(name, "").strip()
@@ -62,6 +85,7 @@ def register_public_routes(app, templates, current_user) -> None:
                 .order_by(ServicePlan.monthly_fee)
             )
         )
+        fair_offers = [_fair_offer(plan) for plan in plans]
         return templates.TemplateResponse(
             request=request,
             name="public_home.html",
@@ -69,6 +93,8 @@ def register_public_routes(app, templates, current_user) -> None:
                 "user": user,
                 "app_settings": settings,
                 "plans": plans,
+                "fair_offers": fair_offers,
+                "fair_discount_percent": FAIR_DISCOUNT_PERCENT,
                 "contact_sent": request.query_params.get("contacto") == "recibido",
             },
         )

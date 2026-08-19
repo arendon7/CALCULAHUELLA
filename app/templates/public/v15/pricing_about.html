@@ -1,12 +1,24 @@
 <section class="section v15-pricing-section" id="precios" aria-labelledby="v15-pricing-title">
   <div class="container">
+    <div class="v15-fair-banner" role="note" aria-label="Beneficio Feria de Negocios Verdes Corantioquia">
+      <div class="v15-fair-brand">
+        <div class="v15-fair-wordmark"><span>FERIA DE</span><strong>NEGOCIOS VERDES</strong><small>Corantioquia</small></div>
+        <img src="{{ url_for('static', path='img/campaign/corantioquia.png') }}" alt="Corantioquia">
+      </div>
+      <div class="v15-fair-offer">
+        <strong>{{ fair_discount_percent }}% DE DESCUENTO</strong>
+        <p>Beneficio especial de feria aplicado al valor anual de referencia durante esta campaña comercial.</p>
+      </div>
+    </div>
+
     <header class="section-head v15-pricing-head">
-      <div class="eyebrow">Planes y precios de referencia</div>
+      <div class="eyebrow">Planes anuales · precio especial de feria</div>
       <h2 id="v15-pricing-title">Empieza con el nivel de gestión que realmente necesitas.</h2>
       <p>La licencia organiza el trabajo dentro de la plataforma. El diagnóstico inicial confirma sedes, fuentes, alcance, periodicidad, calidad de datos, integraciones y profundidad del acompañamiento antes de cerrar una propuesta.</p>
     </header>
     <div class="v15-plan-grid">
-      {% for plan in plans %}
+      {% for offer in fair_offers %}
+      {% set plan = offer.plan %}
       <article class="v15-plan-card{% if plan.code == 'EMPRESARIAL' %} featured{% endif %}" data-plan-code="{{ plan.code }}">
         <div class="v15-plan-top">
           <span class="v15-plan-label">{{ 'RECOMENDADO' if plan.code == 'EMPRESARIAL' else plan.code }}</span>
@@ -17,13 +29,14 @@
           {% else %}<p>Capacidades de plataforma configuradas según el alcance definido para tu organización.</p>{% endif %}
         </div>
         <div class="v15-price">
-          {% if plan.monthly_fee and plan.monthly_fee > 0 %}
-          <strong>${{ plan.monthly_fee|number_es(0) }}</strong><span>COP / mes</span>
+          {% if offer.regular_annual_fee and offer.regular_annual_fee > 0 %}
+          <div class="v15-regular-price">Valor anual de referencia <del>${{ offer.regular_annual_fee|number_es(0) }}</del> COP</div>
+          <div class="v15-promo-price"><strong>${{ offer.promo_annual_fee|number_es(0) }}</strong><span>COP / año</span></div>
+          <div class="v15-saving">{{ offer.discount_percent }}% de descuento · ahorras ${{ (offer.regular_annual_fee - offer.promo_annual_fee)|number_es(0) }} COP</div>
           {% else %}
-          <strong>A medida</strong><span>según diagnóstico</span>
+          <div class="v15-promo-price"><strong>A medida</strong><span>según diagnóstico</span></div>
           {% endif %}
         </div>
-        {% if plan.annual_fee and plan.annual_fee > 0 %}<div class="v15-annual">Opción anual: ${{ plan.annual_fee|number_es(0) }} COP</div>{% endif %}
         <ul>
           <li><b>{{ plan.max_users }}</b> usuarios incluidos</li>
           <li><b>{{ plan.max_facilities }}</b> sedes incluidas</li>
@@ -36,7 +49,7 @@
       {% else %}
       <article class="v15-plan-card">
         <div class="v15-plan-top"><span class="v15-plan-label">ESENCIAL</span><h3>Huella Esencial</h3><p>Primera medición y organización del proceso.</p></div>
-        <div class="v15-price"><strong>A medida</strong><span>según diagnóstico</span></div>
+        <div class="v15-price"><div class="v15-promo-price"><strong>A medida</strong><span>según diagnóstico</span></div></div>
         <a class="btn btn-primary" href="/diagnostico">Solicitar diagnóstico →</a>
       </article>
       {% endfor %}
@@ -46,7 +59,7 @@
       <div><strong>Se define en el diagnóstico</strong><p>Levantamientos especiales, visitas, integraciones, alcance 3 de alta complejidad, desarrollos específicos y profundidad del acompañamiento profesional.</p></div>
       <div><strong>Independiente cuando corresponda</strong><p>Una revisión interna o el uso del portal no equivalen a verificación independiente. Los servicios de un tercero verificador se acuerdan y contratan por separado.</p></div>
     </div>
-    <p class="v15-price-note">Valores de referencia en COP. La propuesta final puede variar según complejidad, número de sedes, fuentes, frecuencia, calidad de información y servicios profesionales requeridos.</p>
+    <p class="v15-price-note">Valores de referencia en COP por año. El descuento del 30% corresponde a la campaña comercial de la Feria de Negocios Verdes de Corantioquia y se confirma en la propuesta. La propuesta final puede variar según complejidad, número de sedes, fuentes, frecuencia, calidad de información y servicios profesionales requeridos.</p>
   </div>
 </section>
 
