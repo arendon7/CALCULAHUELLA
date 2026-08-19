@@ -4,6 +4,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 PRICING = ROOT / "app/templates/public/v15/pricing_about.html"
 RESULT = ROOT / "app/templates/public_thanks.html"
+PUBLIC_BASE = ROOT / "app/templates/public_base.html"
 PLAN_COPY = ROOT / "app/templates/public/plan_copy.html"
 PRODUCT_INTELLIGENCE_WEB = ROOT / "app/product_intelligence_web.py"
 
@@ -50,6 +51,14 @@ def test_v253_result_handoff_does_not_present_login_as_the_next_commercial_step(
     assert 'href="/login"' not in actions
     assert 'href="/login"' in result
     assert "¿Ya tienes una cuenta?" in result
+
+
+def test_v253_individual_result_is_noindex_while_public_base_keeps_default_indexing():
+    base = _read(PUBLIC_BASE)
+    result = _read(RESULT)
+
+    assert '{% block robots %}<meta name="robots" content="index,follow">{% endblock %}' in base
+    assert '{% block robots %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}' in result
 
 
 def test_v253_result_keeps_recommendation_authority_in_the_diagnostic_engine():
