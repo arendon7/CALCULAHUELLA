@@ -30,12 +30,16 @@ def test_v248_landing_keeps_v14_authority_and_adds_v15_layers_in_order() -> None
     assert "Toda tu gestión de carbono, conectada" in home
 
 
-def test_v248_navigation_and_styles_expose_pricing_without_removing_v14_routes() -> None:
+def test_v248_navigation_promotes_pricing_within_four_primary_destinations() -> None:
     base = _text(TEMPLATES / "public_base.html")
     assert "css/public-v15.css" in base
     assert 'class="public-v14-body public-v15-body"' in base
-    for href in ("/#como-funciona", "/#plataforma", "/#informes", "/#precios", "/#soluciones"):
-        assert href in base
+    nav = base.split('<nav class="nav-links"', 1)[1].split("</nav>", 1)[0]
+    assert nav.count("<a ") == 4
+    for href in ("/#como-funciona", "/#plataforma", "/#informes", "/#precios"):
+        assert href in nav
+    assert "/#soluciones" not in nav
+    assert "/#soluciones" in base  # remains discoverable in the footer and page flow
     assert "Potenciado por GREENATICS" in base
 
 

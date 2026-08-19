@@ -27,7 +27,7 @@
   <div class="container nav">
     <a class="brand" href="/" aria-label="Calcula tu Huella, inicio"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
     <nav class="nav-links" aria-label="Navegación principal">
-      <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a><a href="/#soluciones">Soluciones</a>
+      <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a>
     </nav>
     <div class="nav-actions">
       {% if user %}<a class="login-link" href="/dashboard">Ir a la plataforma</a>{% else %}<a class="login-link" href="/login">Iniciar sesión</a>{% endif %}
@@ -36,7 +36,7 @@
     </div>
   </div>
   <aside class="mobile-panel" id="mobilePanel" data-mobile-panel aria-label="Menú móvil">
-    <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a><a href="/#soluciones">Soluciones</a>
+    <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a>
     {% if user %}<a href="/dashboard">Ir a la plataforma</a>{% else %}<a href="/login">Iniciar sesión</a>{% endif %}<a class="btn btn-primary" href="/diagnostico">Empezar diagnóstico</a>
   </aside>
 </header>
