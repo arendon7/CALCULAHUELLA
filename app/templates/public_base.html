@@ -14,19 +14,20 @@
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/public-v1.6.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/v2.1-public.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/public-v15.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/diagnosis_handoff.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/public-contact.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
   <script defer src="{{ url_for('static', path='js/public-v1.6.js') }}"></script>
   <script defer src="{{ url_for('static', path='js/diagnosis_handoff.js') }}"></script>
 </head>
-<body class="public-v14-body">
+<body class="public-v14-body public-v15-body">
 <a class="skip-link" href="#contenido-principal">Saltar al contenido</a>
 <header class="site-header">
   <div class="container nav">
     <a class="brand" href="/" aria-label="Calcula tu Huella, inicio"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
     <nav class="nav-links" aria-label="Navegación principal">
-      <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#soluciones">Soluciones</a>
+      <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a><a href="/#soluciones">Soluciones</a>
     </nav>
     <div class="nav-actions">
       {% if user %}<a class="login-link" href="/dashboard">Ir a la plataforma</a>{% else %}<a class="login-link" href="/login">Iniciar sesión</a>{% endif %}
@@ -35,7 +36,7 @@
     </div>
   </div>
   <aside class="mobile-panel" id="mobilePanel" data-mobile-panel aria-label="Menú móvil">
-    <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#soluciones">Soluciones</a>
+    <a href="/#como-funciona">Cómo funciona</a><a href="/#plataforma">Plataforma</a><a href="/#informes">Qué obtienes</a><a href="/#precios">Precios</a><a href="/#soluciones">Soluciones</a>
     {% if user %}<a href="/dashboard">Ir a la plataforma</a>{% else %}<a href="/login">Iniciar sesión</a>{% endif %}<a class="btn btn-primary" href="/diagnostico">Empezar diagnóstico</a>
   </aside>
 </header>
@@ -44,8 +45,8 @@
   <div class="container">
     <div class="footer-grid">
       <div><img class="canonical-footer-logo" src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"><p>Plataforma colaborativa para medir, explicar y gestionar la huella de carbono con información conectada y acompañamiento profesional.</p><strong>Potenciado por GREENATICS</strong></div>
-      <div><strong>Producto</strong><a href="/#plataforma">Plataforma</a><a href="/#como-funciona">Cómo funciona</a><a href="/#informes">Informes y trazabilidad</a><a href="/#reduccion">Reducción</a></div>
-      <div><strong>Comenzar</strong><a href="/diagnostico">Diagnóstico</a><a href="/#soluciones">Soluciones</a><a href="/#experiencia">Experiencia</a><a href="/#recursos">Recursos</a></div>
+      <div><strong>Producto</strong><a href="/#plataforma">Plataforma</a><a href="/#como-funciona">Cómo funciona</a><a href="/#informes">Informes y trazabilidad</a><a href="/#precios">Planes y precios</a></div>
+      <div><strong>Comenzar</strong><a href="/diagnostico">Diagnóstico</a><a href="/#soluciones">Soluciones</a><a href="/#quienes-somos">Quiénes somos</a><a href="/#recursos">Recursos</a></div>
       <div><strong>Legal y confianza</strong><a href="/legal/terminos">Términos</a><a href="/legal/privacidad">Privacidad</a><a href="/legal/dpa">Tratamiento de datos</a><a href="/legal/metodologia">Alcance metodológico</a></div>
     </div>
     <div class="footer-legal"><span>© 2026 Calcula tu Huella · Gestión de carbono en evolución controlada</span><span>Los resultados dependen de la calidad de los datos y de la revisión metodológica aplicable. La plataforma no actúa automáticamente como organismo verificador o certificador.</span></div>
