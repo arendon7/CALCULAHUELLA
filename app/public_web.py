@@ -10,8 +10,16 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .database import CommercialLead, ServicePlan, get_db
 
+_CONTACT_PLAN_LABELS = {
+    "ESENCIAL": "Huella Esencial",
+    "EMPRESARIAL": "Huella Empresarial",
+    "CORPORATIVO": "Gestión Corporativa",
+}
 _ALLOWED_CONTACT_PLANS = {
     "Huella Esencial": "ESENCIAL",
+    "Huella Empresarial": "EMPRESARIAL",
+    "Gestión Corporativa": "CORPORATIVO",
+    # Aliases históricos conservados para el handoff desde GitHub Pages.
     "Gestión de Carbono": "EMPRESARIAL",
     "Gestión Avanzada": "CORPORATIVO",
     "Gestión Avanzada y Verificación": "CORPORATIVO",
@@ -59,6 +67,13 @@ def _query_choice(request: Request, name: str, allowed: set[str] | dict[str, str
     return value if value in allowed else fallback
 
 
+def _normalize_contact_plan(value: str) -> tuple[str, str]:
+    """Resolve any approved public/legacy label to canonical code + current label."""
+
+    code = _ALLOWED_CONTACT_PLANS.get((value or "").strip(), "")
+    return code, _CONTACT_PLAN_LABELS.get(code, "")
+
+
 def _query_sites(request: Request) -> int | None:
     raw = request.query_params.get("sites", "").strip()
     if not raw:
@@ -102,8 +117,10 @@ def register_public_routes(app, templates, current_user) -> None:
     @app.api_route("/contacto", methods=["GET", "POST"], response_class=HTMLResponse)
     async def public_contact(request: Request, session: Session = Depends(get_db)):
         if request.method == "GET":
+            raw_plan = _query_choice(request, "plan", _ALLOWED_CONTACT_PLANS)
+            _, current_plan_label = _normalize_contact_plan(raw_plan)
             route_context = {
-                "plan": _query_choice(request, "plan", _ALLOWED_CONTACT_PLANS),
+                "plan": current_plan_label,
                 "sector": _query_choice(request, "sector", _ALLOWED_SECTORS),
                 "sites": _query_sites(request),
                 "objective": _query_choice(request, "objective", _ALLOWED_OBJECTIVES),
@@ -147,6 +164,9 @@ def register_public_routes(app, templates, current_user) -> None:
             )
         if normalized_interest not in _ALLOWED_CONTACT_PLANS:
             normalized_interest = "Quiero entender por dónde comenzar"
+        plan_code, current_plan_label = _normalize_contact_plan(normalized_interest)
+        if plan_code:
+            normalized_interest = current_plan_label
         if normalized_sector not in _ALLOWED_SECTORS:
             normalized_sector = "Por definir"
 
@@ -171,7 +191,7 @@ def register_public_routes(app, templates, current_user) -> None:
                 f"{message}"
             ),
             complexity_score=0,
-            recommended_plan_code=_ALLOWED_CONTACT_PLANS.get(normalized_interest, ""),
+            recommended_plan_code=plan_code,
             status="Nuevo",
             source="Contacto público same-origin",
         )
