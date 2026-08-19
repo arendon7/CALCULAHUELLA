@@ -28,12 +28,10 @@
     </div>
 
     <section class="diagnosis-step" data-diagnosis-step="1">
-      <div class="form-section"><span>1</span><div><h2>Empresa y contacto</h2><p>Información básica para contextualizar la recomendación.</p></div></div>
+      <div class="form-section"><span>1</span><div><h2>Empresa y contacto</h2><p>Empezamos con el contexto mínimo de la organización. El correo y el teléfono se solicitan al final, cuando ya hayas completado la evaluación.</p></div></div>
       <div class="public-form-grid">
         <label>Empresa<input name="company_name" autocomplete="organization" required></label>
         <label>Nombre de contacto<input name="contact_name" autocomplete="name" required></label>
-        <label>Correo corporativo<input type="email" name="email" autocomplete="email" required></label>
-        <label>Teléfono<input name="phone" autocomplete="tel"></label>
         <label>Sector<select name="sector" required><option value="">Selecciona un sector</option><option>Manufactura</option><option>Transporte y logística</option><option>Servicios y oficinas</option><option>Agroindustria</option><option>Gestión de residuos</option><option>Construcción</option><option>Salud</option><option>Energía</option><option>Otro</option></select></label>
         <label>Ciudad<input name="city" autocomplete="address-level2"></label>
       </div>
@@ -75,7 +73,7 @@
     </section>
 
     <section class="diagnosis-step" data-diagnosis-step="4" hidden>
-      <div class="form-section"><span>4</span><div><h2>Objetivo y profundidad</h2><p>La finalidad define el alcance, la evidencia y el nivel de revisión recomendado.</p></div></div>
+      <div class="form-section"><span>4</span><div><h2>Objetivo y profundidad</h2><p>La finalidad define el alcance, la evidencia y el nivel de revisión recomendado. Al final dejamos los datos de contacto necesarios para dar continuidad a la solicitud.</p></div></div>
       <div class="public-form-grid">
         <label>Alcance deseado<select name="desired_scopes"><option>Alcances 1 y 2</option><option>Alcances 1, 2 y 3 priorizado</option><option>Alcances 1, 2 y 3 avanzado</option></select></label>
         <label>Objetivo principal<select name="objective"><option>Conocer la huella corporativa</option><option>Requisito de clientes y estrategia de reducción</option><option>Licitación o cadena de suministro</option><option>Preparación para verificación</option><option>Reporte regulatorio o sostenibilidad</option><option>Información para dirección o financiadores</option></select></label>
@@ -83,6 +81,8 @@
         <label>Plazo objetivo<select name="deadline_months"><option value="12">12 meses</option><option value="6">6 meses</option><option value="4">4 meses</option><option value="2">2 meses</option></select></label>
         <label>Prioridad<select name="urgency"><option>Normal</option><option>Alta</option></select></label>
         <label class="full">Contexto adicional<textarea name="notes" rows="4" placeholder="Incluye obligaciones, clientes, plazos o procesos especiales que debamos considerar"></textarea></label>
+        <label>Correo corporativo<input type="email" name="email" autocomplete="email" required></label>
+        <label>Teléfono<input name="phone" autocomplete="tel"></label>
       </div>
       <div class="diagnosis-consent"><span>✓</span><p>Al generar el resultado aceptas que usemos esta información únicamente para elaborar el diagnóstico y dar continuidad a la solicitud.</p></div>
     </section>
@@ -92,7 +92,7 @@
       <button class="button primary" type="button" data-diagnosis-next>Continuar →</button>
       <button class="button primary" type="submit" data-diagnosis-submit hidden>Generar diagnóstico y ruta</button>
     </div>
-    <small class="privacy-note">No necesitas adjuntar documentos ni cifras de emisiones en esta etapa.</small>
+    <small class="privacy-note">No necesitas adjuntar documentos ni cifras de emisiones en esta etapa. El correo se solicita únicamente al completar el diagnóstico.</small>
   </form>
 </section>
 {% endblock %}
