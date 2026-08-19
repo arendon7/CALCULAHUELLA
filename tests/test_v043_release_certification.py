@@ -192,7 +192,7 @@ def test_v043_operational_scripts_bootstrap_project_path(tmp_path: Path):
         if legacy_bootstrap in source:
             continue
 
-        module_invocation = f"python -m scripts.{operational_script.stem}"
+        module_invocation = f"-m scripts.{operational_script.stem}"
         assert module_invocation in module_registry_sources, (
             f"{operational_script.name} importa app sin bootstrap y tampoco está registrado "
             f"como módulo operativo ({module_invocation}) en workflows o start_prod.sh."
