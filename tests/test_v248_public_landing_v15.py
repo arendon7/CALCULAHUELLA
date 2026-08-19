@@ -69,7 +69,7 @@ def test_v248_fair_campaign_is_annual_and_preserves_verification_boundary() -> N
     assert "plan.annual_fee" not in pricing
     assert "COP / año" in pricing
     assert "COP / mes" not in pricing
-    assert "30% de descuento" in pricing
+    assert "{{ fair_discount_percent }}% DE DESCUENTO" in pricing
     assert "Feria de Negocios Verdes de Corantioquia" in pricing
     assert "img/campaign/corantioquia.png" in pricing
     assert 'id="precios"' in pricing
