@@ -18,6 +18,14 @@ services:
         value: staging
       - key: PORT
         value: "8765"
+      # Binding dedicado: start_prod.sh lo hace prevalecer sobre cualquier
+      # DATABASE_URL heredada/configurada manualmente en el servicio.
+      - key: RENDER_DATABASE_URL
+        fromDatabase:
+          name: calcula-tu-huella-preview-db
+          property: connectionString
+      # Compatibilidad para herramientas que consumen DATABASE_URL directamente.
+      # Ambos bindings apuntan a la MISMA base administrada por este Blueprint.
       - key: DATABASE_URL
         fromDatabase:
           name: calcula-tu-huella-preview-db
