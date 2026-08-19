@@ -1,6 +1,7 @@
 {% extends "public_base.html" %}
 {% from "public/plan_copy.html" import public_plan_description, public_plan_name %}
 {% block title %}Resultado del diagnóstico · Calcula tu Huella{% endblock %}
+{% block robots %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
 {% block content %}
 <section class="result-shell intelligent-result">
   <div class="result-check">✓</div><span>DIAGNÓSTICO INTELIGENTE GENERADO</span><h1>{{ lead.company_name }}</h1><p>Esta recomendación es un punto de partida técnico y comercial. El alcance definitivo requiere validación humana.</p>
