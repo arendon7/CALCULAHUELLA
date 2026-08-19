@@ -6,13 +6,13 @@
   <div class="result-grid four">
     <article><small>Complejidad</small><strong>{{ assessment.row.complexity_level if assessment else ('Baja' if lead.complexity_score <= 5 else 'Media' if lead.complexity_score <= 12 else 'Alta') }}</strong><span>{{ lead.complexity_score }} puntos explicables</span></article>
     <article><small>Madurez</small><strong>{{ assessment.row.maturity_level if assessment else 'Por validar' }}</strong><span>{{ assessment.row.data_maturity_score if assessment else 0 }}% datos · {{ assessment.row.governance_maturity_score if assessment else 0 }}% gobierno</span></article>
-    <article><small>Paquete recomendado</small><strong>{{ assessment.package_label if assessment else (plan.name if plan else lead.recommended_plan_code) }}</strong><span>{{ assessment.package_description if assessment else (plan.description if plan else 'Sujeto a validación técnica') }}</span></article>
+    <article><small>Paquete recomendado</small><strong>{{ plan.name if plan else (assessment.package_label if assessment else lead.recommended_plan_code) }}</strong><span>{{ plan.description if plan else (assessment.package_description if assessment else 'Sujeto a validación técnica') }}</span></article>
     <article><small>Implementación estimada</small><strong>{{ assessment.row.estimated_duration_months if assessment else '—' }} meses</strong><span>{{ assessment.row.estimated_effort_hours if assessment else '—' }} horas de referencia</span></article>
   </div>
   {% if assessment %}
   <div class="public-result-columns">
     <article><h2>Alcance recomendado</h2>{% for item in assessment.recommended_scopes %}<span class="result-tag">{{ item }}</span>{% endfor %}<h3>Fuentes probables</h3><ul>{% for item in assessment.probable_sources %}<li>{{ item }}</li>{% endfor %}</ul></article>
-    <article><h2>Hallazgos iniciales</h2><ul>{% for item in assessment.findings %}<li>{{ item }}</li>{% endfor %}</ul>{% if assessment.risk_flags %}<h3>Riesgos a controlar</h3><ul>{% for item in assessment.risk_flags %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}</article>
+    <article><h2>Hallazgos iniciales</h2><ul>{% for item in assessment.findings %}<li>{{ item }}</li>{% endfor %}{% if assessment.risk_flags %}<h3>Riesgos a controlar</h3><ul>{% for item in assessment.risk_flags %}<li>{{ item }}</li>{% endfor %}</ul>{% endif %}</article>
     <article><h2>Módulos aplicables</h2><div class="result-tag-list">{% for item in assessment.applicable_modules %}<span class="result-tag muted">{{ item }}</span>{% endfor %}</div><h3>Exclusiones iniciales</h3><ul>{% for item in assessment.exclusions %}<li>{{ item }}</li>{% endfor %}</ul></article>
   </div>
   {% endif %}
