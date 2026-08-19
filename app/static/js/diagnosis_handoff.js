@@ -49,7 +49,7 @@
     return true;
   }
 
-  function showHandoffNotice(form, plan, applied) {
+  function showPrefillNotice(form, applied, plan = null) {
     if (!form || (!plan && applied < 1) || form.querySelector('[data-diagnosis-prefill]')) return;
     const note = document.createElement('div');
     note.className = 'diagnosis-prefill-note';
@@ -91,7 +91,7 @@
     Object.entries(allowed).forEach(([field, select]) => {
       if (setSelectValue(select, reusable[field])) applied += 1;
     });
-    showHandoffNotice(form, plan, applied);
+    showPrefillNotice(form, applied, plan);
     return applied;
   }
 
