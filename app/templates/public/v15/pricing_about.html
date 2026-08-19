@@ -46,9 +46,9 @@
           <li>{% if plan.includes_scope3 %}<b>Alcance 3</b> incluido según configuración del plan{% else %}Alcance 3 se prioriza y cotiza cuando aplique{% endif %}</li>
           <li>{% if plan.includes_verification_portal %}Portal para preparar revisión externa{% else %}Revisión profesional según alcance contratado{% endif %}</li>
         </ul>
-        {% if plan.code == 'ESENCIAL' %}<a class="btn btn-secondary" href="/diagnostico">Validar plan Esencial →</a>
-        {% elif plan.code == 'EMPRESARIAL' %}<a class="btn btn-primary" href="/diagnostico">Evaluar plan Empresarial →</a>
-        {% elif plan.code == 'CORPORATIVO' %}<a class="btn btn-secondary" href="/diagnostico">Revisar alcance Corporativo →</a>
+        {% if plan.code == 'ESENCIAL' %}<a class="btn btn-secondary" href="/diagnostico?plan=ESENCIAL">Validar plan Esencial →</a>
+        {% elif plan.code == 'EMPRESARIAL' %}<a class="btn btn-primary" href="/diagnostico?plan=EMPRESARIAL">Evaluar plan Empresarial →</a>
+        {% elif plan.code == 'CORPORATIVO' %}<a class="btn btn-secondary" href="/diagnostico?plan=CORPORATIVO">Revisar alcance Corporativo →</a>
         {% else %}<a class="btn btn-secondary" href="/diagnostico">Confirmar alcance →</a>{% endif %}
       </article>
       {% else %}
