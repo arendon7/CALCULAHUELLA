@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+from dataclasses import replace
 
+import app.security as security
 from app.observability import MetricsRegistry
 from app.path_privacy import PUBLIC_RESULT_CANONICAL_PATH, privacy_safe_path
 from app.security import RequestContextMiddleware, SecurityHeadersMiddleware
-from app.config import settings
 
 
 TOKEN_WITHOUT_DIGITS = "OnlyLettersAnd_Underscores-NoDigitsTokenValue"
@@ -90,7 +91,11 @@ def test_v256_structured_log_never_exposes_raw_public_result_token(tmp_path, mon
             send,
         )
 
-    monkeypatch.setattr(settings, "structured_logging", True)
+    monkeypatch.setattr(
+        security,
+        "settings",
+        replace(security.settings, structured_logging=True),
+    )
     asyncio.run(exercise())
 
     record = json.loads((tmp_path / "application.jsonl").read_text(encoding="utf-8"))
