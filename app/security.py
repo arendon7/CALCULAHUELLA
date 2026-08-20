@@ -322,7 +322,7 @@ class SecurityHeadersMiddleware:
                 sensitive_prefixes = (
                     "/login", "/api/", "/inventarios", "/fuentes", "/reportes",
                     "/operacion", "/usuarios", "/aseguramiento", "/huella-producto",
-                    "/proyectos-mitigacion", "/cadena-valor",
+                    "/proyectos-mitigacion", "/cadena-valor", "/diagnostico/gracias/",
                 )
                 if path.startswith(sensitive_prefixes):
                     additions[b"cache-control"] = b"no-store"
