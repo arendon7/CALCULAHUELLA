@@ -10,6 +10,7 @@ from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 from .config import settings
+from .path_privacy import privacy_safe_path
 
 
 _RELEASE_COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
@@ -61,6 +62,7 @@ class MetricsRegistry:
 
     @staticmethod
     def _normalize_path(path: str) -> str:
+        path = privacy_safe_path(path)
         pieces = []
         for piece in path.split("/"):
             if piece.isdigit() or (len(piece) > 20 and any(char.isdigit() for char in piece)):
