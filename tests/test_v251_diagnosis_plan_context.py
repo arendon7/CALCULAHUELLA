@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PRICING = ROOT / "app" / "templates" / "public" / "v15" / "pricing_about.html"
 DIAGNOSIS = ROOT / "app" / "templates" / "public_diagnosis.html"
 THANKS = ROOT / "app" / "templates" / "public_thanks.html"
+PLAN_COPY = ROOT / "app" / "templates" / "public" / "plan_copy.html"
 HANDOFF = ROOT / "app" / "static" / "js" / "diagnosis_handoff.js"
 ENGINE = ROOT / "app" / "product_intelligence_web.py"
 SEED_DEFAULTS = ROOT / "app" / "seed_defaults.py"
@@ -52,10 +53,24 @@ def test_v251_incoming_plan_cannot_override_engine_recommendation() -> None:
     assert 'recommended_plan_code=plan' not in engine
 
 
-def test_v251_public_result_prefers_current_service_plan_presentation_truth() -> None:
+def test_v251_public_result_uses_current_public_plan_presentation_truth() -> None:
     thanks = _text(THANKS)
-    assert "{{ plan.name if plan else (assessment.package_label if assessment else lead.recommended_plan_code) }}" in thanks
-    assert "{{ plan.description if plan else (assessment.package_description if assessment else 'Sujeto a validación técnica') }}" in thanks
+    plan_copy = _text(PLAN_COPY)
+
+    assert 'from "public/plan_copy.html" import public_plan_description, public_plan_name' in thanks
+    assert "public_plan_name(lead.recommended_plan_code)" in thanks
+    assert "{{ public_plan_description(lead.recommended_plan_code) }}" in thanks
+    assert "assessment.package_label" not in thanks
+    assert "assessment.package_description" not in thanks
+    assert "plan.description" not in thanks
+
+    for code, label in (
+        ("ESENCIAL", "Huella Esencial"),
+        ("EMPRESARIAL", "Huella Empresarial"),
+        ("CORPORATIVO", "Gestión Corporativa"),
+    ):
+        assert code in plan_copy
+        assert label in plan_copy
 
     seed = _text(SEED_DEFAULTS)
     assert '("ESENCIAL", "Huella Esencial"' in seed

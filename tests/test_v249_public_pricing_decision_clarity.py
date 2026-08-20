@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / "app" / "templates"
 STATIC = ROOT / "app" / "static"
+PLAN_COPY = TEMPLATES / "public" / "plan_copy.html"
 
 
 def _text(path: Path) -> str:
@@ -14,10 +15,15 @@ def _text(path: Path) -> str:
 
 def test_v249_pricing_explains_plan_fit_without_inventing_a_recommendation() -> None:
     pricing = _text(TEMPLATES / "public" / "v15" / "pricing_about.html")
+    plan_copy = _text(PLAN_COPY)
+
+    assert 'from "public/plan_copy.html" import public_plan_description, public_plan_fit' in pricing
     assert "IDEAL PARA" in pricing
+    assert "{{ public_plan_fit(plan.code) }}" in pricing
     for fit in ("Primera huella", "Gestión continua", "Mayor exigencia"):
-        assert fit in pricing
+        assert fit in plan_copy
     assert "RECOMENDADO" not in pricing
+    assert "RECOMENDADO" not in plan_copy
     assert "v15-plan-fit" in pricing
 
 
@@ -39,7 +45,8 @@ def test_v249_plan_ctas_remain_same_origin_and_diagnosis_led() -> None:
         "Revisar alcance Corporativo",
     ):
         assert label in pricing
-    assert pricing.count('href="/diagnostico"') >= 3
+    for code in ("ESENCIAL", "EMPRESARIAL", "CORPORATIVO"):
+        assert f'href="/diagnostico?plan={code}"' in pricing
     assert "http://" not in pricing
     assert "https://" not in pricing
 
