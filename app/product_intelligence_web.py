@@ -8,7 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import CommercialLead, DiagnosticAssessment, ServicePlan, get_db
-from .public_result_access import public_result_is_expired
+from .public_result_access import public_result_access_window_label, public_result_is_expired
 from .repositories.organizations import get_organization
 from .repositories.product_intelligence import (
     get_assessment,
@@ -207,7 +207,12 @@ def register_product_intelligence_routes(
             lead.created_at,
             settings.public_result_max_age_hours,
         ):
-            raise HTTPException(404, "Diagnóstico no encontrado")
+            return templates.TemplateResponse(
+                request=request,
+                name="public_result_unavailable.html",
+                context={"app_settings": settings},
+                status_code=404,
+            )
         plan = session.scalar(select(ServicePlan).where(ServicePlan.code == lead.recommended_plan_code))
         assessment = session.scalar(
             select(DiagnosticAssessment)
@@ -223,6 +228,9 @@ def register_product_intelligence_routes(
                 "plan": plan,
                 "assessment": assessment_view(assessment),
                 "package_labels": PACKAGE_LABELS,
+                "public_result_access_window": public_result_access_window_label(
+                    settings.public_result_max_age_hours
+                ),
                 "app_settings": settings,
             },
         )
