@@ -38,6 +38,8 @@ services:
         value: "true"
       - key: PUBLIC_BASE_URL
         value: https://calcula-tu-huella-arendon7-preview.onrender.com
+      - key: PUBLIC_RESULT_MAX_AGE_HOURS
+        value: "720"
       - key: TRUSTED_HOSTS
         value: calcula-tu-huella-arendon7-preview.onrender.com,localhost,127.0.0.1
       - key: SEED_DEMO
