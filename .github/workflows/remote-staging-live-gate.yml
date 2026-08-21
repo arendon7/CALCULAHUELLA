@@ -8,6 +8,11 @@ on:
         required: true
         default: https://calcula-tu-huella-arendon7-preview.onrender.com
         type: string
+      expected_sha:
+        description: SHA Git completo que debe estar sirviendo el staging; vacío usa el commit despachado
+        required: false
+        default: ""
+        type: string
 
 permissions:
   contents: read
@@ -16,10 +21,12 @@ jobs:
   remote-staging-contract:
     name: Contrato remoto no destructivo
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     env:
       STAGING_BASE_URL: ${{ inputs.base_url }}
+      EXPECTED_GIT_COMMIT: ${{ inputs.expected_sha || github.sha }}
       REMOTE_STAGING_ARTIFACT_DIR: remote-staging-artifacts
+      REMOTE_STAGING_DEPLOY_TIMEOUT_SECONDS: "360"
 
     steps:
       - name: Checkout
@@ -36,7 +43,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install httpx==0.28.1
 
-      - name: Certificar staging remoto sin mutar datos
+      - name: Certificar staging remoto y commit desplegado sin mutar datos
         run: python -m scripts.remote_staging_contract
 
       - name: Publicar evidencia remota
