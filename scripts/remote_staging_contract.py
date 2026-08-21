@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 from pathlib import Path
 from urllib.parse import urlparse
@@ -14,8 +15,17 @@ ARTIFACT_DIR = Path(os.environ.get("REMOTE_STAGING_ARTIFACT_DIR", "remote-stagin
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 EVIDENCE_PATH = ARTIFACT_DIR / "remote-staging-evidence.json"
 STARTUP_TIMEOUT_SECONDS = float(os.environ.get("REMOTE_STAGING_STARTUP_TIMEOUT_SECONDS", "120"))
+DEPLOY_TIMEOUT_SECONDS = float(os.environ.get("REMOTE_STAGING_DEPLOY_TIMEOUT_SECONDS", "360"))
 REQUEST_TIMEOUT_SECONDS = float(os.environ.get("REMOTE_STAGING_REQUEST_TIMEOUT_SECONDS", "20"))
 POLL_INTERVAL_SECONDS = float(os.environ.get("REMOTE_STAGING_POLL_INTERVAL_SECONDS", "3"))
+EXPECTED_GIT_COMMIT = os.environ.get("EXPECTED_GIT_COMMIT", "").strip().lower()
+_GIT_COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{40}$")
+_RELEASE_COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
+
+
+def _normalize_release_commit(value: object) -> str:
+    candidate = str(value or "").strip().lower()
+    return candidate if _RELEASE_COMMIT_PATTERN.fullmatch(candidate) else ""
 
 
 def _assert_safe_target() -> None:
@@ -24,6 +34,8 @@ def _assert_safe_target() -> None:
         raise AssertionError(f"El staging remoto debe usar HTTPS: {BASE_URL}")
     if not parsed.netloc:
         raise AssertionError(f"STAGING_BASE_URL inválida: {BASE_URL}")
+    if EXPECTED_GIT_COMMIT and not _GIT_COMMIT_PATTERN.fullmatch(EXPECTED_GIT_COMMIT):
+        raise AssertionError("EXPECTED_GIT_COMMIT debe ser un SHA Git completo de 40 caracteres hexadecimales")
 
 
 def _timed_get(client: httpx.Client, path: str) -> tuple[httpx.Response, int]:
@@ -70,6 +82,59 @@ def _wait_for_staging_health(client: httpx.Client) -> tuple[httpx.Response, dict
         time.sleep(min(POLL_INTERVAL_SECONDS, remaining))
 
 
+def _wait_for_expected_release(
+    client: httpx.Client,
+    first_payload: dict[str, object] | None = None,
+) -> dict[str, object]:
+    """Wait until the healthy staging surface proves it serves the expected commit."""
+
+    if not EXPECTED_GIT_COMMIT:
+        return {"status": "skipped", "reason": "EXPECTED_GIT_COMMIT no configurado"}
+
+    started = time.perf_counter()
+    deadline = started + DEPLOY_TIMEOUT_SECONDS
+    attempts = 0
+    last_seen = "ausente"
+    payload = first_payload
+
+    while True:
+        attempts += 1
+        try:
+            if payload is None:
+                response = client.get("/api/health", timeout=REQUEST_TIMEOUT_SECONDS)
+                if response.status_code != 200:
+                    last_seen = f"HTTP {response.status_code}"
+                else:
+                    payload = response.json()
+
+            if isinstance(payload, dict):
+                served_commit = _normalize_release_commit(payload.get("release_commit"))
+                if served_commit:
+                    last_seen = served_commit
+                    if served_commit == EXPECTED_GIT_COMMIT:
+                        return {
+                            "status": "matched",
+                            "expected_commit": EXPECTED_GIT_COMMIT,
+                            "served_commit": served_commit,
+                            "attempts": attempts,
+                            "elapsed_ms": round((time.perf_counter() - started) * 1000),
+                        }
+                else:
+                    last_seen = "release_commit ausente o inválido"
+        except (ValueError, httpx.TimeoutException, httpx.TransportError) as exc:
+            last_seen = f"{type(exc).__name__}: {exc}"
+
+        remaining = deadline - time.perf_counter()
+        if remaining <= 0:
+            raise AssertionError(
+                f"Render no sirvió el commit esperado {EXPECTED_GIT_COMMIT} en "
+                f"{DEPLOY_TIMEOUT_SECONDS:.0f}s después de {attempts} intento(s). "
+                f"Última identidad observada: {last_seen}"
+            )
+        payload = None
+        time.sleep(min(POLL_INTERVAL_SECONDS, remaining))
+
+
 def _csrf_headers(token: str) -> dict[str, str]:
     return {"x-csrf-token": token}
 
@@ -92,11 +157,16 @@ def _assert_secure_csrf_cookie() -> dict[str, object]:
 
 def main() -> None:
     _assert_safe_target()
-    evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v2"}
+    evidence: dict[str, object] = {"base_url": BASE_URL, "contract": "non-mutating-remote-staging-v3"}
 
     with httpx.Client(base_url=BASE_URL, timeout=REQUEST_TIMEOUT_SECONDS, follow_redirects=False) as client:
         _, health_evidence = _wait_for_staging_health(client)
         evidence["health"] = health_evidence
+        health_payload = health_evidence.get("payload")
+        evidence["release_identity"] = _wait_for_expected_release(
+            client,
+            first_payload=health_payload if isinstance(health_payload, dict) else None,
+        )
         evidence["csrf_cookie"] = _assert_secure_csrf_cookie()
 
         for path, marker, key in (
