@@ -45,9 +45,12 @@ def test_v258_unavailable_result_is_generic_noindex_and_recoverable():
 
 def test_v258_missing_and_expired_links_share_the_same_404_surface():
     routes = _read(ROUTES)
+    public_result_route = routes.split(
+        '@app.get("/diagnostico/gracias/{token}", response_class=HTMLResponse)', 1
+    )[1].split('@app.get("/inteligencia-producto", response_class=HTMLResponse)', 1)[0]
 
-    assert "if not lead or public_result_is_expired(" in routes
-    assert 'name="public_result_unavailable.html"' in routes
-    assert "status_code=404" in routes
-    assert 'raise HTTPException(404, "Diagnóstico no encontrado")' not in routes
-    assert '"public_result_access_window": public_result_access_window_label(' in routes
+    assert "if not lead or public_result_is_expired(" in public_result_route
+    assert 'name="public_result_unavailable.html"' in public_result_route
+    assert "status_code=404" in public_result_route
+    assert 'raise HTTPException(404, "Diagnóstico no encontrado")' not in public_result_route
+    assert '"public_result_access_window": public_result_access_window_label(' in public_result_route
