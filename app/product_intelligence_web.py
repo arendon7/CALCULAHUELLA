@@ -8,6 +8,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .database import CommercialLead, DiagnosticAssessment, ServicePlan, get_db
+from .public_result_access import public_result_is_expired
 from .repositories.organizations import get_organization
 from .repositories.product_intelligence import (
     get_assessment,
@@ -202,7 +203,10 @@ def register_product_intelligence_routes(
     @app.get("/diagnostico/gracias/{token}", response_class=HTMLResponse)
     def diagnostic_thanks(token: str, request: Request, session: Session = Depends(get_db)):
         lead = session.scalar(select(CommercialLead).where(CommercialLead.public_token == token))
-        if not lead:
+        if not lead or public_result_is_expired(
+            lead.created_at,
+            settings.public_result_max_age_hours,
+        ):
             raise HTTPException(404, "Diagnóstico no encontrado")
         plan = session.scalar(select(ServicePlan).where(ServicePlan.code == lead.recommended_plan_code))
         assessment = session.scalar(
