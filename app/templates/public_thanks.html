@@ -43,7 +43,7 @@
       <article><span>3</span><strong>Activar el inventario</strong><p>Configurar el periodo, cargar datos piloto y validar el primer cálculo trazable.</p></article>
     </div>
     <ol>{% if assessment %}{% for item in assessment.next_steps %}<li>{{ item }}</li>{% endfor %}{% else %}<li>Revisar las fuentes probables y la información disponible.</li><li>Validar el alcance mediante una conversación técnica.</li><li>Preparar entregables, tiempos y responsabilidades.</li>{% endif %}</ol>
-    <div class="method-note"><strong>Tu diagnóstico quedó registrado.</strong><p>Queda disponible como solicitud para seguimiento comercial y técnico. Este resultado no crea una cuenta ni activa una licencia por sí solo.</p></div>
+    <div class="method-note"><strong>Tu diagnóstico quedó registrado.</strong><p>Queda disponible como solicitud para seguimiento comercial y técnico. Este enlace público tiene vigencia limitada a {{ public_result_access_window }}; esa vigencia no significa que el registro se elimine al vencer. Este resultado no crea una cuenta ni activa una licencia por sí solo.</p></div>
     <div class="result-actions"><button class="button secondary large" type="button" data-print-result>Imprimir o guardar PDF</button><a class="button secondary large" href="/diagnostico">Realizar otro diagnóstico</a><a class="button primary large" href="/#precios">Revisar planes y precios</a></div>
     <p class="privacy-note">¿Ya tienes una cuenta? <a href="/login">Ingresar a la plataforma</a></p>
   </div>
