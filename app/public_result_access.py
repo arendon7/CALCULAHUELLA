@@ -9,6 +9,14 @@ def _as_utc(value: datetime) -> datetime:
     return value.astimezone(UTC)
 
 
+def public_result_access_window_label(max_age_hours: int) -> str:
+    """Return a human-readable label for the configured public-link window."""
+    if max_age_hours > 0 and max_age_hours % 24 == 0:
+        days = max_age_hours // 24
+        return f"{days} día" if days == 1 else f"{days} días"
+    return f"{max_age_hours} hora" if max_age_hours == 1 else f"{max_age_hours} horas"
+
+
 def public_result_is_expired(
     created_at: datetime | None,
     max_age_hours: int,
