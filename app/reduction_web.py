@@ -136,26 +136,60 @@ def register_reduction_routes(
         set_flash(request, "Acción actualizada.")
         return RedirectResponse("/reduccion", status_code=303)
 
-    @app.get("/reduccion", response_class=HTMLResponse)
-    def reduction_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-        inventory = get_inventory(session, user)
+    def _render_reduction(
+        request: Request,
+        session: Session,
+        user: dict,
+        inventory,
+        *,
+        scoped_workspace: bool,
+    ):
         legacy_summary = reduction_summary(session, inventory.id)
         portfolio = portfolio_summary(session, inventory)
+        render_user = user
+        if scoped_workspace:
+            render_user = dict(user)
+            render_user["can_manage_inventory"] = False
         return templates.TemplateResponse(
             request=request,
             name="reduction.html",
             context=common_context(
-                request, session, user, "reduction", inventory=inventory, sources=inventory.sources,
-                targets=inventory.targets, portfolio=portfolio, **legacy_summary,
+                request, session, render_user, "reduction", inventory=inventory, sources=inventory.sources,
+                targets=inventory.targets, portfolio=portfolio, scoped_workspace=scoped_workspace, **legacy_summary,
             ),
         )
 
+    @app.get("/reduccion", response_class=HTMLResponse)
+    def reduction_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        return _render_reduction(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=False,
+        )
+
+    @app.get("/inventarios/{inventory_id}/reduccion", response_class=HTMLResponse)
+    def inventory_reduction_page(
+        inventory_id: int,
+        request: Request,
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        inventory = get_inventory(session, user, inventory_id)
+        return _render_reduction(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=True,
+        )
 
     @app.get("/api/reduccion/resumen")
     def reduction_portfolio_api(session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
         return portfolio_json(portfolio_summary(session, inventory))
-
 
     @app.get("/reduccion/exportar.xlsx")
     def export_reduction_portfolio(session: Session = Depends(get_db), user: dict = Depends(require_user)):

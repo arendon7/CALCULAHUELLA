@@ -1,12 +1,14 @@
 {% extends "base.html" %}
-{% block title %}Consolidación V1.0 · Calcula tu Huella{% endblock %}
-{% block page_label %}Producto / Consolidación y auditoría{% endblock %}
+{% block title %}Gobierno de release · Calcula tu Huella{% endblock %}
+{% block page_label %}Producto / Gobierno de release y auditoría{% endblock %}
 {% block content %}
+{% set identity = summary.release_candidate.identity %}
+{% set snapshot = identity.canonical_snapshot %}
 <section class="page-heading consolidation-heading">
   <div>
     <span class="eyebrow">CONSOLIDACIÓN, AUDITORÍA Y ARQUITECTURA</span>
-    <h1>V1.0 final y puerta de producción</h1>
-    <p>Confirma el cierre funcional, la aceptación metodológica y jurídica interna, y separa el despliegue controlado de la producción pública.</p>
+    <h1>Gobierno de release e identidad técnica</h1>
+    <p>Distingue la versión técnica de la aplicación, la línea de certificación web y el snapshot histórico de canonicalización antes de tomar decisiones de liberación.</p>
   </div>
   <div class="page-actions">
     <a class="button secondary" href="/modulos">Mapa del producto</a>
@@ -15,7 +17,7 @@
 </section>
 
 <section class="kpi-grid five consolidation-kpis">
-  <article class="kpi-card featured"><div class="kpi-icon green">V1</div><div><small>CIERRE FUNCIONAL</small><strong>{{ summary.readiness_score }} %</strong><p>El porcentaje refleja gobierno interno; la producción pública conserva controles externos.</p></div></article>
+  <article class="kpi-card featured"><div class="kpi-icon green">1.0</div><div><small>CIERRE FUNCIONAL</small><strong>{{ summary.readiness_score }} %</strong><p>El porcentaje refleja gobierno interno; la producción pública conserva controles externos.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">▦</div><div><small>MÓDULOS REGISTRADOS</small><strong>{{ summary.module_count }}</strong><p>Tres capas de producto.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">!</div><div><small>HALLAZGOS ABIERTOS</small><strong>{{ summary.open_findings }}</strong><p>{{ summary.critical_open }} críticos.</p></div></article>
   <article class="kpi-card"><div class="kpi-icon">◆</div><div><small>PUERTAS APROBADAS</small><strong>{{ summary.approved_gates }}/{{ summary.gate_count }}</strong><p>Condiciones mínimas de salida.</p></div></article>
@@ -27,12 +29,31 @@
   <p>No se agregan nuevos dominios funcionales. Cada cambio debe reducir deuda, mejorar confiabilidad metodológica, validar un recorrido o cerrar una condición de salida.</p>
 </section>
 
+<section class="card" id="identidad-release">
+  <div class="card-head">
+    <div><small>IDENTIDAD DE RELEASE</small><h3>Tres referencias con funciones distintas</h3></div>
+    <span class="consolidation-status status-aprobado">Sin versionado artificial</span>
+  </div>
+  <p class="helper-text">La evolución de la web no cambia automáticamente la versión semántica de la aplicación. El SHA certificado de cada iteración vive en CI, Render y el PR de certificación, evitando que un commit tenga que autorreferenciarse.</p>
+  <div class="architecture-metrics">
+    <div><small>Versión de aplicación</small><strong>{{ identity.application_version }}</strong><span>Contrato técnico, runtime y paquete</span></div>
+    <div><small>Línea de certificación web</small><strong>{{ identity.web_certification_line }}</strong><span>{{ identity.web_certification_source }}</span></div>
+    <div><small>Snapshot canónico histórico</small><strong>{{ snapshot.release_id or 'No disponible' }}</strong><span>{{ snapshot.canonical_date or 'Sin fecha' }}</span></div>
+    <div><small>Migración del snapshot</small><strong>{{ snapshot.migration_head or 'No registrada' }}</strong><span>Referencia histórica; no representa por sí sola el head actual</span></div>
+  </div>
+  {% if snapshot.status == 'available' %}
+  <p class="helper-text">El snapshot <strong>{{ snapshot.release_id }}</strong> conserva la evidencia de canonicalización del {{ snapshot.canonical_date }} para la versión técnica {{ snapshot.application_version }}. Se mantiene como historia auditable; la certificación web posterior se demuestra por sus propios gates.</p>
+  {% else %}
+  <p class="alert warning">El manifest histórico RELEASE_CANONICA.json no está disponible o no es legible. La versión técnica activa continúa siendo {{ identity.application_version }}.</p>
+  {% endif %}
+</section>
+
 <section class="card" id="candidata-v1">
   <div class="card-head">
-    <div><small>V1.0.0 FINAL · ALCANCE CONGELADO</small><h3>Puerta de liberación verificable</h3></div>
+    <div><small>VERSIÓN DE APLICACIÓN {{ identity.application_version }} · CONTRATO TÉCNICO</small><h3>Puerta de liberación verificable</h3></div>
     <span class="consolidation-status {{ 'status-aprobado' if summary.release_candidate.controlled_release_ready else ('status-en-revision' if summary.release_candidate.package_ready else 'status-bloqueado') }}">{{ summary.release_candidate.status }}</span>
   </div>
-  <p class="helper-text">La V1.0 final puede utilizarse en despliegues controlados con acompañamiento. La producción pública exige además infraestructura real, pruebas físicas de Windows e intervención de seguridad independiente.</p>
+  <p class="helper-text">Este bloque evalúa el release técnico 1.0.0 con su evidencia V1 preservada. La línea web {{ identity.web_certification_line }} se certifica separadamente mediante CI y Render. La producción pública exige además infraestructura real, pruebas físicas de Windows e intervención de seguridad independiente.</p>
   <div class="architecture-metrics">
     <div><small>Paquete interno</small><strong>{{ 'APROBADO' if summary.release_candidate.package_ready else 'PENDIENTE' }}</strong></div>
     <div><small>Aceptación interna</small><strong>{{ 'APROBADO' if summary.release_candidate.internal_ready else 'PENDIENTE' }}</strong></div>
@@ -128,7 +149,7 @@
 </section>
 
 <section class="card" id="puertas">
-  <div class="card-head"><div><small>GOBIERNO DE RELEASE</small><h3>Puertas obligatorias antes de V1.0</h3></div><span class="counter">{{ summary.approved_gates }} aprobadas</span></div>
+  <div class="card-head"><div><small>GOBIERNO DE RELEASE</small><h3>Puertas del release técnico {{ identity.application_version }}</h3></div><span class="counter">{{ summary.approved_gates }} aprobadas</span></div>
   <div class="responsive-table">
     <table class="consolidation-table">
       <thead><tr><th>Código</th><th>Categoría</th><th>Condición</th><th>Estado</th><th>Responsable</th><th>Evidencia</th><th>Control</th></tr></thead>

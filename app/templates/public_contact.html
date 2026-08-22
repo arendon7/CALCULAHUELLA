@@ -1,0 +1,76 @@
+{% extends "public_base.html" %}
+{% block title %}Solicitar revisión | Calcula tu Huella{% endblock %}
+{% block content %}
+<section class="contact-page">
+  <div class="container contact-page-grid">
+    <div class="contact-page-copy">
+      <span class="contact-kicker">Revisión profesional</span>
+      <h1>Convierte la ruta orientativa en una conversación con contexto.</h1>
+      <p>Los datos personales se solicitan únicamente aquí, dentro de la aplicación de Calcula tu Huella. GitHub Pages no recibe ni almacena nombre, correo o teléfono.</p>
+
+      {% if route_context.plan or route_context.sector or route_context.sites or route_context.objective %}
+      <aside class="contact-route-context" aria-label="Contexto recibido del diagnóstico público">
+        <strong>Contexto transferido desde el diagnóstico</strong>
+        <dl>
+          {% if route_context.plan %}<div><dt>Ruta</dt><dd>{{ route_context.plan }}</dd></div>{% endif %}
+          {% if route_context.sector %}<div><dt>Sector</dt><dd>{{ route_context.sector }}</dd></div>{% endif %}
+          {% if route_context.sites %}<div><dt>Sedes</dt><dd>{{ route_context.sites }}</dd></div>{% endif %}
+          {% if route_context.objective %}<div><dt>Objetivo</dt><dd>{{ route_context.objective }}</dd></div>{% endif %}
+        </dl>
+        <p>Este contexto no contiene PII y será validado nuevamente antes de almacenarse.</p>
+      </aside>
+      {% endif %}
+
+      <div class="contact-trust-note">
+        <strong>Qué ocurrirá al enviar</strong>
+        <p>Crearemos una solicitud comercial para responderte. El consentimiento de privacidad es obligatorio; las comunicaciones comerciales son opcionales.</p>
+      </div>
+    </div>
+
+    <div class="contact-page-panel">
+      {% if contact_sent %}
+      <div class="contact-success" role="status">
+        <span>Solicitud recibida</span>
+        <h2>Ya tenemos tu solicitud.</h2>
+        <p>El equipo podrá revisar el contexto enviado y responder usando los datos que autorizaste.</p>
+        <div class="contact-actions"><a class="btn btn-primary" href="/diagnostico">Volver al diagnóstico</a><a class="btn btn-secondary" href="/">Ir al inicio</a></div>
+      </div>
+      {% else %}
+      <form class="contact-form" method="post" action="/contacto">
+        <input type="hidden" name="_csrf_token" value="{{ request.state.csrf_token }}">
+        <input type="hidden" name="sector" value="{{ route_context.sector }}">
+        <input type="hidden" name="interest" value="{{ route_context.plan }}">
+
+        <label>Empresa
+          <input name="company_name" required minlength="2" autocomplete="organization">
+        </label>
+        <label>Nombre de contacto
+          <input name="contact_name" required minlength="2" autocomplete="name">
+        </label>
+        <label>Correo
+          <input name="email" type="email" required autocomplete="email">
+        </label>
+        <label>Teléfono <span>Opcional</span>
+          <input name="phone" autocomplete="tel">
+        </label>
+        <label class="contact-form-wide">Cuéntanos qué necesitas resolver
+          <textarea name="message" required minlength="12" rows="6">{% if route_context.plan %}Quiero revisar la ruta {{ route_context.plan }}{% if route_context.objective %} para {{ route_context.objective|lower }}{% endif %}.{% endif %}</textarea>
+        </label>
+        <label class="contact-consent contact-form-wide">
+          <input type="checkbox" name="accept_privacy" value="yes" required>
+          <span>Autorizo el tratamiento de estos datos para responder mi solicitud. <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">Ver política de privacidad</a>.</span>
+        </label>
+        <label class="contact-consent contact-form-wide">
+          <input type="checkbox" name="accept_commercial" value="yes">
+          <span>Acepto recibir comunicaciones comerciales relacionadas con el servicio. Es opcional.</span>
+        </label>
+        <div class="contact-submit contact-form-wide">
+          <button class="btn btn-primary" type="submit">Solicitar revisión profesional</button>
+          <a href="/diagnostico">Volver al diagnóstico</a>
+        </div>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+</section>
+{% endblock %}

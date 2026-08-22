@@ -22,6 +22,7 @@ from starlette.datastructures import Headers
 from starlette.responses import Response
 
 from .config import INSTANCE_DIR, settings
+from .path_privacy import is_public_result_path, privacy_safe_path
 
 PBKDF2_ITERATIONS = max(int(os.environ.get("PBKDF2_ITERATIONS", "390000")), 10_000)
 SAFE_METHODS = {"GET", "HEAD", "OPTIONS", "TRACE"}
@@ -279,7 +280,7 @@ class RequestContextMiddleware:
                 "timestamp": datetime.now(UTC).isoformat(),
                 "request_id": request_id,
                 "method": scope.get("method", ""),
-                "path": path,
+                "path": privacy_safe_path(path),
                 "status": status_code,
                 "duration_ms": elapsed_ms,
                 "client_hash": hashlib.sha256(_client_ip(scope).encode("utf-8")).hexdigest()[:16],
@@ -302,12 +303,16 @@ class SecurityHeadersMiddleware:
     async def __call__(self, scope, receive, send):
         async def send_headers(message):
             if message.get("type") == "http.response.start":
+                path = str(scope.get("path", ""))
+                public_result = is_public_result_path(path)
                 headers = list(message.get("headers", []))
+                if public_result:
+                    headers = [(key, value) for key, value in headers if key.lower() != b"referrer-policy"]
                 existing = {key.lower() for key, _ in headers}
                 additions = {
                     b"x-content-type-options": b"nosniff",
                     b"x-frame-options": b"DENY",
-                    b"referrer-policy": b"strict-origin-when-cross-origin",
+                    b"referrer-policy": b"no-referrer" if public_result else b"strict-origin-when-cross-origin",
                     b"permissions-policy": b"camera=(), microphone=(), geolocation=(), payment=()",
                     b"cross-origin-opener-policy": b"same-origin",
                     b"cross-origin-resource-policy": b"same-origin",
@@ -318,13 +323,12 @@ class SecurityHeadersMiddleware:
                         b"frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
                     ),
                 }
-                path = str(scope.get("path", ""))
                 sensitive_prefixes = (
                     "/login", "/api/", "/inventarios", "/fuentes", "/reportes",
                     "/operacion", "/usuarios", "/aseguramiento", "/huella-producto",
                     "/proyectos-mitigacion", "/cadena-valor",
                 )
-                if path.startswith(sensitive_prefixes):
+                if public_result or path.startswith(sensitive_prefixes):
                     additions[b"cache-control"] = b"no-store"
                 if settings.is_production and settings.session_https_only:
                     additions[b"strict-transport-security"] = b"max-age=31536000; includeSubDomains"

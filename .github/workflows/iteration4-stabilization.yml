@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - refactor/v1-9-0-core-surfaces
+      - stabilization/v2-0-0-product-readiness
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
@@ -70,6 +71,8 @@ jobs:
             tests/test_v200_postgres_continuity_gate.py \
             tests/test_v200_postgres_schema_compatibility.py \
             tests/test_v200_postgres_methodology_schema.py \
+            tests/test_v210_brand_provenance.py \
+            tests/test_v210_brand_package.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía

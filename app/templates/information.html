@@ -6,27 +6,43 @@
   <div>
     <p class="breadcrumb">{{ inventory.name }} / Información</p>
     <h1>Datos y evidencias</h1>
-    <p>Consulta el historial consolidado, gestiona solicitudes y conserva cada soporte. Para registrar información nueva usa la captura guiada.</p>
+    <p>Consulta el historial consolidado, gestiona solicitudes y conserva cada soporte. La plataforma prioriza la tarea que corresponde a tu rol y al estado del periodo que estás trabajando.</p>
   </div>
   <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
     <details class="head-action-menu">
       <summary class="btn btn-outline">Otras formas de carga</summary>
       <div><a href="/informacion/plantilla.xlsx">Descargar plantilla sectorial</a><a href="/informacion/importar">Importar archivo Excel</a></div>
     </details>
-    <a class="btn btn-primary" href="/captura-guiada">Registrar un dato</a>
+    {% if user.can_provide_data %}<a class="btn btn-primary" href="/captura-guiada">Registrar un dato</a>{% endif %}
   </div>
 </div>
+
+<section class="work-command information-command">
+  <div class="work-command-main">
+    <span class="eyebrow">{{ information_focus.eyebrow }}</span>
+    <h2>{{ information_focus.title }}</h2>
+    <p>{{ information_focus.detail }}</p>
+    <div class="work-command-meta"><span><b>Tu rol:</b> {{ role_profile.name }}</span><span><b>Solicitudes abiertas:</b> {{ open_requests|length }}</span></div>
+  </div>
+  <div class="work-command-action">
+    <small>TU FOCO AHORA</small>
+    <strong>{{ information_focus.task|capitalize }}</strong>
+    <span>Las demás tareas siguen disponibles debajo.</span>
+    <a class="btn btn-primary" href="{{ information_focus.href }}">{{ information_focus.action }} →</a>
+  </div>
+</section>
 
 <div class="source-summary-grid data-summary-grid">
   <article class="mini-card"><small>REGISTROS</small><strong>{{ records|length }}</strong><p>Datos de actividad</p></article>
   <article class="mini-card"><small>EVIDENCIAS</small><strong>{{ documents|length }}</strong><p>Archivos protegidos</p></article>
   <article class="mini-card"><small>CALIDAD A–B</small><strong>{{ quality_counts.A + quality_counts.B }}</strong><p>Datos confiables</p></article>
-  <article class="mini-card"><small>SOLICITUDES ABIERTAS</small><strong>{{ requests|rejectattr('status','equalto','Completado')|list|length }}</strong><p>Requieren gestión</p></article>
+  <article class="mini-card"><small>SOLICITUDES ABIERTAS</small><strong>{{ open_requests|length }}</strong><p>Requieren gestión</p></article>
 </div>
 
-<nav class="task-jumpbar" aria-label="Tareas de información" data-task-tabs="information" data-default-task="datos">
+<nav class="task-jumpbar" aria-label="Tareas de información" data-task-tabs="information" data-default-task="{{ information_focus.task }}">
   <a href="#datos" data-task-target="datos"><span>1</span><strong>Registrar datos</strong><small>Valor, periodo y fuente</small></a>
-  <a href="#solicitudes" data-task-target="solicitudes"><span>2</span><strong>Solicitar información</strong><small>Responsables y vencimientos</small></a>
+  <a href="#solicitudes" data-task-target="solicitudes"><span>2</span><strong>Gestionar solicitudes</strong><small>Responsables y vencimientos</small></a>
   <a href="#evidencias" data-task-target="evidencias"><span>3</span><strong>Gestionar evidencias</strong><small>Soportes e integridad</small></a>
 </nav>
 
@@ -101,7 +117,7 @@
 </section>
 
 <section class="section-anchor task-panel" id="solicitudes" data-task-panel="solicitudes">
-  <div class="section-title-row"><div><span class="section-number">2</span><div><small>FLUJO DE INFORMACIÓN</small><h2>Solicitudes al cliente</h2></div></div></div>
+  <div class="section-title-row"><div><span class="section-number">2</span><div><small>FLUJO DE INFORMACIÓN</small><h2>Solicitudes de información</h2></div></div></div>
   <div class="information-layout">
     <section class="card">
       <div class="request-list">{% for item in requests %}
@@ -113,7 +129,7 @@
             <button class="tiny-button">Guardar</button>
           </form>
         </article>
-      {% else %}<div class="inline-empty"><strong>Sin solicitudes abiertas</strong></div>{% endfor %}</div>
+      {% else %}<div class="inline-empty"><strong>Sin solicitudes registradas</strong></div>{% endfor %}</div>
     </section>
 
     {% if user.can_manage_sources %}<aside class="card sticky-form progressive-action-card"><details class="task-form-disclosure" data-exclusive-details="information-create"><summary><div><small>NUEVA SOLICITUD</small><strong>Pedir información</strong><span>Abre el formulario solo cuando necesites asignar un requerimiento.</span></div><b>Crear</b></summary><form method="post" action="/informacion/solicitudes/nueva" class="stack-form">

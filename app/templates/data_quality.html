@@ -86,6 +86,12 @@
 </div>
 
 {% if summary.selected %}
+{% if selected_inventory %}
+<section class="card architecture-note" style="margin-top:16px" data-selected-batch-context>
+  <div><span>↳</span><p><strong>Lote vinculado a {{ selected_inventory.name }}.</strong><small>{{ selected_inventory.start_date.strftime('%d/%m/%Y') }} – {{ selected_inventory.end_date.strftime('%d/%m/%Y') }}. Este contexto aplica al detalle del lote seleccionado; los KPI superiores resumen el centro de calidad y no deben interpretarse como métricas exclusivas de este periodo.</small></p></div>
+  <a href="/inventarios/{{ selected_inventory.id }}">Abrir expediente del periodo →</a>
+</section>
+{% endif %}
 <section class="card" style="margin-top:16px">
   <div class="card-head">
     <div><small>DETALLE DEL LOTE</small><h3>{{ summary.selected.code }} · {{ summary.selected.filename }}</h3></div>

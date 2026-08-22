@@ -4,7 +4,34 @@
 {% block content %}
 <div class="page-head"><div><p class="breadcrumb">Fuentes / {{ source.category }} / {{ source.name }}</p><h1>{{ source.name }} <span class="status-chip {{ 'complete' if source.status == 'Completado' else 'progressing' if source.status == 'En progreso' else 'pending' }}">{{ source.status }}</span></h1><p>{{ source.facility.name if source.facility else 'Nivel corporativo' }} · {{ source.responsible }} · materialidad {{ source.materiality|lower }}</p></div><div class="head-actions"><a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/fuentes">Volver</a>{% if user.can_view_methodology %}<form method="post" action="/fuentes/{{ source.id }}/recalcular"><button class="btn btn-primary">↻ Recalcular</button></form>{% endif %}</div></div>
 
-<div class="calculation-notice notice-success"><span>TRAZABLE</span><p><strong>Dato, conversión, factor, gas, GWP y resultado ya están conectados.</strong><small>Los factores precargados son demostrativos; la trazabilidad del motor sí es funcional.</small></p></div>
+{% set factor_state = namespace(pending=0, applied_records=0, missing_records=0) %}
+{% for item in all_records %}
+  {% set record_factor = namespace(applied=false) %}
+  {% for selection in item.factor_selections %}
+    {% if selection.active and selection.selection_status in ['Propuesto','Requiere ajuste'] %}
+      {% set factor_state.pending = factor_state.pending + 1 %}
+    {% elif selection.active and selection.selection_status in ['Aprobado','Seleccionado'] %}
+      {% set record_factor.applied = true %}
+    {% endif %}
+  {% endfor %}
+  {% if record_factor.applied %}{% set factor_state.applied_records = factor_state.applied_records + 1 %}{% endif %}
+  {% if not assignments and not record_factor.applied %}{% set factor_state.missing_records = factor_state.missing_records + 1 %}{% endif %}
+{% endfor %}
+{% set focus = namespace(task='resultado', label='RESULTADO TRAZABLE', title='Dato, factor y resultado están conectados.', detail='La cadena de cálculo está disponible; revisa la aptitud documental del factor antes de usar el resultado en un reporte formal.', success=true, href='#resultado-gases', cta='Revisar resultado') %}
+{% if summary.errors %}
+  {% set focus.task = 'memoria' %}{% set focus.label = 'CORREGIR CÁLCULO' %}{% set focus.title = 'El motor encontró errores que deben corregirse antes de confiar en el resultado.' %}{% set focus.detail = 'La memoria de cálculo muestra la fórmula, la conversión y el motivo del error para resolverlo sin perder trazabilidad.' %}{% set focus.success = false %}{% set focus.href = '#memoria-calculo' %}{% set focus.cta = 'Ver errores' %}
+{% elif record_total == 0 %}
+  {% set focus.task = 'datos' %}{% set focus.label = 'SIGUIENTE TAREA' %}{% set focus.title = 'Carga el primer dato de actividad de esta fuente.' %}{% set focus.detail = 'Sin periodo, valor y unidad todavía no existe una base sobre la cual elegir factor ni calcular emisiones.' %}{% set focus.success = false %}{% set focus.href = '#datos-actividad' %}{% set focus.cta = 'Revisar datos' %}
+{% elif factor_state.pending %}
+  {% set focus.task = 'factor' %}{% set focus.label = 'DECISIÓN METODOLÓGICA' %}{% set focus.title = 'Hay propuestas de factor pendientes de revisión.' %}{% set focus.detail = 'Una propuesta no afecta el cálculo hasta que la revisión confirme unidad, representatividad y ausencia de doble conteo.' %}{% set focus.success = false %}{% set focus.href = '#conversacion-tecnica' %}{% set focus.cta = 'Revisar factores' %}
+{% elif factor_state.missing_records %}
+  {% set focus.task = 'factor' %}{% set focus.label = 'SIGUIENTE TAREA' %}{% set focus.title = 'Falta un factor aplicable para convertir los datos en emisiones.' %}{% set focus.detail = 'Selecciona un factor aprobado para la fuente o documenta una decisión específica para el dato antes de calcular.' %}{% set focus.success = false %}{% set focus.href = '#conversacion-tecnica' %}{% set focus.cta = 'Resolver factor' %}
+{% elif summary.alerts or summary.warnings %}
+  {% set focus.task = 'memoria' %}{% set focus.label = 'VALIDAR ALERTAS' %}{% set focus.title = 'El cálculo existe, pero conserva alertas metodológicas que requieren revisión.' %}{% set focus.detail = 'Revisa vigencia, representatividad, documentación e incertidumbre antes de cerrar esta fuente.' %}{% set focus.success = false %}{% set focus.href = '#memoria-calculo' %}{% set focus.cta = 'Revisar alertas' %}
+{% elif not summary.calculations %}
+  {% set focus.task = 'resultado' %}{% set focus.label = 'GENERAR RESULTADO' %}{% set focus.title = 'La fuente tiene datos y factor, pero aún no hay un resultado calculado.' %}{% set focus.detail = 'El cálculo debe generarse y quedar persistido antes de considerar esta fuente lista para revisión.' %}{% set focus.success = false %}{% set focus.href = '#resultado-gases' %}{% set focus.cta = 'Abrir resultado' %}
+{% endif %}
+<div class="calculation-notice{% if focus.success %} notice-success{% endif %}" data-source-focus="{{ focus.task }}"><span>{{ focus.label }}</span><p><strong>{{ focus.title }}</strong><small>{{ focus.detail }}</small></p><a class="tiny-link" href="{{ focus.href }}">{{ focus.cta }}</a></div>
 
 {% if user.can_manage_sources %}
 <details class="card source-config-panel" data-exclusive-details="source-settings">
@@ -52,7 +79,7 @@
   <article class="mini-card"><small>ESTADO DEL MOTOR</small><strong>{% if summary.errors %}{{ summary.errors }} errores{% elif summary.alerts %}{{ summary.alerts }} alertas{% else %}OK{% endif %}</strong><p>{{ summary.calculations|length }} componentes</p></article>
 </div>
 
-<nav class="task-jumpbar source-detail-taskbar" aria-label="Etapas de revisión de la fuente" data-task-tabs="source-detail" data-default-task="datos">
+<nav class="task-jumpbar source-detail-taskbar" aria-label="Etapas de revisión de la fuente" data-task-tabs="source-detail" data-default-task="{{ focus.task }}">
   <a href="#datos-actividad" data-task-target="datos"><span>1</span><strong>Datos</strong><small>Periodo, unidad y soporte</small></a>
   <a href="#conversacion-tecnica" data-task-target="factor"><span>2</span><strong>Factor</strong><small>Comparación y decisión</small></a>
   <a href="#factores-predeterminados" data-task-target="factor"><span>3</span><strong>Predeterminados</strong><small>Componentes heredados</small></a>
@@ -135,13 +162,13 @@
     </details>
   </div>
 
-  <aside class="card trace-card"><h3>Trazabilidad completa</h3>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Dato</strong><p>{{ record_total }} registros persistentes.</p></div></div>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Conversión</strong><p>{{ calculation.conversion }}</p></div></div>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Factor</strong><p>{{ assignments|length }} versiones activas.</p></div></div>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>GWP</strong><p>{{ inventory.gwp_version }}.</p></div></div>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Fórmula</strong><p>Cada cálculo conserva su instantánea.</p></div></div>
-    <div class="trace-item"><span class="trace-real">✓</span><div><strong>Revisión y aprobación</strong><p>Flujo de revisión y aprobación disponible.</p></div></div>
+  <aside class="card trace-card"><h3>Cadena de trazabilidad</h3>
+    <div class="trace-item"><span class="{{ 'trace-real' if record_total else 'trace-partial' }}">{{ '✓' if record_total else '!' }}</span><div><strong>Dato</strong><p>{{ record_total }} registros persistentes.</p></div></div>
+    <div class="trace-item"><span class="{{ 'trace-real' if summary.calculations and not summary.errors else 'trace-partial' }}">{{ '✓' if summary.calculations and not summary.errors else '!' }}</span><div><strong>Conversión</strong><p>{{ calculation.conversion }}</p></div></div>
+    <div class="trace-item"><span class="{{ 'trace-real' if assignments or factor_state.applied_records else 'trace-partial' }}">{{ '✓' if assignments or factor_state.applied_records else '!' }}</span><div><strong>Factor</strong><p>{{ assignments|length }} por defecto · {{ factor_state.applied_records }} registro(s) con decisión específica aprobada.</p></div></div>
+    <div class="trace-item"><span class="{{ 'trace-real' if inventory.gwp_version else 'trace-partial' }}">{{ '✓' if inventory.gwp_version else '!' }}</span><div><strong>GWP</strong><p>{{ inventory.gwp_version or 'Sin evaluación GWP definida' }}.</p></div></div>
+    <div class="trace-item"><span class="{{ 'trace-real' if summary.calculations else 'trace-partial' }}">{{ '✓' if summary.calculations else '!' }}</span><div><strong>Fórmula</strong><p>{{ 'Cada cálculo conserva su instantánea.' if summary.calculations else 'Aún no existe memoria de cálculo.' }}</p></div></div>
+    <div class="trace-item"><span class="{{ 'trace-partial' if factor_state.pending else 'trace-real' }}">{{ '!' if factor_state.pending else '✓' }}</span><div><strong>Revisión metodológica</strong><p>{% if factor_state.pending %}{{ factor_state.pending }} decisión(es) de factor pendientes.{% else %}No hay propuestas de factor pendientes de revisión.{% endif %}</p></div></div>
     {% if summary.warnings %}<div class="trace-warning"><strong>Alertas metodológicas</strong>{% for warning in summary.warnings %}<p>• {{ warning }}</p>{% endfor %}</div>{% endif %}
   </aside>
 </div>

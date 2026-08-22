@@ -361,6 +361,7 @@ def sync_data_request(
     acceptance = request_record.instructions.strip() or (
         "Entregar el dato solicitado con periodo, unidad, origen y evidencia suficiente."
     )
+    period_route = f"/inventarios/{request_record.inventory_id}"
     changed = False
 
     if not existing:
@@ -383,7 +384,7 @@ def sync_data_request(
             next_action=_next_action_for_status(mapped_status),
             source_entity_type="DataRequest",
             source_entity_id=request_record.id,
-            source_route="/informacion",
+            source_route=period_route,
             created_by=actor_email,
             closed_at=(request_record.completed_at or datetime.now(UTC)) if mapped_status == "closed" else None,
         )
@@ -396,7 +397,7 @@ def sync_data_request(
                 entity_id=request_record.id,
                 relationship_type="origin",
                 label=request_record.title.strip(),
-                route="/informacion",
+                route=period_route,
             )
         )
         add_audit(
@@ -432,12 +433,41 @@ def sync_data_request(
         "assignee_email": normalized_target if is_email else "",
         "assignee_role": membership_role,
         "assignee_area": "" if is_email else request_record.requested_to.strip(),
-        "source_route": "/informacion",
+        "source_route": period_route,
     }
     for field, value in new_values.items():
         if getattr(item, field) != value:
             setattr(item, field, value)
             changed = True
+
+    origin_link = session.scalar(
+        select(WorkItemLink).where(
+            WorkItemLink.work_item_id == item.id,
+            WorkItemLink.entity_type == "DataRequest",
+            WorkItemLink.entity_id == request_record.id,
+            WorkItemLink.relationship_type == "origin",
+        )
+    )
+    if origin_link is None:
+        session.add(
+            WorkItemLink(
+                work_item_id=item.id,
+                entity_type="DataRequest",
+                entity_id=request_record.id,
+                relationship_type="origin",
+                label=request_record.title.strip(),
+                route=period_route,
+            )
+        )
+        changed = True
+    else:
+        if origin_link.route != period_route:
+            origin_link.route = period_route
+            changed = True
+        if origin_link.label != request_record.title.strip():
+            origin_link.label = request_record.title.strip()
+            changed = True
+
     if item.status_code != mapped_status:
         previous = item.status_code
         item.status_code = mapped_status

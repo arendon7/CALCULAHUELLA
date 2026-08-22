@@ -1,12 +1,39 @@
 from __future__ import annotations
 
+import json
 import math
+import os
+import re
 import threading
 import time
 from collections import defaultdict, deque
 from dataclasses import dataclass, field
 
 from .config import settings
+from .path_privacy import privacy_safe_path
+
+
+_RELEASE_COMMIT_PATTERN = re.compile(r"^[0-9a-fA-F]{7,64}$")
+
+
+def release_commit_from_environment() -> str:
+    """Return a public deploy identifier without exposing arbitrary environment data."""
+    for key in ("RENDER_GIT_COMMIT", "GITHUB_SHA"):
+        candidate = os.environ.get(key, "").strip()
+        if _RELEASE_COMMIT_PATTERN.fullmatch(candidate):
+            return candidate.lower()
+    return ""
+
+
+def _health_body_with_release_commit(body: bytes) -> bytes:
+    try:
+        payload = json.loads(body.decode("utf-8"))
+    except (UnicodeDecodeError, json.JSONDecodeError):
+        return body
+    if not isinstance(payload, dict):
+        return body
+    payload["release_commit"] = release_commit_from_environment()
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":")).encode("utf-8")
 
 
 @dataclass
@@ -35,6 +62,7 @@ class MetricsRegistry:
 
     @staticmethod
     def _normalize_path(path: str) -> str:
+        path = privacy_safe_path(path)
         pieces = []
         for piece in path.split("/"):
             if piece.isdigit() or (len(piece) > 20 and any(char.isdigit() for char in piece)):
@@ -111,7 +139,7 @@ metrics = MetricsRegistry()
 
 
 class OperationalMetricsMiddleware:
-    """Pure ASGI metrics middleware with lower overhead than BaseHTTPMiddleware."""
+    """Pure ASGI metrics middleware with release identity on the health surface."""
 
     def __init__(self, app) -> None:
         self.app = app
@@ -122,13 +150,40 @@ class OperationalMetricsMiddleware:
             return
         started = time.perf_counter()
         status = 500
+        path = str(scope.get("path", "/"))
+        enrich_health = path == "/api/health"
+        health_start = None
+        health_body_parts: list[bytes] = []
         with metrics.lock:
             metrics.active_requests += 1
 
         async def send_with_status(message):
-            nonlocal status
-            if message.get("type") == "http.response.start":
+            nonlocal status, health_start
+            message_type = message.get("type")
+            if message_type == "http.response.start":
                 status = int(message.get("status", 500))
+                if enrich_health:
+                    health_start = dict(message)
+                    return
+            if enrich_health and message_type == "http.response.body":
+                health_body_parts.append(message.get("body", b""))
+                if message.get("more_body", False):
+                    return
+                body = _health_body_with_release_commit(b"".join(health_body_parts))
+                if health_start is not None:
+                    headers = [
+                        (name, value)
+                        for name, value in health_start.get("headers", [])
+                        if name.lower() != b"content-length"
+                    ]
+                    headers.append((b"content-length", str(len(body)).encode("ascii")))
+                    health_start["headers"] = headers
+                    await send(health_start)
+                final_message = dict(message)
+                final_message["body"] = body
+                final_message["more_body"] = False
+                await send(final_message)
+                return
             await send(message)
 
         try:
@@ -137,4 +192,4 @@ class OperationalMetricsMiddleware:
             duration = time.perf_counter() - started
             with metrics.lock:
                 metrics.active_requests = max(0, metrics.active_requests - 1)
-            metrics.observe(str(scope.get("method", "GET")), str(scope.get("path", "/")), status, duration)
+            metrics.observe(str(scope.get("method", "GET")), path, status, duration)

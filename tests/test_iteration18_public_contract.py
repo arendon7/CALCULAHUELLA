@@ -11,14 +11,15 @@ pytestmark = pytest.mark.smoke
 
 
 def test_iteration18_public_v14_contract_and_diagnostic_flow() -> None:
-    """Replace the legacy `Mide.` landing assertion with the approved V1.4 contract."""
+    """Keep the public value proposition current while protecting the diagnostic handoff."""
     email = "diagnostico-v14@prospecto.test"
     with TestClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200
-        assert "Toda tu gestión de carbono" in home.text
-        assert "conectada." in home.text
-        assert "Plataforma colaborativa de gestión de carbono" in home.text
+        assert "De datos dispersos a una huella de carbono" in home.text
+        assert "puedes explicar." in home.text
+        assert "Medición, trazabilidad y gestión de carbono" in home.text
+        assert "Empezar diagnóstico" in home.text
         assert 'href="/diagnostico"' in home.text
 
         response = client.post(

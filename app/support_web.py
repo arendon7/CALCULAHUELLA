@@ -41,6 +41,7 @@ def register_support_routes(
         status: str = "",
         category: str = "",
         q: str = "",
+        ticket_id: int | None = None,
         inventory_id: int | None = None,
         source_id: int | None = None,
         activity_data_id: int | None = None,
@@ -48,6 +49,17 @@ def register_support_routes(
     ):
         user = require_user(request)
         organization_id = int(user["organization_id"])
+        if ticket_id is not None:
+            ticket_exists = session.scalar(
+                select(SupportTicket.id).where(
+                    SupportTicket.id == ticket_id,
+                    SupportTicket.organization_id == organization_id,
+                )
+            )
+            if not ticket_exists:
+                raise HTTPException(404, "Caso no encontrado")
+            return RedirectResponse(f"/soporte/{ticket_id}", status_code=303)
+
         query = (
             select(SupportTicket)
             .where(SupportTicket.organization_id == organization_id)
@@ -114,11 +126,21 @@ def register_support_routes(
             message for message in ticket.messages
             if message.visible_to_client or user["role"] != "Cliente"
         ]
-        return templates.TemplateResponse(request, "support_detail.html", common_context(
-            request, session, user, "support", ticket=ticket, messages=visible_messages,
-            context_items=ticket_context(ticket), overdue=ticket_overdue(ticket),
-            waiting_days=ticket_waiting_days(ticket), status_class=status_class(ticket.status),
-        ))
+        context = common_context(
+            request,
+            session,
+            user,
+            "support",
+            ticket=ticket,
+            messages=visible_messages,
+            context_items=ticket_context(ticket),
+            overdue=ticket_overdue(ticket),
+            waiting_days=ticket_waiting_days(ticket),
+            status_class=status_class(ticket.status),
+        )
+        if ticket.inventory is not None:
+            context["inventory"] = ticket.inventory
+        return templates.TemplateResponse(request, "support_detail.html", context)
 
 
     @app.post("/soporte/nuevo")
@@ -257,8 +279,7 @@ def register_support_routes(
             raise HTTPException(403, "El cliente puede crear y responder casos, pero el equipo gestiona su estado")
         ensure_capability(user, "manage_support")
         ticket = session.scalar(select(SupportTicket).where(
-            SupportTicket.id == ticket_id,
-            SupportTicket.organization_id == int(user["organization_id"]),
+            SupportTicket.id == ticket_id, SupportTicket.organization_id == int(user["organization_id"]),
         ))
         if not ticket:
             raise HTTPException(404, "Caso no encontrado")

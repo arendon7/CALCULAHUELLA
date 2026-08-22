@@ -1,0 +1,150 @@
+/* V2.1.3 · Core Workflows
+   Inventarios, captura guiada, calidad e informes.
+   Capa aditiva: contexto → estado → siguiente acción → detalle. */
+
+/* Inventarios: convertir la lista en un selector de periodos escaneable. */
+body.app-shell .architecture-note{margin-bottom:18px;padding:14px 18px;border-style:dashed;background:linear-gradient(135deg,#fff,#f7faf8);box-shadow:none}
+body.app-shell .architecture-note>div{align-items:center}
+body.app-shell .architecture-note>div>span{display:grid;place-items:center;width:38px;height:38px;border-radius:12px;background:#0b3b2e;color:#fff;font-weight:850}
+body.app-shell .inventory-card-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:stretch}
+body.app-shell .inventory-card{position:relative;display:flex;flex-direction:column;min-height:330px;padding:22px;overflow:hidden;transition:transform .16s ease,border-color .16s ease,box-shadow .16s ease}
+body.app-shell .inventory-card::before{content:"";position:absolute;inset:0 0 auto;height:4px;background:linear-gradient(90deg,#2d6f73,#a7c1a0);opacity:.55}
+body.app-shell .inventory-card:has(.status-chip.active){border-color:rgba(45,111,115,.28);box-shadow:0 18px 42px rgba(11,59,46,.09)}
+body.app-shell .inventory-card:has(.status-chip.active)::before{height:5px;opacity:1}
+body.app-shell .inventory-card-top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:18px}
+body.app-shell .inventory-card h2{margin:0 0 6px;font-size:1.35rem;letter-spacing:-.035em}
+body.app-shell .inventory-card>p{margin:0 0 18px;color:var(--v212-app-muted)}
+body.app-shell .inventory-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0;margin:0 0 18px;border-block:1px solid var(--v212-app-line)}
+body.app-shell .inventory-card dl>div{min-width:0;padding:12px 8px}
+body.app-shell .inventory-card dl>div:nth-child(odd){padding-left:0;border-right:1px solid var(--v212-app-line)}
+body.app-shell .inventory-card dt{font-size:.68rem;letter-spacing:.07em;text-transform:uppercase;color:#718079}
+body.app-shell .inventory-card dd{margin:4px 0 0;font-weight:760;color:#183229;line-height:1.35}
+body.app-shell .inventory-card .progress{height:7px;border-radius:999px;background:#e8efea;overflow:hidden}
+body.app-shell .inventory-card .card-actions{display:flex;gap:9px;margin-top:auto;padding-top:18px}
+body.app-shell .inventory-card .card-actions .btn-primary{flex:1}
+
+/* Captura guiada: la fuente y el formulario deben sentirse como una sola tarea. */
+body.app-shell .capture-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}
+body.app-shell .capture-summary-grid .mini-card{min-height:122px;padding:18px;border:1px solid var(--v212-app-line);border-radius:17px;background:#fff;box-shadow:0 7px 24px rgba(11,59,46,.04)}
+body.app-shell .capture-summary-grid .mini-card strong{display:block;margin:5px 0;font-size:1.45rem;letter-spacing:-.035em;color:#0b3b2e}
+body.app-shell .capture-summary-grid .mini-card p{margin:0;color:var(--v212-app-muted);line-height:1.4}
+body.app-shell .capture-summary-grid .mini-card:last-child{background:linear-gradient(145deg,#0b3b2e,#165342);border-color:transparent;color:#fff;box-shadow:0 16px 36px rgba(11,59,46,.13)}
+body.app-shell .capture-summary-grid .mini-card:last-child :is(small,strong,p){color:#fff}
+body.app-shell .capture-summary-grid .mini-card:last-child small{opacity:.72}
+body.app-shell .capture-workspace{display:grid;grid-template-columns:minmax(270px,.72fr) minmax(0,2fr);gap:16px;align-items:start}
+body.app-shell .capture-source-rail{position:sticky;top:92px;max-height:calc(100vh - 116px);overflow:auto;scrollbar-width:thin;padding:18px}
+body.app-shell .capture-rail-intro{margin:0 0 14px;color:var(--v212-app-muted);font-size:.8rem;line-height:1.5}
+body.app-shell .capture-source-list{display:grid;gap:7px}
+body.app-shell .capture-source-item{display:grid;grid-template-columns:10px minmax(0,1fr) auto;gap:10px;align-items:center;min-height:64px;padding:11px;border:1px solid transparent;border-radius:13px;background:#f7faf8}
+body.app-shell .capture-source-item.active{border-color:rgba(45,111,115,.24);background:#eef6f2;box-shadow:inset 3px 0 0 #2d6f73}
+body.app-shell .capture-source-item strong{display:block;color:#183229;line-height:1.25}
+body.app-shell .capture-source-item small{display:block;margin-top:3px;color:#6b7b73;line-height:1.35}
+body.app-shell .capture-source-brief{padding:22px;background:linear-gradient(145deg,#fff,#f8fbf9)}
+body.app-shell .capture-brief-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:9px;margin-top:18px}
+body.app-shell .capture-brief-grid article{padding:14px;border-radius:14px;border:1px solid rgba(11,59,46,.08);background:#fff}
+body.app-shell .capture-brief-grid strong{display:block;margin:4px 0;color:#183229;line-height:1.3}
+body.app-shell .capture-brief-grid p{margin:0;color:#6a7a72;font-size:.75rem;line-height:1.4}
+body.app-shell .capture-integrity-note{margin-top:14px;padding:13px 15px;border-radius:13px;border-left:3px solid #2d6f73;background:#edf5f2}
+body.app-shell .capture-integrity-note p{margin:3px 0 0;line-height:1.5;color:#53665d}
+body.app-shell .capture-form-card{padding:clamp(18px,2.5vw,28px)}
+body.app-shell .capture-guided-form{display:grid;gap:16px}
+body.app-shell .assisted-fieldset{position:relative;margin:0;padding:20px;border:1px solid var(--v212-app-line);border-radius:17px;background:#fff}
+body.app-shell .assisted-fieldset legend{display:flex;align-items:center;gap:10px;padding:0 8px;color:#183229}
+body.app-shell .assisted-fieldset legend>span{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:#0b3b2e;color:#fff;font-weight:850}
+body.app-shell .capture-evidence-choice{display:grid;grid-template-columns:1fr auto 1fr;gap:12px;align-items:center}
+body.app-shell .capture-evidence-choice>span{display:grid;place-items:center;width:34px;height:34px;border-radius:50%;background:#eef4f0;color:#718079;font-size:.72rem}
+body.app-shell .advanced-form-section{box-shadow:none!important;background:#fafcfb}
+body.app-shell .capture-live-summary{padding:15px 17px;border:1px solid rgba(45,111,115,.17);border-radius:14px;background:#f1f7f4}
+body.app-shell .capture-submit-row{display:flex;justify-content:space-between;align-items:center;gap:20px;padding:16px 18px;border:1px solid rgba(11,59,46,.10);border-radius:16px;background:#fff;box-shadow:0 10px 28px rgba(11,59,46,.07)}
+body.app-shell .capture-submit-row>div{max-width:68ch}
+
+/* Calidad: primero el riesgo, luego el archivo y finalmente el detalle tabular. */
+body.app-shell .kpi-grid.five{grid-template-columns:1.25fr repeat(4,minmax(0,1fr));gap:12px}
+body.app-shell .kpi-grid.five .kpi-card{min-height:126px;border-radius:17px;border-color:var(--v212-app-line);box-shadow:0 7px 24px rgba(11,59,46,.04)}
+body.app-shell .kpi-grid.five .kpi-card.featured{background:linear-gradient(145deg,#0b3b2e,#165342);color:#fff;border-color:transparent;box-shadow:0 16px 36px rgba(11,59,46,.13)}
+body.app-shell .kpi-grid.five .kpi-card.featured :is(small,strong,p){color:#fff}
+body.app-shell .kpi-grid.five .kpi-card:last-child{border-color:rgba(190,112,75,.22);background:#fffaf6}
+body.app-shell .two-column-form{gap:24px;align-items:center}
+body.app-shell .two-column-form>.inline-form{padding:16px;border:1px solid rgba(11,59,46,.09);border-radius:15px;background:#f8fbf9}
+body.app-shell .inventory-layout{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(260px,.55fr);gap:16px;align-items:start}
+body.app-shell .inventory-layout>aside{position:sticky;top:92px}
+body.app-shell .inventory-layout .check-row{padding:12px 0;border-bottom:1px solid var(--v212-app-line)}
+body.app-shell .inventory-layout .check-row:last-child{border-bottom:0}
+body.app-shell .table-card .responsive-table,body.app-shell #hallazgos .responsive-table{border:1px solid var(--v212-app-line)}
+body.app-shell .table-card table,body.app-shell #hallazgos table{min-width:860px}
+body.app-shell #hallazgos{border-left:4px solid #ca9a6c}
+
+/* Informes: el usuario debe entender el estado de publicación antes de generar. */
+body.app-shell .report-summary-strip{display:grid;grid-template-columns:1.2fr repeat(3,minmax(0,1fr));gap:0;margin-bottom:14px;border:1px solid var(--v212-app-line);border-radius:19px;background:#fff;overflow:hidden;box-shadow:0 10px 28px rgba(11,59,46,.05)}
+body.app-shell .report-summary-strip>div{display:flex;flex-direction:column;justify-content:center;min-height:96px;padding:18px 20px}
+body.app-shell .report-summary-strip>div+div{border-left:1px solid var(--v212-app-line)}
+body.app-shell .report-summary-strip>div:first-child{background:linear-gradient(145deg,#0b3b2e,#165342);color:#fff}
+body.app-shell .report-summary-strip>div:first-child :is(small,strong){color:#fff}
+body.app-shell .report-summary-strip small{color:#718079;letter-spacing:.07em}
+body.app-shell .report-summary-strip strong{margin-top:5px;font-size:1.2rem;color:#183229;letter-spacing:-.02em}
+body.app-shell .delivery-alert{margin-bottom:16px;border-radius:16px;box-shadow:none}
+body.app-shell .report-layout-v6{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.5fr);gap:16px;align-items:start}
+body.app-shell .deliverable-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+body.app-shell .delivery-document-card{display:flex;flex-direction:column;min-height:280px;padding:18px;border-radius:16px;background:linear-gradient(180deg,#fff,#fafcfb);box-shadow:none}
+body.app-shell .delivery-document-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px}
+body.app-shell .delivery-document-card h3{margin:4px 0 8px;letter-spacing:-.025em}
+body.app-shell .delivery-document-card p{color:var(--v212-app-muted);line-height:1.5}
+body.app-shell .delivery-document-card em{display:block;margin-top:auto;padding-top:12px;color:#6d7e75;font-size:.75rem}
+body.app-shell .delivery-document-card form{margin-top:14px}
+body.app-shell .delivery-document-card form .btn{width:100%}
+body.app-shell .report-summary{position:sticky;top:92px;background:linear-gradient(180deg,#fff,#f7faf8)}
+body.app-shell .report-summary .summary-number{letter-spacing:-.045em}
+body.app-shell .report-history{margin-top:16px}
+body.app-shell .report-history table{min-width:920px}
+
+/* Las tablas densas se desplazan de forma explícita, no se comprimen. */
+body.app-shell .responsive-table{position:relative;overflow:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+body.app-shell .responsive-table table{width:100%}
+body.app-shell .responsive-table th:first-child,body.app-shell .responsive-table td:first-child{position:sticky;left:0;z-index:1;background:inherit}
+body.app-shell .responsive-table thead th:first-child{z-index:3;background:#f1f6f3}
+
+@media(max-width:1100px){
+  body.app-shell .capture-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .capture-brief-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .kpi-grid.five{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.app-shell .kpi-grid.five .kpi-card.featured{grid-column:span 2}
+  body.app-shell .report-summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .report-summary-strip>div:nth-child(3){border-left:0;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .report-summary-strip>div:nth-child(4){border-top:1px solid var(--v212-app-line)}
+}
+
+@media(max-width:900px){
+  body.app-shell .capture-workspace,body.app-shell .inventory-layout,body.app-shell .report-layout-v6{grid-template-columns:1fr}
+  body.app-shell .capture-source-rail,body.app-shell .inventory-layout>aside,body.app-shell .report-summary{position:static;max-height:none}
+  body.app-shell .capture-source-list{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .deliverable-grid{grid-template-columns:1fr}
+  body.app-shell .report-summary{order:-1}
+}
+
+@media(max-width:620px){
+  body.app-shell .architecture-note{align-items:flex-start}
+  body.app-shell .architecture-note>a{display:none}
+  body.app-shell .inventory-card-grid,body.app-shell .capture-summary-grid,body.app-shell .capture-source-list,body.app-shell .capture-brief-grid,body.app-shell .kpi-grid.five,body.app-shell .report-summary-strip{grid-template-columns:1fr}
+  body.app-shell .kpi-grid.five .kpi-card.featured{grid-column:auto}
+  body.app-shell .inventory-card{min-height:0;padding:18px}
+  body.app-shell .inventory-card dl{grid-template-columns:1fr}
+  body.app-shell .inventory-card dl>div:nth-child(odd){border-right:0}
+  body.app-shell .inventory-card dl>div+div{border-top:1px solid var(--v212-app-line)}
+  body.app-shell .inventory-card .card-actions{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));z-index:2;margin-inline:-6px;padding:10px 6px 0;background:linear-gradient(180deg,rgba(255,255,255,0),#fff 24%)}
+  body.app-shell .inventory-card .card-actions .btn{flex:1}
+  body.app-shell .capture-evidence-choice{grid-template-columns:1fr}
+  body.app-shell .capture-evidence-choice>span{width:auto;height:auto;background:transparent}
+  body.app-shell .assisted-fieldset{padding:16px 13px}
+  body.app-shell .capture-submit-row{position:sticky;bottom:calc(72px + env(safe-area-inset-bottom));z-index:4;display:grid;grid-template-columns:1fr;padding:13px;box-shadow:0 14px 34px rgba(11,59,46,.14)}
+  body.app-shell .capture-submit-row .btn{width:100%;min-height:50px}
+  body.app-shell .report-summary-strip>div+div{border-left:0;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .report-summary-strip>div{min-height:78px;padding:14px 16px}
+  body.app-shell .delivery-alert{align-items:flex-start}
+  body.app-shell .delivery-alert>a{width:100%;margin-top:8px}
+  body.app-shell .page-content:has(.report-layout-v6) .page-head,body.app-shell .page-content:has(.capture-workspace) .page-head{align-items:flex-start}
+  body.app-shell .page-content:has(.report-layout-v6) .page-head h1{font-size:clamp(1.8rem,9vw,2.35rem)}
+}
+
+@media(prefers-reduced-motion:reduce){
+  body.app-shell .inventory-card,body.app-shell .capture-source-item{transition:none}
+}

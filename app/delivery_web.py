@@ -36,6 +36,32 @@ def register_delivery_routes(app, templates, common_context, require_user, get_i
             ),
         )
 
+    @app.get("/inventarios/{inventory_id}/entrega-profesional", response_class=HTMLResponse)
+    def inventory_professional_delivery(
+        inventory_id: int,
+        request: Request,
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        inventory = get_inventory(session, user, inventory_id)
+        delivery = professional_delivery_summary(session, inventory)
+        artifacts = list_report_artifacts(session, inventory.id)
+        return templates.TemplateResponse(
+            request=request,
+            name="delivery_scoped.html",
+            context=common_context(
+                request,
+                session,
+                user,
+                "delivery",
+                inventory=inventory,
+                delivery=delivery,
+                artifacts=artifacts,
+                scoped_workspace=True,
+                **delivery["analysis"],
+            ),
+        )
+
     @app.get("/api/entrega-profesional/resumen")
     def professional_delivery_api(
         session: Session = Depends(get_db),

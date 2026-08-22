@@ -79,8 +79,9 @@ def test_v025_execution_page_and_guided_dashboard_are_available():
         assert "Datos mensuales del piloto" in page.text
         dashboard = client.get("/dashboard")
         assert dashboard.status_code == 200
-        assert "TU SIGUIENTE ACCIÓN" in dashboard.text
-        assert "Seis etapas, una ruta clara" in dashboard.text
+        assert "EMPIEZA AQUÍ · TU SIGUIENTE ACCIÓN" in dashboard.text
+        assert "TU RUTA DE TRABAJO" in dashboard.text
+        assert "Del dato al informe, sin perder el hilo" in dashboard.text
 
 
 def test_v025_workbook_import_creates_activity_data_and_calculates_electricity():

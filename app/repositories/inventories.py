@@ -12,7 +12,7 @@ def list_inventories(session: Session, organization_id: int) -> list[Inventory]:
             select(Inventory)
             .where(Inventory.organization_id == organization_id)
             .options(selectinload(Inventory.sources), selectinload(Inventory.facility_links))
-            .order_by(Inventory.start_date.desc())
+            .order_by(Inventory.start_date.desc(), Inventory.id.desc())
         )
     )
 

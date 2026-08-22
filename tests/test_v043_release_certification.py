@@ -174,9 +174,14 @@ def test_v043_operational_scripts_bootstrap_project_path(tmp_path: Path):
     assert "Certificación operativa" in source
     assert "_PROJECT_ROOT = _BootstrapPath(__file__).resolve().parents[1]" in source
 
-    workflow_sources = "\n".join(
-        path.read_text(encoding="utf-8")
-        for path in project_dir.joinpath(".github", "workflows").glob("*.yml")
+    module_registry_sources = "\n".join(
+        [
+            *(
+                path.read_text(encoding="utf-8")
+                for path in project_dir.joinpath(".github", "workflows").glob("*.yml")
+            ),
+            project_dir.joinpath("start_prod.sh").read_text(encoding="utf-8"),
+        ]
     )
     legacy_bootstrap = "_PROJECT_ROOT = _BootstrapPath(__file__).resolve().parents[1]"
 
@@ -187,8 +192,8 @@ def test_v043_operational_scripts_bootstrap_project_path(tmp_path: Path):
         if legacy_bootstrap in source:
             continue
 
-        module_invocation = f"python -m scripts.{operational_script.stem}"
-        assert module_invocation in workflow_sources, (
+        module_invocation = f"-m scripts.{operational_script.stem}"
+        assert module_invocation in module_registry_sources, (
             f"{operational_script.name} importa app sin bootstrap y tampoco está registrado "
-            f"como módulo operativo ({module_invocation})."
+            f"como módulo operativo ({module_invocation}) en workflows o start_prod.sh."
         )
