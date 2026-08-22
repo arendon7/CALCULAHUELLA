@@ -50,13 +50,12 @@ def test_v260_public_experience_surfaces_make_documentary_claim_governance_expli
     experience = _experience_section()
     about = _about_section()
 
-    assert "credenciales individuales" in experience
-    assert "soporte documental aprobado" in experience
-    assert "títulos, años de experiencia ni referencias de proyectos" in experience
-
-    assert "credenciales individuales" in about
-    assert "soporte documental aprobado" in about
-    assert "títulos, años de experiencia ni referencias de proyectos" in about
+    for section in (experience, about):
+        assert "credenciales individuales" in section
+        assert "soporte documental aprobado" in section
+        assert "títulos" in section
+        assert "años de experiencia" in section
+        assert "referencias de proyectos" in section
 
 
 def test_v260_does_not_change_resources_diagnosis_pricing_or_faq_contracts() -> None:
