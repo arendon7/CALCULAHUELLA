@@ -38,6 +38,7 @@ def test_iteration18_public_v14_contract_and_diagnostic_flow() -> None:
                 "objective": "Preparación para verificación",
                 "urgency": "Alta",
                 "notes": "Prueba del contrato público V1.4",
+                "accept_privacy": "yes",
             },
             follow_redirects=False,
         )
