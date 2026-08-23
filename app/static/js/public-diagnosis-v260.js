@@ -4,7 +4,6 @@ function initializeV260DiagnosisWizard() {
 
   const steps = Array.from(form.querySelectorAll('[data-diagnosis-step]'));
   const indicators = Array.from(form.querySelectorAll('[data-diagnosis-indicator]'));
-  const progress = form.querySelector('[data-diagnosis-progress]');
   const counter = form.querySelector('[data-diagnosis-counter]');
   const title = form.querySelector('[data-diagnosis-title]');
   const back = form.querySelector('[data-diagnosis-back]');
@@ -37,7 +36,7 @@ function initializeV260DiagnosisWizard() {
       indicator.classList.toggle('complete', index < current);
       indicator.setAttribute('aria-current', index === current ? 'step' : 'false');
     });
-    if (progress) progress.style.width = `${((current + 1) / steps.length) * 100}%`;
+    form.dataset.diagnosisProgressStep = String(current + 1);
     if (counter) counter.textContent = `Paso ${current + 1} de ${steps.length}`;
     if (title) title.textContent = titles[current] || '';
     if (back) back.hidden = current === 0;
