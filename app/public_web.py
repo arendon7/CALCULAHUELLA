@@ -193,13 +193,23 @@ def register_public_routes(app, templates, current_user) -> None:
             phone=phone,
             sector=normalized_sector,
             city="",
-            message=message,
+            employees_band="Por definir",
+            facilities_count=1,
+            has_previous_inventory=False,
+            desired_scopes="Por definir",
+            objective=normalized_interest,
+            urgency="Normal",
+            notes=(
+                f"Solicitud desde contacto público same-origin\n"
+                f"Autorización de privacidad: sí · versión {settings.legal_effective_date}\n"
+                f"Comunicaciones comerciales opcionales: {'sí' if accept_commercial == 'yes' else 'no'}\n\n"
+                f"{message}"
+            ),
+            complexity_score=0,
             recommended_plan_code=plan_code,
             status="Nuevo",
-            source="web_contact",
-            accepted_privacy=True,
-            accepted_commercial=accept_commercial == "yes",
+            source="Contacto público same-origin",
         )
         session.add(lead)
         session.commit()
-        return RedirectResponse(url="/contacto?estado=recibido", status_code=303)
+        return RedirectResponse("/contacto?estado=recibido", status_code=303)
