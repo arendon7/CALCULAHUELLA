@@ -106,10 +106,11 @@ def test_v2602_authorized_diagnosis_persists_legal_version_with_lead() -> None:
         assert "Necesitamos ordenar el inventario inicial." in lead.notes
 
 
-def test_v2602_diagnosis_uses_dedicated_reduced_motion_controller() -> None:
+def test_v2602_diagnosis_uses_dedicated_reduced_motion_and_csp_safe_controller() -> None:
     template = _text(TEMPLATE)
     legacy_bundle = _text(ROOT / "app" / "static" / "js" / "app.js")
     wizard = _text(WIZARD_JS)
+    css = _text(HANDOFF_CSS)
 
     assert "data-v260-diagnosis-wizard" in template
     assert "data-diagnosis-wizard" not in template
@@ -119,6 +120,11 @@ def test_v2602_diagnosis_uses_dedicated_reduced_motion_controller() -> None:
     assert "prefers-reduced-motion: reduce" in wizard
     assert "reducedMotion ? 'auto' : 'smooth'" in wizard
     assert "data-diagnosis-initial-step" in template
+    assert "form.dataset.diagnosisProgressStep" in wizard
+    assert ".style.width" not in wizard
+    for step, width in ((1, 25), (2, 50), (3, 75), (4, 100)):
+        assert f'data-diagnosis-progress-step="{step}"' in css
+        assert f"width: {width}%" in css
 
 
 def test_v2602_backend_contract_validates_consent_before_assessment_creation() -> None:
