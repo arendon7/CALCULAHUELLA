@@ -100,7 +100,12 @@ def register_product_intelligence_routes(
         return templates.TemplateResponse(
             request=request,
             name="public_diagnosis.html",
-            context={"app_settings": settings, "error": None},
+            context={
+                "app_settings": settings,
+                "error": None,
+                "form_values": {},
+                "initial_step": 1,
+            },
         )
 
     @app.post("/diagnostico", response_class=HTMLResponse)
@@ -136,14 +141,67 @@ def register_product_intelligence_routes(
         core_processes: str = Form(""),
         current_data_systems: str = Form(""),
         notes: str = Form(""),
+        accept_privacy: str | None = Form(None),
         session: Session = Depends(get_db),
     ):
         normalized_email = email.strip().lower()
-        if "@" not in normalized_email or len(company_name.strip()) < 2 or len(contact_name.strip()) < 2:
+        form_values = {
+            "company_name": company_name.strip(),
+            "contact_name": contact_name.strip(),
+            "email": normalized_email,
+            "phone": phone.strip(),
+            "sector": sector.strip(),
+            "city": city.strip(),
+            "employees_band": employees_band,
+            "facilities_count": min(max(int(facilities_count), 1), 100),
+            "countries_count": min(max(int(countries_count), 1), 50),
+            "has_previous_inventory": bool(has_previous_inventory),
+            "desired_scopes": desired_scopes,
+            "objective": objective,
+            "urgency": urgency if urgency in {"Normal", "Alta"} else "Normal",
+            "deadline_months": min(max(int(deadline_months), 1), 36),
+            "data_availability": data_availability,
+            "evidence_readiness": evidence_readiness,
+            "reporting_frequency": reporting_frequency,
+            "assurance_ambition": assurance_ambition,
+            "has_fleet": bool(has_fleet),
+            "uses_fuels": bool(uses_fuels),
+            "uses_refrigerants": bool(uses_refrigerants),
+            "manages_waste": bool(manages_waste),
+            "has_wastewater": bool(has_wastewater),
+            "has_agriculture": bool(has_agriculture),
+            "relies_on_suppliers": bool(relies_on_suppliers),
+            "owns_generation": bool(owns_generation),
+            "has_process_emissions": bool(has_process_emissions),
+            "core_processes": core_processes,
+            "current_data_systems": current_data_systems,
+            "notes": notes,
+            "accept_privacy": accept_privacy == "yes",
+        }
+        invalid_identity = len(company_name.strip()) < 2 or len(contact_name.strip()) < 2
+        invalid_email = "@" not in normalized_email
+        if invalid_identity or invalid_email:
             return templates.TemplateResponse(
                 request=request,
                 name="public_diagnosis.html",
-                context={"app_settings": settings, "error": "Completa empresa, contacto y un correo válido."},
+                context={
+                    "app_settings": settings,
+                    "error": "Completa empresa, contacto y un correo válido.",
+                    "form_values": form_values,
+                    "initial_step": 1 if invalid_identity else 4,
+                },
+                status_code=400,
+            )
+        if accept_privacy != "yes":
+            return templates.TemplateResponse(
+                request=request,
+                name="public_diagnosis.html",
+                context={
+                    "app_settings": settings,
+                    "error": "Debes autorizar el tratamiento de datos para generar el diagnóstico y dar continuidad a la solicitud.",
+                    "form_values": form_values,
+                    "initial_step": 4,
+                },
                 status_code=400,
             )
         payload = _public_payload(
@@ -174,6 +232,10 @@ def register_product_intelligence_routes(
             current_data_systems=current_data_systems,
         )
         provisional = create_assessment(session, payload=payload, actor_email="diagnostico-publico-v045")
+        authorization_note = (
+            f"Autorización de privacidad: sí · versión {settings.legal_effective_date}"
+        )
+        user_notes = notes.strip()
         lead = CommercialLead(
             public_token=__import__("secrets").token_urlsafe(24),
             company_name=company_name.strip(),
@@ -188,7 +250,7 @@ def register_product_intelligence_routes(
             desired_scopes=desired_scopes,
             objective=objective,
             urgency=urgency if urgency in {"Normal", "Alta"} else "Normal",
-            notes=notes.strip(),
+            notes=f"{authorization_note}\n\n{user_notes}" if user_notes else authorization_note,
             complexity_score=provisional.total_score,
             recommended_plan_code=provisional.recommended_package_code,
             status="Nuevo",
