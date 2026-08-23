@@ -123,7 +123,8 @@ def test_v248_about_copy_does_not_turn_internal_review_into_independent_verifica
     assert "Software climático con criterio ambiental detrás" in about
     assert "sin presentar el software como sustituto del juicio profesional" in about
     assert "una verificación independiente exige un tercero competente e independiente" in about
-    assert "verificación documental correspondiente" in legacy_authority
+    assert "Las credenciales individuales solo se publican cuando cuentan con soporte documental aprobado." in legacy_authority
+    assert "No usamos títulos, años de experiencia ni referencias de proyectos como claims públicos" in legacy_authority
     assert "certifica automáticamente" not in about.lower()
 
 
