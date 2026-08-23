@@ -75,4 +75,9 @@ def test_v253_findings_and_risks_are_separate_valid_lists():
     risks = '<ul>{% for item in assessment.risk_flags %}<li>{{ item }}</li>{% endfor %}</ul>'
     assert findings in result
     assert risks in result
-    assert findings in result.split("<h2>Hallazgos iniciales</h2>", 1)[1]
+
+    validation_section = result.split("<h2>Qué conviene validar</h2>", 1)[1]
+    assert "<h3>Hallazgos iniciales</h3>" in validation_section
+    assert findings in validation_section.split("<h3>Hallazgos iniciales</h3>", 1)[1]
+    assert "<h3>Riesgos a controlar</h3>" in validation_section
+    assert risks in validation_section.split("<h3>Riesgos a controlar</h3>", 1)[1]
