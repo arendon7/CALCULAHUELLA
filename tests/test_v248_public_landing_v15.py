@@ -122,7 +122,7 @@ def test_v248_about_copy_does_not_turn_internal_review_into_independent_verifica
     legacy_authority = _text(TEMPLATES / "public" / "v14" / "experience_resources_cta.html")
     assert "Software climático con criterio ambiental detrás" in about
     assert "sin presentar el software como sustituto del juicio profesional" in about
-    assert "verificación documental correspondiente" in about
+    assert "una verificación independiente exige un tercero competente e independiente" in about
     assert "verificación documental correspondiente" in legacy_authority
     assert "certifica automáticamente" not in about.lower()
 
