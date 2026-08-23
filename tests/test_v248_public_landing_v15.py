@@ -120,7 +120,7 @@ def test_v248_product_proof_reuses_real_repository_screenshots() -> None:
 def test_v248_about_copy_does_not_turn_internal_review_into_independent_verification() -> None:
     about = _text(TEMPLATES / "public" / "v15" / "pricing_about.html")
     legacy_authority = _text(TEMPLATES / "public" / "v14" / "experience_resources_cta.html")
-    assert "Software climático con experiencia ambiental detrás" in about
+    assert "Software climático con criterio ambiental detrás" in about
     assert "sin presentar el software como sustituto del juicio profesional" in about
     assert "verificación documental correspondiente" in about
     assert "verificación documental correspondiente" in legacy_authority
