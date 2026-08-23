@@ -64,6 +64,8 @@ def test_v252_does_not_change_four_step_technical_sequence_or_method_boundary() 
         assert f'data-diagnosis-step="{number}"' in diagnosis
         assert f"<h2>{title}</h2>" in diagnosis
 
-    assert "Una recomendación, no una verificación" in diagnosis
-    assert "No valida un inventario ni reemplaza la revisión del equipo técnico." in diagnosis
+    assert "Una orientación inicial, no una verificación" in diagnosis
+    assert "No calcula tu huella" in diagnosis
+    assert "no certifica resultados" in diagnosis
+    assert "no reemplaza la revisión del equipo técnico" in diagnosis
     assert "No necesitas adjuntar documentos ni cifras de emisiones" in diagnosis
