@@ -44,7 +44,12 @@ def test_v252_progressive_contact_keeps_same_post_contract_and_required_identity
     assert 'action="/diagnostico" method="post"' in diagnosis
     assert 'name="company_name"' in diagnosis
     assert 'name="contact_name"' in diagnosis
-    assert 'type="email" name="email" autocomplete="email" required' in diagnosis
+
+    email_input = next(line for line in diagnosis.splitlines() if 'name="email"' in line)
+    assert 'type="email"' in email_input
+    assert 'autocomplete="email"' in email_input
+    assert "fv.get('email', '')" in email_input
+    assert "required" in email_input
     assert diagnosis.count('name="email"') == 1
     assert diagnosis.count('name="phone"') == 1
 
