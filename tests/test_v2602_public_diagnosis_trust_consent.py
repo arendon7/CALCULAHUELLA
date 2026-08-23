@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "app" / "templates" / "public_diagnosis.html"
 ENGINE = ROOT / "app" / "product_intelligence_web.py"
 WIZARD_JS = ROOT / "app" / "static" / "js" / "public-diagnosis-v260.js"
+HANDOFF_JS = ROOT / "app" / "static" / "js" / "diagnosis_handoff.js"
 HANDOFF_CSS = ROOT / "app" / "static" / "css" / "diagnosis_handoff.css"
 
 
@@ -125,6 +126,15 @@ def test_v2602_diagnosis_uses_dedicated_reduced_motion_and_csp_safe_controller()
     for step, width in ((1, 25), (2, 50), (3, 75), (4, 100)):
         assert f'data-diagnosis-progress-step="{step}"' in css
         assert f"width: {width}%" in css
+
+
+def test_v2602_landing_handoff_targets_new_wizard_without_overwriting_rejected_form() -> None:
+    handoff = _text(HANDOFF_JS)
+
+    assert "[data-v260-diagnosis-wizard], [data-diagnosis-wizard]" in handoff
+    assert "const restoringRejectedForm = Boolean(form.querySelector('[role=\"alert\"]'));" in handoff
+    assert "if (restoringRejectedForm) return 0;" in handoff
+    assert handoff.index("if (restoringRejectedForm) return 0;") < handoff.index("Object.entries(allowed)")
 
 
 def test_v2602_backend_contract_validates_consent_before_assessment_creation() -> None:
