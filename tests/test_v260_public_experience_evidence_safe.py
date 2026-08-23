@@ -4,6 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
+HERO = ROOT / "app" / "templates" / "public" / "v14" / "hero_trust.html"
 EXPERIENCE = ROOT / "app" / "templates" / "public" / "v14" / "experience_resources_cta.html"
 PRICING_ABOUT = ROOT / "app" / "templates" / "public" / "v15" / "pricing_about.html"
 
@@ -23,9 +24,14 @@ def _about_section() -> str:
 
 
 def test_v260_public_experience_surfaces_use_capabilities_not_unverified_personal_credentials() -> None:
+    hero = HERO.read_text(encoding="utf-8")
     experience = _experience_section()
     about = _about_section()
-    public_experience = experience + about
+    public_experience = hero + experience + about
+
+    assert "Criterio ambiental aplicado" in hero
+    assert "datos, evidencia, metodología y decisiones" in hero
+    assert "Resultado trazable" in hero
 
     assert "Acompañamiento técnico y profesional" in experience
     assert "criterio técnico" in experience.casefold()
