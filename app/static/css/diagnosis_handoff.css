@@ -69,3 +69,9 @@
   outline: 3px solid rgba(45, 111, 115, .24);
   outline-offset: 3px;
 }
+
+/* CSP/WebKit: el progreso depende de un estado discreto, no de style inline. */
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="1"] .diagnosis-progress-track i { width: 25%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="2"] .diagnosis-progress-track i { width: 50%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="3"] .diagnosis-progress-track i { width: 75%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="4"] .diagnosis-progress-track i { width: 100%; }
