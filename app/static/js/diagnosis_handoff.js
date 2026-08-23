@@ -77,8 +77,14 @@
   }
 
   function applyLandingContext() {
-    const form = document.querySelector('[data-diagnosis-wizard]');
+    const form = document.querySelector('[data-v260-diagnosis-wizard], [data-diagnosis-wizard]');
     if (!form) return 0;
+
+    // A server-side validation response is authoritative. Reapplying cached landing
+    // context here would overwrite answers the user already reviewed and submitted.
+    const restoringRejectedForm = Boolean(form.querySelector('[role="alert"]'));
+    if (restoringRejectedForm) return 0;
+
     const plan = readPlanContext();
     const context = readContext();
     const reusable = context && context.reusable ? context.reusable : {};
