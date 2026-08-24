@@ -46,4 +46,4 @@ def proposal_initial_payment(
 def subscription_custom_monthly_fee(recurring_fee: float, billing_cycle: str) -> float:
     """Persist the negotiated recurring price using the subscription model's monthly-equivalent field."""
     cycles = billing_cycles_per_year(billing_cycle)
-    return round(recurring_fee if cycles == 12 else recurring_fee / 12, 2)
+    return recurring_fee if cycles == 12 else recurring_fee / 12
