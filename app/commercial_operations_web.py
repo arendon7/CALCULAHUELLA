@@ -425,14 +425,16 @@ def register_commercial_operations_routes(
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
+        mandatory_note = (
+            "Registro recurrente por la base contractual antes de impuesto. La liquidación tributaria final está pendiente; "
+            "este registro no constituye factura electrónica."
+        )
+        user_note = notes.strip()
+        invoice_notes = mandatory_note if not user_note else f"{mandatory_note}\nNota operativa: {user_note}"
         invoice = BillingInvoice(
             organization_id=subscription.organization_id, subscription_id=subscription.id, reference=normalized_reference,
             period_start=start, period_end=end, amount=base_amount, status="Pendiente", issued_at=date.today(),
-            due_date=due,
-            notes=notes.strip() or (
-                "Registro recurrente por la base contractual antes de impuesto. La liquidación tributaria final está pendiente; "
-                "este registro no constituye factura electrónica."
-            ),
+            due_date=due, notes=invoice_notes,
         )
         session.add(invoice)
         session.flush()
