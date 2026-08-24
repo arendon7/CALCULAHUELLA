@@ -16,6 +16,7 @@ from .commercial_pricing import proposal_initial_payment, subscription_custom_mo
 from .config import settings
 from .database import get_db
 from .db.models import (
+    BillingChargeBreakdown,
     BillingInvoice,
     CommercialLead,
     CommercialProposal,
@@ -24,6 +25,7 @@ from .db.models import (
     OrganizationSubscription,
     PaymentTransaction,
 )
+from .revenue_operations import INVOICE_TOTAL_WITH_TAX, activation_breakdown
 
 
 class PaymentWebhookPayload(BaseModel):
@@ -204,6 +206,31 @@ def register_payment_routes(app, templates) -> None:
                 )
                 session.add(invoice)
                 session.flush()
+            breakdown = session.scalar(
+                select(BillingChargeBreakdown).where(BillingChargeBreakdown.invoice_id == invoice.id)
+            )
+            if not breakdown:
+                parts = activation_breakdown(
+                    proposal.implementation_fee,
+                    proposal.recurring_fee,
+                    proposal.discount_amount,
+                    proposal.tax_rate,
+                )
+                if abs(parts["total_amount"] - payment.amount) > 0.01:
+                    raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
+                session.add(BillingChargeBreakdown(
+                    invoice_id=invoice.id,
+                    charge_type="Activación",
+                    amount_semantics=INVOICE_TOTAL_WITH_TAX,
+                    net_amount=parts["net_amount"],
+                    tax_rate_snapshot=parts["tax_rate_snapshot"],
+                    tax_amount=parts["tax_amount"],
+                    total_amount=parts["total_amount"],
+                    source_reference=proposal.reference,
+                    classification_note=(
+                        "Total de activación derivado de la propuesta aceptada: implementación + primer ciclo - descuento inicial + impuesto."
+                    ),
+                ))
             payment.subscription_id = subscription.id if subscription else None
             payment.invoice_id = invoice.id
             onboarding_specs = [
