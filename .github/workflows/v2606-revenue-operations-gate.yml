@@ -66,6 +66,12 @@ jobs:
           mkdir -p "${INSTANCE_DIR}"
           python -m alembic upgrade head
           python -m alembic current
+          python - <<'PY'
+          from sqlalchemy import inspect
+          from app.db.base import ENGINE
+          tables = set(inspect(ENGINE).get_table_names())
+          assert {"billing_charge_breakdowns", "contract_signature_snapshots"} <= tables
+          PY
 
       - name: Upgrade histórico 0040 a head SQLite
         run: |
@@ -73,8 +79,23 @@ jobs:
           rm -rf "${INSTANCE_DIR}"
           mkdir -p "${INSTANCE_DIR}"
           python -m alembic upgrade 20260812_0040
+          python - <<'PY'
+          from sqlalchemy import text
+          from app.db.base import ENGINE
+          # Base.metadata.create_all() en revisiones antiguas conoce el metadata actual.
+          # Eliminamos solo los companions V2.60.6 para reproducir una base real pre-0041.
+          with ENGINE.begin() as connection:
+              connection.execute(text("DROP TABLE IF EXISTS contract_signature_snapshots"))
+              connection.execute(text("DROP TABLE IF EXISTS billing_charge_breakdowns"))
+          PY
           python -m alembic upgrade head
           python -m alembic current
+          python - <<'PY'
+          from sqlalchemy import inspect
+          from app.db.base import ENGINE
+          tables = set(inspect(ENGINE).get_table_names())
+          assert {"billing_charge_breakdowns", "contract_signature_snapshots"} <= tables
+          PY
 
       - name: Publicar evidencia rápida
         if: always()
