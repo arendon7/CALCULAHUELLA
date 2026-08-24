@@ -154,17 +154,42 @@ def main() -> int:
         page.locator("text=Cómo leer estos indicadores").wait_for(state="visible")
         page.locator("text=Preparación de datos").wait_for(state="visible")
         page.locator("text=Decisiones que siguen abiertas").wait_for(state="visible")
+        page.locator("text=Gestión Corporativa").wait_for(state="visible")
 
         result_text = page.locator("main").inner_text()
-        for forbidden in ("puntos del diagnóstico", "horas estimadas", "% gobierno del proceso"):
+        for forbidden in (
+            "puntos del diagnóstico",
+            "horas estimadas",
+            "% gobierno del proceso",
+            "Gestión Avanzada y Verificación",
+        ):
             if forbidden in result_text:
-                raise AssertionError(f"El resultado público volvió a exponer falsa precisión: {forbidden!r}")
+                raise AssertionError(f"El resultado público volvió a exponer semántica interna: {forbidden!r}")
+
+        footer_logo = page.locator("footer .canonical-footer-logo")
+        footer_logo.wait_for(state="visible")
+        logo_state = footer_logo.evaluate(
+            """img => ({
+                naturalWidth: img.naturalWidth,
+                naturalHeight: img.naturalHeight,
+                filter: getComputedStyle(img).filter,
+                objectFit: getComputedStyle(img).objectFit
+            })"""
+        )
+        if logo_state["naturalWidth"] <= 0 or logo_state["naturalHeight"] <= 0:
+            raise AssertionError(f"El logo canónico del footer no cargó: {logo_state!r}")
+        if logo_state["filter"] != "none":
+            raise AssertionError(
+                "El logo canónico del footer está siendo reinterpretado por CSS: "
+                f"filter={logo_state['filter']!r}"
+            )
 
         screenshot = ARTIFACT_DIR / "public-funnel-result.png"
         page.screenshot(path=str(screenshot), full_page=True)
         evidence["screenshot"] = screenshot.name
         evidence["result_url"] = page.url.replace(BASE_URL, "")
         evidence["persistence"] = _persistence_contract()
+        evidence["canonical_footer_logo"] = logo_state
         evidence["browser_errors"] = {"console": console_errors, "page": page_errors}
 
         if console_errors or page_errors:
