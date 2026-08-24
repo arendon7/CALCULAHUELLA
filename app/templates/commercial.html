@@ -65,6 +65,7 @@
     <div class="callout">
       <strong>Autoridad de la oferta</strong>
       <p>El diagnóstico orienta complejidad y plan de referencia, pero no fija precio, impuestos, descuento, vigencia, tiempo de implementación ni alcance contractual. Los valores de campañas públicas tampoco se copian automáticamente a esta propuesta.</p>
+      <p><small>El valor recurrente siempre significa <strong>valor por ciclo</strong>: una mensualidad si eliges Mensual o una anualidad si eliges Anual. El sistema calcula aparte la inversión del primer año y el pago de activación.</small></p>
     </div>
 
     {% if proposal_error %}
@@ -106,11 +107,13 @@
         <label>Implementación · COP
           <input type="number" name="implementation_fee" value="{{ pf.get('implementation_fee', '') }}" min="0" step="0.01" inputmode="decimal" placeholder="Define el valor" required>
         </label>
-        <label>Valor recurrente · COP
+        <label>Valor recurrente por ciclo · COP
           <input type="number" name="recurring_fee" value="{{ pf.get('recurring_fee', '') }}" min="0" step="0.01" inputmode="decimal" placeholder="Define el valor" required>
+          <small>Mensual: valor de cada mes. Anual: valor de cada año.</small>
         </label>
-        <label>Descuento · COP
+        <label>Descuento inicial · COP
           <input type="number" name="discount_amount" value="{{ pf.get('discount_amount', '0') }}" min="0" step="0.01" inputmode="decimal" required>
+          <small>Se aplica una sola vez al pago de activación y al valor contractual del primer año.</small>
         </label>
         <label>Impuesto %
           <input type="number" name="tax_rate" value="{{ pf.get('tax_rate', '') }}" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Define la tasa" required>
@@ -121,6 +124,7 @@
             <option value="Anual" {% if pf.get('billing_cycle') == 'Anual' %}selected{% endif %}>Anual</option>
             <option value="Mensual" {% if pf.get('billing_cycle') == 'Mensual' %}selected{% endif %}>Mensual</option>
           </select>
+          <small>El primer año contiene 1 ciclo anual o 12 ciclos mensuales.</small>
         </label>
         <label>Válida hasta
           <input type="date" name="valid_until" value="{{ pf.get('valid_until', '') }}" min="{{ proposal_min_valid_until }}" required>
@@ -153,7 +157,7 @@
   <div class="panel-heading"><div><span class="eyebrow">PROPUESTAS</span><h2>Seguimiento y aceptación</h2></div></div>
   <div class="table-wrap">
     <table>
-      <thead><tr><th>Referencia</th><th>Empresa</th><th>Plan</th><th>Valor</th><th>Estado</th><th>Enlace</th><th></th></tr></thead>
+      <thead><tr><th>Referencia</th><th>Empresa</th><th>Plan</th><th>Valor primer año</th><th>Estado</th><th>Enlace</th><th></th></tr></thead>
       <tbody>
       {% for proposal in proposals %}
         <tr>
