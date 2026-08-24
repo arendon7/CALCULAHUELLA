@@ -30,7 +30,7 @@ def test_v260_public_result_puts_diagnostic_value_before_commercial_recommendati
     diagnostic_markers = (
         "Complejidad operativa",
         "Madurez general",
-        "Madurez de datos",
+        "Preparación de datos",
         "Preparación para revisión externa",
         "Qué sabemos ahora",
         "Qué conviene validar",
@@ -62,23 +62,30 @@ def test_v260_public_result_does_not_present_assessment_as_footprint_or_verifica
     assert "DIAGNÓSTICO ORIENTATIVO GENERADO" in result
     assert "DIAGNÓSTICO INTELIGENTE GENERADO" not in result
     assert "No es una huella calculada, una certificación ni una verificación independiente" in result
-    assert "Indicador orientativo; no equivale a una verificación" in result
+    assert "Orientación de alistamiento; no acredita verificación ni aseguramiento" in result
+    assert "No representan porcentajes de cumplimiento" in result
     assert "No constituye una cotización definitiva" in result
     assert "sujeta a validación técnica del alcance" in result
 
 
-def test_v260_result_uses_existing_assessment_signals_without_new_calculation_logic() -> None:
+def test_v260_result_uses_existing_assessment_signals_without_exposing_raw_engine_semantics() -> None:
     result = _text(RESULT)
 
     assert "assessment.row.complexity_level" in result
     assert "assessment.row.maturity_level" in result
-    assert "assessment.row.governance_maturity_score" in result
-    assert "assessment.row.data_maturity_score" in result
-    assert "assessment.row.verification_readiness_score" in result
+    assert "data_readiness_band(assessment.row.data_maturity_score)" in result
+    assert "review_readiness_band(assessment.row.verification_readiness_score)" in result
     assert "assessment.recommended_scopes" in result
     assert "assessment.probable_sources" in result
     assert "assessment.findings" in result
     assert "assessment.risk_flags" in result
     assert "assessment.applicable_modules" in result
-    assert "assessment.exclusions" in result
-    assert "assessment.next_steps" in result
+
+    # V2.60.3 preserves exact engine scores internally but deliberately avoids
+    # presenting them as public audit/verification precision or exposing raw
+    # engine action lists without professional validation.
+    assert "assessment.row.governance_maturity_score" not in result
+    assert "{{ assessment.row.data_maturity_score" not in result
+    assert "{{ assessment.row.verification_readiness_score" not in result
+    assert "assessment.exclusions" not in result
+    assert "assessment.next_steps" not in result
