@@ -50,6 +50,12 @@ def _ensure_supported_billing_contract(proposal: CommercialProposal) -> None:
         )
 
 
+def _canonical_acceptance_timestamp(value: datetime) -> str:
+    """Normalize ORM round-trips so an acceptance snapshot can be recomputed byte-for-byte."""
+    normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return normalized.isoformat()
+
+
 def _proposal_acceptance_source(
     proposal: CommercialProposal,
     accepted_by: str,
@@ -71,7 +77,7 @@ def _proposal_acceptance_source(
         "terms": proposal.terms,
         "accepted_by": accepted_by.strip(),
         "accepted_email": accepted_email.strip().lower(),
-        "accepted_at": accepted_at.isoformat(),
+        "accepted_at": _canonical_acceptance_timestamp(accepted_at),
     }
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
