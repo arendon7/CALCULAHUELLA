@@ -59,7 +59,9 @@ def test_v2606_revenue_truth_has_dedicated_early_gate_without_reducing_full_regr
     assert "V2.60.6 · Revenue operations truth gate" in source
     assert "Revenue truth · fast feedback" in source
     assert "Contratos Revenue Operations" in source
-    assert "pytest -q tests/test_v2606_revenue_operations_truth.py" in source
+    assert "pytest -q" in source
+    assert "tests/test_v2606_revenue_operations_truth.py" in source
+    assert "tests/test_v2606_activation_invoice_integrity.py" in source
     assert "Fresh migration SQLite" in source
     assert "Upgrade histórico 0040 a head SQLite" in source
     assert "20260824_0041_v2606_revenue_operations_truth.py" in source
