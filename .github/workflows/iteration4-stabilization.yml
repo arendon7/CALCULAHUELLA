@@ -73,6 +73,15 @@ jobs:
             tests/test_v200_postgres_methodology_schema.py \
             tests/test_v210_brand_provenance.py \
             tests/test_v210_brand_package.py \
+            tests/test_v259_render_release_identity_gate.py \
+            tests/test_v2602_public_diagnosis_trust_consent.py \
+            tests/test_v2603_public_result_interpretation.py \
+            tests/test_v260_public_diagnosis_value_hierarchy.py \
+            tests/test_v260_public_experience_evidence_safe.py \
+            tests/test_v260_public_handoff_taxonomy.py \
+            tests/test_v260_public_result_visual_contract.py \
+            tests/test_v260_solution_plan_alignment.py \
+            tests/test_v2604_product_readiness_feedback.py \
             --junitxml=iteration4-targeted.xml
 
       - name: Migración desde base vacía
