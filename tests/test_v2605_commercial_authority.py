@@ -120,6 +120,7 @@ def test_v2605_missing_explicit_amount_returns_400_preserves_form_and_does_not_p
         ("tax_rate", "nan", "debe ser un número finito"),
         ("tax_rate", "101", "no puede ser mayor que 100"),
         ("billing_cycle", "Semanal", "Selecciona un ciclo de facturación válido"),
+        ("valid_until", "not-a-date", "La fecha de vigencia no es válida"),
     ],
 )
 def test_v2605_invalid_contractual_values_are_rejected_without_silent_coercion(
