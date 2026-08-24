@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .commercial_pricing import proposal_initial_payment, subscription_custom_monthly_fee
 from .config import settings
 from .database import get_db
 from .db.models import (
@@ -30,6 +31,15 @@ class PaymentWebhookPayload(BaseModel):
     status: str = Field(min_length=3, max_length=30)
     amount: float = Field(ge=0)
     payer_email: str = ""
+
+
+def _next_billing_date(start: date, billing_cycle: str) -> date:
+    safe_day = min(start.day, 28)
+    if billing_cycle == "Mensual":
+        if start.month == 12:
+            return date(start.year + 1, 1, safe_day)
+        return date(start.year, start.month + 1, safe_day)
+    return date(start.year + 1, start.month, safe_day)
 
 
 def register_payment_routes(app, templates) -> None:
@@ -60,9 +70,16 @@ def register_payment_routes(app, templates) -> None:
         if not payment:
             payment = PaymentTransaction(
                 proposal_id=proposal.id, public_token=secrets.token_urlsafe(24), gateway="Demo",
-                status="Pendiente", amount=proposal.first_year_total, currency="COP",
+                status="Pendiente",
+                amount=proposal_initial_payment(
+                    proposal.implementation_fee,
+                    proposal.recurring_fee,
+                    proposal.discount_amount,
+                    proposal.tax_rate,
+                ),
+                currency="COP",
                 external_reference=f"PAY-{proposal.reference}", payer_name=proposal.accepted_by,
-                payer_email=proposal.accepted_email, provider_payload='{"mode": "demo"}',
+                payer_email=proposal.accepted_email, provider_payload='{"mode": "demo", "charge": "activation"}',
             )
             session.add(payment)
         session.commit()
@@ -101,7 +118,7 @@ def register_payment_routes(app, templates) -> None:
         payment.payer_name = payer_name.strip()
         payment.payer_email = payer_email.strip().lower()
         payment.paid_at = datetime.now(UTC)
-        payment.provider_payload = json.dumps({"mode": "demo", "method": method, "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
+        payment.provider_payload = json.dumps({"mode": "demo", "method": method, "charge": "activation", "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
         if not proposal.organization_id:
             base_name = proposal.company_name.strip()
             organization = session.scalar(select(Organization).where(Organization.name == base_name))
@@ -121,7 +138,11 @@ def register_payment_routes(app, templates) -> None:
                 subscription = OrganizationSubscription(
                     organization_id=organization.id, plan_id=proposal.plan_id, billing_cycle=proposal.billing_cycle,
                     status="Activa", start_date=date.today(), renewal_date=renewal,
-                    notes=f"Activada desde propuesta {proposal.reference} y pago demostrativo.",
+                    custom_monthly_fee=subscription_custom_monthly_fee(
+                        proposal.recurring_fee,
+                        proposal.billing_cycle,
+                    ),
+                    notes=f"Activada desde propuesta {proposal.reference}; conserva el valor recurrente negociado por ciclo.",
                 )
                 session.add(subscription)
                 session.flush()
@@ -130,9 +151,10 @@ def register_payment_routes(app, templates) -> None:
                 invoice = BillingInvoice(
                     organization_id=organization.id, subscription_id=subscription.id if subscription else None,
                     reference=f"COBRO-{proposal.reference}", period_start=date.today(),
-                    period_end=date(date.today().year + 1, date.today().month, min(date.today().day, 28)),
+                    period_end=_next_billing_date(date.today(), proposal.billing_cycle),
                     amount=payment.amount, status="Pagada", issued_at=date.today(), due_date=date.today(),
-                    paid_at=payment.paid_at, notes="Registro administrativo generado desde el pago demostrativo. No constituye factura electrónica.",
+                    paid_at=payment.paid_at,
+                    notes="Cobro de activación generado desde el pago demostrativo. Incluye implementación, primer ciclo recurrente, descuento inicial e impuestos según la propuesta. No constituye factura electrónica.",
                 )
                 session.add(invoice)
                 session.flush()
