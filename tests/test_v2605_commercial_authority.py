@@ -7,14 +7,30 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
+from app.commercial_pricing import (
+    proposal_first_year_total,
+    proposal_initial_payment,
+    subscription_custom_monthly_fee,
+)
 from app.db.base import SessionLocal
-from app.db.models import CommercialLead, CommercialProposal, ServicePlan
+from app.db.models import (
+    BillingInvoice,
+    CommercialLead,
+    CommercialProposal,
+    OrganizationSubscription,
+    PaymentTransaction,
+    ServicePlan,
+)
 from app.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / "app" / "templates" / "commercial.html"
+PUBLIC_TEMPLATE = ROOT / "app" / "templates" / "public_proposal.html"
+PAYMENT_TEMPLATE = ROOT / "app" / "templates" / "public_payment.html"
 SOURCE = ROOT / "app" / "commercial_web.py"
+PAYMENT_SOURCE = ROOT / "app" / "payment_web.py"
+OPERATIONS_SOURCE = ROOT / "app" / "commercial_operations_web.py"
 
 
 def _login(client: TestClient) -> None:
@@ -37,7 +53,7 @@ def _lead_and_plan() -> tuple[int, int]:
         return lead.id, plan.id
 
 
-def _valid_payload(title: str) -> dict[str, str]:
+def _valid_payload(title: str, *, billing_cycle: str = "Anual") -> dict[str, str]:
     lead_id, plan_id = _lead_and_plan()
     return {
         "lead_id": str(lead_id),
@@ -47,7 +63,7 @@ def _valid_payload(title: str) -> dict[str, str]:
         "recurring_fee": "2000000",
         "discount_amount": "250000",
         "tax_rate": "19",
-        "billing_cycle": "Anual",
+        "billing_cycle": billing_cycle,
         "valid_until": (date.today() + timedelta(days=30)).isoformat(),
         "scope": "Alcances 1 y 2\nSedes acordadas",
         "deliverables": "Inventario corporativo\nMemoria de cálculo",
@@ -65,15 +81,29 @@ def _proposal_count(title: str) -> int:
         )
 
 
-def test_v2605_commercial_ui_has_explicit_offer_authority_and_no_legacy_defaults() -> None:
+def _proposal_by_title(title: str) -> CommercialProposal:
+    with SessionLocal() as session:
+        proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.title == title))
+        assert proposal is not None
+        session.expunge(proposal)
+        return proposal
+
+
+def test_v2605_commercial_ui_has_explicit_offer_and_billing_authority() -> None:
     template = TEMPLATE.read_text(encoding="utf-8")
+    public_template = PUBLIC_TEMPLATE.read_text(encoding="utf-8")
+    payment_template = PAYMENT_TEMPLATE.read_text(encoding="utf-8")
     source = SOURCE.read_text(encoding="utf-8")
+    payment_source = PAYMENT_SOURCE.read_text(encoding="utf-8")
 
     assert '{% from "public/plan_copy.html" import public_plan_name %}' in template
     assert "Autoridad de la oferta" in template
     assert "referencia diagnóstica" in template
     assert "plan contractual" in template.lower()
     assert "Los valores de campañas públicas tampoco se copian automáticamente" in template
+    assert "valor por ciclo" in template.lower()
+    assert "12 ciclos mensuales" in template
+    assert "Descuento inicial" in template
     assert "lead.complexity_score" not in template
 
     for legacy in ("8500000", "9900000", "8 a 10 semanas"):
@@ -86,11 +116,24 @@ def test_v2605_commercial_ui_has_explicit_offer_authority_and_no_legacy_defaults
     assert 'name="valid_until"' in template and 'min="{{ proposal_min_valid_until }}"' in template
 
     assert "_parse_nonnegative_number" in source
-    assert 'billing_cycle if billing_cycle in {"Mensual", "Anual"} else "Anual"' not in source
-    assert "implementation_fee=max(0" not in source
-    assert "recurring_fee=max(0" not in source
-    assert "discount_amount=max(0" not in source
-    assert "tax_rate=max(0" not in source
+    assert "proposal_first_year_total" in source
+    assert 'contract_version="1.1"' in source
+    assert "proposal_initial_payment" in source
+    assert "recurring_first_year_value" in source
+    assert "proposal_initial_payment" in payment_source
+    assert "_ensure_supported_billing_contract" in payment_source
+    assert "Pago de activación" in public_template
+    assert "12 ciclos primer año" in public_template
+    assert "Revisión comercial requerida" in public_template
+    assert "Pago de activación" in payment_template
+
+
+def test_v2605_billing_math_distinguishes_contract_value_from_activation_charge() -> None:
+    assert proposal_first_year_total(1_000_000, 200_000, 100_000, 19, "Mensual") == 3_927_000
+    assert proposal_initial_payment(1_000_000, 200_000, 100_000, 19) == 1_309_000
+    assert proposal_first_year_total(1_000_000, 2_000_000, 250_000, 19, "Anual") == 3_272_500
+    assert proposal_initial_payment(1_000_000, 2_000_000, 250_000, 19) == 3_272_500
+    assert subscription_custom_monthly_fee(1_200_001, "Anual") * 12 == pytest.approx(1_200_001)
 
 
 def test_v2605_missing_explicit_amount_returns_400_preserves_form_and_does_not_persist() -> None:
@@ -141,7 +184,7 @@ def test_v2605_invalid_contractual_values_are_rejected_without_silent_coercion(
     assert _proposal_count(title) == 0
 
 
-def test_v2605_discount_cannot_exceed_explicit_subtotal() -> None:
+def test_v2605_discount_cannot_exceed_activation_subtotal() -> None:
     title = "V2.60.5 excessive discount"
     payload = _valid_payload(title)
     payload["implementation_fee"] = "100"
@@ -153,7 +196,7 @@ def test_v2605_discount_cannot_exceed_explicit_subtotal() -> None:
         response = client.post("/comercial/propuestas/nueva", data=payload, follow_redirects=False)
 
     assert response.status_code == 400
-    assert "El descuento no puede superar" in response.text
+    assert "descuento inicial no puede superar el primer cobro" in response.text.lower()
     assert _proposal_count(title) == 0
 
 
@@ -171,8 +214,8 @@ def test_v2605_proposal_validity_cannot_be_in_the_past() -> None:
     assert _proposal_count(title) == 0
 
 
-def test_v2605_valid_explicit_offer_preserves_values_and_existing_transaction_contract() -> None:
-    title = "V2.60.5 explicit commercial offer"
+def test_v2605_valid_annual_offer_preserves_existing_total_contract() -> None:
+    title = "V2.60.5 explicit annual offer"
     payload = _valid_payload(title)
 
     with TestClient(app) as client:
@@ -182,23 +225,124 @@ def test_v2605_valid_explicit_offer_preserves_values_and_existing_transaction_co
     assert response.status_code == 303
     assert response.headers["location"] == "/comercial"
 
-    with SessionLocal() as session:
-        proposal = session.scalar(
-            select(CommercialProposal).where(CommercialProposal.title == title)
-        )
-        assert proposal is not None
-        assert proposal.implementation_fee == 1_000_000
-        assert proposal.recurring_fee == 2_000_000
-        assert proposal.discount_amount == 250_000
-        assert proposal.tax_rate == 19
-        assert proposal.billing_cycle == "Anual"
-        assert proposal.first_year_total == 3_272_500
-        assert proposal.valid_until == date.today() + timedelta(days=30)
-        assert proposal.status == "Borrador"
-        assert proposal.public_token
-        token = proposal.public_token
+    proposal = _proposal_by_title(title)
+    assert proposal.implementation_fee == 1_000_000
+    assert proposal.recurring_fee == 2_000_000
+    assert proposal.discount_amount == 250_000
+    assert proposal.tax_rate == 19
+    assert proposal.billing_cycle == "Anual"
+    assert proposal.first_year_total == 3_272_500
+    assert proposal.valid_until == date.today() + timedelta(days=30)
+    assert proposal.status == "Borrador"
+    assert proposal.contract_version == "1.1"
 
     with TestClient(app) as client:
-        public = client.get(f"/propuesta/{token}")
+        public = client.get(f"/propuesta/{proposal.public_token}")
         assert public.status_code == 200
         assert title in public.text
+        assert "En ciclo anual coincide con la inversión del primer año" in public.text
+
+
+def test_v2605_monthly_offer_annualizes_contract_but_charges_only_activation_cycle() -> None:
+    title = "V2.60.5 monthly billing authority"
+    payload = _valid_payload(title, billing_cycle="Mensual")
+    payload.update(
+        implementation_fee="1000000",
+        recurring_fee="200000",
+        discount_amount="100000",
+        tax_rate="19",
+    )
+
+    with TestClient(app) as client:
+        _login(client)
+        created = client.post("/comercial/propuestas/nueva", data=payload, follow_redirects=False)
+        assert created.status_code == 303
+        proposal = _proposal_by_title(title)
+        assert proposal.first_year_total == 3_927_000
+
+        public = client.get(f"/propuesta/{proposal.public_token}")
+        assert public.status_code == 200
+        assert "12 ciclos primer año" in public.text
+        assert "2.400.000" in public.text
+        assert "1.309.000" in public.text
+
+        accepted = client.post(
+            f"/propuesta/{proposal.public_token}/aceptar",
+            data={
+                "accepted_by": "Valentina Gómez",
+                "accepted_email": "gerencia@cafedemo.co",
+                "accept_terms": "on",
+            },
+            follow_redirects=False,
+        )
+        assert accepted.status_code == 303
+        assert accepted.headers["location"].startswith("/pago/")
+        payment_token = accepted.headers["location"].rsplit("/", 1)[-1]
+
+        with SessionLocal() as session:
+            payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.public_token == payment_token))
+            assert payment is not None
+            assert payment.amount == 1_309_000
+            assert payment.amount != proposal.first_year_total
+
+        payment_page = client.get(f"/pago/{payment_token}")
+        assert payment_page.status_code == 200
+        assert "No representa el valor completo del primer año" in payment_page.text
+
+        confirmed = client.post(
+            f"/pago/{payment_token}/confirmar",
+            data={"payer_name": "Valentina Gómez", "payer_email": "gerencia@cafedemo.co"},
+            follow_redirects=False,
+        )
+        assert confirmed.status_code == 303
+
+    with SessionLocal() as session:
+        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.public_token == payment_token))
+        assert payment is not None
+        assert payment.subscription_id is not None
+        subscription = session.get(OrganizationSubscription, payment.subscription_id)
+        assert subscription is not None
+        assert subscription.billing_cycle == "Mensual"
+        assert subscription.custom_monthly_fee == 200_000
+        invoice = session.get(BillingInvoice, payment.invoice_id)
+        assert invoice is not None
+        assert invoice.amount == 1_309_000
+        assert invoice.period_end < date(date.today().year + 1, date.today().month, min(date.today().day, 28))
+
+
+def test_v2605_legacy_monthly_proposal_cannot_be_accepted() -> None:
+    title = "V2.60.5 legacy monthly guard"
+    payload = _valid_payload(title, billing_cycle="Mensual")
+    payload["recurring_fee"] = "200000"
+
+    with TestClient(app) as client:
+        _login(client)
+        assert client.post("/comercial/propuestas/nueva", data=payload, follow_redirects=False).status_code == 303
+        proposal = _proposal_by_title(title)
+        with SessionLocal() as session:
+            stored = session.get(CommercialProposal, proposal.id)
+            assert stored is not None
+            stored.contract_version = "1.0"
+            session.commit()
+
+        public = client.get(f"/propuesta/{proposal.public_token}")
+        assert public.status_code == 200
+        assert "Revisión comercial requerida" in public.text
+        assert "Aceptar propuesta" not in public.text
+
+        rejected = client.post(
+            f"/propuesta/{proposal.public_token}/aceptar",
+            data={"accepted_by": "Valentina Gómez", "accepted_email": "gerencia@cafedemo.co", "accept_terms": "on"},
+            follow_redirects=False,
+        )
+        assert rejected.status_code == 409
+        assert "versión contractual anterior" in rejected.text
+
+    with SessionLocal() as session:
+        assert session.scalar(select(func.count()).select_from(PaymentTransaction).where(PaymentTransaction.proposal_id == proposal.id)) == 0
+
+
+def test_v2605_recurring_invoice_uses_negotiated_zero_instead_of_catalog_fallback() -> None:
+    operations_source = OPERATIONS_SOURCE.read_text(encoding="utf-8")
+    assert "subscription.custom_monthly_fee is not None" in operations_source
+    assert "subscription.custom_monthly_fee or subscription.plan.monthly_fee" not in operations_source
