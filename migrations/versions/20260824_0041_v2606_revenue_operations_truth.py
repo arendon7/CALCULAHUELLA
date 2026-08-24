@@ -68,6 +68,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     # No eliminamos automáticamente evidencia contractual ni clasificación de
-    # cobro. La precisión monetaria Float -> Numeric/Decimal se abordará en una
-    # revisión posterior, una vez estabilizada esta semántica.
+    # cobro. Un cambio posterior de precisión monetaria será deliberado y se
+    # abordará únicamente después de estabilizar esta semántica.
     return
