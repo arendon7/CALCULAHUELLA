@@ -50,6 +50,32 @@ def _ensure_supported_billing_contract(proposal: CommercialProposal) -> None:
         )
 
 
+def _proposal_acceptance_source(
+    proposal: CommercialProposal,
+    accepted_by: str,
+    accepted_email: str,
+    accepted_at: datetime,
+) -> str:
+    """Canonical acceptance snapshot binding identity, scope and complete economics."""
+    payload = {
+        "reference": proposal.reference,
+        "contract_version": proposal.contract_version,
+        "billing_cycle": proposal.billing_cycle,
+        "implementation_fee": f"{proposal.implementation_fee:.2f}",
+        "recurring_fee": f"{proposal.recurring_fee:.2f}",
+        "discount_amount": f"{proposal.discount_amount:.2f}",
+        "tax_rate": f"{proposal.tax_rate:.4f}",
+        "first_year_total": f"{proposal.first_year_total:.2f}",
+        "scope_json": proposal.scope_json,
+        "deliverables_json": proposal.deliverables_json,
+        "terms": proposal.terms,
+        "accepted_by": accepted_by.strip(),
+        "accepted_email": accepted_email.strip().lower(),
+        "accepted_at": accepted_at.isoformat(),
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
 def register_payment_routes(app, templates) -> None:
     @app.post("/propuesta/{token}/aceptar")
     def accept_public_proposal(
@@ -68,7 +94,7 @@ def register_payment_routes(app, templates) -> None:
         _ensure_supported_billing_contract(proposal)
         timestamp = datetime.now(UTC)
         client_ip = request.client.host if request.client else "unknown"
-        acceptance_source = f"{proposal.reference}|{accepted_by.strip()}|{accepted_email.strip().lower()}|{timestamp.isoformat()}|{proposal.first_year_total}|{proposal.contract_version}"
+        acceptance_source = _proposal_acceptance_source(proposal, accepted_by, accepted_email, timestamp)
         proposal.status = "Aceptada"
         proposal.accepted_by = accepted_by.strip()
         proposal.accepted_email = accepted_email.strip().lower()
@@ -152,7 +178,11 @@ def register_payment_routes(app, templates) -> None:
                         proposal.recurring_fee,
                         proposal.billing_cycle,
                     ),
-                    notes=f"Activada desde propuesta {proposal.reference}; conserva el valor recurrente negociado por ciclo.",
+                    notes=(
+                        f"Activada desde propuesta {proposal.reference}; conserva el valor base recurrente negociado "
+                        f"por ciclo. Impuesto contractual de {proposal.tax_rate:g}% se conserva en la propuesta y se "
+                        "liquida en el documento tributario/pago final, no dentro de custom_monthly_fee."
+                    ),
                 )
                 session.add(subscription)
                 session.flush()
