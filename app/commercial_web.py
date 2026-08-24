@@ -215,8 +215,8 @@ def register_commercial_routes(
             if not valid_until.strip():
                 raise ValueError("Define hasta cuándo es válida la propuesta.")
             try:
-                valid_until_date = parse_date(valid_until)
-            except (TypeError, ValueError) as exc:
+                valid_until_date = date.fromisoformat(valid_until)
+            except ValueError as exc:
                 raise ValueError("La fecha de vigencia no es válida.") from exc
             if valid_until_date < date.today():
                 raise ValueError("La fecha de vigencia no puede estar en el pasado.")
