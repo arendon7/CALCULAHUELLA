@@ -14,8 +14,9 @@
 .process-nav{grid-template-columns:repeat(8,1fr)}
 
 /* El logo clásico no tiene variante invertida autorizada: se preserva exacto sobre placa clara.
- * La especificidad anula el filtro invertido histórico del footer sin alterar el SVG canónico. */
-.public-footer-v14 .canonical-footer-logo{display:block;box-sizing:border-box;width:230px;max-width:100%;height:auto;padding:8px 10px;border-radius:12px;background:#fff;filter:none}
+ * El override por ruta neutraliza el filtro histórico del footer sin aplicar filtros a la clase canónica. */
+.public-footer-v14 img[src$="brand-primary.svg"]{filter:none}
+.canonical-footer-logo{display:block;box-sizing:border-box;max-width:238px;height:auto;padding:8px 10px;border-radius:12px;background:#fff}
 
 /* Handoff público → diagnóstico: dos respuestas reutilizables, sin PII. */
 .diagnostic-preconfig-grid{align-items:start}
