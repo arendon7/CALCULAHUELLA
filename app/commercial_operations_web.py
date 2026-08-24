@@ -250,13 +250,10 @@ def register_commercial_operations_routes(
         contract.signed_email = clean_signed_email
         contract.signed_at = signed_at
         contract.signature_hash = signature_hash
+        contract.signature_version = CONTRACT_SIGNATURE_VERSION
+        contract.signature_payload = canonical_payload
+        contract.signature_snapshot_created_at = signed_at
         contract.status = "Vigente"
-        session.add(ContractSignatureSnapshot(
-            contract_id=contract.id,
-            signature_version=CONTRACT_SIGNATURE_VERSION,
-            canonical_payload=canonical_payload,
-            payload_hash=signature_hash,
-        ))
         add_audit(session, contract.organization_id, str(user["email"]), "FIRMAR", "Contrato de servicio", contract.reference, new_value=signature_hash)
         session.commit()
         set_flash(request, f"Firma contractual registrada para {contract.reference} con snapshot v{CONTRACT_SIGNATURE_VERSION}.")
@@ -435,11 +432,6 @@ def register_commercial_operations_routes(
             organization_id=subscription.organization_id, subscription_id=subscription.id, reference=normalized_reference,
             period_start=start, period_end=end, amount=base_amount, status="Pendiente", issued_at=date.today(),
             due_date=due, notes=invoice_notes,
-        )
-        session.add(invoice)
-        session.flush()
-        session.add(BillingChargeBreakdown(
-            invoice_id=invoice.id,
             charge_type="Recurrente",
             amount_semantics=INVOICE_BASE_BEFORE_TAX,
             net_amount=base_amount,
@@ -451,7 +443,10 @@ def register_commercial_operations_routes(
                 "Base recurrente conocida. No existe una tasa tributaria contractual persistida en la suscripción; "
                 "no se infiere un total a cobrar."
             ),
-        ))
+            semantics_created_at=datetime.now(UTC),
+        )
+        session.add(invoice)
+        session.flush()
         session.add(BillingDocumentRecord(
             organization_id=subscription.organization_id, invoice_id=invoice.id,
             document_type="Documento de cobro interno", internal_reference=f"DOC-{invoice.reference}",
