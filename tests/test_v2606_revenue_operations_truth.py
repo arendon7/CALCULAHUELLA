@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -12,6 +12,7 @@ from app.commercial_pricing import proposal_first_year_total
 from app.database import SessionLocal
 from app.db.models import (
     BillingChargeBreakdown,
+    BillingDocumentRecord,
     BillingInvoice,
     CollectionAction,
     CommercialLead,
@@ -224,15 +225,34 @@ def test_v2606_new_contract_signature_snapshot_is_complete_and_roundtrip_stable(
 
 
 def test_v2606_legacy_signature_is_not_rehashed_automatically() -> None:
+    legacy_hash = "a" * 64
+    reference = _unique("CTR-LEGACY-V2606")
     with SessionLocal() as session:
-        legacy = session.scalar(
-            select(ServiceContract)
-            .where(ServiceContract.signature_hash != "")
-            .order_by(ServiceContract.id)
+        organization = session.scalar(select(Organization).order_by(Organization.id))
+        assert organization is not None
+        legacy = ServiceContract(
+            organization_id=organization.id,
+            reference=reference,
+            title="Contrato legacy",
+            version="1.0",
+            status="Vigente",
+            start_date=date(2026, 1, 1),
+            end_date=date(2026, 12, 31),
+            renewal_type="Anual",
+            auto_renew=False,
+            notice_days=30,
+            contract_value=1000,
+            billing_cycle="Anual",
+            owner="Equipo comercial",
+            terms_snapshot="Snapshot histórico",
+            signed_by="Firmante legacy",
+            signed_email="legacy@example.com",
+            signed_at=datetime(2026, 1, 2, 12, 0, tzinfo=UTC),
+            signature_hash=legacy_hash,
+            created_by="legacy@calculatuhuella.local",
         )
-        if legacy is None:
-            pytest.skip("La semilla no contiene firma contractual legacy")
-        before_hash = legacy.signature_hash
+        session.add(legacy)
+        session.commit()
         legacy_id = legacy.id
         assert session.scalar(
             select(ContractSignatureSnapshot).where(ContractSignatureSnapshot.contract_id == legacy_id)
@@ -246,7 +266,7 @@ def test_v2606_legacy_signature_is_not_rehashed_automatically() -> None:
 
     with SessionLocal() as session:
         legacy = session.get(ServiceContract, legacy_id)
-        assert legacy.signature_hash == before_hash
+        assert legacy.signature_hash == legacy_hash
         assert session.scalar(
             select(ContractSignatureSnapshot).where(ContractSignatureSnapshot.contract_id == legacy_id)
         ) is None
@@ -289,6 +309,7 @@ def test_v2606_recurring_charge_records_base_without_inventing_tax_total() -> No
         assert breakdown.tax_amount is None
         assert breakdown.total_amount is None
         assert "no constituye factura electrónica" in invoice.notes.lower()
+        assert "nota operativa: prueba v2.60.6" in invoice.notes.lower()
 
 
 def test_v2606_recurring_charge_rejects_invalid_dates_and_negative_authority() -> None:
@@ -354,17 +375,36 @@ def test_v2606_recurring_charge_rejects_invalid_dates_and_negative_authority() -
 
 
 def test_v2606_base_pending_tax_cannot_be_marked_as_paid_total() -> None:
+    reference = _unique("REC-PENDING-TAX")
     with SessionLocal() as session:
-        invoice = session.scalar(
-            select(BillingInvoice)
-            .join(BillingChargeBreakdown, BillingChargeBreakdown.invoice_id == BillingInvoice.id)
-            .where(BillingChargeBreakdown.amount_semantics == INVOICE_BASE_BEFORE_TAX)
-            .order_by(BillingInvoice.id.desc())
+        organization = session.scalar(select(Organization).order_by(Organization.id))
+        assert organization is not None
+        invoice = BillingInvoice(
+            organization_id=organization.id,
+            reference=reference,
+            period_start=date(2026, 9, 1),
+            period_end=date(2026, 9, 30),
+            amount=250000,
+            status="Pendiente",
+            issued_at=date(2026, 9, 30),
+            due_date=date(2026, 10, 5),
+            notes="Registro interno de prueba",
         )
-        if invoice is None:
-            pytest.skip("Requiere el registro recurrente del contrato V2.60.6")
+        session.add(invoice)
+        session.flush()
+        session.add(BillingChargeBreakdown(
+            invoice_id=invoice.id,
+            charge_type="Recurrente",
+            amount_semantics=INVOICE_BASE_BEFORE_TAX,
+            net_amount=250000,
+            tax_rate_snapshot=None,
+            tax_amount=None,
+            total_amount=None,
+            source_reference="TEST-V2606",
+            classification_note="Base antes de impuesto",
+        ))
         action = CollectionAction(
-            organization_id=invoice.organization_id,
+            organization_id=organization.id,
             invoice_id=invoice.id,
             action_type="Confirmación de pago",
             channel="Correo",
@@ -390,7 +430,8 @@ def test_v2606_base_pending_tax_cannot_be_marked_as_paid_total() -> None:
         action = session.get(CollectionAction, action_id)
         invoice = session.get(BillingInvoice, invoice_id)
         assert action.status == "Pendiente"
-        assert invoice.status != "Pagada"
+        assert invoice.status == "Pendiente"
+        assert invoice.paid_at is None
 
 
 def test_v2606_activation_payment_has_authoritative_net_tax_total_breakdown() -> None:
@@ -477,15 +518,34 @@ def test_v2606_operations_ui_names_semantics_and_tax_boundary_explicitly() -> No
 
 def test_v2606_external_emission_requires_real_provider_identity() -> None:
     with SessionLocal() as session:
-        document = session.scalar(select(BillingInvoice).order_by(BillingInvoice.id))
-        if document is None:
-            pytest.skip("No hay cobros en la semilla")
-        from app.db.models import BillingDocumentRecord
-        record = session.scalar(
-            select(BillingDocumentRecord).where(BillingDocumentRecord.invoice_id == document.id).order_by(BillingDocumentRecord.id)
+        organization = session.scalar(select(Organization).order_by(Organization.id))
+        assert organization is not None
+        invoice = BillingInvoice(
+            organization_id=organization.id,
+            reference=_unique("COBRO-EXT-V2606"),
+            period_start=date(2026, 8, 1),
+            period_end=date(2026, 8, 31),
+            amount=100000,
+            status="Pendiente",
+            issued_at=date(2026, 8, 31),
+            due_date=date(2026, 9, 5),
+            notes="Registro interno",
         )
-        if record is None:
-            pytest.skip("No hay documento de cobro en la semilla")
+        session.add(invoice)
+        session.flush()
+        record = BillingDocumentRecord(
+            organization_id=organization.id,
+            invoice_id=invoice.id,
+            document_type="Documento de cobro interno",
+            internal_reference=_unique("DOC-EXT-V2606"),
+            provider="Sin integración",
+            status="Pendiente de integración",
+            issued_at=None,
+            notes="Pendiente de emisión externa",
+            created_by="test@calculatuhuella.local",
+        )
+        session.add(record)
+        session.commit()
         record_id = record.id
 
     with TestClient(app) as client:
@@ -501,3 +561,8 @@ def test_v2606_external_emission_requires_real_provider_identity() -> None:
             follow_redirects=False,
         )
         assert response.status_code == 400
+
+    with SessionLocal() as session:
+        record = session.get(BillingDocumentRecord, record_id)
+        assert record.status == "Pendiente de integración"
+        assert record.provider == "Sin integración"
