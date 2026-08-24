@@ -42,6 +42,14 @@ def _next_billing_date(start: date, billing_cycle: str) -> date:
     return date(start.year + 1, start.month, safe_day)
 
 
+def _ensure_supported_billing_contract(proposal: CommercialProposal) -> None:
+    if proposal.billing_cycle == "Mensual" and proposal.contract_version != "1.1":
+        raise HTTPException(
+            409,
+            "La propuesta mensual usa una versión contractual anterior. Debe regenerarse antes de aceptar o confirmar pagos.",
+        )
+
+
 def register_payment_routes(app, templates) -> None:
     @app.post("/propuesta/{token}/aceptar")
     def accept_public_proposal(
@@ -57,6 +65,7 @@ def register_payment_routes(app, templates) -> None:
             proposal.status = "Vencida"
             session.commit()
             raise HTTPException(409, "La propuesta está vencida")
+        _ensure_supported_billing_contract(proposal)
         timestamp = datetime.now(UTC)
         client_ip = request.client.host if request.client else "unknown"
         acceptance_source = f"{proposal.reference}|{accepted_by.strip()}|{accepted_email.strip().lower()}|{timestamp.isoformat()}|{proposal.first_year_total}|{proposal.contract_version}"
@@ -113,6 +122,7 @@ def register_payment_routes(app, templates) -> None:
         proposal = payment.proposal
         if proposal.status != "Aceptada":
             raise HTTPException(409, "La propuesta debe aceptarse antes del pago")
+        _ensure_supported_billing_contract(proposal)
         payment.status = "Pagada"
         payment.gateway = "Demo"
         payment.payer_name = payer_name.strip()
@@ -186,9 +196,11 @@ def register_payment_routes(app, templates) -> None:
     def payment_webhook(payload: PaymentWebhookPayload, x_payment_secret: str | None = Header(None), session: Session = Depends(get_db)):
         if not settings.payment_webhook_secret or not hmac.compare_digest(x_payment_secret or "", settings.payment_webhook_secret):
             raise HTTPException(401, "Firma de pago inválida")
-        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.external_reference == payload.external_reference))
+        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.external_reference == payload.external_reference).options(selectinload(PaymentTransaction.proposal)))
         if not payment:
             raise HTTPException(404, "Transacción no encontrada")
+        if payment.proposal:
+            _ensure_supported_billing_contract(payment.proposal)
         if abs(payment.amount - payload.amount) > 0.01:
             raise HTTPException(409, "El valor informado no coincide")
         normalized_status = payload.status.strip().lower()
