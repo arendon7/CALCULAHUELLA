@@ -22,18 +22,23 @@ ACTIVE_RELEASE_CONTRACTS = (
 def _workflow_sections() -> tuple[str, str]:
     workflow = WORKFLOW.read_text(encoding="utf-8")
     targeted_marker = "- name: Ejecutar contratos de product readiness"
+    migration_marker = "- name: Migración desde base vacía"
     full_marker = "- name: Suite integral aislada"
     targeted_start = workflow.index(targeted_marker)
-    full_start = workflow.index(full_marker, targeted_start)
-    return workflow[targeted_start:full_start], workflow[full_start:]
+    targeted_end = workflow.index(migration_marker, targeted_start)
+    full_start = workflow.index(full_marker, targeted_end)
+    assert targeted_start < targeted_end < full_start
+    return workflow[targeted_start:targeted_end], workflow[full_start:]
 
 
-def test_v2604_active_release_contracts_run_before_exhaustive_regression() -> None:
+def test_v2604_active_release_contracts_run_in_exact_early_gate() -> None:
     targeted, full = _workflow_sections()
 
     for contract in ACTIVE_RELEASE_CONTRACTS:
-        assert contract in targeted, f"Contrato activo fuera del gate temprano: {contract}"
+        assert contract in targeted, f"Contrato activo fuera del gate dirigido temprano: {contract}"
 
+    assert "pytest -q" in targeted
+    assert "--junitxml=iteration4-targeted.xml" in targeted
     assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full
 
 
