@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import math
 import secrets
 from datetime import UTC, date, datetime
 
@@ -11,7 +12,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .config import settings
 from .database import get_db
-from .db.models import CommercialLead, CommercialProposal, PaymentTransaction, ServicePlan
+from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment, PaymentTransaction, ServicePlan
 
 
 def register_commercial_routes(
@@ -31,34 +32,114 @@ def register_commercial_routes(
             return []
 
     def _proposal_total(implementation_fee: float, recurring_fee: float, discount_amount: float, tax_rate: float) -> float:
-        subtotal = max(0.0, implementation_fee) + max(0.0, recurring_fee) - max(0.0, discount_amount)
-        return round(max(0.0, subtotal) * (1 + max(0.0, tax_rate) / 100), 2)
+        subtotal = implementation_fee + recurring_fee - discount_amount
+        return round(subtotal * (1 + tax_rate / 100), 2)
+
+    def _commercial_data(session: Session) -> dict[str, object]:
+        leads = list(session.scalars(select(CommercialLead).order_by(CommercialLead.created_at.desc())))
+        proposals = list(session.scalars(
+            select(CommercialProposal)
+            .options(selectinload(CommercialProposal.lead), selectinload(CommercialProposal.plan))
+            .order_by(CommercialProposal.created_at.desc())
+        ))
+        payments = list(session.scalars(
+            select(PaymentTransaction)
+            .options(selectinload(PaymentTransaction.proposal))
+            .order_by(PaymentTransaction.created_at.desc())
+            .limit(50)
+        ))
+        plans = list(session.scalars(
+            select(ServicePlan).where(ServicePlan.active.is_(True)).order_by(ServicePlan.id)
+        ))
+
+        assessment_by_lead: dict[int, DiagnosticAssessment] = {}
+        lead_ids = [lead.id for lead in leads]
+        if lead_ids:
+            assessments = session.scalars(
+                select(DiagnosticAssessment)
+                .where(DiagnosticAssessment.lead_id.in_(lead_ids))
+                .order_by(DiagnosticAssessment.assessed_at.desc(), DiagnosticAssessment.id.desc())
+            )
+            for assessment in assessments:
+                if assessment.lead_id is not None and assessment.lead_id not in assessment_by_lead:
+                    assessment_by_lead[assessment.lead_id] = assessment
+
+        summary = {
+            "leads": len(leads),
+            "qualified": sum(1 for item in leads if item.status in {"Calificado", "Propuesta"}),
+            "proposals": len(proposals),
+            "accepted": sum(1 for item in proposals if item.status == "Aceptada"),
+            "pipeline": round(sum(
+                item.first_year_total
+                for item in proposals
+                if item.status in {"Borrador", "Enviada", "Vista", "Aceptada"}
+            )),
+            "paid": round(sum(item.amount for item in payments if item.status == "Pagada")),
+        }
+        return {
+            "leads": leads,
+            "proposals": proposals,
+            "payments": payments,
+            "plans": plans,
+            "assessment_by_lead": assessment_by_lead,
+            "summary": summary,
+        }
+
+    def _render_commercial(
+        request: Request,
+        session: Session,
+        user,
+        *,
+        proposal_error: str = "",
+        proposal_form_values: dict[str, object] | None = None,
+        status_code: int = 200,
+    ):
+        data = _commercial_data(session)
+        context = common_context(
+            request,
+            session,
+            user,
+            "commercial",
+            **data,
+            proposal_error=proposal_error,
+            proposal_form_values=proposal_form_values or {},
+            proposal_min_valid_until=date.today().isoformat(),
+        )
+        return templates.TemplateResponse(
+            request,
+            "commercial.html",
+            context,
+            status_code=status_code,
+        )
+
+    def _parse_nonnegative_number(raw: str, label: str, *, maximum: float | None = None) -> float:
+        value_raw = str(raw or "").strip()
+        if not value_raw:
+            raise ValueError(f"Define {label}.")
+        try:
+            value = float(value_raw)
+        except ValueError as exc:
+            raise ValueError(f"{label.capitalize()} debe ser un número válido.") from exc
+        if not math.isfinite(value):
+            raise ValueError(f"{label.capitalize()} debe ser un número finito.")
+        if value < 0:
+            raise ValueError(f"{label.capitalize()} no puede ser negativo.")
+        if maximum is not None and value > maximum:
+            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum:g}.")
+        return value
 
     @app.get("/comercial", response_class=HTMLResponse)
     def commercial_center(request: Request, session: Session = Depends(get_db)):
         user = require_user(request)
         ensure_capability(user, "manage_commercial")
-        leads = list(session.scalars(select(CommercialLead).order_by(CommercialLead.created_at.desc())))
-        proposals = list(session.scalars(
-            select(CommercialProposal).options(selectinload(CommercialProposal.lead), selectinload(CommercialProposal.plan)).order_by(CommercialProposal.created_at.desc())
-        ))
-        payments = list(session.scalars(
-            select(PaymentTransaction).options(selectinload(PaymentTransaction.proposal)).order_by(PaymentTransaction.created_at.desc()).limit(50)
-        ))
-        plans = list(session.scalars(select(ServicePlan).where(ServicePlan.active.is_(True)).order_by(ServicePlan.monthly_fee)))
-        summary = {
-            "leads": len(leads), "qualified": sum(1 for item in leads if item.status in {"Calificado", "Propuesta"}),
-            "proposals": len(proposals), "accepted": sum(1 for item in proposals if item.status == "Aceptada"),
-            "pipeline": round(sum(item.first_year_total for item in proposals if item.status in {"Borrador", "Enviada", "Vista", "Aceptada"})),
-            "paid": round(sum(item.amount for item in payments if item.status == "Pagada")),
-        }
-        return templates.TemplateResponse(request, "commercial.html", common_context(
-            request, session, user, "commercial", leads=leads, proposals=proposals, payments=payments, plans=plans, summary=summary,
-        ))
+        return _render_commercial(request, session, user)
 
     @app.post("/comercial/leads/{lead_id}/estado")
     def update_commercial_lead(
-        lead_id: int, request: Request, status: str = Form(...), assigned_to: str = Form("Equipo comercial"),
+        lead_id: int,
+        request: Request,
+        status: str = Form(...),
+        assigned_to: str = Form("Equipo comercial"),
         session: Session = Depends(get_db),
     ):
         user = require_user(request)
@@ -75,10 +156,20 @@ def register_commercial_routes(
 
     @app.post("/comercial/propuestas/nueva")
     def create_commercial_proposal(
-        request: Request, lead_id: int = Form(...), plan_id: int = Form(...), title: str = Form(...),
-        implementation_fee: float = Form(0), recurring_fee: float = Form(0), discount_amount: float = Form(0),
-        tax_rate: float = Form(19), billing_cycle: str = Form("Anual"), valid_until: str = Form(""),
-        scope: str = Form(""), deliverables: str = Form(""), terms: str = Form(""), session: Session = Depends(get_db),
+        request: Request,
+        lead_id: int = Form(...),
+        plan_id: int = Form(...),
+        title: str = Form(""),
+        implementation_fee: str = Form(""),
+        recurring_fee: str = Form(""),
+        discount_amount: str = Form("0"),
+        tax_rate: str = Form(""),
+        billing_cycle: str = Form(""),
+        valid_until: str = Form(""),
+        scope: str = Form(""),
+        deliverables: str = Form(""),
+        terms: str = Form(""),
+        session: Session = Depends(get_db),
     ):
         user = require_user(request)
         ensure_capability(user, "manage_commercial")
@@ -86,23 +177,103 @@ def register_commercial_routes(
         plan = session.get(ServicePlan, plan_id)
         if not lead or not plan:
             raise HTTPException(404, "Prospecto o plan no encontrado")
+
+        form_values: dict[str, object] = {
+            "lead_id": lead_id,
+            "plan_id": plan_id,
+            "title": title,
+            "implementation_fee": implementation_fee,
+            "recurring_fee": recurring_fee,
+            "discount_amount": discount_amount,
+            "tax_rate": tax_rate,
+            "billing_cycle": billing_cycle,
+            "valid_until": valid_until,
+            "scope": scope,
+            "deliverables": deliverables,
+            "terms": terms,
+        }
+
+        try:
+            clean_title = title.strip()
+            if not clean_title:
+                raise ValueError("Define el título de la propuesta.")
+            if not plan.active:
+                raise ValueError("El plan seleccionado ya no está activo. Selecciona otro plan.")
+
+            implementation_value = _parse_nonnegative_number(implementation_fee, "el valor de implementación")
+            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente")
+            discount_value = _parse_nonnegative_number(discount_amount, "el descuento")
+            tax_value = _parse_nonnegative_number(tax_rate, "la tasa de impuesto", maximum=100)
+
+            if billing_cycle not in {"Mensual", "Anual"}:
+                raise ValueError("Selecciona un ciclo de facturación válido.")
+
+            subtotal_before_discount = implementation_value + recurring_value
+            if discount_value > subtotal_before_discount:
+                raise ValueError("El descuento no puede superar la suma de implementación y valor recurrente.")
+
+            if not valid_until.strip():
+                raise ValueError("Define hasta cuándo es válida la propuesta.")
+            try:
+                valid_until_date = parse_date(valid_until)
+            except (TypeError, ValueError) as exc:
+                raise ValueError("La fecha de vigencia no es válida.") from exc
+            if valid_until_date < date.today():
+                raise ValueError("La fecha de vigencia no puede estar en el pasado.")
+
+            scope_items = [item.strip() for item in scope.splitlines() if item.strip()]
+            if not scope_items:
+                raise ValueError("Define al menos un elemento de alcance.")
+            deliverable_items = [item.strip() for item in deliverables.splitlines() if item.strip()]
+            if not deliverable_items:
+                raise ValueError("Define al menos un entregable.")
+            clean_terms = terms.strip()
+            if not clean_terms:
+                raise ValueError("Define las condiciones de la propuesta.")
+        except ValueError as exc:
+            return _render_commercial(
+                request,
+                session,
+                user,
+                proposal_error=str(exc),
+                proposal_form_values=form_values,
+                status_code=400,
+            )
+
         today = date.today()
         sequence = (session.scalar(select(func.count(CommercialProposal.id))) or 0) + 1
         reference = f"PROP-{today.year}-{sequence:04d}"
         while session.scalar(select(CommercialProposal).where(CommercialProposal.reference == reference)):
             sequence += 1
             reference = f"PROP-{today.year}-{sequence:04d}"
+
         proposal = CommercialProposal(
-            lead_id=lead.id, plan_id=plan.id, reference=reference, public_token=secrets.token_urlsafe(24),
-            title=title.strip(), company_name=lead.company_name, contact_name=lead.contact_name, contact_email=lead.email,
-            status="Borrador", valid_until=parse_date(valid_until) if valid_until else None,
-            billing_cycle=billing_cycle if billing_cycle in {"Mensual", "Anual"} else "Anual",
-            implementation_fee=max(0, implementation_fee), recurring_fee=max(0, recurring_fee),
-            discount_amount=max(0, discount_amount), tax_rate=max(0, tax_rate),
-            first_year_total=_proposal_total(implementation_fee, recurring_fee, discount_amount, tax_rate),
-            scope_json=json.dumps([item.strip() for item in scope.splitlines() if item.strip()], ensure_ascii=False),
-            deliverables_json=json.dumps([item.strip() for item in deliverables.splitlines() if item.strip()], ensure_ascii=False),
-            terms=terms.strip(), contract_version="1.0", created_by=str(user["email"]),
+            lead_id=lead.id,
+            plan_id=plan.id,
+            reference=reference,
+            public_token=secrets.token_urlsafe(24),
+            title=clean_title,
+            company_name=lead.company_name,
+            contact_name=lead.contact_name,
+            contact_email=lead.email,
+            status="Borrador",
+            valid_until=valid_until_date,
+            billing_cycle=billing_cycle,
+            implementation_fee=implementation_value,
+            recurring_fee=recurring_value,
+            discount_amount=discount_value,
+            tax_rate=tax_value,
+            first_year_total=_proposal_total(
+                implementation_value,
+                recurring_value,
+                discount_value,
+                tax_value,
+            ),
+            scope_json=json.dumps(scope_items, ensure_ascii=False),
+            deliverables_json=json.dumps(deliverable_items, ensure_ascii=False),
+            terms=clean_terms,
+            contract_version="1.0",
+            created_by=str(user["email"]),
         )
         session.add(proposal)
         lead.status = "Propuesta"
@@ -125,7 +296,11 @@ def register_commercial_routes(
 
     @app.get("/propuesta/{token}", response_class=HTMLResponse)
     def public_proposal(token: str, request: Request, session: Session = Depends(get_db)):
-        proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.public_token == token).options(selectinload(CommercialProposal.plan)))
+        proposal = session.scalar(
+            select(CommercialProposal)
+            .where(CommercialProposal.public_token == token)
+            .options(selectinload(CommercialProposal.plan))
+        )
         if not proposal:
             raise HTTPException(404, "Propuesta no encontrada")
         if proposal.status == "Enviada":
@@ -133,8 +308,20 @@ def register_commercial_routes(
         if not proposal.viewed_at:
             proposal.viewed_at = datetime.now(UTC)
         session.commit()
-        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.proposal_id == proposal.id).order_by(PaymentTransaction.id.desc()).limit(1))
-        return templates.TemplateResponse(request=request, name="public_proposal.html", context={
-            "proposal": proposal, "scope_items": _proposal_items(proposal.scope_json),
-            "deliverables": _proposal_items(proposal.deliverables_json), "payment": payment, "app_settings": settings,
-        })
+        payment = session.scalar(
+            select(PaymentTransaction)
+            .where(PaymentTransaction.proposal_id == proposal.id)
+            .order_by(PaymentTransaction.id.desc())
+            .limit(1)
+        )
+        return templates.TemplateResponse(
+            request=request,
+            name="public_proposal.html",
+            context={
+                "proposal": proposal,
+                "scope_items": _proposal_items(proposal.scope_json),
+                "deliverables": _proposal_items(proposal.deliverables_json),
+                "payment": payment,
+                "app_settings": settings,
+            },
+        )
