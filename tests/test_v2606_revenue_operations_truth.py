@@ -37,6 +37,7 @@ from app.revenue_operations import (
 
 ROOT = Path(__file__).resolve().parents[1]
 MIGRATION = ROOT / "migrations" / "versions" / "20260824_0041_v2606_revenue_operations_truth.py"
+REVENUE_MODEL = ROOT / "app" / "db" / "models" / "revenue.py"
 TEMPLATE = ROOT / "app" / "templates" / "commercial_operations.html"
 
 
@@ -49,14 +50,32 @@ def _unique(prefix: str) -> str:
     return f"{prefix}-{date.today().strftime('%Y%m%d')}"
 
 
-def test_v2606_revenue_migration_is_explicit_idempotent_and_non_destructive() -> None:
+def test_v2606_revenue_migration_is_explicit_idempotent_non_destructive_and_zero_table() -> None:
     source = MIGRATION.read_text(encoding="utf-8")
+    model_source = REVENUE_MODEL.read_text(encoding="utf-8")
     assert 'revision = "20260824_0041"' in source
     assert 'down_revision = "20260812_0040"' in source
-    assert 'if "billing_charge_breakdowns" not in tables' in source
-    assert 'if "contract_signature_snapshots" not in tables' in source
-    assert 'sa.UniqueConstraint("invoice_id"' in source
-    assert 'sa.UniqueConstraint("contract_id"' in source
+    assert 'INVOICE_COLUMNS' in source and 'CONTRACT_COLUMNS' in source
+    for column in (
+        "charge_type",
+        "amount_semantics",
+        "net_amount",
+        "tax_rate_snapshot",
+        "tax_amount",
+        "total_amount",
+        "source_reference",
+        "classification_note",
+        "semantics_created_at",
+    ):
+        assert f'(\"{column}\"' in source
+    for column in ("signature_version", "signature_payload", "signature_snapshot_created_at"):
+        assert f'(\"{column}\"' in source
+    assert 'op.add_column("billing_invoices"' in source
+    assert 'op.add_column("service_contracts"' in source
+    assert "op.create_table" not in source
+    assert "billing_charge_breakdowns" not in source
+    assert "contract_signature_snapshots" not in source
+    assert "__tablename__" not in model_source
     assert "def downgrade()" in source and "return" in source.split("def downgrade()", 1)[1]
     assert "Numeric" not in source
 
@@ -209,6 +228,8 @@ def test_v2606_new_contract_signature_snapshot_is_complete_and_roundtrip_stable(
         contract = session.get(ServiceContract, contract_id)
         snapshot = session.scalar(select(ContractSignatureSnapshot).where(ContractSignatureSnapshot.contract_id == contract_id))
         assert contract is not None and snapshot is not None and contract.signed_at is not None
+        assert contract.signature_version == CONTRACT_SIGNATURE_VERSION
+        assert contract.signature_payload == snapshot.canonical_payload
         assert snapshot.signature_version == CONTRACT_SIGNATURE_VERSION
         assert contract.signature_hash == snapshot.payload_hash
         assert contract_signature_hash(contract, contract.signed_by, contract.signed_email, contract.signed_at) == contract.signature_hash
@@ -254,6 +275,7 @@ def test_v2606_legacy_signature_is_not_rehashed_automatically() -> None:
         session.add(legacy)
         session.commit()
         legacy_id = legacy.id
+        assert legacy.signature_version is None
         assert session.scalar(
             select(ContractSignatureSnapshot).where(ContractSignatureSnapshot.contract_id == legacy_id)
         ) is None
@@ -267,6 +289,7 @@ def test_v2606_legacy_signature_is_not_rehashed_automatically() -> None:
     with SessionLocal() as session:
         legacy = session.get(ServiceContract, legacy_id)
         assert legacy.signature_hash == legacy_hash
+        assert legacy.signature_version is None
         assert session.scalar(
             select(ContractSignatureSnapshot).where(ContractSignatureSnapshot.contract_id == legacy_id)
         ) is None
@@ -300,6 +323,7 @@ def test_v2606_recurring_charge_records_base_without_inventing_tax_total() -> No
     with SessionLocal() as session:
         invoice = session.scalar(select(BillingInvoice).where(BillingInvoice.reference == reference))
         assert invoice is not None
+        assert invoice.amount_semantics == INVOICE_BASE_BEFORE_TAX
         breakdown = session.scalar(select(BillingChargeBreakdown).where(BillingChargeBreakdown.invoice_id == invoice.id))
         assert breakdown is not None
         assert breakdown.charge_type == "Recurrente"
@@ -389,11 +413,6 @@ def test_v2606_base_pending_tax_cannot_be_marked_as_paid_total() -> None:
             issued_at=date(2026, 9, 30),
             due_date=date(2026, 10, 5),
             notes="Registro interno de prueba",
-        )
-        session.add(invoice)
-        session.flush()
-        session.add(BillingChargeBreakdown(
-            invoice_id=invoice.id,
             charge_type="Recurrente",
             amount_semantics=INVOICE_BASE_BEFORE_TAX,
             net_amount=250000,
@@ -402,7 +421,10 @@ def test_v2606_base_pending_tax_cannot_be_marked_as_paid_total() -> None:
             total_amount=None,
             source_reference="TEST-V2606",
             classification_note="Base antes de impuesto",
-        ))
+            semantics_created_at=datetime(2026, 9, 30, 12, 0, tzinfo=UTC),
+        )
+        session.add(invoice)
+        session.flush()
         action = CollectionAction(
             organization_id=organization.id,
             invoice_id=invoice.id,
@@ -492,6 +514,7 @@ def test_v2606_activation_payment_has_authoritative_net_tax_total_breakdown() ->
         payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.proposal_id == proposal_id))
         assert payment is not None and payment.invoice_id is not None
         invoice = session.get(BillingInvoice, payment.invoice_id)
+        assert invoice is not None and invoice.amount_semantics == INVOICE_TOTAL_WITH_TAX
         breakdown = session.scalar(select(BillingChargeBreakdown).where(BillingChargeBreakdown.invoice_id == invoice.id))
         assert breakdown is not None
         assert breakdown.charge_type == "Activación"
