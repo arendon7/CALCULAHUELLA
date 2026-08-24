@@ -1,0 +1,46 @@
+from __future__ import annotations
+
+from pathlib import Path
+
+
+ROOT = Path(__file__).resolve().parents[1]
+WORKFLOW = ROOT / ".github" / "workflows" / "iteration4-stabilization.yml"
+
+ACTIVE_RELEASE_CONTRACTS = (
+    "tests/test_v259_render_release_identity_gate.py",
+    "tests/test_v2602_public_diagnosis_trust_consent.py",
+    "tests/test_v2603_public_result_interpretation.py",
+    "tests/test_v260_public_diagnosis_value_hierarchy.py",
+    "tests/test_v260_public_experience_evidence_safe.py",
+    "tests/test_v260_public_handoff_taxonomy.py",
+    "tests/test_v260_public_result_visual_contract.py",
+    "tests/test_v260_solution_plan_alignment.py",
+    "tests/test_v2604_product_readiness_feedback.py",
+)
+
+
+def _workflow_sections() -> tuple[str, str]:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+    targeted_marker = "- name: Ejecutar contratos de product readiness"
+    full_marker = "- name: Suite integral aislada"
+    targeted_start = workflow.index(targeted_marker)
+    full_start = workflow.index(full_marker, targeted_start)
+    return workflow[targeted_start:full_start], workflow[full_start:]
+
+
+def test_v2604_active_release_contracts_run_before_exhaustive_regression() -> None:
+    targeted, full = _workflow_sections()
+
+    for contract in ACTIVE_RELEASE_CONTRACTS:
+        assert contract in targeted, f"Contrato activo fuera del gate temprano: {contract}"
+
+    assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full
+
+
+def test_v2604_full_regression_remains_exhaustive_after_fast_feedback() -> None:
+    workflow = WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Suite integral aislada" in workflow
+    assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in workflow
+    assert "--deselect=tests/test_v259" not in workflow
+    assert "--deselect=tests/test_v260" not in workflow
