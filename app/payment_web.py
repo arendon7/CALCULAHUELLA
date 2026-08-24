@@ -16,7 +16,6 @@ from .commercial_pricing import proposal_initial_payment, subscription_custom_mo
 from .config import settings
 from .database import get_db
 from .db.models import (
-    BillingChargeBreakdown,
     BillingInvoice,
     CommercialLead,
     CommercialProposal,
@@ -82,6 +81,61 @@ def _proposal_acceptance_source(
         "accepted_at": _canonical_acceptance_timestamp(accepted_at),
     }
     return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _classify_activation_invoice(
+    invoice: BillingInvoice,
+    proposal: CommercialProposal,
+    payment: PaymentTransaction,
+) -> None:
+    parts = activation_breakdown(
+        proposal.implementation_fee,
+        proposal.recurring_fee,
+        proposal.discount_amount,
+        proposal.tax_rate,
+    )
+    if abs(parts["total_amount"] - payment.amount) > 0.01:
+        raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
+
+    if invoice.amount_semantics is not None:
+        expected = {
+            "charge_type": "Activación",
+            "amount_semantics": INVOICE_TOTAL_WITH_TAX,
+            "net_amount": parts["net_amount"],
+            "tax_rate_snapshot": parts["tax_rate_snapshot"],
+            "tax_amount": parts["tax_amount"],
+            "total_amount": parts["total_amount"],
+            "source_reference": proposal.reference,
+        }
+        actual = {
+            "charge_type": invoice.charge_type,
+            "amount_semantics": invoice.amount_semantics,
+            "net_amount": invoice.net_amount,
+            "tax_rate_snapshot": invoice.tax_rate_snapshot,
+            "tax_amount": invoice.tax_amount,
+            "total_amount": invoice.total_amount,
+            "source_reference": invoice.source_reference,
+        }
+        for key, expected_value in expected.items():
+            actual_value = actual[key]
+            if isinstance(expected_value, float):
+                if actual_value is None or abs(float(actual_value) - expected_value) > 0.01:
+                    raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+            elif actual_value != expected_value:
+                raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+        return
+
+    invoice.charge_type = "Activación"
+    invoice.amount_semantics = INVOICE_TOTAL_WITH_TAX
+    invoice.net_amount = parts["net_amount"]
+    invoice.tax_rate_snapshot = parts["tax_rate_snapshot"]
+    invoice.tax_amount = parts["tax_amount"]
+    invoice.total_amount = parts["total_amount"]
+    invoice.source_reference = proposal.reference
+    invoice.classification_note = (
+        "Total de activación derivado de la propuesta aceptada: implementación + primer ciclo - descuento inicial + impuesto."
+    )
+    invoice.semantics_created_at = payment.paid_at or datetime.now(UTC)
 
 
 def register_payment_routes(app, templates) -> None:
@@ -206,31 +260,7 @@ def register_payment_routes(app, templates) -> None:
                 )
                 session.add(invoice)
                 session.flush()
-            breakdown = session.scalar(
-                select(BillingChargeBreakdown).where(BillingChargeBreakdown.invoice_id == invoice.id)
-            )
-            if not breakdown:
-                parts = activation_breakdown(
-                    proposal.implementation_fee,
-                    proposal.recurring_fee,
-                    proposal.discount_amount,
-                    proposal.tax_rate,
-                )
-                if abs(parts["total_amount"] - payment.amount) > 0.01:
-                    raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
-                session.add(BillingChargeBreakdown(
-                    invoice_id=invoice.id,
-                    charge_type="Activación",
-                    amount_semantics=INVOICE_TOTAL_WITH_TAX,
-                    net_amount=parts["net_amount"],
-                    tax_rate_snapshot=parts["tax_rate_snapshot"],
-                    tax_amount=parts["tax_amount"],
-                    total_amount=parts["total_amount"],
-                    source_reference=proposal.reference,
-                    classification_note=(
-                        "Total de activación derivado de la propuesta aceptada: implementación + primer ciclo - descuento inicial + impuesto."
-                    ),
-                ))
+            _classify_activation_invoice(invoice, proposal, payment)
             payment.subscription_id = subscription.id if subscription else None
             payment.invoice_id = invoice.id
             onboarding_specs = [
