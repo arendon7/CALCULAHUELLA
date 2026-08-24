@@ -279,10 +279,12 @@ def register_commercial_operations_routes(
         normalized_reference = reference.strip().upper() or f"REC-{subscription.organization_id}-{start.strftime('%Y%m')}-{subscription.id}"
         if session.scalar(select(BillingInvoice).where(BillingInvoice.reference == normalized_reference)):
             raise HTTPException(409, "Ya existe un cobro para esa referencia")
-        if subscription.billing_cycle == "Mensual":
-            amount = subscription.custom_monthly_fee or subscription.plan.monthly_fee
+        if subscription.custom_monthly_fee is not None:
+            amount = subscription.custom_monthly_fee if subscription.billing_cycle == "Mensual" else subscription.custom_monthly_fee * 12
+        elif subscription.billing_cycle == "Mensual":
+            amount = subscription.plan.monthly_fee
         else:
-            amount = (subscription.custom_monthly_fee * 12) if subscription.custom_monthly_fee else subscription.plan.annual_fee
+            amount = subscription.plan.annual_fee
         invoice = BillingInvoice(
             organization_id=subscription.organization_id, subscription_id=subscription.id, reference=normalized_reference,
             period_start=start, period_end=end, amount=max(0, amount), status="Pendiente", issued_at=date.today(),
