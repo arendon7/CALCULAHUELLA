@@ -1,0 +1,86 @@
+name: V2.60.6 · Revenue operations truth gate
+
+on:
+  pull_request:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - "app/commercial_operations_web.py"
+      - "app/payment_web.py"
+      - "app/revenue_operations.py"
+      - "app/db/models/revenue.py"
+      - "app/db/models/__init__.py"
+      - "app/templates/commercial_operations.html"
+      - "migrations/versions/20260824_0041_v2606_revenue_operations_truth.py"
+      - "tests/test_v2606_revenue_operations_truth.py"
+      - ".github/workflows/v2606-revenue-operations-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  revenue-truth:
+    name: Revenue truth · fast feedback
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+      INSTANCE_DIR: /tmp/cth-v2606-fast
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.6
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v2606-pycache" python -m compileall -q \
+            app/commercial_operations_web.py \
+            app/payment_web.py \
+            app/revenue_operations.py \
+            app/db/models/revenue.py \
+            migrations/versions/20260824_0041_v2606_revenue_operations_truth.py \
+            tests/test_v2606_revenue_operations_truth.py
+
+      - name: Contratos Revenue Operations
+        run: pytest -q tests/test_v2606_revenue_operations_truth.py --junitxml=v2606-revenue-truth.xml
+
+      - name: Fresh migration SQLite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Upgrade histórico 0040 a head SQLite
+        run: |
+          export INSTANCE_DIR="${RUNNER_TEMP}/cth-v2606-upgrade"
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade 20260812_0040
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Publicar evidencia rápida
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2606-revenue-truth-evidence
+          path: v2606-revenue-truth.xml
+          if-no-files-found: warn
+          retention-days: 14
