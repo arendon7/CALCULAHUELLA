@@ -3,12 +3,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from fastapi.testclient import TestClient
+from jinja2 import Environment, FileSystemLoader
 
 from app.main import app
 
 
 ROOT = Path(__file__).resolve().parents[1]
-RESULT_TEMPLATE = ROOT / "app" / "templates" / "public_thanks.html"
+TEMPLATES = ROOT / "app" / "templates"
+RESULT_TEMPLATE = TEMPLATES / "public_thanks.html"
+INTERPRETATION_TEMPLATE = TEMPLATES / "public" / "diagnostic_interpretation.html"
 ENGINE = ROOT / "app" / "services" / "product_intelligence.py"
 
 
@@ -54,12 +57,38 @@ def test_v2603_public_result_uses_qualitative_readiness_not_false_precision() ->
     assert "Preparación de datos" in template
     assert "Preparación para revisión externa" in template
     assert "Orientación de alistamiento; no acredita verificación ni aseguramiento" in template
+    assert 'data_readiness_band(assessment.row.data_maturity_score)' in template
+    assert 'review_readiness_band(assessment.row.verification_readiness_score)' in template
 
     assert "{{ assessment.row.data_maturity_score" not in template
     assert "{{ assessment.row.governance_maturity_score" not in template
     assert "{{ assessment.row.verification_readiness_score" not in template
     assert "puntos del diagnóstico" not in template
     assert "estimated_effort_hours" not in template
+
+
+def test_v2603_interpretation_policy_has_explicit_stable_boundaries() -> None:
+    env = Environment(loader=FileSystemLoader(TEMPLATES), autoescape=True)
+    policy = env.get_template("public/diagnostic_interpretation.html").module
+
+    assert str(policy.data_readiness_band(0)) == "Inicial"
+    assert str(policy.data_readiness_band(39)) == "Inicial"
+    assert str(policy.data_readiness_band(40)) == "En desarrollo"
+    assert str(policy.data_readiness_band(59)) == "En desarrollo"
+    assert str(policy.data_readiness_band(60)) == "Media"
+    assert str(policy.data_readiness_band(79)) == "Media"
+    assert str(policy.data_readiness_band(80)) == "Alta"
+    assert str(policy.data_readiness_band(100)) == "Alta"
+
+    assert str(policy.review_readiness_band(0)) == "Inicial"
+    assert str(policy.review_readiness_band(49)) == "Inicial"
+    assert str(policy.review_readiness_band(50)) == "En desarrollo"
+    assert str(policy.review_readiness_band(69)) == "En desarrollo"
+    assert str(policy.review_readiness_band(70)) == "Preparación alta"
+    assert str(policy.review_readiness_band(100)) == "Preparación alta"
+
+    assert str(policy.duration_reference(2)) == "2–3 meses"
+    assert str(policy.duration_reference(6)) == "6–7 meses"
 
 
 def test_v2603_public_result_curates_actions_instead_of_exposing_raw_engine_copy() -> None:
@@ -76,6 +105,14 @@ def test_v2603_public_result_curates_actions_instead_of_exposing_raw_engine_copy
     assert template.count("Activar el inventario") == 1
 
 
+def test_v2603_public_result_uses_public_plan_canon_not_database_label() -> None:
+    template = _text(RESULT_TEMPLATE)
+
+    assert "plan.name" not in template
+    assert "{{ public_plan_name(lead.recommended_plan_code) }}" in template
+    assert "{{ public_plan_description(lead.recommended_plan_code) }}" in template
+
+
 def test_v2603_runtime_result_explains_limits_and_keeps_commercial_reference_bounded() -> None:
     email = "resultado-v2603@example.test"
     with TestClient(app) as client:
@@ -89,6 +126,8 @@ def test_v2603_runtime_result_explains_limits_and_keeps_commercial_reference_bou
     assert "No representan porcentajes de cumplimiento" in result.text
     assert "No es una huella calculada, una certificación ni una verificación independiente." in result.text
     assert "No constituye una cotización definitiva." in result.text
+    assert "Gestión Corporativa" in result.text
+    assert "Gestión Avanzada y Verificación" not in result.text
     assert "horas estimadas" not in result.text
     assert "puntos del diagnóstico" not in result.text
 
