@@ -30,6 +30,41 @@ def _assert_step(page: Page, number: int) -> None:
         raise AssertionError(f"Paso {number} quedó marcado aria-hidden durante el recorrido público.")
 
 
+def _assert_no_horizontal_overflow(page: Page, label: str) -> dict[str, int]:
+    metrics = page.evaluate(
+        """() => ({
+            viewport: document.documentElement.clientWidth,
+            scroll: document.documentElement.scrollWidth
+        })"""
+    )
+    if metrics["scroll"] > metrics["viewport"] + 1:
+        raise AssertionError(
+            f"{label} presenta overflow horizontal: viewport={metrics['viewport']}, scroll={metrics['scroll']}"
+        )
+    return metrics
+
+
+def _canonical_footer_logo_state(page: Page) -> dict[str, object]:
+    footer_logo = page.locator("footer .canonical-footer-logo")
+    footer_logo.wait_for(state="visible")
+    state = footer_logo.evaluate(
+        """img => ({
+            naturalWidth: img.naturalWidth,
+            naturalHeight: img.naturalHeight,
+            filter: getComputedStyle(img).filter,
+            objectFit: getComputedStyle(img).objectFit
+        })"""
+    )
+    if state["naturalWidth"] <= 0 or state["naturalHeight"] <= 0:
+        raise AssertionError(f"El logo canónico del footer no cargó: {state!r}")
+    if state["filter"] != "none":
+        raise AssertionError(
+            "El logo canónico del footer está siendo reinterpretado por CSS: "
+            f"filter={state['filter']!r}"
+        )
+    return state
+
+
 def _persistence_contract() -> dict[str, object]:
     with SessionLocal() as session:
         lead = session.scalar(
@@ -70,7 +105,7 @@ def main() -> int:
     evidence: dict[str, object] = {
         "engine": "chromium",
         "base_url": BASE_URL,
-        "journey": "landing -> prefill -> diagnosis -> consent -> result",
+        "journey": "landing -> prefill -> diagnosis -> consent -> result -> mobile result",
         "email": EMAIL,
     }
     console_errors: list[str] = []
@@ -166,30 +201,38 @@ def main() -> int:
             if forbidden in result_text:
                 raise AssertionError(f"El resultado público volvió a exponer semántica interna: {forbidden!r}")
 
-        footer_logo = page.locator("footer .canonical-footer-logo")
-        footer_logo.wait_for(state="visible")
-        logo_state = footer_logo.evaluate(
-            """img => ({
-                naturalWidth: img.naturalWidth,
-                naturalHeight: img.naturalHeight,
-                filter: getComputedStyle(img).filter,
-                objectFit: getComputedStyle(img).objectFit
-            })"""
-        )
-        if logo_state["naturalWidth"] <= 0 or logo_state["naturalHeight"] <= 0:
-            raise AssertionError(f"El logo canónico del footer no cargó: {logo_state!r}")
-        if logo_state["filter"] != "none":
-            raise AssertionError(
-                "El logo canónico del footer está siendo reinterpretado por CSS: "
-                f"filter={logo_state['filter']!r}"
-            )
-
+        desktop_logo_state = _canonical_footer_logo_state(page)
+        desktop_layout = _assert_no_horizontal_overflow(page, "Resultado desktop")
         screenshot = ARTIFACT_DIR / "public-funnel-result.png"
         page.screenshot(path=str(screenshot), full_page=True)
-        evidence["screenshot"] = screenshot.name
-        evidence["result_url"] = page.url.replace(BASE_URL, "")
+
+        result_path = page.url.replace(BASE_URL, "")
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload(wait_until="networkidle")
+        page.locator("text=DIAGNÓSTICO ORIENTATIVO GENERADO").wait_for(state="visible")
+        page.locator("text=Tu ruta desde este resultado").wait_for(state="visible")
+        page.locator("text=Gestión Corporativa").wait_for(state="visible")
+        mobile_layout = _assert_no_horizontal_overflow(page, "Resultado móvil")
+        mobile_logo_state = _canonical_footer_logo_state(page)
+        if page.locator(".result-actions .button").count() < 3:
+            raise AssertionError("El resultado móvil perdió alguna de sus tres acciones de salida.")
+        mobile_screenshot = ARTIFACT_DIR / "public-funnel-result-mobile.png"
+        page.screenshot(path=str(mobile_screenshot), full_page=True)
+
+        evidence["screenshots"] = {
+            "desktop": screenshot.name,
+            "mobile": mobile_screenshot.name,
+        }
+        evidence["result_url"] = result_path
         evidence["persistence"] = _persistence_contract()
-        evidence["canonical_footer_logo"] = logo_state
+        evidence["canonical_footer_logo"] = {
+            "desktop": desktop_logo_state,
+            "mobile": mobile_logo_state,
+        }
+        evidence["layout"] = {
+            "desktop": desktop_layout,
+            "mobile": mobile_layout,
+        }
         evidence["browser_errors"] = {"console": console_errors, "page": page_errors}
 
         if console_errors or page_errors:
