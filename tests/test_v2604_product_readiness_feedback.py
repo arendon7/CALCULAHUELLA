@@ -16,6 +16,7 @@ ACTIVE_RELEASE_CONTRACTS = (
     "tests/test_v260_public_result_visual_contract.py",
     "tests/test_v260_solution_plan_alignment.py",
     "tests/test_v2604_product_readiness_feedback.py",
+    "tests/test_v2605_commercial_authority.py",
 )
 
 
