@@ -10,7 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
-from .commercial_pricing import proposal_first_year_total
+from .commercial_pricing import proposal_first_year_total, proposal_initial_payment, recurring_first_year_value
 from .config import settings
 from .database import get_db
 from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment, PaymentTransaction, ServicePlan
@@ -322,6 +322,16 @@ def register_commercial_routes(
                 "scope_items": _proposal_items(proposal.scope_json),
                 "deliverables": _proposal_items(proposal.deliverables_json),
                 "payment": payment,
+                "initial_payment": proposal_initial_payment(
+                    proposal.implementation_fee,
+                    proposal.recurring_fee,
+                    proposal.discount_amount,
+                    proposal.tax_rate,
+                ),
+                "recurring_first_year": recurring_first_year_value(
+                    proposal.recurring_fee,
+                    proposal.billing_cycle,
+                ),
                 "app_settings": settings,
             },
         )
