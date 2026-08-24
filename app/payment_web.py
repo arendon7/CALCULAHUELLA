@@ -96,6 +96,8 @@ def _classify_activation_invoice(
     )
     if abs(parts["total_amount"] - payment.amount) > 0.01:
         raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
+    if abs(float(invoice.amount) - payment.amount) > 0.01:
+        raise HTTPException(409, "El cobro existente no coincide con el pago de activación aceptado")
 
     if invoice.amount_semantics is not None:
         expected = {
