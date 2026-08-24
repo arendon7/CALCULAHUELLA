@@ -13,8 +13,9 @@
 /* El flujo público refleja las ocho etapas canónicas. */
 .process-nav{grid-template-columns:repeat(8,1fr)}
 
-/* El logo clásico no tiene variante invertida autorizada: se preserva exacto sobre placa clara. */
-.canonical-footer-logo{display:block;box-sizing:border-box;max-width:238px;height:auto;padding:8px 10px;border-radius:12px;background:#fff}
+/* El logo clásico no tiene variante invertida autorizada: se preserva exacto sobre placa clara.
+ * La especificidad anula el filtro invertido histórico del footer sin alterar el SVG canónico. */
+.public-footer-v14 .canonical-footer-logo{display:block;box-sizing:border-box;width:230px;max-width:100%;height:auto;padding:8px 10px;border-radius:12px;background:#fff;filter:none}
 
 /* Handoff público → diagnóstico: dos respuestas reutilizables, sin PII. */
 .diagnostic-preconfig-grid{align-items:start}
