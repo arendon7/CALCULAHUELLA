@@ -13,6 +13,7 @@ on:
       - "app/templates/commercial_operations.html"
       - "migrations/versions/20260824_0041_v2606_revenue_operations_truth.py"
       - "tests/test_v2606_revenue_operations_truth.py"
+      - "tests/test_v2606_activation_invoice_integrity.py"
       - ".github/workflows/v2606-revenue-operations-gate.yml"
   workflow_dispatch:
 
@@ -55,10 +56,15 @@ jobs:
             app/revenue_operations.py \
             app/db/models/revenue.py \
             migrations/versions/20260824_0041_v2606_revenue_operations_truth.py \
-            tests/test_v2606_revenue_operations_truth.py
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py
 
       - name: Contratos Revenue Operations
-        run: pytest -q tests/test_v2606_revenue_operations_truth.py --junitxml=v2606-revenue-truth.xml
+        run: |
+          pytest -q \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            --junitxml=v2606-revenue-truth.xml
 
       - name: Fresh migration SQLite
         run: |
