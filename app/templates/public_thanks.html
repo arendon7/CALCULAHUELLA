@@ -1,14 +1,9 @@
 {% extends "public_base.html" %}
 {% from "public/plan_copy.html" import public_plan_description, public_plan_name %}
+{% from "public/diagnostic_interpretation.html" import data_readiness_band, review_readiness_band, duration_reference %}
 {% block title %}Resultado del diagnóstico · Calcula tu Huella{% endblock %}
 {% block robots %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
 {% block content %}
-{% if assessment %}
-  {% set data_score = assessment.row.data_maturity_score %}
-  {% set review_score = assessment.row.verification_readiness_score %}
-  {% set data_band = 'Alta' if data_score >= 80 else 'Media' if data_score >= 60 else 'En desarrollo' if data_score >= 40 else 'Inicial' %}
-  {% set review_band = 'Preparación alta' if review_score >= 70 else 'En desarrollo' if review_score >= 50 else 'Inicial' %}
-{% endif %}
 <section class="result-shell intelligent-result">
   <div class="result-check">✓</div><span>DIAGNÓSTICO ORIENTATIVO GENERADO</span><h1>{{ lead.company_name }}</h1>
   <p>Este resultado organiza la información que compartiste y señala qué conviene validar antes de configurar el inventario. No es una huella calculada, una certificación ni una verificación independiente.</p>
@@ -16,8 +11,8 @@
   <div class="result-grid four">
     <article><small>Complejidad operativa</small><strong>{{ assessment.row.complexity_level if assessment else ('Baja' if lead.complexity_score <= 5 else 'Media' if lead.complexity_score <= 12 else 'Alta') }}</strong><span>Clasificación orientativa según escala, actividades y alcance declarado</span></article>
     <article><small>Madurez general</small><strong>{{ assessment.row.maturity_level if assessment else 'Por validar' }}</strong><span>Lectura cualitativa del proceso; no es una auditoría</span></article>
-    <article><small>Preparación de datos</small><strong>{{ data_band if assessment else 'Por validar' }}</strong><span>Disponibilidad, soportes e historial declarados</span></article>
-    <article><small>Preparación para revisión externa</small><strong>{{ review_band if assessment else 'Por validar' }}</strong><span>Orientación de alistamiento; no acredita verificación ni aseguramiento</span></article>
+    <article><small>Preparación de datos</small><strong>{{ data_readiness_band(assessment.row.data_maturity_score) if assessment else 'Por validar' }}</strong><span>Disponibilidad, soportes e historial declarados</span></article>
+    <article><small>Preparación para revisión externa</small><strong>{{ review_readiness_band(assessment.row.verification_readiness_score) if assessment else 'Por validar' }}</strong><span>Orientación de alistamiento; no acredita verificación ni aseguramiento</span></article>
   </div>
 
   <div class="method-note"><strong>Cómo leer estos indicadores</strong><p>Son índices orientativos construidos a partir de respuestas declaradas para ordenar el trabajo inicial. No representan porcentajes de cumplimiento, resultados de auditoría ni una evaluación independiente.</p></div>
@@ -68,8 +63,8 @@
 
     <div class="method-note"><strong>Referencia comercial, después del diagnóstico</strong><p>Con la información disponible, la ruta que mejor encaja como punto de partida es una referencia sujeta a validación técnica del alcance. No constituye una cotización definitiva.</p></div>
     <div class="result-grid">
-      <article><small>Plan de referencia</small><strong>{{ plan.name if plan else public_plan_name(lead.recommended_plan_code) }}</strong><span>{{ public_plan_description(lead.recommended_plan_code) }}</span></article>
-      <article><small>Tiempo inicial de referencia</small><strong>{% if assessment %}{{ assessment.row.estimated_duration_months }}–{{ assessment.row.estimated_duration_months + 1 }} meses{% else %}Por validar{% endif %}</strong><span>Orden de magnitud sujeto a alcance, sedes, responsables y disponibilidad real de información</span></article>
+      <article><small>Plan de referencia</small><strong>{{ public_plan_name(lead.recommended_plan_code) }}</strong><span>{{ public_plan_description(lead.recommended_plan_code) }}</span></article>
+      <article><small>Tiempo inicial de referencia</small><strong>{{ duration_reference(assessment.row.estimated_duration_months) if assessment else 'Por validar' }}</strong><span>Orden de magnitud sujeto a alcance, sedes, responsables y disponibilidad real de información</span></article>
     </div>
 
     <div class="method-note"><strong>Tu diagnóstico quedó registrado.</strong><p>Queda disponible como solicitud para seguimiento comercial y técnico. Este enlace público tiene vigencia limitada a {{ public_result_access_window }}; esa vigencia no significa que el registro se elimine al vencer. Este resultado no crea una cuenta ni activa una licencia por sí solo.</p></div>
