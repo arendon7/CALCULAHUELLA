@@ -10,6 +10,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from .commercial_pricing import proposal_first_year_total
 from .config import settings
 from .database import get_db
 from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment, PaymentTransaction, ServicePlan
@@ -30,10 +31,6 @@ def register_commercial_routes(
             return [str(item) for item in parsed] if isinstance(parsed, list) else []
         except (json.JSONDecodeError, TypeError):
             return []
-
-    def _proposal_total(implementation_fee: float, recurring_fee: float, discount_amount: float, tax_rate: float) -> float:
-        subtotal = implementation_fee + recurring_fee - discount_amount
-        return round(subtotal * (1 + tax_rate / 100), 2)
 
     def _commercial_data(session: Session) -> dict[str, object]:
         leads = list(session.scalars(select(CommercialLead).order_by(CommercialLead.created_at.desc())))
@@ -201,16 +198,18 @@ def register_commercial_routes(
                 raise ValueError("El plan seleccionado ya no está activo. Selecciona otro plan.")
 
             implementation_value = _parse_nonnegative_number(implementation_fee, "el valor de implementación")
-            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente")
-            discount_value = _parse_nonnegative_number(discount_amount, "el descuento")
+            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente por ciclo")
+            discount_value = _parse_nonnegative_number(discount_amount, "el descuento inicial")
             tax_value = _parse_nonnegative_number(tax_rate, "la tasa de impuesto", maximum=100)
 
             if billing_cycle not in {"Mensual", "Anual"}:
                 raise ValueError("Selecciona un ciclo de facturación válido.")
 
-            subtotal_before_discount = implementation_value + recurring_value
-            if discount_value > subtotal_before_discount:
-                raise ValueError("El descuento no puede superar la suma de implementación y valor recurrente.")
+            initial_subtotal_before_discount = implementation_value + recurring_value
+            if discount_value > initial_subtotal_before_discount:
+                raise ValueError(
+                    "El descuento inicial no puede superar el primer cobro: implementación más un ciclo recurrente."
+                )
 
             if not valid_until.strip():
                 raise ValueError("Define hasta cuándo es válida la propuesta.")
@@ -263,16 +262,17 @@ def register_commercial_routes(
             recurring_fee=recurring_value,
             discount_amount=discount_value,
             tax_rate=tax_value,
-            first_year_total=_proposal_total(
+            first_year_total=proposal_first_year_total(
                 implementation_value,
                 recurring_value,
                 discount_value,
                 tax_value,
+                billing_cycle,
             ),
             scope_json=json.dumps(scope_items, ensure_ascii=False),
             deliverables_json=json.dumps(deliverable_items, ensure_ascii=False),
             terms=clean_terms,
-            contract_version="1.0",
+            contract_version="1.1",
             created_by=str(user["email"]),
         )
         session.add(proposal)
