@@ -11,7 +11,7 @@ from .commercial import BillingInvoice, ServiceContract
 # Nullable columns are deliberate: historical rows remain unknown until there is
 # evidence to classify them. No legacy amount or signature is reinterpreted.
 BillingInvoice.charge_type = mapped_column(String(40), nullable=True)
-BillingInvoice.amount_semantics = mapped_column(String(40), nullable=True, index=True)
+BillingInvoice.amount_semantics = mapped_column(String(40), nullable=True)
 BillingInvoice.net_amount = mapped_column(Float, nullable=True)
 BillingInvoice.tax_rate_snapshot = mapped_column(Float, nullable=True)
 BillingInvoice.tax_amount = mapped_column(Float, nullable=True)
