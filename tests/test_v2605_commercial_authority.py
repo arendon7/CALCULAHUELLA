@@ -1,6 +1,8 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+import hashlib
+import json
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -22,6 +24,7 @@ from app.db.models import (
     ServicePlan,
 )
 from app.main import app
+from app.payment_web import _proposal_acceptance_source
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -122,6 +125,7 @@ def test_v2605_commercial_ui_has_explicit_offer_and_billing_authority() -> None:
     assert "recurring_first_year_value" in source
     assert "proposal_initial_payment" in payment_source
     assert "_ensure_supported_billing_contract" in payment_source
+    assert "_proposal_acceptance_source" in payment_source
     assert "Pago de activación" in public_template
     assert "12 ciclos primer año" in public_template
     assert "Revisión comercial requerida" in public_template
@@ -134,6 +138,77 @@ def test_v2605_billing_math_distinguishes_contract_value_from_activation_charge(
     assert proposal_first_year_total(1_000_000, 2_000_000, 250_000, 19, "Anual") == 3_272_500
     assert proposal_initial_payment(1_000_000, 2_000_000, 250_000, 19) == 3_272_500
     assert subscription_custom_monthly_fee(1_200_001, "Anual") * 12 == pytest.approx(1_200_001)
+
+
+def test_v2605_acceptance_snapshot_binds_identity_scope_and_complete_economics() -> None:
+    title = "V2.60.5 acceptance snapshot contract"
+    payload = _valid_payload(title, billing_cycle="Mensual")
+    payload.update(recurring_fee="200000", discount_amount="100000")
+
+    with TestClient(app) as client:
+        _login(client)
+        assert client.post("/comercial/propuestas/nueva", data=payload, follow_redirects=False).status_code == 303
+
+    proposal = _proposal_by_title(title)
+    accepted_at = datetime(2026, 8, 24, 4, 30, tzinfo=UTC)
+    baseline = _proposal_acceptance_source(
+        proposal,
+        "Valentina Gómez",
+        "GERENCIA@CAFEDEMO.CO",
+        accepted_at,
+    )
+    snapshot = json.loads(baseline)
+
+    assert snapshot == {
+        "reference": proposal.reference,
+        "contract_version": "1.1",
+        "billing_cycle": "Mensual",
+        "implementation_fee": "1000000.00",
+        "recurring_fee": "200000.00",
+        "discount_amount": "100000.00",
+        "tax_rate": "19.0000",
+        "first_year_total": "3927000.00",
+        "scope_json": proposal.scope_json,
+        "deliverables_json": proposal.deliverables_json,
+        "terms": proposal.terms,
+        "accepted_by": "Valentina Gómez",
+        "accepted_email": "gerencia@cafedemo.co",
+        "accepted_at": accepted_at.isoformat(),
+    }
+    baseline_hash = hashlib.sha256(baseline.encode("utf-8")).hexdigest()
+
+    mutations = {
+        "billing_cycle": "Anual",
+        "implementation_fee": proposal.implementation_fee + 1,
+        "recurring_fee": proposal.recurring_fee + 1,
+        "discount_amount": proposal.discount_amount + 1,
+        "tax_rate": proposal.tax_rate + 0.01,
+        "first_year_total": proposal.first_year_total + 1,
+        "scope_json": '["Alcance alterado"]',
+        "deliverables_json": '["Entregable alterado"]',
+        "terms": proposal.terms + " Cambio.",
+        "contract_version": "1.2",
+    }
+    for attribute, mutated_value in mutations.items():
+        original = getattr(proposal, attribute)
+        setattr(proposal, attribute, mutated_value)
+        mutated = _proposal_acceptance_source(
+            proposal,
+            "Valentina Gómez",
+            "gerencia@cafedemo.co",
+            accepted_at,
+        )
+        assert hashlib.sha256(mutated.encode("utf-8")).hexdigest() != baseline_hash, attribute
+        setattr(proposal, attribute, original)
+
+    identity_variants = [
+        ("Otra persona", "gerencia@cafedemo.co", accepted_at),
+        ("Valentina Gómez", "otra@cafedemo.co", accepted_at),
+        ("Valentina Gómez", "gerencia@cafedemo.co", accepted_at + timedelta(seconds=1)),
+    ]
+    for accepted_by, accepted_email, timestamp in identity_variants:
+        mutated = _proposal_acceptance_source(proposal, accepted_by, accepted_email, timestamp)
+        assert hashlib.sha256(mutated.encode("utf-8")).hexdigest() != baseline_hash
 
 
 def test_v2605_missing_explicit_amount_returns_400_preserves_form_and_does_not_persist() -> None:
@@ -284,6 +359,16 @@ def test_v2605_monthly_offer_annualizes_contract_but_charges_only_activation_cyc
             assert payment is not None
             assert payment.amount == 1_309_000
             assert payment.amount != proposal.first_year_total
+            accepted_proposal = session.get(CommercialProposal, proposal.id)
+            assert accepted_proposal is not None
+            assert accepted_proposal.accepted_at is not None
+            expected_source = _proposal_acceptance_source(
+                accepted_proposal,
+                accepted_proposal.accepted_by,
+                accepted_proposal.accepted_email,
+                accepted_proposal.accepted_at,
+            )
+            assert accepted_proposal.acceptance_hash == hashlib.sha256(expected_source.encode("utf-8")).hexdigest()
 
         payment_page = client.get(f"/pago/{payment_token}")
         assert payment_page.status_code == 200
@@ -304,6 +389,8 @@ def test_v2605_monthly_offer_annualizes_contract_but_charges_only_activation_cyc
         assert subscription is not None
         assert subscription.billing_cycle == "Mensual"
         assert subscription.custom_monthly_fee == 200_000
+        assert "valor base recurrente negociado" in subscription.notes
+        assert "Impuesto contractual de 19%" in subscription.notes
         invoice = session.get(BillingInvoice, payment.invoice_id)
         assert invoice is not None
         assert invoice.amount == 1_309_000
