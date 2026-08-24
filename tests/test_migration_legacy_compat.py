@@ -10,7 +10,7 @@ from sqlalchemy import create_engine, inspect
 
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_REVISION = "20260806_0038"
-HEAD_REVISION = "20260812_0040"
+HEAD_REVISION = "20260824_0041"
 WORK_TABLES = {
     "work_items",
     "work_item_events",
@@ -53,6 +53,7 @@ def test_migration_graph_contains_live_checkpoint_and_single_head(tmp_path: Path
     assert LEGACY_REVISION in history
     assert "20260810_0038" in history
     assert "20260810_0039" in history
+    assert "20260812_0040" in history
     assert heads.count("(head)") == 1
     assert HEAD_REVISION in heads
 
@@ -113,5 +114,21 @@ def test_live_like_0038_database_upgrades_without_shrinking_or_schema_bootstrap(
     assert next(
         c for c in after.get_columns("methodology_source_documents") if c["name"] == "status"
     )["type"].length >= 160
+    invoice_columns = {item["name"] for item in after.get_columns("billing_invoices")}
+    contract_columns = {item["name"] for item in after.get_columns("service_contracts")}
+    assert {
+        "charge_type",
+        "amount_semantics",
+        "net_amount",
+        "tax_rate_snapshot",
+        "tax_amount",
+        "total_amount",
+        "source_reference",
+        "classification_note",
+        "semantics_created_at",
+    } <= invoice_columns
+    assert {"signature_version", "signature_payload", "signature_snapshot_created_at"} <= contract_columns
+    assert "billing_charge_breakdowns" not in set(after.get_table_names())
+    assert "contract_signature_snapshots" not in set(after.get_table_names())
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == HEAD_REVISION

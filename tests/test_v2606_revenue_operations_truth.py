@@ -359,18 +359,32 @@ def test_v2606_recurring_charge_rejects_invalid_dates_and_negative_authority() -
             follow_redirects=False,
         )
         assert inverted.status_code == 400
-        due_before_end = client.post(
+
+        due_inside_period = client.post(
             "/operacion-comercial/cobros/recurrente",
             data={
                 "subscription_id": subscription_id,
                 "period_start": "2026-09-01",
                 "period_end": "2026-09-30",
                 "due_date": "2026-09-15",
+                "reference": _unique("REC-DUE-IN-PERIOD"),
+            },
+            follow_redirects=False,
+        )
+        assert due_inside_period.status_code == 303
+
+        due_before_start = client.post(
+            "/operacion-comercial/cobros/recurrente",
+            data={
+                "subscription_id": subscription_id,
+                "period_start": "2026-12-01",
+                "period_end": "2026-12-31",
+                "due_date": "2026-11-30",
                 "reference": _unique("REC-BAD-DUE"),
             },
             follow_redirects=False,
         )
-        assert due_before_end.status_code == 400
+        assert due_before_start.status_code == 400
 
     with SessionLocal() as session:
         subscription = session.get(OrganizationSubscription, subscription_id)

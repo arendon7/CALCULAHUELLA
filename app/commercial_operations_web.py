@@ -401,8 +401,8 @@ def register_commercial_operations_routes(
             validate_date_window(start, end, label="periodo de cobro")
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
-        if due < end:
-            raise HTTPException(400, "El vencimiento no puede ser anterior al fin del periodo cobrado")
+        if due < start:
+            raise HTTPException(400, "El vencimiento no puede ser anterior al inicio del periodo cobrado")
 
         normalized_reference = reference.strip().upper() or f"REC-{subscription.organization_id}-{start.strftime('%Y%m')}-{subscription.id}"
         if session.scalar(select(BillingInvoice).where(BillingInvoice.reference == normalized_reference)):
