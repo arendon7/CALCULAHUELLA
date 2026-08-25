@@ -6,6 +6,7 @@ on:
       - stabilization/v2-0-0-product-readiness
     paths:
       - "app/money.py"
+      - "app/seed_defaults.py"
       - "app/commercial_pricing.py"
       - "app/commercial_web.py"
       - "app/payment_web.py"
@@ -56,6 +57,7 @@ jobs:
         run: |
           PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v2607-pycache" python -m compileall -q \
             app/money.py \
+            app/seed_defaults.py \
             app/commercial_pricing.py \
             app/commercial_web.py \
             app/payment_web.py \
@@ -83,10 +85,14 @@ jobs:
           python -m alembic current
           python - <<'PY'
           from sqlalchemy import Float, Numeric, inspect
-          from app.db.base import ENGINE
+          from app.db.base import Base, ENGINE
 
           inspector = inspect(ENGINE)
-          assert len(inspector.get_table_names()) == 124
+          domain_tables = set(Base.metadata.tables)
+          physical_tables = set(inspector.get_table_names())
+          assert len(domain_tables) == 124
+          assert domain_tables <= physical_tables
+          assert physical_tables - domain_tables <= {"alembic_version", "sqlite_sequence"}
 
           def check(table, column, precision, scale):
               item = next(entry for entry in inspector.get_columns(table) if entry["name"] == column)
@@ -253,11 +259,15 @@ jobs:
           python - <<'PY'
           from decimal import Decimal
           from sqlalchemy import Numeric, inspect, select
-          from app.db.base import ENGINE, SessionLocal
+          from app.db.base import Base, ENGINE, SessionLocal
           from app.db.models import ServicePlan
 
           inspector = inspect(ENGINE)
-          assert len(inspector.get_table_names()) == 124
+          domain_tables = set(Base.metadata.tables)
+          physical_tables = set(inspector.get_table_names())
+          assert len(domain_tables) == 124
+          assert domain_tables <= physical_tables
+          assert physical_tables - domain_tables <= {"alembic_version"}
           monthly = next(entry for entry in inspector.get_columns("service_plans") if entry["name"] == "monthly_fee")
           assert isinstance(monthly["type"], Numeric)
           assert (monthly["type"].precision, monthly["type"].scale) == (18, 2)
@@ -269,8 +279,7 @@ jobs:
               assert plan.annual_fee == Decimal("1200001.99")
           PY
 
-      - name: Publicar evidencia PostgreSQL
-        if: always()
+      - name: Registrar evidencia PostgreSQL exitosa
         run: |
           python - <<'PY'
           import json
@@ -282,7 +291,7 @@ jobs:
           PY
 
       - uses: actions/upload-artifact@v4
-        if: always()
+        if: success()
         with:
           name: v2607-monetary-precision-postgres
           path: v2607-postgres-evidence.json
