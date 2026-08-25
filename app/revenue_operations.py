@@ -4,6 +4,16 @@ import hashlib
 import json
 import math
 from datetime import UTC, date, datetime
+from decimal import Decimal
+
+from .monetary import (
+    HUNDRED,
+    money_tax,
+    parse_nonnegative_money,
+    parse_nonnegative_rate,
+    quantize_money,
+    quantize_rate,
+)
 
 
 CONTRACT_SIGNATURE_VERSION = "1.1"
@@ -21,6 +31,13 @@ def canonical_utc_timestamp(value: datetime) -> str:
 
 
 def parse_nonnegative_number(raw: object, label: str, *, maximum: float | None = None) -> float:
+    """Parse non-monetary operational numbers.
+
+    Monetary values must use ``parse_nonnegative_money`` and contractual rates
+    must use ``parse_nonnegative_rate``. This helper intentionally remains
+    binary-float for non-economic fields such as notice-day validation.
+    """
+
     value_raw = str(raw if raw is not None else "").strip()
     if not value_raw:
         raise ValueError(f"Define {label}.")
@@ -43,11 +60,13 @@ def validate_date_window(start: date, end: date | None, *, label: str) -> None:
 
 
 def contract_signature_payload(contract, signed_by: str, signed_email: str, signed_at: datetime) -> dict[str, object]:
-    """Return the complete V2.60.6 contractual signature snapshot.
+    """Return the complete contractual signature snapshot.
 
-    The payload deliberately binds source/provenance and material commercial
-    terms. It does not mutate legacy signatures that predate this version.
+    V2.60.7 preserves the V2.60.6 signature version and canonical two-decimal
+    contract-value representation. Existing signature payloads/hashes are never
+    rewritten by the precision migration.
     """
+
     return {
         "signature_version": CONTRACT_SIGNATURE_VERSION,
         "reference": contract.reference,
@@ -61,7 +80,7 @@ def contract_signature_payload(contract, signed_by: str, signed_email: str, sign
         "renewal_type": contract.renewal_type,
         "auto_renew": bool(contract.auto_renew),
         "notice_days": int(contract.notice_days),
-        "contract_value": f"{contract.contract_value:.2f}",
+        "contract_value": f"{quantize_money(contract.contract_value):.2f}",
         "billing_cycle": contract.billing_cycle,
         "owner": contract.owner,
         "terms_snapshot": contract.terms_snapshot,
@@ -85,12 +104,42 @@ def contract_signature_hash(contract, signed_by: str, signed_email: str, signed_
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def activation_breakdown(implementation_fee: float, recurring_fee: float, discount_amount: float, tax_rate: float) -> dict[str, float]:
-    net = implementation_fee + recurring_fee - discount_amount
-    tax = net * (tax_rate / 100.0)
+def activation_breakdown(
+    implementation_fee: object,
+    recurring_fee: object,
+    discount_amount: object,
+    tax_rate: object,
+) -> dict[str, Decimal]:
+    """Return the exact V2.60.6 activation semantics using decimal arithmetic."""
+
+    implementation = quantize_money(implementation_fee)
+    recurring = quantize_money(recurring_fee)
+    discount = quantize_money(discount_amount)
+    rate = quantize_rate(tax_rate)
+    net = quantize_money(implementation + recurring - discount)
+    tax = money_tax(net, rate)
     return {
         "net_amount": net,
-        "tax_rate_snapshot": tax_rate,
+        "tax_rate_snapshot": rate,
         "tax_amount": tax,
-        "total_amount": net + tax,
+        "total_amount": quantize_money(net + tax),
     }
+
+
+__all__ = [
+    "CONTRACT_SIGNATURE_VERSION",
+    "HUNDRED",
+    "INVOICE_BASE_BEFORE_TAX",
+    "INVOICE_LEGACY_UNKNOWN",
+    "INVOICE_TOTAL_WITH_TAX",
+    "activation_breakdown",
+    "canonical_utc_datetime",
+    "canonical_utc_timestamp",
+    "contract_signature_hash",
+    "contract_signature_payload",
+    "contract_signature_source",
+    "parse_nonnegative_money",
+    "parse_nonnegative_number",
+    "parse_nonnegative_rate",
+    "validate_date_window",
+]
