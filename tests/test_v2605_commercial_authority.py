@@ -3,6 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -118,7 +119,9 @@ def test_v2605_commercial_ui_has_explicit_offer_and_billing_authority() -> None:
     assert 'name="billing_cycle" required' in template
     assert 'name="valid_until"' in template and 'min="{{ proposal_min_valid_until }}"' in template
 
-    assert "_parse_nonnegative_number" in source
+    assert "parse_money" in source
+    assert "parse_rate" in source
+    assert "_parse_nonnegative_number" not in source
     assert "proposal_first_year_total" in source
     assert 'contract_version="1.1"' in source
     assert "proposal_initial_payment" in source
@@ -182,7 +185,7 @@ def test_v2605_acceptance_snapshot_binds_identity_scope_and_complete_economics()
         "implementation_fee": proposal.implementation_fee + 1,
         "recurring_fee": proposal.recurring_fee + 1,
         "discount_amount": proposal.discount_amount + 1,
-        "tax_rate": proposal.tax_rate + 0.01,
+        "tax_rate": proposal.tax_rate + Decimal("0.01"),
         "first_year_total": proposal.first_year_total + 1,
         "scope_json": '["Alcance alterado"]',
         "deliverables_json": '["Entregable alterado"]',
