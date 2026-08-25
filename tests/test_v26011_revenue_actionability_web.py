@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
 
 from fastapi.testclient import TestClient
@@ -19,6 +19,22 @@ def _login(client: TestClient) -> None:
         follow_redirects=False,
     )
     assert response.status_code == 303
+
+
+def _normalized_utc_naive(value: datetime | None) -> datetime | None:
+    """Compare the same persisted instant across SQLite timezone adapters.
+
+    SQLite can reload a timezone-aware UTC value as a naive datetime while
+    preserving the exact wall-clock value down to microseconds. Normalizing
+    only the representation keeps the no-write assertion strict: a changed
+    timestamp still fails.
+    """
+
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value
+    return value.astimezone(UTC).replace(tzinfo=None)
 
 
 def test_v26011_commercial_operations_get_surfaces_action_without_mutating_contract() -> None:
@@ -51,7 +67,7 @@ def test_v26011_commercial_operations_get_surfaces_action_without_mutating_contr
             "status": contract.status,
             "signature_hash": contract.signature_hash,
             "contract_value": contract.contract_value,
-            "updated_at": contract.updated_at,
+            "updated_at": _normalized_utc_naive(contract.updated_at),
         }
 
     with TestClient(app) as client:
@@ -76,7 +92,7 @@ def test_v26011_commercial_operations_get_surfaces_action_without_mutating_contr
             "status": contract.status,
             "signature_hash": contract.signature_hash,
             "contract_value": contract.contract_value,
-            "updated_at": contract.updated_at,
+            "updated_at": _normalized_utc_naive(contract.updated_at),
         }
         assert after == before
 
