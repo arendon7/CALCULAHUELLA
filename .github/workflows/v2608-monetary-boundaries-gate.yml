@@ -111,13 +111,21 @@ jobs:
           INSTANCE_DIR: ${{ runner.temp }}/cth-v2608-postgres
         run: |
           python - <<'PY'
+          from datetime import date
           from decimal import Decimal
           from sqlalchemy import select
           from app.db.base import SessionLocal
           from app.db.models import Organization, ServiceContract
 
           with SessionLocal() as session:
-              organization = Organization(name="V2608 PostgreSQL", tax_id="V2608-PG", sector="Prueba", country="Colombia", status="Activa")
+              organization = Organization(
+                  name="V2608 PostgreSQL",
+                  tax_id="V2608-PG",
+                  sector="Prueba",
+                  country="Colombia",
+                  city="Bogotá",
+                  status="Activa",
+              )
               session.add(organization)
               session.flush()
               contract = ServiceContract(
@@ -126,7 +134,7 @@ jobs:
                   title="Prueba PostgreSQL",
                   version="1.0",
                   status="Borrador",
-                  start_date=__import__("datetime").date(2026, 9, 1),
+                  start_date=date(2026, 9, 1),
                   renewal_type="Por acuerdo",
                   auto_renew=False,
                   notice_days=30,
