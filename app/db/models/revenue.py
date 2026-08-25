@@ -4,6 +4,7 @@ from decimal import Decimal
 
 from sqlalchemy import event, inspect as sa_inspect, select
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import set_committed_value
 
 from ..base import Base
 from ..monetary_types import ExactDecimal, ExactNumeric
@@ -45,6 +46,41 @@ _EXACT_NUMERIC_FIELDS: dict[type, tuple[str, ...]] = {
 }
 
 
+def _restore_exact_runtime_values(target: object, field_names: tuple[str, ...]) -> None:
+    """Restore ExactDecimal semantics without making a clean ORM row dirty.
+
+    Some SQLAlchemy dialects adapt ``Numeric`` and can therefore return a base
+    ``Decimal`` even though the canonical type has a result processor. The
+    economic value and scale are already correct at that point; this hook only
+    restores the compatibility subtype used by historical arithmetic and
+    presentation. ``set_committed_value`` deliberately avoids UPDATE churn.
+    """
+
+    for field_name in field_names:
+        value = getattr(target, field_name, None)
+        if value is None or isinstance(value, ExactDecimal):
+            continue
+        if isinstance(value, Decimal):
+            set_committed_value(target, field_name, ExactDecimal(value))
+
+
+def _restore_loaded_exact_runtime_values(target: object, context) -> None:
+    _restore_exact_runtime_values(target, _EXACT_NUMERIC_FIELDS.get(type(target), ()))
+
+
+def _restore_refreshed_exact_runtime_values(target: object, context, attrs) -> None:
+    field_names = _EXACT_NUMERIC_FIELDS.get(type(target), ())
+    if attrs:
+        refreshed = set(attrs)
+        field_names = tuple(name for name in field_names if name in refreshed)
+    _restore_exact_runtime_values(target, field_names)
+
+
+for _model in _EXACT_NUMERIC_FIELDS:
+    event.listen(_model, "load", _restore_loaded_exact_runtime_values)
+    event.listen(_model, "refresh", _restore_refreshed_exact_runtime_values)
+
+
 @event.listens_for(Session, "before_flush")
 def _enforce_exact_numeric_before_flush(session: Session, flush_context, instances) -> None:
     """Enforce economic invariants before dialect adaptation or SQL emission."""
@@ -67,7 +103,7 @@ def _enforce_exact_numeric_before_flush(session: Session, flush_context, instanc
             if not isinstance(column_type, ExactNumeric):
                 raise RuntimeError(f"{type(obj).__name__}.{field_name} perdió su autoridad ExactNumeric")
             normalized = column_type.normalize_value(value)
-            if normalized != value or not isinstance(value, Decimal):
+            if normalized != value or not isinstance(value, ExactDecimal):
                 setattr(obj, field_name, normalized)
 
 
