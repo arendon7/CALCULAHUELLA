@@ -20,6 +20,7 @@ from .db.models import (
     ServiceContract,
     ServiceOrder,
 )
+from .revenue_actionability import build_revenue_action_queue, summarize_revenue_actions
 from .revenue_operations import (
     CONTRACT_SIGNATURE_VERSION,
     INVOICE_BASE_BEFORE_TAX,
@@ -109,6 +110,10 @@ def register_commercial_operations_routes(
         ))
         organizations = list(session.scalars(select(Organization).order_by(Organization.name)))
         org_map = {item.id: item for item in organizations}
+        organization_names = {
+            item.id: (item.trade_name or item.name)
+            for item in organizations
+        }
         proposals = list(session.scalars(
             select(CommercialProposal)
             .where(CommercialProposal.status == "Aceptada", CommercialProposal.organization_id.is_not(None))
@@ -152,12 +157,28 @@ def register_commercial_operations_routes(
             "legacy_outstanding": legacy_outstanding,
             "renewals": len(renewals),
         }
+        revenue_actions = build_revenue_action_queue(
+            contracts=contracts,
+            orders=orders,
+            invoices=invoices,
+            proposals=proposals,
+            collection_actions=actions,
+            breakdown_by_invoice=breakdown_by_invoice,
+            organization_names=organization_names,
+            today=today,
+        )
+        action_summary = summarize_revenue_actions(revenue_actions)
+        action_queue = revenue_actions[:12]
+        hidden_action_count = max(0, action_summary["total"] - len(action_queue))
+        summary["actionable_total"] = action_summary["total"]
+        summary["critical_actions"] = action_summary["critical"]
         return templates.TemplateResponse(request, "commercial_operations.html", common_context(
             request, session, user, "commercial_operations",
             contracts=contracts, orders=orders, invoices=invoices, actions=actions, documents=documents,
             subscriptions=subscriptions, organizations=organizations, org_map=org_map, proposals=proposals,
             overdue=overdue, renewals=renewals, summary=summary, today=today,
             breakdown_by_invoice=breakdown_by_invoice, signature_by_contract=signature_by_contract,
+            action_queue=action_queue, hidden_action_count=hidden_action_count,
         ))
 
     @app.post("/operacion-comercial/contratos/nuevo")
