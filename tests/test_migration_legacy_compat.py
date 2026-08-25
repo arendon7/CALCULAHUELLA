@@ -7,10 +7,11 @@ import sys
 from pathlib import Path
 
 from sqlalchemy import create_engine, inspect
+from sqlalchemy.sql.sqltypes import Numeric
 
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_REVISION = "20260806_0038"
-HEAD_REVISION = "20260824_0041"
+HEAD_REVISION = "20260825_0042"
 WORK_TABLES = {
     "work_items",
     "work_item_events",
@@ -28,6 +29,13 @@ def _run_python(code: str, env: dict[str, str]) -> None:
         capture_output=True,
         text=True,
     )
+
+
+def _assert_numeric(inspector, table: str, column: str, precision: int, scale: int) -> None:
+    column_type = next(item["type"] for item in inspector.get_columns(table) if item["name"] == column)
+    assert isinstance(column_type, Numeric)
+    assert column_type.precision == precision
+    assert column_type.scale == scale
 
 
 def test_migration_graph_contains_live_checkpoint_and_single_head(tmp_path: Path) -> None:
@@ -54,6 +62,7 @@ def test_migration_graph_contains_live_checkpoint_and_single_head(tmp_path: Path
     assert "20260810_0038" in history
     assert "20260810_0039" in history
     assert "20260812_0040" in history
+    assert "20260824_0041" in history
     assert heads.count("(head)") == 1
     assert HEAD_REVISION in heads
 
@@ -130,5 +139,14 @@ def test_live_like_0038_database_upgrades_without_shrinking_or_schema_bootstrap(
     assert {"signature_version", "signature_payload", "signature_snapshot_created_at"} <= contract_columns
     assert "billing_charge_breakdowns" not in set(after.get_table_names())
     assert "contract_signature_snapshots" not in set(after.get_table_names())
+
+    _assert_numeric(after, "billing_invoices", "amount", 20, 2)
+    _assert_numeric(after, "billing_invoices", "net_amount", 20, 2)
+    _assert_numeric(after, "billing_invoices", "tax_rate_snapshot", 9, 4)
+    _assert_numeric(after, "commercial_proposals", "recurring_fee", 20, 2)
+    _assert_numeric(after, "commercial_proposals", "tax_rate", 9, 4)
+    _assert_numeric(after, "organization_subscriptions", "custom_monthly_fee", 20, 6)
+    _assert_numeric(after, "service_contracts", "contract_value", 20, 2)
+
     with sqlite3.connect(db_path) as conn:
         assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == HEAD_REVISION

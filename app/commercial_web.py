@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import math
 import secrets
 from datetime import UTC, date, datetime
 
@@ -14,6 +13,7 @@ from .commercial_pricing import proposal_first_year_total, proposal_initial_paym
 from .config import settings
 from .database import get_db
 from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment, PaymentTransaction, ServicePlan
+from .monetary import parse_nonnegative_money, parse_nonnegative_rate
 
 
 def register_commercial_routes(
@@ -109,22 +109,6 @@ def register_commercial_routes(
             status_code=status_code,
         )
 
-    def _parse_nonnegative_number(raw: str, label: str, *, maximum: float | None = None) -> float:
-        value_raw = str(raw or "").strip()
-        if not value_raw:
-            raise ValueError(f"Define {label}.")
-        try:
-            value = float(value_raw)
-        except ValueError as exc:
-            raise ValueError(f"{label.capitalize()} debe ser un número válido.") from exc
-        if not math.isfinite(value):
-            raise ValueError(f"{label.capitalize()} debe ser un número finito.")
-        if value < 0:
-            raise ValueError(f"{label.capitalize()} no puede ser negativo.")
-        if maximum is not None and value > maximum:
-            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum:g}.")
-        return value
-
     @app.get("/comercial", response_class=HTMLResponse)
     def commercial_center(request: Request, session: Session = Depends(get_db)):
         user = require_user(request)
@@ -197,10 +181,10 @@ def register_commercial_routes(
             if not plan.active:
                 raise ValueError("El plan seleccionado ya no está activo. Selecciona otro plan.")
 
-            implementation_value = _parse_nonnegative_number(implementation_fee, "el valor de implementación")
-            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente por ciclo")
-            discount_value = _parse_nonnegative_number(discount_amount, "el descuento inicial")
-            tax_value = _parse_nonnegative_number(tax_rate, "la tasa de impuesto", maximum=100)
+            implementation_value = parse_nonnegative_money(implementation_fee, "el valor de implementación")
+            recurring_value = parse_nonnegative_money(recurring_fee, "el valor recurrente por ciclo")
+            discount_value = parse_nonnegative_money(discount_amount, "el descuento inicial")
+            tax_value = parse_nonnegative_rate(tax_rate, "la tasa de impuesto")
 
             if billing_cycle not in {"Mensual", "Anual"}:
                 raise ValueError("Selecciona un ciclo de facturación válido.")
