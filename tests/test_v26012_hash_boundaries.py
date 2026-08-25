@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import func, select
+from sqlalchemy import select
 
 from app.commercial_lifecycle import LifecyclePersistenceConflict
 from app.database import SessionLocal
@@ -191,11 +191,11 @@ def test_v26012_new_signature_cannot_be_injected_into_non_draft_contract() -> No
         assert persisted.signed_at is None
 
 
-def test_v26012_unsigned_terminated_contract_cannot_be_renewed_by_adding_child() -> None:
+def test_v26012_legacy_unsigned_contract_renews_only_through_a_linked_child() -> None:
     parent = ServiceContract(
         organization_id=_organization_id(),
         reference=_uid("CTR-UNSIGNED-END"),
-        title="Contrato terminado sin firma",
+        title="Contrato terminado legacy sin firma",
         status="Terminado",
         start_date=date.today() - timedelta(days=365),
         end_date=date.today() - timedelta(days=1),
@@ -208,10 +208,17 @@ def test_v26012_unsigned_terminated_contract_cannot_be_renewed_by_adding_child()
         session.add(parent)
         session.commit()
         parent_id = parent.id
-        child_reference = _uid("CTR-UNSIGNED-RENEWAL")
 
         parent.status = "Renovado"
-        session.add(ServiceContract(
+        with pytest.raises(LifecyclePersistenceConflict, match="renovación contractual vinculada"):
+            session.commit()
+        session.rollback()
+
+        parent = session.get(ServiceContract, parent_id)
+        assert parent is not None and parent.status == "Terminado"
+        child_reference = _uid("CTR-UNSIGNED-RENEWAL")
+        parent.status = "Renovado"
+        child = ServiceContract(
             organization_id=parent.organization_id,
             parent_contract_id=parent.id,
             reference=child_reference,
@@ -224,17 +231,20 @@ def test_v26012_unsigned_terminated_contract_cannot_be_renewed_by_adding_child()
             billing_cycle="Anual",
             owner=parent.owner,
             created_by="tests@calculatuhuella.local",
-        ))
-        with pytest.raises(LifecyclePersistenceConflict, match="evidencia de firma"):
-            session.commit()
-        session.rollback()
+        )
+        session.add(child)
+        session.commit()
+        child_id = child.id
+        assert parent.status == "Renovado"
+        assert child.parent_contract_id == parent.id
+        assert not parent.signature_hash
 
     with SessionLocal() as session:
-        persisted = session.get(ServiceContract, parent_id)
-        assert persisted is not None and persisted.status == "Terminado"
-        assert session.scalar(
-            select(func.count()).select_from(ServiceContract).where(ServiceContract.reference == child_reference)
-        ) == 0
+        persisted_parent = session.get(ServiceContract, parent_id)
+        persisted_child = session.get(ServiceContract, child_id)
+        assert persisted_parent is not None and persisted_parent.status == "Renovado"
+        assert persisted_child is not None and persisted_child.parent_contract_id == parent_id
+        assert not persisted_parent.signature_hash
 
 
 def test_v26012_order_acceptance_cannot_fabricate_delivery_in_same_flush() -> None:
