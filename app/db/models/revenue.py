@@ -18,6 +18,12 @@ from .commercial import (
     ServicePlan,
 )
 
+# Importing the canonical model facade must also register the commercial
+# lifecycle Session guard. The lifecycle module has no eager dependency on the
+# model facade, so this side-effect import is cycle-safe and covers web, scripts,
+# jobs and tests that create Session objects without importing a route module.
+from ... import commercial_lifecycle as _commercial_lifecycle  # noqa: E402,F401
+
 
 # V2.60.9 authoritative ORM write surface. V2.60.10 keeps enforcement here but
 # the physical/ORM column authority now lives declaratively in commercial.py.
