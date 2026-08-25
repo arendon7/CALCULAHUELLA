@@ -114,7 +114,6 @@ jobs:
           from decimal import Decimal
 
           from sqlalchemy import select
-          from sqlalchemy.exc import StatementError
 
           from app.db.base import SessionLocal
           from app.db.models import Organization, ServiceContract
@@ -178,10 +177,9 @@ jobs:
               session.add(rejected)
               try:
                   session.commit()
-              except StatementError as exc:
+              except ValueError as exc:
                   session.rollback()
-                  assert isinstance(exc.orig, ValueError), type(exc.orig)
-                  assert "límite portable" in str(exc.orig)
+                  assert "límite portable" in str(exc)
               else:
                   raise AssertionError("PostgreSQL aceptó un valor fuera del contrato portable")
           PY
