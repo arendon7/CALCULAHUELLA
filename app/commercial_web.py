@@ -9,6 +9,7 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session, selectinload
 
+from .commercial_lifecycle import LifecycleTransitionError, ensure_proposal_can_send
 from .commercial_pricing import proposal_first_year_total, proposal_initial_payment, recurring_first_year_value
 from .config import settings
 from .database import get_db
@@ -285,6 +286,10 @@ def register_commercial_routes(
         proposal = session.get(CommercialProposal, proposal_id)
         if not proposal:
             raise HTTPException(404, "Propuesta no encontrada")
+        try:
+            ensure_proposal_can_send(proposal)
+        except LifecycleTransitionError as exc:
+            raise HTTPException(409, str(exc)) from exc
         proposal.status = "Enviada"
         proposal.sent_at = datetime.now(UTC)
         session.commit()
