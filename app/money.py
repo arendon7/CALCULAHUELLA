@@ -67,6 +67,11 @@ def parse_rate(raw: object, label: str) -> Decimal:
     return parse_nonnegative_decimal(raw, label, maximum=ONE_HUNDRED, scale=CONTRACT_RATE_SCALE)
 
 
+def parse_recurring_basis(raw: object, label: str) -> Decimal:
+    """Parse the persisted monthly-equivalent basis without collapsing sub-cent precision."""
+    return parse_nonnegative_decimal(raw, label, scale=RECURRING_BASIS_SCALE)
+
+
 def quantize_money(value: object) -> Decimal:
     """Round a derived monetary result to the settlement precision."""
     decimal_value = value if isinstance(value, Decimal) else Decimal(str(value))
