@@ -115,7 +115,8 @@ class ExactNumeric(Numeric):
                 raise ValueError("El valor económico persistido debe ser un número válido") from exc
             if not exact.is_finite():
                 raise ValueError("Los valores monetarios persistidos deben ser finitos")
-            if abs(exact) >= overflow_threshold:
+            magnitude = exact.copy_abs()
+            if magnitude >= overflow_threshold:
                 raise ValueError(
                     f"El valor económico excede el límite portable de NUMERIC({precision},{scale}): "
                     f"{portable_maximum}"
@@ -128,7 +129,8 @@ class ExactNumeric(Numeric):
                 raise ValueError(
                     f"El valor económico no puede representarse como NUMERIC({precision},{scale})"
                 ) from exc
-            if abs(quantized) > physical_maximum or abs(quantized) > portable_maximum:
+            quantized_magnitude = quantized.copy_abs()
+            if quantized_magnitude > physical_maximum or quantized_magnitude > portable_maximum:
                 raise ValueError(
                     f"El valor económico excede el límite portable de NUMERIC({precision},{scale}): "
                     f"{portable_maximum}"
