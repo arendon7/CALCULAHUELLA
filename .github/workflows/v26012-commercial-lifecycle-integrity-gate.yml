@@ -1,0 +1,211 @@
+name: V2.60.12 · Commercial lifecycle integrity gate
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/commercial_lifecycle.py"
+      - "app/commercial_web.py"
+      - "app/payment_web.py"
+      - "app/commercial_operations_web.py"
+      - "app/db/models/revenue.py"
+      - "tests/test_v26012_*.py"
+      - ".github/workflows/v26012-commercial-lifecycle-integrity-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26012-commercial-lifecycle-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  commercial-lifecycle-integrity:
+    name: State machine · immutable evidence · SQLite and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v26012
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v26012"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.12
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v26012-pycache" python -m compileall -q \
+            app/commercial_lifecycle.py \
+            app/commercial_web.py \
+            app/payment_web.py \
+            app/commercial_operations_web.py \
+            app/db/models/revenue.py \
+            tests/test_v26012_commercial_lifecycle_policy.py \
+            tests/test_v26012_commercial_lifecycle_integrity.py \
+            tests/test_v26012_hash_boundaries.py
+
+      - name: Probar lifecycle y regresiones económicas autoritativas
+        run: |
+          pytest -q \
+            tests/test_v26012_commercial_lifecycle_policy.py \
+            tests/test_v26012_commercial_lifecycle_integrity.py \
+            tests/test_v26012_hash_boundaries.py \
+            tests/test_v26011_revenue_actionability.py \
+            tests/test_v26011_revenue_actionability_web.py \
+            tests/test_v26010_1_decimal_integration_closure.py \
+            tests/test_v26010_monetary_authority_consolidation.py \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            --junitxml=v26012-commercial-lifecycle.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26012-sqlite
+        run: |
+          unset DATABASE_URL
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26012
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26012-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: PostgreSQL real · guard registrado fuera de rutas web y rechazo sin mutación
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26012
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26012-postgres
+          SEED_DEMO: "true"
+        run: |
+          python - <<'PY'
+          from datetime import UTC, date, datetime, timedelta
+          from decimal import Decimal
+          from uuid import uuid4
+
+          # Deliberately do not import app.commercial_lifecycle or any web route.
+          # The model bootstrap must register the Session guard by itself.
+          from app.database import SessionLocal, init_db
+          from app.db.models import CommercialProposal
+
+          init_db()
+          reference = f"CI-LIFECYCLE-{uuid4().hex[:10]}"
+          token = f"ci-{uuid4().hex}"
+          original_terms = "CI immutable acceptance terms"
+
+          with SessionLocal() as session:
+              proposal = CommercialProposal(
+                  reference=reference,
+                  public_token=token,
+                  title="CI lifecycle evidence",
+                  company_name="CI lifecycle",
+                  status="Aceptada",
+                  valid_until=date.today() + timedelta(days=10),
+                  billing_cycle="Anual",
+                  implementation_fee=Decimal("0.00"),
+                  recurring_fee=Decimal("100.00"),
+                  discount_amount=Decimal("0.00"),
+                  tax_rate=Decimal("19.0000"),
+                  first_year_total=Decimal("119.00"),
+                  scope_json="[]",
+                  deliverables_json="[]",
+                  terms=original_terms,
+                  contract_version="1.1",
+                  accepted_by="CI",
+                  accepted_email="ci@example.com",
+                  accepted_at=datetime.now(UTC),
+                  accepted_ip="127.0.0.1",
+                  acceptance_hash="d" * 64,
+                  created_by="ci@calculatuhuella.local",
+              )
+              session.add(proposal)
+              session.commit()
+              proposal_id = proposal.id
+
+              proposal.terms = "tampered after acceptance"
+              rejected = False
+              try:
+                  session.commit()
+              except Exception as exc:
+                  if getattr(exc, "status_code", None) != 409:
+                      raise
+                  rejected = True
+                  session.rollback()
+              assert rejected, "The lifecycle Session guard did not reject the contradictory write."
+
+          with SessionLocal() as session:
+              persisted = session.get(CommercialProposal, proposal_id)
+              assert persisted is not None
+              assert persisted.terms == original_terms
+              assert persisted.acceptance_hash == "d" * 64
+
+          print("model_bootstrap_guard=PASS")
+          print("postgres_rejection_without_mutation=PASS")
+          PY
+
+      - name: Construir evidencia V2.60.12
+        if: always()
+        run: |
+          {
+            echo "checkpoint=V2.60.12"
+            echo "sha=${GITHUB_SHA}"
+            echo "migration=none"
+            echo "policy=explicit-commercial-state-machine"
+            echo "acceptance_hash_boundary=immutable-after-persisted-milestone"
+            echo "contract_signature_boundary=immutable-after-persisted-milestone"
+            echo "settled_payment_boundary=immutable-economic-core"
+            echo "listener_bootstrap=app.db.models.revenue"
+            echo "postgres_guard=separate-process-no-web-route-import"
+          } > v26012-evidence.txt
+
+      - name: Publicar evidencia V2.60.12
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26012-commercial-lifecycle-integrity-evidence
+          path: |
+            v26012-commercial-lifecycle.xml
+            v26012-evidence.txt
+          if-no-files-found: warn
+          retention-days: 14
