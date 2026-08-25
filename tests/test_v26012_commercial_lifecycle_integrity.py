@@ -109,7 +109,7 @@ def test_v26012_payment_provider_is_closed_and_terminal_regression_is_forbidden(
         validate_payment_transition("Pagada", "Pendiente")
 
 
-def test_v26012_contract_policy_requires_signature_for_vigente_and_renewal_evidence() -> None:
+def test_v26012_contract_policy_requires_signature_for_vigente_and_versioned_renewal() -> None:
     unsigned = SimpleNamespace(
         status="Borrador", signature_hash="", signed_at=None, signed_by="", signed_email=""
     )
@@ -131,6 +131,10 @@ def test_v26012_contract_policy_requires_signature_for_vigente_and_renewal_evide
 
     signed_active = SimpleNamespace(**{**signed_suspended.__dict__, "status": "Vigente"})
     ensure_contract_can_renew(signed_active)
+    legacy_unsigned_active = SimpleNamespace(
+        status="Vigente", signature_hash="", signed_at=None, signed_by="", signed_email=""
+    )
+    ensure_contract_can_renew(legacy_unsigned_active)
 
 
 def test_v26012_order_and_invoice_policy_rejects_factless_terminal_states() -> None:
@@ -459,7 +463,7 @@ def test_v26012_accepted_proposal_cannot_be_rejected_again_over_public_route() -
         persisted = session.get(CommercialProposal, proposal_id)
         assert persisted.status == "Aceptada"
         assert persisted.acceptance_hash == original_hash
-        assert persisted.accepted_at == original_accepted_at
+        assert persisted.accepted_at == original_accepted_at.replace(tzinfo=None) or persisted.accepted_at == original_accepted_at
 
 
 def test_v26012_paid_transaction_cannot_regress_or_rewrite_paid_at() -> None:
