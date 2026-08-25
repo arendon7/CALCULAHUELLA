@@ -1,9 +1,9 @@
 from __future__ import annotations
 
 import json
-import math
 import secrets
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -14,6 +14,7 @@ from .commercial_pricing import proposal_first_year_total, proposal_initial_paym
 from .config import settings
 from .database import get_db
 from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment, PaymentTransaction, ServicePlan
+from .money import parse_money, parse_rate
 
 
 def register_commercial_routes(
@@ -109,21 +110,11 @@ def register_commercial_routes(
             status_code=status_code,
         )
 
-    def _parse_nonnegative_number(raw: str, label: str, *, maximum: float | None = None) -> float:
-        value_raw = str(raw or "").strip()
-        if not value_raw:
-            raise ValueError(f"Define {label}.")
-        try:
-            value = float(value_raw)
-        except ValueError as exc:
-            raise ValueError(f"{label.capitalize()} debe ser un número válido.") from exc
-        if not math.isfinite(value):
-            raise ValueError(f"{label.capitalize()} debe ser un número finito.")
-        if value < 0:
-            raise ValueError(f"{label.capitalize()} no puede ser negativo.")
-        if maximum is not None and value > maximum:
-            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum:g}.")
-        return value
+    def _parse_proposal_amount(raw: str, label: str) -> Decimal:
+        return parse_money(raw, label)
+
+    def _parse_proposal_rate(raw: str, label: str) -> Decimal:
+        return parse_rate(raw, label)
 
     @app.get("/comercial", response_class=HTMLResponse)
     def commercial_center(request: Request, session: Session = Depends(get_db)):
@@ -197,10 +188,10 @@ def register_commercial_routes(
             if not plan.active:
                 raise ValueError("El plan seleccionado ya no está activo. Selecciona otro plan.")
 
-            implementation_value = _parse_nonnegative_number(implementation_fee, "el valor de implementación")
-            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente por ciclo")
-            discount_value = _parse_nonnegative_number(discount_amount, "el descuento inicial")
-            tax_value = _parse_nonnegative_number(tax_rate, "la tasa de impuesto", maximum=100)
+            implementation_value = _parse_proposal_amount(implementation_fee, "el valor de implementación")
+            recurring_value = _parse_proposal_amount(recurring_fee, "el valor recurrente por ciclo")
+            discount_value = _parse_proposal_amount(discount_amount, "el descuento inicial")
+            tax_value = _parse_proposal_rate(tax_rate, "la tasa de impuesto")
 
             if billing_cycle not in {"Mensual", "Anual"}:
                 raise ValueError("Selecciona un ciclo de facturación válido.")
