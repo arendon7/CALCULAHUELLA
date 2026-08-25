@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 
 from sqlalchemy import DateTime, Numeric, String, Text, select
 from sqlalchemy.orm import mapped_column
@@ -72,7 +72,23 @@ class ExactDecimal(Decimal):
 
 
 class ExactNumeric(Numeric):
-    """NUMERIC returning ``ExactDecimal`` while preserving SQL NUMERIC identity."""
+    """NUMERIC with deterministic scale enforcement at the ORM/driver boundary."""
+
+    def bind_processor(self, dialect):
+        parent = super().bind_processor(dialect)
+        scale = int(self.scale or 0)
+        quantum = Decimal("1").scaleb(-scale)
+
+        def process(value):
+            if value is None:
+                return None
+            exact = value if isinstance(value, Decimal) else Decimal(str(value))
+            if not exact.is_finite():
+                raise ValueError("Los valores monetarios persistidos deben ser finitos")
+            quantized = exact.quantize(quantum, rounding=ROUND_HALF_UP)
+            return parent(quantized) if parent is not None else quantized
+
+        return process
 
     def result_processor(self, dialect, coltype):
         parent = super().result_processor(dialect, coltype)
@@ -101,9 +117,10 @@ def _rate_type() -> Numeric:
 def _set_exact_type(model, column_name: str, column_type: Numeric) -> None:
     """Bind an existing commercial authority to its exact numeric type.
 
-    V2.60.7 deliberately changes only economic columns. Scientific,
-    environmental, usage and customer-success measurements keep their Float
-    semantics in the owning model modules.
+    Scientific, environmental, usage and customer-success measurements keep
+    their Float semantics in the owning model modules. V2.60.8 additionally
+    guarantees that every economic value is quantized deterministically before
+    the database driver receives it.
     """
 
     model.__table__.c[column_name].type = column_type
