@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "iteration4-stabilization.yml"
 V2606_FAST_GATE = ROOT / ".github" / "workflows" / "v2606-revenue-operations-gate.yml"
+V2607_FAST_GATE = ROOT / ".github" / "workflows" / "v2607-monetary-precision-gate.yml"
 
 ACTIVE_RELEASE_CONTRACTS = (
     "tests/test_v259_render_release_identity_gate.py",
@@ -65,6 +66,24 @@ def test_v2606_revenue_truth_has_dedicated_early_gate_without_reducing_full_regr
     assert "Fresh migration SQLite" in source
     assert "Upgrade histórico 0040 a head SQLite" in source
     assert "20260824_0041_v2606_revenue_operations_truth.py" in source
+
+    full_workflow = WORKFLOW.read_text(encoding="utf-8")
+    assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full_workflow
+
+
+def test_v2607_monetary_precision_has_sqlite_and_postgres_roundtrip_gate() -> None:
+    source = V2607_FAST_GATE.read_text(encoding="utf-8")
+
+    assert "V2.60.7 · Monetary precision gate" in source
+    assert "Monetary precision · SQLite" in source
+    assert "Monetary precision · PostgreSQL 16" in source
+    assert "tests/test_v2607_monetary_precision.py" in source
+    assert "tests/test_v2606_revenue_operations_truth.py" in source
+    assert "tests/test_v2606_activation_invoice_integrity.py" in source
+    assert "python -m alembic downgrade 20260824_0041" in source
+    assert "python -m alembic upgrade head" in source
+    assert "20260824_0042_v2607_monetary_precision.py" in source
+    assert "len(inspector.get_table_names()) == 124" in source
 
     full_workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full_workflow
