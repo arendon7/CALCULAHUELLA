@@ -78,6 +78,58 @@ DOCUMENT_TRANSITIONS: dict[str, frozenset[str]] = {
     "Anulado": frozenset({"Anulado"}),
 }
 
+# These fields are the evidence envelope behind the canonical hashes. Once the
+# corresponding milestone existed before the current flush, changing any bound
+# field would make the persisted hash describe a different business fact.
+PROPOSAL_ACCEPTANCE_BOUND_FIELDS = (
+    "reference",
+    "contract_version",
+    "billing_cycle",
+    "implementation_fee",
+    "recurring_fee",
+    "discount_amount",
+    "tax_rate",
+    "first_year_total",
+    "scope_json",
+    "deliverables_json",
+    "terms",
+    "accepted_by",
+    "accepted_email",
+    "accepted_at",
+    "accepted_ip",
+    "acceptance_hash",
+)
+CONTRACT_SIGNATURE_BOUND_FIELDS = (
+    "reference",
+    "organization_id",
+    "proposal_id",
+    "parent_contract_id",
+    "title",
+    "version",
+    "start_date",
+    "end_date",
+    "renewal_type",
+    "auto_renew",
+    "notice_days",
+    "contract_value",
+    "billing_cycle",
+    "owner",
+    "terms_snapshot",
+    "signed_by",
+    "signed_email",
+    "signed_at",
+    "signature_hash",
+    "signature_version",
+    "signature_payload",
+    "signature_snapshot_created_at",
+)
+PAYMENT_SETTLEMENT_BOUND_FIELDS = (
+    "amount",
+    "currency",
+    "external_reference",
+    "paid_at",
+)
+
 
 def _allowed_targets(matrix: dict[str, frozenset[str]], current: str, label: str) -> frozenset[str]:
     allowed = matrix.get(current)
@@ -175,10 +227,15 @@ def validate_contract_transition(
     if target == current:
         return
     _validate_transition(CONTRACT_TRANSITIONS, current, target, "contrato")
-    if target == "Renovado" and not allow_renewal:
-        raise LifecycleTransitionError(
-            "El estado Renovado solo puede generarse al crear una renovación contractual vinculada."
-        )
+    if target == "Renovado":
+        if not allow_renewal:
+            raise LifecycleTransitionError(
+                "El estado Renovado solo puede generarse al crear una renovación contractual vinculada."
+            )
+        if not contract_has_signature_evidence(contract):
+            raise LifecycleTransitionError(
+                "No se puede consolidar una renovación desde un contrato sin evidencia de firma persistida."
+            )
     if target == "Vigente" and not contract_has_signature_evidence(contract):
         raise LifecycleTransitionError(
             "Un contrato no puede quedar Vigente sin identidad, fecha y hash de firma persistidos."
@@ -264,6 +321,35 @@ def _history_previous(state: Any, field_name: str) -> Any:
     return getattr(state.object, field_name, None)
 
 
+def _field_existed_before_flush(state: Any, field_name: str) -> bool:
+    history = state.attrs[field_name].history
+    if history.has_changes():
+        previous = history.deleted[0] if history.deleted else None
+        return previous not in (None, "")
+    return getattr(state.object, field_name, None) not in (None, "")
+
+
+def _field_becoming_established(state: Any, field_name: str) -> bool:
+    history = state.attrs[field_name].history
+    if not history.has_changes():
+        return False
+    previous = history.deleted[0] if history.deleted else None
+    current = getattr(state.object, field_name, None)
+    return previous in (None, "") and current not in (None, "")
+
+
+def _milestone_existed_before_flush(state: Any, field_names: Iterable[str]) -> bool:
+    return any(_field_existed_before_flush(state, field_name) for field_name in field_names)
+
+
+def _reject_any_changes(state: Any, field_names: Iterable[str], label: str) -> None:
+    for field_name in field_names:
+        if state.attrs[field_name].history.has_changes():
+            raise LifecycleTransitionError(
+                f"La evidencia consolidada de {label} vincula {field_name}; ese campo no puede sobrescribirse."
+            )
+
+
 def _reject_rewrite_of_established(state: Any, field_names: Iterable[str], label: str) -> None:
     for field_name in field_names:
         history = state.attrs[field_name].history
@@ -286,6 +372,14 @@ def _renewal_child_exists(session: Session, contract: Any) -> bool:
     )
 
 
+def _order_had_persisted_delivery(state: Any) -> bool:
+    history = state.attrs.delivered_at.history
+    if history.has_changes():
+        previous = history.deleted[0] if history.deleted else None
+        return previous not in (None, "")
+    return getattr(state.object, "delivered_at", None) is not None
+
+
 def _enforce_dirty_lifecycle(session: Session, obj: Any) -> None:
     from .db.models import (
         BillingDocumentRecord,
@@ -300,41 +394,74 @@ def _enforce_dirty_lifecycle(session: Session, obj: Any) -> None:
     state = sa_inspect(obj)
     try:
         if isinstance(obj, CommercialProposal):
-            _reject_rewrite_of_established(
-                state,
-                ("accepted_by", "accepted_email", "accepted_ip", "accepted_at", "acceptance_hash"),
-                "aceptación de propuesta",
-            )
+            if _milestone_existed_before_flush(state, ("acceptance_hash", "accepted_at")):
+                _reject_any_changes(state, PROPOSAL_ACCEPTANCE_BOUND_FIELDS, "aceptación de propuesta")
+            else:
+                _reject_rewrite_of_established(
+                    state,
+                    ("accepted_by", "accepted_email", "accepted_ip", "accepted_at", "acceptance_hash"),
+                    "aceptación de propuesta",
+                )
             if state.attrs.status.history.has_changes():
                 validate_proposal_transition(_history_previous(state, "status"), obj.status)
 
         elif isinstance(obj, PaymentTransaction):
-            _reject_rewrite_of_established(state, ("paid_at",), "pago")
+            if _field_existed_before_flush(state, "paid_at"):
+                _reject_any_changes(state, PAYMENT_SETTLEMENT_BOUND_FIELDS, "liquidación de pago")
+            else:
+                _reject_rewrite_of_established(state, ("paid_at",), "pago")
             if state.attrs.status.history.has_changes():
                 validate_payment_transition(_history_previous(state, "status"), obj.status)
 
         elif isinstance(obj, ServiceContract):
-            _reject_rewrite_of_established(
-                state,
-                (
-                    "signed_by", "signed_email", "signed_at", "signature_hash", "signature_version",
-                    "signature_payload", "signature_snapshot_created_at",
-                ),
-                "firma contractual",
+            signature_preexisted = _milestone_existed_before_flush(state, ("signature_hash", "signed_at"))
+            signature_becoming_established = _field_becoming_established(state, "signature_hash")
+            if signature_preexisted:
+                _reject_any_changes(state, CONTRACT_SIGNATURE_BOUND_FIELDS, "firma contractual")
+            else:
+                _reject_rewrite_of_established(
+                    state,
+                    (
+                        "signed_by", "signed_email", "signed_at", "signature_hash", "signature_version",
+                        "signature_payload", "signature_snapshot_created_at",
+                    ),
+                    "firma contractual",
+                )
+            previous_status = (
+                _history_previous(state, "status")
+                if state.attrs.status.history.has_changes()
+                else obj.status
             )
+            if signature_becoming_established:
+                if previous_status != "Borrador":
+                    raise LifecycleTransitionError(
+                        "Una nueva firma contractual solo puede originarse desde un contrato en Borrador."
+                    )
+                if obj.status != "Vigente":
+                    raise LifecycleTransitionError(
+                        "La firma contractual debe completar el handoff Borrador → Vigente en la misma transacción."
+                    )
+                if not contract_has_signature_evidence(obj):
+                    raise LifecycleTransitionError(
+                        "La nueva firma contractual requiere identidad, correo, fecha y hash completos."
+                    )
             if state.attrs.status.history.has_changes():
-                previous = _history_previous(state, "status")
                 validate_contract_transition(
                     obj,
                     obj.status,
-                    current_status=previous,
+                    current_status=previous_status,
                     allow_renewal=(obj.status == "Renovado" and _renewal_child_exists(session, obj)),
                 )
 
         elif isinstance(obj, ServiceOrder):
             _reject_rewrite_of_established(state, ("delivered_at", "accepted_at"), "entrega de orden")
             if state.attrs.status.history.has_changes():
-                validate_order_transition(obj, obj.status, current_status=_history_previous(state, "status"))
+                previous_status = _history_previous(state, "status")
+                if obj.status == "Aceptada" and not _order_had_persisted_delivery(state):
+                    raise LifecycleTransitionError(
+                        "Una orden solo puede aceptarse cuando la evidencia de entrega ya fue persistida previamente."
+                    )
+                validate_order_transition(obj, obj.status, current_status=previous_status)
 
         elif isinstance(obj, BillingInvoice):
             _reject_rewrite_of_established(state, ("paid_at",), "pago de cobro")
@@ -375,8 +502,8 @@ def _enforce_commercial_lifecycle_before_flush(session: Session, flush_context, 
     """Fail closed on contradictory lifecycle writes before any SQL is emitted.
 
     Existing rows are never normalized or rewritten. Only dirty persisted rows
-    are inspected, making this a forward-write contract compatible with legacy
-    records while protecting newly established commercial evidence.
+    are inspected, making this a forward-transition contract compatible with
+    legacy records while protecting newly established commercial evidence.
     """
 
     for obj in tuple(session.dirty):
@@ -394,6 +521,9 @@ __all__ = [
     "ORDER_TRANSITIONS",
     "INVOICE_TRANSITIONS",
     "DOCUMENT_TRANSITIONS",
+    "PROPOSAL_ACCEPTANCE_BOUND_FIELDS",
+    "CONTRACT_SIGNATURE_BOUND_FIELDS",
+    "PAYMENT_SETTLEMENT_BOUND_FIELDS",
     "ensure_proposal_can_send",
     "ensure_proposal_can_decide",
     "validate_proposal_transition",
