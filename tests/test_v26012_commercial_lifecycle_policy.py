@@ -91,19 +91,19 @@ def test_v26012_payment_transitions_preserve_terminal_evidence() -> None:
         validate_payment_transition("Estado legacy", "Pagada")
 
 
-def test_v26012_unsigned_contract_cannot_claim_active_or_renewed_state() -> None:
+def test_v26012_unsigned_contract_cannot_claim_active_but_legacy_renewal_stays_versioned() -> None:
     contract = _unsigned_contract()
     assert contract_allowed_targets(contract) == ("Borrador", "Terminado")
     with pytest.raises(LifecycleTransitionError, match="no puede quedar Vigente"):
         validate_contract_transition(contract, "Vigente")
     with pytest.raises(LifecycleTransitionError, match="Renovado"):
         validate_contract_transition(contract, "Renovado")
-    with pytest.raises(LifecycleTransitionError, match="evidencia de firma"):
-        ensure_contract_can_renew(NS(**vars(contract), status="Terminado"))
 
     unsigned_terminated = _unsigned_contract("Terminado")
-    with pytest.raises(LifecycleTransitionError, match="evidencia de firma"):
-        validate_contract_transition(unsigned_terminated, "Renovado", allow_renewal=True)
+    ensure_contract_can_renew(unsigned_terminated)
+    with pytest.raises(LifecycleTransitionError, match="Renovado"):
+        validate_contract_transition(unsigned_terminated, "Renovado")
+    validate_contract_transition(unsigned_terminated, "Renovado", allow_renewal=True)
 
 
 def test_v26012_signed_contract_can_suspend_resume_and_renew_but_not_return_to_draft() -> None:
