@@ -83,7 +83,14 @@ def test_v2607_monetary_precision_has_sqlite_and_postgres_roundtrip_gate() -> No
     assert "python -m alembic downgrade 20260824_0041" in source
     assert "python -m alembic upgrade head" in source
     assert "20260824_0042_v2607_monetary_precision.py" in source
-    assert "len(inspector.get_table_names()) == 124" in source
+    assert "domain_tables = set(Base.metadata.tables)" in source
+    assert "assert len(domain_tables) == 124" in source
+    assert 'physical_tables - domain_tables <= {"alembic_version"}' in source
+    assert 'physical_tables - domain_tables <= {"alembic_version", "sqlite_sequence"}' in source
+    assert "assert len(inspector.get_table_names()) == 124" not in source
+    assert "- name: Registrar evidencia PostgreSQL exitosa" in source
+    assert "name: v2607-monetary-precision-postgres" in source
+    assert "if: success()" in source
 
     full_workflow = WORKFLOW.read_text(encoding="utf-8")
     assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full_workflow
