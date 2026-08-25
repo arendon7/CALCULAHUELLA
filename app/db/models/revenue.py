@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from sqlalchemy import DateTime, Float, String, Text, select
+from sqlalchemy import DateTime, Numeric, String, Text, select
 from sqlalchemy.orm import mapped_column
 
 from ..base import Base
@@ -9,13 +9,14 @@ from .commercial import BillingInvoice, ServiceContract
 
 # V2.60.6 extends the existing authorities instead of creating one-to-one tables.
 # Nullable columns are deliberate: historical rows remain unknown until there is
-# evidence to classify them. No legacy amount or signature is reinterpreted.
+# evidence to classify them. V2.60.7 changes only numeric representation; it does
+# not classify or reinterpret legacy rows.
 BillingInvoice.charge_type = mapped_column(String(40), nullable=True)
 BillingInvoice.amount_semantics = mapped_column(String(40), nullable=True)
-BillingInvoice.net_amount = mapped_column(Float, nullable=True)
-BillingInvoice.tax_rate_snapshot = mapped_column(Float, nullable=True)
-BillingInvoice.tax_amount = mapped_column(Float, nullable=True)
-BillingInvoice.total_amount = mapped_column(Float, nullable=True)
+BillingInvoice.net_amount = mapped_column(Numeric(18, 2, asdecimal=True), nullable=True)
+BillingInvoice.tax_rate_snapshot = mapped_column(Numeric(9, 6, asdecimal=True), nullable=True)
+BillingInvoice.tax_amount = mapped_column(Numeric(18, 2, asdecimal=True), nullable=True)
+BillingInvoice.total_amount = mapped_column(Numeric(18, 2, asdecimal=True), nullable=True)
 BillingInvoice.source_reference = mapped_column(String(120), nullable=True)
 BillingInvoice.classification_note = mapped_column(Text, nullable=True)
 BillingInvoice.semantics_created_at = mapped_column(DateTime, nullable=True)
