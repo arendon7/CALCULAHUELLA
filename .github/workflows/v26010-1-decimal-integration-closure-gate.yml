@@ -93,7 +93,6 @@ jobs:
 
       - name: Fresh migration SQLite
         env:
-          DATABASE_URL: ""
           INSTANCE_DIR: ${{ runner.temp }}/cth-v260101-sqlite
         run: |
           rm -rf "${INSTANCE_DIR}"
