@@ -101,6 +101,10 @@ def test_v26012_unsigned_contract_cannot_claim_active_or_renewed_state() -> None
     with pytest.raises(LifecycleTransitionError, match="evidencia de firma"):
         ensure_contract_can_renew(NS(**vars(contract), status="Terminado"))
 
+    unsigned_terminated = _unsigned_contract("Terminado")
+    with pytest.raises(LifecycleTransitionError, match="evidencia de firma"):
+        validate_contract_transition(unsigned_terminated, "Renovado", allow_renewal=True)
+
 
 def test_v26012_signed_contract_can_suspend_resume_and_renew_but_not_return_to_draft() -> None:
     active = _signed_contract("Vigente")
@@ -126,19 +130,19 @@ def test_v26012_contract_signing_is_single_handoff_from_draft() -> None:
 
 
 def test_v26012_service_order_transition_matrix_prevents_timestamp_contradictions() -> None:
-    planned = NS(status="Planeada")
+    planned = NS(status="Planeada", delivered_at=None)
     assert order_allowed_targets(planned) == ("Planeada", "En ejecución", "Bloqueada", "Cancelada")
     validate_order_transition(planned, "En ejecución")
     with pytest.raises(LifecycleTransitionError):
         validate_order_transition(planned, "Aceptada")
 
-    delivered = NS(status="Entregada")
+    delivered = NS(status="Entregada", delivered_at=datetime.now(UTC))
     assert order_allowed_targets(delivered) == ("En ejecución", "Entregada", "Aceptada")
     validate_order_transition(delivered, "En ejecución")
     validate_order_transition(delivered, "Aceptada")
 
     for terminal in ("Aceptada", "Cancelada"):
-        item = NS(status=terminal)
+        item = NS(status=terminal, delivered_at=datetime.now(UTC))
         validate_order_transition(item, terminal)
         with pytest.raises(LifecycleTransitionError):
             validate_order_transition(item, "Planeada")
