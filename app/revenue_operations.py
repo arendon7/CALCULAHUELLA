@@ -4,6 +4,9 @@ import hashlib
 import json
 import math
 from datetime import UTC, date, datetime
+from decimal import Decimal
+
+from .money import ONE_HUNDRED, as_decimal, quantize_money, quantize_rate
 
 
 CONTRACT_SIGNATURE_VERSION = "1.1"
@@ -21,6 +24,7 @@ def canonical_utc_timestamp(value: datetime) -> str:
 
 
 def parse_nonnegative_number(raw: object, label: str, *, maximum: float | None = None) -> float:
+    """Parse non-monetary controls that still require ordinary numeric semantics."""
     value_raw = str(raw if raw is not None else "").strip()
     if not value_raw:
         raise ValueError(f"Define {label}.")
@@ -45,8 +49,9 @@ def validate_date_window(start: date, end: date | None, *, label: str) -> None:
 def contract_signature_payload(contract, signed_by: str, signed_email: str, signed_at: datetime) -> dict[str, object]:
     """Return the complete V2.60.6 contractual signature snapshot.
 
-    The payload deliberately binds source/provenance and material commercial
-    terms. It does not mutate legacy signatures that predate this version.
+    Formatting remains byte-compatible for previously supported two-decimal
+    contract values. V2.60.7 changes arithmetic representation, not the
+    canonical signature document or its version.
     """
     return {
         "signature_version": CONTRACT_SIGNATURE_VERSION,
@@ -85,12 +90,21 @@ def contract_signature_hash(contract, signed_by: str, signed_email: str, signed_
     return hashlib.sha256(source.encode("utf-8")).hexdigest()
 
 
-def activation_breakdown(implementation_fee: float, recurring_fee: float, discount_amount: float, tax_rate: float) -> dict[str, float]:
-    net = implementation_fee + recurring_fee - discount_amount
-    tax = net * (tax_rate / 100.0)
+def activation_breakdown(
+    implementation_fee: object,
+    recurring_fee: object,
+    discount_amount: object,
+    tax_rate: object,
+) -> dict[str, Decimal]:
+    implementation = as_decimal(implementation_fee, "la implementación")
+    recurring = as_decimal(recurring_fee, "el valor recurrente")
+    discount = as_decimal(discount_amount, "el descuento")
+    rate = quantize_rate(as_decimal(tax_rate, "la tasa de impuesto"))
+    net = quantize_money(implementation + recurring - discount)
+    tax = quantize_money(net * (rate / ONE_HUNDRED))
     return {
         "net_amount": net,
-        "tax_rate_snapshot": tax_rate,
+        "tax_rate_snapshot": rate,
         "tax_amount": tax,
-        "total_amount": net + tax,
+        "total_amount": quantize_money(net + tax),
     }
