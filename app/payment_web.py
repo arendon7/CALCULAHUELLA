@@ -13,6 +13,13 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .commercial_lifecycle import (
+    LifecycleTransitionError,
+    ensure_proposal_can_decide,
+    normalize_payment_provider_status,
+    payment_is_terminal,
+    validate_payment_transition,
+)
 from .commercial_pricing import proposal_initial_payment, subscription_custom_monthly_fee
 from .config import settings
 from .database import get_db
@@ -157,6 +164,10 @@ def register_payment_routes(app, templates) -> None:
         proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.public_token == token))
         if not proposal:
             raise HTTPException(404, "Propuesta no encontrada")
+        try:
+            ensure_proposal_can_decide(proposal, action="una nueva aceptación")
+        except LifecycleTransitionError as exc:
+            raise HTTPException(409, str(exc)) from exc
         if not accept_terms:
             raise HTTPException(400, "Debes aceptar las condiciones de la propuesta")
         if proposal.valid_until and proposal.valid_until < date.today():
@@ -197,6 +208,10 @@ def register_payment_routes(app, templates) -> None:
         proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.public_token == token))
         if not proposal:
             raise HTTPException(404, "Propuesta no encontrada")
+        try:
+            ensure_proposal_can_decide(proposal, action="un nuevo rechazo")
+        except LifecycleTransitionError as exc:
+            raise HTTPException(409, str(exc)) from exc
         proposal.status = "Rechazada"
         proposal.rejection_reason = reason.strip()
         session.commit()
@@ -221,11 +236,17 @@ def register_payment_routes(app, templates) -> None:
         if proposal.status != "Aceptada":
             raise HTTPException(409, "La propuesta debe aceptarse antes del pago")
         _ensure_supported_billing_contract(proposal)
+        if payment_is_terminal(payment.status):
+            raise HTTPException(409, "El pago ya alcanzó un estado terminal y su evidencia no puede sobrescribirse")
+        try:
+            validate_payment_transition(payment.status, "Pagada")
+        except LifecycleTransitionError as exc:
+            raise HTTPException(409, str(exc)) from exc
         payment.status = "Pagada"
         payment.gateway = "Demo"
         payment.payer_name = payer_name.strip()
         payment.payer_email = payer_email.strip().lower()
-        payment.paid_at = datetime.now(UTC)
+        payment.paid_at = payment.paid_at or datetime.now(UTC)
         payment.provider_payload = json.dumps({"mode": "demo", "method": method, "charge": "activation", "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
         if not proposal.organization_id:
             base_name = proposal.company_name.strip()
@@ -306,11 +327,24 @@ def register_payment_routes(app, templates) -> None:
             _ensure_supported_billing_contract(payment.proposal)
         if abs(quantize_money(payment.amount) - quantize_money(payload.amount)) > MONEY_QUANTUM:
             raise HTTPException(409, "El valor informado no coincide")
-        normalized_status = payload.status.strip().lower()
-        mapping = {"paid": "Pagada", "approved": "Pagada", "pending": "Pendiente", "failed": "Fallida", "declined": "Fallida", "refunded": "Reembolsada"}
-        payment.status = mapping.get(normalized_status, payload.status[:30])
+        try:
+            target_status = normalize_payment_provider_status(payload.status)
+        except LifecycleTransitionError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        try:
+            validate_payment_transition(payment.status, target_status)
+        except LifecycleTransitionError as exc:
+            raise HTTPException(409, str(exc)) from exc
+        if target_status == "Pagada" and payment.proposal and payment.proposal.status != "Aceptada":
+            raise HTTPException(409, "La propuesta asociada debe estar aceptada antes de confirmar el pago")
+
+        if target_status == payment.status and payment_is_terminal(payment.status):
+            return {"ok": True, "transaction_id": payment.id, "status": payment.status, "idempotent": True}
+
+        payment.status = target_status
         payment.payer_email = payload.payer_email.strip().lower() or payment.payer_email
-        payment.paid_at = datetime.now(UTC) if payment.status == "Pagada" else payment.paid_at
+        if target_status == "Pagada" and payment.paid_at is None:
+            payment.paid_at = datetime.now(UTC)
         payment.provider_payload = json.dumps(payload.model_dump(mode="json"), ensure_ascii=False)
         session.commit()
-        return {"ok": True, "transaction_id": payment.id, "status": payment.status}
+        return {"ok": True, "transaction_id": payment.id, "status": payment.status, "idempotent": False}
