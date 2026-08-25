@@ -7,6 +7,7 @@ from decimal import Decimal, InvalidOperation
 
 from .monetary import (
     HUNDRED,
+    MONEY_PORTABLE_MAX,
     money_tax,
     parse_nonnegative_money,
     parse_nonnegative_rate,
@@ -40,14 +41,16 @@ def parse_nonnegative_number(
     raw: object,
     label: str,
     *,
-    maximum: float | Decimal | None = None,
+    maximum: float | Decimal | None = MONEY_PORTABLE_MAX,
 ) -> ParsedDecimal:
-    """Parse a generic nonnegative form number without IEEE-754 conversion.
+    """Parse a generic nonnegative Revenue Operations form number exactly.
 
-    Monetary values should still use ``parse_nonnegative_money`` so their
-    two-decimal rounding policy is explicit. This compatibility helper is used
-    by mixed operational forms (for example contract value + notice days), so
-    it stays unquantized while remaining decimal exact.
+    Monetary values should use ``parse_nonnegative_money`` when the form can
+    distinguish them, because that helper also applies the two-decimal policy.
+    This compatibility helper is shared by mixed operational forms (currently
+    contract value + notice days), so it remains unquantized but V2.60.9 caps
+    it at the portable economic ceiling by default. Callers with a tighter
+    non-monetary domain may continue to pass an explicit ``maximum``.
     """
 
     value_raw = str(raw if raw is not None else "").strip()
@@ -64,7 +67,7 @@ def parse_nonnegative_number(
     if maximum is not None:
         maximum_decimal = Decimal(str(maximum))
         if value > maximum_decimal:
-            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum_decimal:g}.")
+            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum_decimal:f}.")
     return value
 
 

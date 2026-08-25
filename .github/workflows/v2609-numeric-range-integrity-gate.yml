@@ -1,0 +1,197 @@
+name: V2.60.9 · Numeric range integrity
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/db/models/revenue.py"
+      - "app/monetary.py"
+      - "app/revenue_operations.py"
+      - "app/saas_admin_web.py"
+      - "tests/test_v2609_numeric_range_integrity.py"
+      - "tests/test_v2609_orm_flush_guard.py"
+      - "tests/test_v2608_monetary_boundaries.py"
+      - "tests/test_v2608_bind_policy.py"
+      - "tests/test_v2607_monetary_precision.py"
+      - "tests/test_v2606_revenue_operations_truth.py"
+      - "tests/test_v2606_activation_invoice_integrity.py"
+      - ".github/workflows/v2609-numeric-range-integrity-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2609-numeric-range-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  numeric-range-integrity:
+    name: Portable numeric capacity · SQLite and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v2609
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v2609"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.9
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v2609-pycache" python -m compileall -q \
+            app/db/models/revenue.py \
+            app/monetary.py \
+            app/revenue_operations.py \
+            app/saas_admin_web.py \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py
+
+      - name: Probar capacidad portable y regresiones monetarias
+        run: |
+          pytest -q \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            --junitxml=v2609-numeric-range-integrity.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2609-sqlite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2609
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2609-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Verificar límite portable en PostgreSQL real
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2609
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2609-postgres
+        run: |
+          python - <<'PY'
+          from datetime import date
+          from decimal import Decimal
+
+          from sqlalchemy import select
+
+          from app.db.base import SessionLocal
+          from app.db.models import Organization, ServiceContract
+          from app.monetary import MONEY_PORTABLE_MAX
+
+          with SessionLocal() as session:
+              organization = Organization(
+                  name="V2609 PostgreSQL",
+                  tax_id="V2609-PG",
+                  sector="Prueba",
+                  country="Colombia",
+                  department="Antioquia",
+                  city="Medellín",
+                  status="Activa",
+              )
+              session.add(organization)
+              session.flush()
+              organization_id = organization.id
+
+              accepted = ServiceContract(
+                  organization_id=organization_id,
+                  reference="CTR-V2609-PG-MAX",
+                  title="Máximo portable PostgreSQL",
+                  version="1.0",
+                  status="Borrador",
+                  start_date=date(2026, 9, 1),
+                  renewal_type="Por acuerdo",
+                  auto_renew=False,
+                  notice_days=30,
+                  contract_value=MONEY_PORTABLE_MAX,
+                  billing_cycle="Anual",
+                  owner="CI",
+                  terms_snapshot="Capacidad portable V2.60.9",
+                  created_by="ci",
+              )
+              session.add(accepted)
+              session.commit()
+              session.expire_all()
+              stored = session.scalar(
+                  select(ServiceContract).where(ServiceContract.reference == "CTR-V2609-PG-MAX")
+              )
+              assert stored is not None
+              assert stored.contract_value == MONEY_PORTABLE_MAX, stored.contract_value
+
+              rejected = ServiceContract(
+                  organization_id=organization_id,
+                  reference="CTR-V2609-PG-OVER",
+                  title="Fuera de capacidad portable",
+                  version="1.0",
+                  status="Borrador",
+                  start_date=date(2026, 9, 1),
+                  renewal_type="Por acuerdo",
+                  auto_renew=False,
+                  notice_days=30,
+                  contract_value=MONEY_PORTABLE_MAX + Decimal("0.01"),
+                  billing_cycle="Anual",
+                  owner="CI",
+                  terms_snapshot="Debe rechazarse antes del driver",
+                  created_by="ci",
+              )
+              session.add(rejected)
+              try:
+                  session.commit()
+              except ValueError as exc:
+                  session.rollback()
+                  assert "límite portable" in str(exc)
+              else:
+                  raise AssertionError("PostgreSQL aceptó un valor fuera del contrato portable")
+          PY
+
+      - name: Publicar evidencia V2.60.9
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2609-numeric-range-integrity-evidence
+          path: v2609-numeric-range-integrity.xml
+          if-no-files-found: warn
+          retention-days: 14
