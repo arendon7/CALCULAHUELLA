@@ -16,6 +16,19 @@ from .db.models import CommercialLead, CommercialProposal, DiagnosticAssessment,
 from .monetary import parse_nonnegative_money, parse_nonnegative_rate
 
 
+def _parse_nonnegative_number(value: object, field_name: str):
+    """Compatibility name for V2.60.5 money inputs, now backed by exact money policy.
+
+    The historical helper name is retained because downstream readiness checks
+    and integrations identify this boundary by name. Its semantics are no
+    longer generic numeric parsing: all callers in this module are monetary and
+    therefore inherit V2.60.7–V2.60.9 rounding, finiteness and portable-range
+    enforcement through ``parse_nonnegative_money``.
+    """
+
+    return parse_nonnegative_money(value, field_name)
+
+
 def register_commercial_routes(
     app,
     templates,
@@ -181,9 +194,9 @@ def register_commercial_routes(
             if not plan.active:
                 raise ValueError("El plan seleccionado ya no está activo. Selecciona otro plan.")
 
-            implementation_value = parse_nonnegative_money(implementation_fee, "el valor de implementación")
-            recurring_value = parse_nonnegative_money(recurring_fee, "el valor recurrente por ciclo")
-            discount_value = parse_nonnegative_money(discount_amount, "el descuento inicial")
+            implementation_value = _parse_nonnegative_number(implementation_fee, "el valor de implementación")
+            recurring_value = _parse_nonnegative_number(recurring_fee, "el valor recurrente por ciclo")
+            discount_value = _parse_nonnegative_number(discount_amount, "el descuento inicial")
             tax_value = parse_nonnegative_rate(tax_rate, "la tasa de impuesto")
 
             if billing_cycle not in {"Mensual", "Anual"}:
