@@ -250,7 +250,7 @@ def register_payment_routes(app, templates) -> None:
                     ),
                     notes=(
                         f"Activada desde propuesta {proposal.reference}; conserva el valor base recurrente negociado "
-                        f"por ciclo. Impuesto contractual de {proposal.tax_rate:g}% se conserva en la propuesta y se "
+                        f"por ciclo. Impuesto contractual de {format(proposal.tax_rate.normalize(), 'f')}% se conserva en la propuesta y se "
                         "liquida en el documento tributario/pago final, no dentro de custom_monthly_fee."
                     ),
                 )
