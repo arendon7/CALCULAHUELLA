@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from .database import add_audit, get_db
 from .db.models import BillingInvoice, Organization, OrganizationSubscription, ServicePlan
+from .monetary import parse_nonnegative_money, parse_nonnegative_normalized_money
 
 
 def register_saas_admin_routes(
@@ -42,7 +43,7 @@ def register_saas_admin_routes(
     def create_service_plan(
         request: Request,
         code: str = Form(...), name: str = Form(...), description: str = Form(""),
-        monthly_fee: float = Form(0), annual_fee: float = Form(0),
+        monthly_fee: str = Form("0"), annual_fee: str = Form("0"),
         max_users: int = Form(5), max_facilities: int = Form(3), max_inventories: int = Form(3), max_storage_mb: int = Form(1024),
         includes_scope3: str | None = Form(None), includes_verification_portal: str | None = Form(None),
         session: Session = Depends(get_db),
@@ -52,10 +53,24 @@ def register_saas_admin_routes(
         normalized_code = re.sub(r"[^A-Z0-9_-]", "", code.upper())
         if not normalized_code or session.scalar(select(ServicePlan).where(ServicePlan.code == normalized_code)):
             raise HTTPException(400, "Código de plan inválido o duplicado")
+        try:
+            monthly_fee_value = parse_nonnegative_money(monthly_fee, "la tarifa mensual")
+            annual_fee_value = parse_nonnegative_money(annual_fee, "la tarifa anual")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
         plan = ServicePlan(
-            code=normalized_code, name=name.strip(), description=description.strip(), monthly_fee=max(0, monthly_fee), annual_fee=max(0, annual_fee),
-            max_users=max(1, max_users), max_facilities=max(1, max_facilities), max_inventories=max(1, max_inventories), max_storage_mb=max(100, max_storage_mb),
-            includes_scope3=bool(includes_scope3), includes_verification_portal=bool(includes_verification_portal), active=True,
+            code=normalized_code,
+            name=name.strip(),
+            description=description.strip(),
+            monthly_fee=monthly_fee_value,
+            annual_fee=annual_fee_value,
+            max_users=max(1, max_users),
+            max_facilities=max(1, max_facilities),
+            max_inventories=max(1, max_inventories),
+            max_storage_mb=max(100, max_storage_mb),
+            includes_scope3=bool(includes_scope3),
+            includes_verification_portal=bool(includes_verification_portal),
+            active=True,
         )
         session.add(plan)
         add_audit(session, int(user["organization_id"]), str(user["email"]), "CREAR", "Plan SaaS", plan.name, detail=plan.code)
@@ -77,10 +92,18 @@ def register_saas_admin_routes(
         plan = session.get(ServicePlan, plan_id)
         if not subscription or not plan:
             raise HTTPException(404, "Suscripción o plan no encontrado")
+        try:
+            custom_monthly_fee_value = (
+                parse_nonnegative_normalized_money(custom_monthly_fee, "la tarifa mensual personalizada")
+                if custom_monthly_fee.strip()
+                else None
+            )
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
         subscription.plan_id = plan.id
         subscription.status = status if status in {"Prueba", "Activa", "Suspendida", "Cancelada"} else subscription.status
         subscription.billing_cycle = billing_cycle if billing_cycle in {"Mensual", "Anual"} else subscription.billing_cycle
-        subscription.custom_monthly_fee = float(custom_monthly_fee) if custom_monthly_fee.strip() else None
+        subscription.custom_monthly_fee = custom_monthly_fee_value
         subscription.renewal_date = parse_date(renewal_date) if renewal_date else None
         subscription.notes = notes.strip()
         session.commit()
