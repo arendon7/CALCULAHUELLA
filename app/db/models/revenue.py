@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 
 from sqlalchemy import DateTime, Numeric, String, Text, select
 from sqlalchemy.orm import mapped_column
@@ -72,20 +72,54 @@ class ExactDecimal(Decimal):
 
 
 class ExactNumeric(Numeric):
-    """NUMERIC with deterministic scale enforcement at the ORM/driver boundary."""
+    """NUMERIC with deterministic scale and storage-range enforcement.
+
+    PostgreSQL enforces NUMERIC precision physically while SQLite generally does
+    not. The bind boundary therefore validates the post-rounding storage range
+    before either driver sees the value, keeping both supported engines aligned.
+    """
+
+    def _storage_contract(self) -> tuple[int, int, Decimal, Decimal, Decimal]:
+        precision = int(self.precision or 0)
+        scale = int(self.scale or 0)
+        if precision <= 0 or scale < 0 or scale > precision:
+            raise ValueError("La precisión NUMERIC configurada no es válida")
+        quantum = Decimal("1").scaleb(-scale)
+        maximum = (Decimal(10) ** (precision - scale)) - quantum
+        overflow_threshold = maximum + (quantum / Decimal(2))
+        return precision, scale, quantum, maximum, overflow_threshold
 
     def bind_processor(self, dialect):
         parent = super().bind_processor(dialect)
-        scale = int(self.scale or 0)
-        quantum = Decimal("1").scaleb(-scale)
+        precision, scale, quantum, maximum, overflow_threshold = self._storage_contract()
 
         def process(value):
             if value is None:
                 return None
-            exact = value if isinstance(value, Decimal) else Decimal(str(value))
+            try:
+                exact = value if isinstance(value, Decimal) else Decimal(str(value))
+            except (InvalidOperation, ValueError) as exc:
+                raise ValueError("El valor económico persistido debe ser un número válido") from exc
             if not exact.is_finite():
                 raise ValueError("Los valores monetarios persistidos deben ser finitos")
-            quantized = exact.quantize(quantum, rounding=ROUND_HALF_UP)
+            if abs(exact) >= overflow_threshold:
+                raise ValueError(
+                    f"El valor económico excede NUMERIC({precision},{scale}); "
+                    f"máximo representable: {maximum}"
+                )
+            try:
+                with localcontext() as context:
+                    context.prec = max(precision + 2, 28)
+                    quantized = exact.quantize(quantum, rounding=ROUND_HALF_UP)
+            except InvalidOperation as exc:
+                raise ValueError(
+                    f"El valor económico no puede representarse como NUMERIC({precision},{scale})"
+                ) from exc
+            if abs(quantized) > maximum:
+                raise ValueError(
+                    f"El valor económico excede NUMERIC({precision},{scale}); "
+                    f"máximo representable: {maximum}"
+                )
             return parent(quantized) if parent is not None else quantized
 
         return process
@@ -118,9 +152,9 @@ def _set_exact_type(model, column_name: str, column_type: Numeric) -> None:
     """Bind an existing commercial authority to its exact numeric type.
 
     Scientific, environmental, usage and customer-success measurements keep
-    their Float semantics in the owning model modules. V2.60.8 additionally
-    guarantees that every economic value is quantized deterministically before
-    the database driver receives it.
+    their Float semantics in the owning model modules. V2.60.8 guarantees
+    deterministic rounding and V2.60.9 additionally makes storage-range
+    validation identical across SQLite and PostgreSQL.
     """
 
     model.__table__.c[column_name].type = column_type
