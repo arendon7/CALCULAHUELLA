@@ -44,6 +44,7 @@ COMMERCIAL_MODEL = ROOT / "app" / "db" / "models" / "commercial.py"
 SAAS_SOURCE = ROOT / "app" / "saas_admin_web.py"
 PAYMENT_SOURCE = ROOT / "app" / "payment_web.py"
 OPERATIONS_SOURCE = ROOT / "app" / "commercial_operations_web.py"
+SEED_SOURCE = ROOT / "app" / "seed_defaults.py"
 
 
 def _login(client: TestClient) -> None:
@@ -259,6 +260,13 @@ def test_v2607_payment_and_operations_do_not_compare_authoritative_money_as_floa
     assert "parse_money(contract_value, \"el valor de renovación\")" in operations_source
     assert "quantize_money(base_value)" in operations_source
     assert "parse_nonnegative_number(raw_amount" not in operations_source
+
+
+def test_v2607_demo_seed_uses_decimal_pricing_authority_without_binary_float_tax_math() -> None:
+    source = SEED_SOURCE.read_text(encoding="utf-8")
+    assert "from .commercial_pricing import proposal_first_year_total" in source
+    assert 'first_year_total=proposal_first_year_total(implementation, recurring, 0, 19, "Anual")' in source
+    assert "first_year_total=round((implementation + recurring) * 1.19, 2)" not in source
 
 
 def test_v2607_migration_is_representation_only_and_reversible() -> None:

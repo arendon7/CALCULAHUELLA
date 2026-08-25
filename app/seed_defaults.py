@@ -265,6 +265,8 @@ def _ensure_v015_defaults(session: Session) -> None:
     plan = session.scalar(select(ServicePlan).where(ServicePlan.code == "EMPRESARIAL"))
     proposal = session.scalar(select(CommercialProposal).where(CommercialProposal.reference == "PROP-DEMO-2026-001"))
     if not proposal:
+        from .commercial_pricing import proposal_first_year_total
+
         recurring = plan.annual_fee if plan else 9_900_000
         implementation = 8_500_000
         proposal = CommercialProposal(
@@ -273,7 +275,7 @@ def _ensure_v015_defaults(session: Session) -> None:
             company_name=lead.company_name, contact_name=lead.contact_name, contact_email=lead.email,
             status="Enviada", valid_until=date(2026, 8, 31), billing_cycle="Anual",
             implementation_fee=implementation, recurring_fee=recurring, discount_amount=0, tax_rate=19,
-            first_year_total=round((implementation + recurring) * 1.19, 2),
+            first_year_total=proposal_first_year_total(implementation, recurring, 0, 19, "Anual"),
             scope_json='["Caracterización y límites", "Alcances 1 y 2", "Alcance 3 priorizado", "Dashboard e informe técnico"]',
             deliverables_json='["Inventario corporativo", "Informe ejecutivo y técnico", "Memoria de cálculo", "Plan inicial de reducción"]',
             terms="Implementación estimada de 8 a 10 semanas. La verificación independiente no está incluida.",
