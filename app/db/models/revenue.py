@@ -6,7 +6,7 @@ from sqlalchemy import event, inspect as sa_inspect, select
 from sqlalchemy.orm import Session
 
 from ..base import Base
-from ..monetary_types import ExactNumeric
+from ..monetary_types import ExactDecimal, ExactNumeric
 from .commercial import (
     BillingInvoice,
     CommercialProposal,
@@ -117,3 +117,11 @@ class ContractSignatureSnapshot(Base):
 
     __table__ = _contract_signature_projection
     __mapper_args__ = {"primary_key": [_contract_signature_projection.c.contract_id]}
+
+
+__all__ = [
+    "BillingChargeBreakdown",
+    "ContractSignatureSnapshot",
+    "ExactDecimal",
+    "ExactNumeric",
+]
