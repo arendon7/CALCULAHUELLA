@@ -1,0 +1,151 @@
+name: V2.60.7 · Monetary precision gate
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+      - stabilization/v2-0-0-product-readiness
+    paths:
+      - "app/monetary.py"
+      - "app/commercial_pricing.py"
+      - "app/commercial_web.py"
+      - "app/commercial_operations_web.py"
+      - "app/payment_web.py"
+      - "app/revenue_operations.py"
+      - "app/db/models/revenue.py"
+      - "migrations/versions/20260825_0042_v2607_monetary_precision.py"
+      - "scripts/v2607_monetary_migration_contract.py"
+      - "tests/test_v2607_monetary_precision.py"
+      - "tests/test_migration_legacy_compat.py"
+      - ".github/workflows/v2607-monetary-precision-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  monetary-precision:
+    name: Monetary precision · fast feedback
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v2607
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v2607"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.7
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v2607-pycache" python -m compileall -q \
+            app/monetary.py \
+            app/commercial_pricing.py \
+            app/commercial_web.py \
+            app/commercial_operations_web.py \
+            app/payment_web.py \
+            app/revenue_operations.py \
+            app/db/models/revenue.py \
+            migrations/versions/20260825_0042_v2607_monetary_precision.py \
+            scripts/v2607_monetary_migration_contract.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_migration_legacy_compat.py
+
+      - name: Contratos de precisión y regresión Revenue Operations
+        run: |
+          pytest -q \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            tests/test_migration_legacy_compat.py \
+            --junitxml=v2607-monetary-precision.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2607-fresh-sqlite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+          python - <<'PY'
+          from sqlalchemy import inspect
+          from sqlalchemy.sql.sqltypes import Numeric
+          from app.db.base import ENGINE
+
+          inspector = inspect(ENGINE)
+          checks = {
+              ("billing_invoices", "amount"): (20, 2),
+              ("billing_invoices", "tax_rate_snapshot"): (9, 4),
+              ("commercial_proposals", "recurring_fee"): (20, 2),
+              ("commercial_proposals", "tax_rate"): (9, 4),
+              ("organization_subscriptions", "custom_monthly_fee"): (20, 6),
+              ("service_contracts", "contract_value"): (20, 2),
+          }
+          for (table, column), expected in checks.items():
+              column_type = next(c["type"] for c in inspector.get_columns(table) if c["name"] == column)
+              assert isinstance(column_type, Numeric), (table, column, column_type)
+              assert (column_type.precision, column_type.scale) == expected
+          PY
+
+      - name: Upgrade histórico 0041 a 0042 SQLite
+        env:
+          DATABASE_URL: sqlite:///${{ runner.temp }}/cth-v2607-historical.db
+          V2607_MIGRATION_CONTRACT: "1"
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2607-historical-instance
+        run: |
+          rm -f "${RUNNER_TEMP}/cth-v2607-historical.db"
+          python scripts/v2607_monetary_migration_contract.py
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2607
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2607-fresh-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Upgrade histórico 0041 a 0042 PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2607
+          V2607_MIGRATION_CONTRACT: "1"
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2607-historical-postgres
+        run: |
+          python scripts/v2607_monetary_migration_contract.py
+
+      - name: Publicar evidencia rápida
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2607-monetary-precision-evidence
+          path: v2607-monetary-precision.xml
+          if-no-files-found: warn
+          retention-days: 14
