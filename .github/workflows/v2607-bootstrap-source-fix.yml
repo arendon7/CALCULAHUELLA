@@ -19,7 +19,7 @@ jobs:
           ref: work/v2607-monetary-precision
           fetch-depth: 0
 
-      - name: Aplicar correcciones V2.60.7 con guardas exactas
+      - name: Aplicar compatibilidad Decimal con guardas exactas
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -35,35 +35,6 @@ jobs:
           assert text.count(old_total) == 1, "legacy float total anchor changed"
           text = text.replace(old_total, new_total)
           seed.write_text(text, encoding="utf-8")
-
-          gate = Path(".github/workflows/v2607-monetary-precision-gate.yml")
-          text = gate.read_text(encoding="utf-8")
-          path_anchor = '      - "app/money.py"\n'
-          assert text.count(path_anchor) == 1
-          text = text.replace(path_anchor, path_anchor + '      - "app/seed_defaults.py"\n')
-          compile_anchor = '            app/money.py \\\n'
-          assert text.count(compile_anchor) == 1
-          text = text.replace(compile_anchor, compile_anchor + '            app/seed_defaults.py \\\n')
-
-          sqlite_import = '          from app.db.base import ENGINE\n\n          inspector = inspect(ENGINE)\n          assert len(inspector.get_table_names()) == 124\n'
-          sqlite_replacement = '''          from app.db.base import Base, ENGINE\n\n          inspector = inspect(ENGINE)\n          domain_tables = set(Base.metadata.tables)\n          physical_tables = set(inspector.get_table_names())\n          assert len(domain_tables) == 124\n          assert domain_tables <= physical_tables\n          assert physical_tables - domain_tables <= {"alembic_version", "sqlite_sequence"}\n'''
-          assert text.count(sqlite_import) == 1, "SQLite table-count anchor changed"
-          text = text.replace(sqlite_import, sqlite_replacement)
-
-          pg_import = '          from app.db.base import ENGINE, SessionLocal\n          from app.db.models import ServicePlan\n\n          inspector = inspect(ENGINE)\n          assert len(inspector.get_table_names()) == 124\n'
-          pg_replacement = '''          from app.db.base import Base, ENGINE, SessionLocal\n          from app.db.models import ServicePlan\n\n          inspector = inspect(ENGINE)\n          domain_tables = set(Base.metadata.tables)\n          physical_tables = set(inspector.get_table_names())\n          assert len(domain_tables) == 124\n          assert domain_tables <= physical_tables\n          assert physical_tables - domain_tables <= {"alembic_version"}\n'''
-          assert text.count(pg_import) == 1, "PostgreSQL table-count anchor changed"
-          text = text.replace(pg_import, pg_replacement)
-
-          false_evidence = '      - name: Publicar evidencia PostgreSQL\n        if: always()\n        run: |\n'
-          true_evidence = '      - name: Registrar evidencia PostgreSQL exitosa\n        run: |\n'
-          assert text.count(false_evidence) == 1, "PostgreSQL evidence anchor changed"
-          text = text.replace(false_evidence, true_evidence)
-          upload_anchor = '      - uses: actions/upload-artifact@v4\n        if: always()\n        with:\n          name: v2607-monetary-precision-postgres\n'
-          upload_replacement = '      - uses: actions/upload-artifact@v4\n        if: success()\n        with:\n          name: v2607-monetary-precision-postgres\n'
-          assert text.count(upload_anchor) == 1, "PostgreSQL upload anchor changed"
-          text = text.replace(upload_anchor, upload_replacement)
-          gate.write_text(text, encoding="utf-8")
 
           tests = Path("tests/test_v2607_monetary_precision.py")
           text = tests.read_text(encoding="utf-8")
@@ -81,12 +52,12 @@ jobs:
         run: |
           git diff --check
           git diff --name-only
-          test "$(git diff --name-only | sort | tr '\n' ' ')" = ".github/workflows/v2607-monetary-precision-gate.yml app/seed_defaults.py tests/test_v2607_monetary_precision.py "
+          test "$(git diff --name-only | sort | tr '\n' ' ')" = "app/seed_defaults.py tests/test_v2607_monetary_precision.py "
 
       - name: Commit y push
         run: |
           git config user.name "arendon7"
           git config user.email "102555888+arendon7@users.noreply.github.com"
-          git add app/seed_defaults.py tests/test_v2607_monetary_precision.py .github/workflows/v2607-monetary-precision-gate.yml
-          git commit -m "fix(v2607): preserve decimal seed and gate truth"
+          git add app/seed_defaults.py tests/test_v2607_monetary_precision.py
+          git commit -m "fix(v2607): preserve decimal seed compatibility"
           git push origin HEAD:work/v2607-monetary-precision
