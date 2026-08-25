@@ -1,0 +1,166 @@
+name: V2.60.11 · Revenue actionability gate
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/revenue_actionability.py"
+      - "app/commercial_operations_web.py"
+      - "app/templates/commercial_operations.html"
+      - "tests/test_v26011_revenue_actionability.py"
+      - "tests/test_v26011_revenue_actionability_web.py"
+      - ".github/workflows/v26011-revenue-actionability-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26011-revenue-actionability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  revenue-actionability:
+    name: Deterministic queue · read-only UX · SQLite and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v26011
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v26011"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.11
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v26011-pycache" python -m compileall -q \
+            app/revenue_actionability.py \
+            app/commercial_operations_web.py \
+            tests/test_v26011_revenue_actionability.py \
+            tests/test_v26011_revenue_actionability_web.py
+
+      - name: Probar actionability y regresiones económicas autoritativas
+        run: |
+          pytest -q \
+            tests/test_v26011_revenue_actionability.py \
+            tests/test_v26011_revenue_actionability_web.py \
+            tests/test_v26010_1_decimal_integration_closure.py \
+            tests/test_v26010_monetary_authority_consolidation.py \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            --junitxml=v26011-revenue-actionability.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26011-sqlite
+        run: |
+          unset DATABASE_URL
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26011
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26011-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: PostgreSQL demo · operación comercial permanece read-only
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26011
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26011-postgres
+          SEED_DEMO: "true"
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from sqlalchemy import func, select
+
+          from app.database import SessionLocal, init_db
+          from app.db.models import BillingInvoice, CollectionAction, ServiceContract
+          from app.main import app
+
+          init_db()
+
+          def snapshot():
+              with SessionLocal() as session:
+                  return {
+                      "contracts": session.scalar(select(func.count()).select_from(ServiceContract)),
+                      "invoices": session.scalar(select(func.count()).select_from(BillingInvoice)),
+                      "collections": session.scalar(select(func.count()).select_from(CollectionAction)),
+                      "contract_states": tuple(session.execute(
+                          select(ServiceContract.id, ServiceContract.status, ServiceContract.signature_hash)
+                          .order_by(ServiceContract.id)
+                      ).all()),
+                      "invoice_states": tuple(session.execute(
+                          select(BillingInvoice.id, BillingInvoice.status, BillingInvoice.amount_semantics,
+                                 BillingInvoice.net_amount, BillingInvoice.tax_amount, BillingInvoice.total_amount)
+                          .order_by(BillingInvoice.id)
+                      ).all()),
+                  }
+
+          before = snapshot()
+          with TestClient(app) as client:
+              login = client.post(
+                  "/login",
+                  data={"email": "consultor@calculatuhuella.local", "password": "Demo2026!"},
+                  follow_redirects=False,
+              )
+              assert login.status_code == 303, login.text
+              page = client.get("/operacion-comercial")
+              assert page.status_code == 200, page.text
+              assert "Qué requiere atención ahora" in page.text
+              assert "Acciones prioritarias" in page.text
+              assert 'id="prioridades-comerciales"' in page.text
+              assert "no crea un score de cliente" in page.text
+          after = snapshot()
+          assert after == before
+          PY
+
+      - name: Publicar evidencia V2.60.11
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26011-revenue-actionability-evidence
+          path: v26011-revenue-actionability.xml
+          if-no-files-found: warn
+          retention-days: 14
