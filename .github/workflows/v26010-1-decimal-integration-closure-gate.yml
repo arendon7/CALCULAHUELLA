@@ -1,0 +1,161 @@
+name: V2.60.10.1 · Decimal integration closure
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/db/monetary_types.py"
+      - "app/db/models/revenue.py"
+      - "app/commercial_web.py"
+      - "app/payment_web.py"
+      - "app/seed_defaults.py"
+      - "tests/test_v26010_1_decimal_integration_closure.py"
+      - "tests/test_v26010_monetary_authority_consolidation.py"
+      - "tests/test_v2605_commercial_authority.py"
+      - ".github/workflows/v26010-1-decimal-integration-closure-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26010-1-decimal-integration-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  decimal-integration:
+    name: Runtime Decimal · demo seed · SQLite and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v260101
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v260101"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "true"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.10.1
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v260101-pycache" python -m compileall -q \
+            app/db/monetary_types.py \
+            app/db/models/revenue.py \
+            app/commercial_web.py \
+            app/payment_web.py \
+            app/seed_defaults.py \
+            tests/test_v26010_1_decimal_integration_closure.py
+
+      - name: Probar cierre de integración y contratos económicos heredados
+        run: |
+          pytest -q \
+            tests/test_v26010_1_decimal_integration_closure.py \
+            tests/test_v26010_monetary_authority_consolidation.py \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            tests/test_v2605_commercial_authority.py \
+            --junitxml=v26010-1-decimal-integration.xml
+
+      - name: Fresh migration SQLite
+        env:
+          DATABASE_URL: ""
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v260101-sqlite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v260101
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v260101-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Sembrar PostgreSQL dos veces y verificar runtime exacto
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v260101
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v260101-postgres
+          SEED_DEMO: "true"
+        run: |
+          python - <<'PY'
+          from decimal import Decimal
+
+          from sqlalchemy import inspect as sa_inspect, select
+
+          from app.database import init_db
+          from app.db.base import SessionLocal
+          from app.db.models import CommercialProposal, ServicePlan
+          from app.db.models.revenue import ExactDecimal
+
+          init_db()
+          init_db()
+
+          with SessionLocal() as session:
+              plan = session.scalar(select(ServicePlan).where(ServicePlan.code == "EMPRESARIAL"))
+              proposal = session.scalar(
+                  select(CommercialProposal).where(CommercialProposal.reference == "PROP-DEMO-2026-001")
+              )
+              assert plan is not None
+              assert proposal is not None
+              assert isinstance(plan.annual_fee, ExactDecimal), type(plan.annual_fee)
+              assert isinstance(proposal.tax_rate, ExactDecimal), type(proposal.tax_rate)
+              assert isinstance(proposal.first_year_total, ExactDecimal), type(proposal.first_year_total)
+              assert f"{proposal.tax_rate:g}%" == "19%"
+              assert proposal.first_year_total == Decimal("21896000.00")
+              assert proposal not in session.dirty
+
+              session.refresh(plan, attribute_names=["annual_fee"])
+              session.refresh(proposal, attribute_names=["tax_rate", "first_year_total"])
+              assert isinstance(plan.annual_fee, ExactDecimal)
+              assert isinstance(proposal.tax_rate, ExactDecimal)
+              assert isinstance(proposal.first_year_total, ExactDecimal)
+              assert proposal not in session.dirty
+              assert not sa_inspect(proposal).attrs.tax_rate.history.has_changes()
+          PY
+
+      - name: Publicar evidencia V2.60.10.1
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26010-1-decimal-integration-evidence
+          path: v26010-1-decimal-integration.xml
+          if-no-files-found: warn
+          retention-days: 14
