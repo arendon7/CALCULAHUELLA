@@ -3,14 +3,33 @@ from __future__ import annotations
 from collections.abc import Iterable
 from typing import Any
 
+from fastapi import HTTPException
+from sqlalchemy import event, inspect as sa_inspect
+from sqlalchemy.orm import Session
+
 from .revenue_operations import INVOICE_TOTAL_WITH_TAX
 
 
 class LifecycleTransitionError(ValueError):
-    """Raised when a new write would contradict an already-established lifecycle fact."""
+    """Raised when a requested lifecycle transition contradicts established facts."""
+
+
+class LifecyclePersistenceConflict(HTTPException):
+    """HTTP-safe persistence boundary for lifecycle violations discovered at flush."""
+
+    def __init__(self, detail: str):
+        super().__init__(status_code=409, detail=detail)
 
 
 PROPOSAL_OPEN_STATES = frozenset({"Borrador", "Enviada", "Vista"})
+PROPOSAL_TRANSITIONS: dict[str, frozenset[str]] = {
+    "Borrador": frozenset({"Borrador", "Enviada", "Aceptada", "Rechazada", "Vencida"}),
+    "Enviada": frozenset({"Enviada", "Vista", "Aceptada", "Rechazada", "Vencida"}),
+    "Vista": frozenset({"Vista", "Aceptada", "Rechazada", "Vencida"}),
+    "Aceptada": frozenset({"Aceptada"}),
+    "Rechazada": frozenset({"Rechazada"}),
+    "Vencida": frozenset({"Vencida"}),
+}
 
 PAYMENT_PROVIDER_STATUS = {
     "paid": "Pagada",
@@ -29,15 +48,10 @@ PAYMENT_TRANSITIONS: dict[str, frozenset[str]] = {
 }
 
 CONTRACT_TRANSITIONS: dict[str, frozenset[str]] = {
-    # Vigente from Borrador is only possible for an already-signed legacy row;
-    # canonical signing uses the dedicated signature route.
     "Borrador": frozenset({"Borrador", "Vigente", "Terminado"}),
-    "Vigente": frozenset({"Vigente", "Suspendido", "Terminado"}),
+    "Vigente": frozenset({"Vigente", "Suspendido", "Terminado", "Renovado"}),
     "Suspendido": frozenset({"Suspendido", "Vigente", "Terminado"}),
-    "Terminado": frozenset({"Terminado"}),
-    # The only canonical way to create Renovado is the renewal route, which
-    # simultaneously creates the child contract. Generic status writes cannot
-    # manufacture that evidence.
+    "Terminado": frozenset({"Terminado", "Renovado"}),
     "Renovado": frozenset({"Renovado"}),
 }
 
@@ -45,7 +59,6 @@ ORDER_TRANSITIONS: dict[str, frozenset[str]] = {
     "Planeada": frozenset({"Planeada", "En ejecución", "Bloqueada", "Cancelada"}),
     "En ejecución": frozenset({"En ejecución", "Bloqueada", "Entregada", "Cancelada"}),
     "Bloqueada": frozenset({"Bloqueada", "En ejecución", "Cancelada"}),
-    # Re-open for rework is explicit; acceptance itself is terminal.
     "Entregada": frozenset({"Entregada", "En ejecución", "Aceptada"}),
     "Aceptada": frozenset({"Aceptada"}),
     "Cancelada": frozenset({"Cancelada"}),
@@ -85,9 +98,7 @@ def _validate_transition(
 ) -> None:
     allowed = _allowed_targets(matrix, current, label)
     if target not in allowed:
-        raise LifecycleTransitionError(
-            f"Transición de {label} no permitida: {current} → {target}."
-        )
+        raise LifecycleTransitionError(f"Transición de {label} no permitida: {current} → {target}.")
 
 
 def ensure_proposal_can_send(proposal: Any) -> None:
@@ -113,6 +124,10 @@ def ensure_proposal_can_decide(proposal: Any, *, action: str) -> None:
         )
 
 
+def validate_proposal_transition(current: str, target: str) -> None:
+    _validate_transition(PROPOSAL_TRANSITIONS, current, target, "propuesta")
+
+
 def normalize_payment_provider_status(raw_status: str) -> str:
     normalized = (raw_status or "").strip().lower()
     try:
@@ -134,8 +149,7 @@ def payment_is_terminal(status: str) -> bool:
 def contract_allowed_targets(contract: Any) -> tuple[str, ...]:
     current = getattr(contract, "status", "")
     allowed = set(_allowed_targets(CONTRACT_TRANSITIONS, current, "contrato"))
-    if current != "Renovado":
-        allowed.discard("Renovado")
+    allowed.discard("Renovado")
     if "Vigente" in allowed and not contract_has_signature_evidence(contract):
         allowed.discard("Vigente")
     order = ("Borrador", "Vigente", "Suspendido", "Terminado", "Renovado")
@@ -158,12 +172,12 @@ def ensure_contract_can_sign(contract: Any, *, has_snapshot: bool = False) -> No
         raise LifecycleTransitionError("El contrato ya conserva evidencia de firma y no puede volver a firmarse.")
 
 
-def validate_contract_transition(contract: Any, target: str) -> None:
+def validate_contract_transition(contract: Any, target: str, *, allow_renewal: bool = False) -> None:
     current = getattr(contract, "status", "")
     if target == current:
         return
     _validate_transition(CONTRACT_TRANSITIONS, current, target, "contrato")
-    if target == "Renovado":
+    if target == "Renovado" and not allow_renewal:
         raise LifecycleTransitionError(
             "El estado Renovado solo puede generarse al crear una renovación contractual vinculada."
         )
@@ -193,6 +207,8 @@ def order_allowed_targets(order: Any) -> tuple[str, ...]:
 
 def validate_order_transition(order: Any, target: str) -> None:
     _validate_transition(ORDER_TRANSITIONS, getattr(order, "status", ""), target, "orden de servicio")
+    if target == "Aceptada" and not getattr(order, "delivered_at", None):
+        raise LifecycleTransitionError("Una orden no puede quedar Aceptada sin evidencia previa de entrega.")
 
 
 def validate_invoice_transition(invoice: Any, target: str) -> None:
@@ -218,6 +234,15 @@ def document_allowed_targets(document: Any) -> tuple[str, ...]:
 
 def validate_document_transition(document: Any, target: str) -> None:
     _validate_transition(DOCUMENT_TRANSITIONS, getattr(document, "status", ""), target, "documento de cobro")
+    if target == "Emitido externamente":
+        provider = (getattr(document, "provider", "") or "").strip()
+        external_number = (getattr(document, "external_number", "") or "").strip()
+        if not provider or provider == "Sin integración":
+            raise LifecycleTransitionError("La emisión externa requiere identificar el proveedor autorizado.")
+        if not external_number or not getattr(document, "issued_at", None):
+            raise LifecycleTransitionError(
+                "La emisión externa requiere número externo y fecha de emisión persistidos."
+            )
 
 
 def ensure_collection_can_complete(action: Any, result: str) -> str:
@@ -230,14 +255,153 @@ def ensure_collection_can_complete(action: Any, result: str) -> str:
 
 
 def ordered_existing(values: Iterable[str], preferred_order: Iterable[str]) -> tuple[str, ...]:
-    """Small helper kept public for UI projections without inventing states."""
     existing = set(values)
     return tuple(item for item in preferred_order if item in existing)
 
 
+def _history_previous(state: Any, field_name: str) -> Any:
+    history = state.attrs[field_name].history
+    if history.deleted:
+        return history.deleted[0]
+    return getattr(state.object, field_name, None)
+
+
+def _reject_rewrite_of_established(state: Any, field_names: Iterable[str], label: str) -> None:
+    for field_name in field_names:
+        history = state.attrs[field_name].history
+        if not history.has_changes() or not history.deleted:
+            continue
+        previous = history.deleted[0]
+        if previous not in (None, ""):
+            raise LifecycleTransitionError(
+                f"La evidencia establecida de {label} ({field_name}) no puede sobrescribirse."
+            )
+
+
+def _renewal_child_exists(session: Session, contract: Any) -> bool:
+    contract_id = getattr(contract, "id", None)
+    if contract_id is None:
+        return False
+    from .db.models import ServiceContract
+
+    for candidate in session.new:
+        if isinstance(candidate, ServiceContract) and getattr(candidate, "parent_contract_id", None) == contract_id:
+            return True
+    return False
+
+
+def _enforce_dirty_lifecycle(session: Session, obj: Any) -> None:
+    from .db.models import (
+        BillingDocumentRecord,
+        BillingInvoice,
+        CollectionAction,
+        CommercialProposal,
+        PaymentTransaction,
+        ServiceContract,
+        ServiceOrder,
+    )
+
+    state = sa_inspect(obj)
+    try:
+        if isinstance(obj, CommercialProposal):
+            _reject_rewrite_of_established(
+                state,
+                ("accepted_by", "accepted_email", "accepted_ip", "accepted_at", "acceptance_hash"),
+                "aceptación de propuesta",
+            )
+            if state.attrs.status.history.has_changes():
+                validate_proposal_transition(_history_previous(state, "status"), obj.status)
+
+        elif isinstance(obj, PaymentTransaction):
+            _reject_rewrite_of_established(state, ("paid_at",), "pago")
+            if state.attrs.status.history.has_changes():
+                validate_payment_transition(_history_previous(state, "status"), obj.status)
+
+        elif isinstance(obj, ServiceContract):
+            _reject_rewrite_of_established(
+                state,
+                (
+                    "signed_by", "signed_email", "signed_at", "signature_hash", "signature_version",
+                    "signature_payload", "signature_snapshot_created_at",
+                ),
+                "firma contractual",
+            )
+            if state.attrs.status.history.has_changes():
+                validate_contract_transition(
+                    obj,
+                    obj.status,
+                    allow_renewal=(obj.status == "Renovado" and _renewal_child_exists(session, obj)),
+                )
+
+        elif isinstance(obj, ServiceOrder):
+            _reject_rewrite_of_established(state, ("delivered_at", "accepted_at"), "entrega de orden")
+            if state.attrs.status.history.has_changes():
+                previous = _history_previous(state, "status")
+                # validate against the previous persisted state while retaining
+                # evidence written in the same transaction.
+                current_status = obj.status
+                obj.status = previous
+                try:
+                    validate_order_transition(obj, current_status)
+                finally:
+                    obj.status = current_status
+
+        elif isinstance(obj, BillingInvoice):
+            _reject_rewrite_of_established(state, ("paid_at",), "pago de cobro")
+            if state.attrs.status.history.has_changes():
+                previous = _history_previous(state, "status")
+                current_status = obj.status
+                obj.status = previous
+                try:
+                    validate_invoice_transition(obj, current_status)
+                finally:
+                    obj.status = current_status
+
+        elif isinstance(obj, BillingDocumentRecord):
+            _reject_rewrite_of_established(
+                state,
+                ("provider", "external_number", "issued_at", "cufe", "document_url"),
+                "emisión externa",
+            )
+            if state.attrs.status.history.has_changes():
+                previous = _history_previous(state, "status")
+                current_status = obj.status
+                obj.status = previous
+                try:
+                    validate_document_transition(obj, current_status)
+                finally:
+                    obj.status = current_status
+
+        elif isinstance(obj, CollectionAction):
+            if _history_previous(state, "status") == "Completada":
+                if any(state.attrs[name].history.has_changes() for name in ("status", "result", "completed_at")):
+                    raise LifecycleTransitionError(
+                        "La gestión de cartera completada es evidencia histórica y no puede sobrescribirse."
+                    )
+            if state.attrs.status.history.has_changes() and obj.status == "Completada":
+                ensure_collection_can_complete(obj, obj.result)
+    except LifecycleTransitionError as exc:
+        raise LifecyclePersistenceConflict(str(exc)) from exc
+
+
+@event.listens_for(Session, "before_flush")
+def _enforce_commercial_lifecycle_before_flush(session: Session, flush_context, instances) -> None:
+    """Fail closed on contradictory lifecycle writes before any SQL is emitted.
+
+    Existing rows are never normalized or rewritten. Only dirty persisted rows
+    are inspected, making this a forward-write contract compatible with legacy
+    records while protecting newly established commercial evidence.
+    """
+
+    for obj in tuple(session.dirty):
+        _enforce_dirty_lifecycle(session, obj)
+
+
 __all__ = [
     "LifecycleTransitionError",
+    "LifecyclePersistenceConflict",
     "PROPOSAL_OPEN_STATES",
+    "PROPOSAL_TRANSITIONS",
     "PAYMENT_PROVIDER_STATUS",
     "PAYMENT_TRANSITIONS",
     "CONTRACT_TRANSITIONS",
@@ -246,6 +410,7 @@ __all__ = [
     "DOCUMENT_TRANSITIONS",
     "ensure_proposal_can_send",
     "ensure_proposal_can_decide",
+    "validate_proposal_transition",
     "normalize_payment_provider_status",
     "validate_payment_transition",
     "payment_is_terminal",
