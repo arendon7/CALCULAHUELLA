@@ -25,6 +25,7 @@ from app.db.models import (
     UsageCounter,
     ValueMilestone,
 )
+from app.db.models.revenue import ExactDecimal
 from app.monetary import (
     parse_nonnegative_money,
     parse_nonnegative_rate,
@@ -98,6 +99,14 @@ def test_v2607_decimal_pricing_has_no_binary_float_artifacts() -> None:
         "tax_amount": Decimal("28.69"),
         "total_amount": Decimal("178.69"),
     }
+
+
+def test_v2607_persisted_decimal_absorbs_legacy_float_literals_without_ieee_artifacts() -> None:
+    recurring = ExactDecimal("9900000.00")
+    total = (8_500_000 + recurring) * 1.19
+    assert isinstance(total, ExactDecimal)
+    assert total == Decimal("21896000.0000")
+    assert round(total, 2) == Decimal("21896000.00")
 
 
 def test_v2607_annual_monthly_equivalent_round_trip_preserves_negotiated_cents() -> None:
