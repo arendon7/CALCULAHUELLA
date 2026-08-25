@@ -39,7 +39,6 @@ PAYMENT_PROVIDER_STATUS = {
     "declined": "Fallida",
     "refunded": "Reembolsada",
 }
-
 PAYMENT_TRANSITIONS: dict[str, frozenset[str]] = {
     "Pendiente": frozenset({"Pendiente", "Pagada", "Fallida"}),
     "Fallida": frozenset({"Fallida", "Pendiente", "Pagada"}),
@@ -90,12 +89,7 @@ def _allowed_targets(matrix: dict[str, frozenset[str]], current: str, label: str
     return allowed
 
 
-def _validate_transition(
-    matrix: dict[str, frozenset[str]],
-    current: str,
-    target: str,
-    label: str,
-) -> None:
+def _validate_transition(matrix: dict[str, frozenset[str]], current: str, target: str, label: str) -> None:
     allowed = _allowed_targets(matrix, current, label)
     if target not in allowed:
         raise LifecycleTransitionError(f"Transición de {label} no permitida: {current} → {target}.")
@@ -119,9 +113,7 @@ def ensure_proposal_can_decide(proposal: Any, *, action: str) -> None:
             "La aceptación de esta propuesta ya quedó registrada y su evidencia no puede sobrescribirse."
         )
     if status not in PROPOSAL_OPEN_STATES:
-        raise LifecycleTransitionError(
-            f"La propuesta está en estado {status or 'desconocido'} y ya no admite {action}."
-        )
+        raise LifecycleTransitionError(f"La propuesta está en estado {status or 'desconocido'} y ya no admite {action}.")
 
 
 def validate_proposal_transition(current: str, target: str) -> None:
@@ -172,8 +164,14 @@ def ensure_contract_can_sign(contract: Any, *, has_snapshot: bool = False) -> No
         raise LifecycleTransitionError("El contrato ya conserva evidencia de firma y no puede volver a firmarse.")
 
 
-def validate_contract_transition(contract: Any, target: str, *, allow_renewal: bool = False) -> None:
-    current = getattr(contract, "status", "")
+def validate_contract_transition(
+    contract: Any,
+    target: str,
+    *,
+    current_status: str | None = None,
+    allow_renewal: bool = False,
+) -> None:
+    current = current_status if current_status is not None else getattr(contract, "status", "")
     if target == current:
         return
     _validate_transition(CONTRACT_TRANSITIONS, current, target, "contrato")
@@ -205,14 +203,15 @@ def order_allowed_targets(order: Any) -> tuple[str, ...]:
     return tuple(item for item in sequence if item in allowed)
 
 
-def validate_order_transition(order: Any, target: str) -> None:
-    _validate_transition(ORDER_TRANSITIONS, getattr(order, "status", ""), target, "orden de servicio")
+def validate_order_transition(order: Any, target: str, *, current_status: str | None = None) -> None:
+    current = current_status if current_status is not None else getattr(order, "status", "")
+    _validate_transition(ORDER_TRANSITIONS, current, target, "orden de servicio")
     if target == "Aceptada" and not getattr(order, "delivered_at", None):
         raise LifecycleTransitionError("Una orden no puede quedar Aceptada sin evidencia previa de entrega.")
 
 
-def validate_invoice_transition(invoice: Any, target: str) -> None:
-    current = getattr(invoice, "status", "")
+def validate_invoice_transition(invoice: Any, target: str, *, current_status: str | None = None) -> None:
+    current = current_status if current_status is not None else getattr(invoice, "status", "")
     _validate_transition(INVOICE_TRANSITIONS, current, target, "cobro")
     if target == "Pagada" and current != "Pagada":
         if getattr(invoice, "amount_semantics", None) != INVOICE_TOTAL_WITH_TAX:
@@ -232,17 +231,16 @@ def document_allowed_targets(document: Any) -> tuple[str, ...]:
     return tuple(item for item in sequence if item in allowed)
 
 
-def validate_document_transition(document: Any, target: str) -> None:
-    _validate_transition(DOCUMENT_TRANSITIONS, getattr(document, "status", ""), target, "documento de cobro")
+def validate_document_transition(document: Any, target: str, *, current_status: str | None = None) -> None:
+    current = current_status if current_status is not None else getattr(document, "status", "")
+    _validate_transition(DOCUMENT_TRANSITIONS, current, target, "documento de cobro")
     if target == "Emitido externamente":
         provider = (getattr(document, "provider", "") or "").strip()
         external_number = (getattr(document, "external_number", "") or "").strip()
         if not provider or provider == "Sin integración":
             raise LifecycleTransitionError("La emisión externa requiere identificar el proveedor autorizado.")
         if not external_number or not getattr(document, "issued_at", None):
-            raise LifecycleTransitionError(
-                "La emisión externa requiere número externo y fecha de emisión persistidos."
-            )
+            raise LifecycleTransitionError("La emisión externa requiere número externo y fecha de emisión persistidos.")
 
 
 def ensure_collection_can_complete(action: Any, result: str) -> str:
@@ -273,9 +271,7 @@ def _reject_rewrite_of_established(state: Any, field_names: Iterable[str], label
             continue
         previous = history.deleted[0]
         if previous not in (None, ""):
-            raise LifecycleTransitionError(
-                f"La evidencia establecida de {label} ({field_name}) no puede sobrescribirse."
-            )
+            raise LifecycleTransitionError(f"La evidencia establecida de {label} ({field_name}) no puede sobrescribirse.")
 
 
 def _renewal_child_exists(session: Session, contract: Any) -> bool:
@@ -284,10 +280,10 @@ def _renewal_child_exists(session: Session, contract: Any) -> bool:
         return False
     from .db.models import ServiceContract
 
-    for candidate in session.new:
-        if isinstance(candidate, ServiceContract) and getattr(candidate, "parent_contract_id", None) == contract_id:
-            return True
-    return False
+    return any(
+        isinstance(candidate, ServiceContract) and getattr(candidate, "parent_contract_id", None) == contract_id
+        for candidate in session.new
+    )
 
 
 def _enforce_dirty_lifecycle(session: Session, obj: Any) -> None:
@@ -327,59 +323,49 @@ def _enforce_dirty_lifecycle(session: Session, obj: Any) -> None:
                 "firma contractual",
             )
             if state.attrs.status.history.has_changes():
+                previous = _history_previous(state, "status")
                 validate_contract_transition(
                     obj,
                     obj.status,
+                    current_status=previous,
                     allow_renewal=(obj.status == "Renovado" and _renewal_child_exists(session, obj)),
                 )
 
         elif isinstance(obj, ServiceOrder):
             _reject_rewrite_of_established(state, ("delivered_at", "accepted_at"), "entrega de orden")
             if state.attrs.status.history.has_changes():
-                previous = _history_previous(state, "status")
-                # validate against the previous persisted state while retaining
-                # evidence written in the same transaction.
-                current_status = obj.status
-                obj.status = previous
-                try:
-                    validate_order_transition(obj, current_status)
-                finally:
-                    obj.status = current_status
+                validate_order_transition(obj, obj.status, current_status=_history_previous(state, "status"))
 
         elif isinstance(obj, BillingInvoice):
             _reject_rewrite_of_established(state, ("paid_at",), "pago de cobro")
             if state.attrs.status.history.has_changes():
-                previous = _history_previous(state, "status")
-                current_status = obj.status
-                obj.status = previous
-                try:
-                    validate_invoice_transition(obj, current_status)
-                finally:
-                    obj.status = current_status
+                validate_invoice_transition(obj, obj.status, current_status=_history_previous(state, "status"))
 
         elif isinstance(obj, BillingDocumentRecord):
-            _reject_rewrite_of_established(
-                state,
-                ("provider", "external_number", "issued_at", "cufe", "document_url"),
-                "emisión externa",
-            )
+            previous_status = _history_previous(state, "status") if state.attrs.status.history.has_changes() else obj.status
+            if previous_status in {"Emitido externamente", "Anulado"}:
+                _reject_rewrite_of_established(
+                    state,
+                    ("provider", "external_number", "issued_at", "cufe", "document_url"),
+                    "emisión externa",
+                )
             if state.attrs.status.history.has_changes():
-                previous = _history_previous(state, "status")
-                current_status = obj.status
-                obj.status = previous
-                try:
-                    validate_document_transition(obj, current_status)
-                finally:
-                    obj.status = current_status
+                validate_document_transition(obj, obj.status, current_status=previous_status)
 
         elif isinstance(obj, CollectionAction):
-            if _history_previous(state, "status") == "Completada":
+            previous_status = _history_previous(state, "status") if state.attrs.status.history.has_changes() else obj.status
+            if previous_status == "Completada":
                 if any(state.attrs[name].history.has_changes() for name in ("status", "result", "completed_at")):
                     raise LifecycleTransitionError(
                         "La gestión de cartera completada es evidencia histórica y no puede sobrescribirse."
                     )
-            if state.attrs.status.history.has_changes() and obj.status == "Completada":
-                ensure_collection_can_complete(obj, obj.result)
+            elif state.attrs.status.history.has_changes():
+                if previous_status != "Pendiente" or obj.status != "Completada":
+                    raise LifecycleTransitionError(
+                        f"Transición de gestión de cartera no permitida: {previous_status} → {obj.status}."
+                    )
+                if not (obj.result or "").strip():
+                    raise LifecycleTransitionError("Registra un resultado antes de completar la gestión de cartera.")
     except LifecycleTransitionError as exc:
         raise LifecyclePersistenceConflict(str(exc)) from exc
 
