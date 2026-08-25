@@ -11,6 +11,7 @@ on:
       - "app/revenue_operations.py"
       - "app/saas_admin_web.py"
       - "tests/test_v2609_numeric_range_integrity.py"
+      - "tests/test_v2609_orm_flush_guard.py"
       - "tests/test_v2608_monetary_boundaries.py"
       - "tests/test_v2608_bind_policy.py"
       - "tests/test_v2607_monetary_precision.py"
@@ -74,12 +75,14 @@ jobs:
             app/monetary.py \
             app/revenue_operations.py \
             app/saas_admin_web.py \
-            tests/test_v2609_numeric_range_integrity.py
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py
 
       - name: Probar capacidad portable y regresiones monetarias
         run: |
           pytest -q \
             tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
             tests/test_v2608_monetary_boundaries.py \
             tests/test_v2608_bind_policy.py \
             tests/test_v2607_monetary_precision.py \
