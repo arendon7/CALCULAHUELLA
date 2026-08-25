@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import hashlib
 import json
-import math
 from datetime import UTC, date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 
 from .monetary import (
     HUNDRED,
@@ -22,6 +21,13 @@ INVOICE_BASE_BEFORE_TAX = "base_before_tax"
 INVOICE_LEGACY_UNKNOWN = "legacy_unknown"
 
 
+class ParsedDecimal(Decimal):
+    """Decimal form value retaining the legacy ``is_integer`` convenience API."""
+
+    def is_integer(self) -> bool:
+        return self == self.to_integral_value()
+
+
 def canonical_utc_datetime(value: datetime) -> datetime:
     return value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
 
@@ -30,27 +36,35 @@ def canonical_utc_timestamp(value: datetime) -> str:
     return canonical_utc_datetime(value).isoformat()
 
 
-def parse_nonnegative_number(raw: object, label: str, *, maximum: float | None = None) -> float:
-    """Parse non-monetary operational numbers.
+def parse_nonnegative_number(
+    raw: object,
+    label: str,
+    *,
+    maximum: float | Decimal | None = None,
+) -> ParsedDecimal:
+    """Parse a generic nonnegative form number without IEEE-754 conversion.
 
-    Monetary values must use ``parse_nonnegative_money`` and contractual rates
-    must use ``parse_nonnegative_rate``. This helper intentionally remains
-    binary-float for non-economic fields such as notice-day validation.
+    Monetary values should still use ``parse_nonnegative_money`` so their
+    two-decimal rounding policy is explicit. This compatibility helper is used
+    by mixed operational forms (for example contract value + notice days), so
+    it stays unquantized while remaining decimal exact.
     """
 
     value_raw = str(raw if raw is not None else "").strip()
     if not value_raw:
         raise ValueError(f"Define {label}.")
     try:
-        value = float(value_raw)
-    except (TypeError, ValueError) as exc:
+        value = ParsedDecimal(value_raw)
+    except (InvalidOperation, ValueError) as exc:
         raise ValueError(f"{label.capitalize()} debe ser un número válido.") from exc
-    if not math.isfinite(value):
+    if not value.is_finite():
         raise ValueError(f"{label.capitalize()} debe ser un número finito.")
     if value < 0:
         raise ValueError(f"{label.capitalize()} no puede ser negativo.")
-    if maximum is not None and value > maximum:
-        raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum:g}.")
+    if maximum is not None:
+        maximum_decimal = Decimal(str(maximum))
+        if value > maximum_decimal:
+            raise ValueError(f"{label.capitalize()} no puede ser mayor que {maximum_decimal:g}.")
     return value
 
 
@@ -132,6 +146,7 @@ __all__ = [
     "INVOICE_BASE_BEFORE_TAX",
     "INVOICE_LEGACY_UNKNOWN",
     "INVOICE_TOTAL_WITH_TAX",
+    "ParsedDecimal",
     "activation_breakdown",
     "canonical_utc_datetime",
     "canonical_utc_timestamp",
