@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal, InvalidOperation, localcontext
 from sqlalchemy import DateTime, Numeric, String, Text, select
 from sqlalchemy.orm import mapped_column
 
+from ...monetary import MONEY_PORTABLE_MAX, NORMALIZED_MONEY_PORTABLE_MAX, RATE_STORAGE_MAX
 from ..base import Base
 from .commercial import (
     BillingInvoice,
@@ -22,6 +23,12 @@ MONEY_SCALE = 2
 NORMALIZED_MONEY_SCALE = 6
 RATE_PRECISION = 9
 RATE_SCALE = 4
+
+_PORTABLE_MAX_BY_NUMERIC = {
+    (MONEY_PRECISION, MONEY_SCALE): MONEY_PORTABLE_MAX,
+    (MONEY_PRECISION, NORMALIZED_MONEY_SCALE): NORMALIZED_MONEY_PORTABLE_MAX,
+    (RATE_PRECISION, RATE_SCALE): RATE_STORAGE_MAX,
+}
 
 
 class ExactDecimal(Decimal):
@@ -72,26 +79,32 @@ class ExactDecimal(Decimal):
 
 
 class ExactNumeric(Numeric):
-    """NUMERIC with deterministic scale and storage-range enforcement.
+    """NUMERIC with deterministic scale and portable capacity enforcement.
 
-    PostgreSQL enforces NUMERIC precision physically while SQLite generally does
-    not. The bind boundary therefore validates the post-rounding storage range
-    before either driver sees the value, keeping both supported engines aligned.
+    PostgreSQL enforces NUMERIC precision physically while SQLite commonly uses
+    an IEEE-754 intermediary for Numeric binds. V2.60.9 validates both the SQL
+    storage range and a conservative portable range before either driver sees
+    the value, then verifies that a float round trip would preserve the target
+    economic quantum. The result is one fail-closed contract for both engines.
     """
 
-    def _storage_contract(self) -> tuple[int, int, Decimal, Decimal, Decimal]:
+    def _storage_contract(self) -> tuple[int, int, Decimal, Decimal, Decimal, Decimal]:
         precision = int(self.precision or 0)
         scale = int(self.scale or 0)
         if precision <= 0 or scale < 0 or scale > precision:
             raise ValueError("La precisión NUMERIC configurada no es válida")
         quantum = Decimal("1").scaleb(-scale)
-        maximum = (Decimal(10) ** (precision - scale)) - quantum
-        overflow_threshold = maximum + (quantum / Decimal(2))
-        return precision, scale, quantum, maximum, overflow_threshold
+        physical_maximum = (Decimal(10) ** (precision - scale)) - quantum
+        portable_maximum = min(
+            physical_maximum,
+            _PORTABLE_MAX_BY_NUMERIC.get((precision, scale), physical_maximum),
+        )
+        overflow_threshold = portable_maximum + (quantum / Decimal(2))
+        return precision, scale, quantum, physical_maximum, portable_maximum, overflow_threshold
 
     def bind_processor(self, dialect):
         parent = super().bind_processor(dialect)
-        precision, scale, quantum, maximum, overflow_threshold = self._storage_contract()
+        precision, scale, quantum, physical_maximum, portable_maximum, overflow_threshold = self._storage_contract()
 
         def process(value):
             if value is None:
@@ -104,8 +117,8 @@ class ExactNumeric(Numeric):
                 raise ValueError("Los valores monetarios persistidos deben ser finitos")
             if abs(exact) >= overflow_threshold:
                 raise ValueError(
-                    f"El valor económico excede NUMERIC({precision},{scale}); "
-                    f"máximo representable: {maximum}"
+                    f"El valor económico excede el límite portable de NUMERIC({precision},{scale}): "
+                    f"{portable_maximum}"
                 )
             try:
                 with localcontext() as context:
@@ -115,11 +128,33 @@ class ExactNumeric(Numeric):
                 raise ValueError(
                     f"El valor económico no puede representarse como NUMERIC({precision},{scale})"
                 ) from exc
-            if abs(quantized) > maximum:
+            if abs(quantized) > physical_maximum or abs(quantized) > portable_maximum:
                 raise ValueError(
-                    f"El valor económico excede NUMERIC({precision},{scale}); "
-                    f"máximo representable: {maximum}"
+                    f"El valor económico excede el límite portable de NUMERIC({precision},{scale}): "
+                    f"{portable_maximum}"
                 )
+
+            # Guard the worst supported persistence path explicitly. Converting
+            # through str(float(...)) does not become the stored representation;
+            # it only proves that a driver using a double intermediary cannot
+            # change the value at the declared economic scale.
+            try:
+                portable_float = float(quantized)
+                portable_decimal = Decimal(str(portable_float))
+                with localcontext() as context:
+                    context.prec = max(precision + 2, 28)
+                    portable_roundtrip = portable_decimal.quantize(quantum, rounding=ROUND_HALF_UP)
+            except (InvalidOperation, OverflowError, ValueError) as exc:
+                raise ValueError(
+                    f"El valor económico no conserva su escala NUMERIC({precision},{scale}) "
+                    "en el contrato portable de persistencia"
+                ) from exc
+            if portable_roundtrip != quantized:
+                raise ValueError(
+                    f"El valor económico no conserva su escala NUMERIC({precision},{scale}) "
+                    "en el contrato portable de persistencia"
+                )
+
             return parent(quantized) if parent is not None else quantized
 
         return process
@@ -153,8 +188,8 @@ def _set_exact_type(model, column_name: str, column_type: Numeric) -> None:
 
     Scientific, environmental, usage and customer-success measurements keep
     their Float semantics in the owning model modules. V2.60.8 guarantees
-    deterministic rounding and V2.60.9 additionally makes storage-range
-    validation identical across SQLite and PostgreSQL.
+    deterministic rounding and V2.60.9 additionally makes numeric capacity and
+    scale preservation fail closed across SQLite and PostgreSQL.
     """
 
     model.__table__.c[column_name].type = column_type
