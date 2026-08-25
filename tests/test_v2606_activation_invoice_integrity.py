@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date
+from decimal import Decimal
 
 import pytest
 from fastapi import HTTPException
@@ -112,6 +113,6 @@ def test_v2606_matching_activation_invoice_can_be_classified_once() -> None:
         invoice.source_reference,
     )
     assert invoice.amount_semantics == "total_with_tax"
-    assert invoice.net_amount == pytest.approx(1_150_000)
-    assert invoice.tax_amount == pytest.approx(218_500)
-    assert invoice.total_amount == pytest.approx(1_368_500)
+    assert invoice.net_amount == Decimal("1150000.00")
+    assert invoice.tax_amount == Decimal("218500.00")
+    assert invoice.total_amount == Decimal("1368500.00")
