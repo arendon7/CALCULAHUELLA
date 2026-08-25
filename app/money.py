@@ -8,6 +8,7 @@ MONEY_PRECISION: Final = 18
 MONEY_SCALE: Final = 2
 RATE_PRECISION: Final = 9
 RATE_SCALE: Final = 6
+CONTRACT_RATE_SCALE: Final = 4
 RECURRING_BASIS_PRECISION: Final = 18
 RECURRING_BASIS_SCALE: Final = 6
 
@@ -57,13 +58,13 @@ def parse_nonnegative_decimal(
 
 
 def parse_money(raw: object, label: str) -> Decimal:
-    """Parse an authoritative monetary input; user-entered money is never silently rounded."""
+    """Parse authoritative money; user-entered amounts are never silently rounded."""
     return parse_nonnegative_decimal(raw, label, scale=MONEY_SCALE)
 
 
 def parse_rate(raw: object, label: str) -> Decimal:
-    """Parse a percentage rate with explicit precision and the existing 0..100 business bound."""
-    return parse_nonnegative_decimal(raw, label, maximum=ONE_HUNDRED, scale=RATE_SCALE)
+    """Parse contractual tax rate without exceeding the V1.1 four-decimal hash snapshot."""
+    return parse_nonnegative_decimal(raw, label, maximum=ONE_HUNDRED, scale=CONTRACT_RATE_SCALE)
 
 
 def quantize_money(value: object) -> Decimal:
