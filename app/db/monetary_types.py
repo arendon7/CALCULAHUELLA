@@ -21,7 +21,15 @@ _PORTABLE_MAX_BY_NUMERIC = {
 
 
 class ExactDecimal(Decimal):
-    """Decimal compatible with historical arithmetic that used float literals."""
+    """Decimal compatible with historical arithmetic and presentation.
+
+    Historical application code occasionally combines persisted economic values
+    with float literals such as ``1.19``. Those literals are coerced through
+    ``str`` before arithmetic so their binary representation never enters the
+    economic calculation. ``:g`` formatting mirrors the former float-facing UI
+    by suppressing storage-only trailing zeroes without changing the persisted
+    Decimal scale.
+    """
 
     @staticmethod
     def _coerce(other: object) -> object:
@@ -59,6 +67,14 @@ class ExactDecimal(Decimal):
     def __rtruediv__(self, other: object):
         return self._wrap(super().__rtruediv__(self._coerce(other)))
 
+    def __format__(self, spec: str) -> str:
+        if spec == "g":
+            normalized = self.normalize()
+            if normalized == 0:
+                normalized = Decimal(0)
+            return format(normalized, "f")
+        return super().__format__(spec)
+
 
 class ExactNumeric(Numeric):
     """NUMERIC with deterministic scale and portable capacity enforcement."""
@@ -77,7 +93,7 @@ class ExactNumeric(Numeric):
         overflow_threshold = portable_maximum + (quantum / Decimal(2))
         return precision, scale, quantum, physical_maximum, portable_maximum, overflow_threshold
 
-    def normalize_value(self, value: object) -> Decimal | None:
+    def normalize_value(self, value: object) -> ExactDecimal | None:
         if value is None:
             return None
         precision, scale, quantum, physical_maximum, portable_maximum, overflow_threshold = self._storage_contract()
@@ -123,7 +139,7 @@ class ExactNumeric(Numeric):
                 f"El valor económico no conserva su escala NUMERIC({precision},{scale}) "
                 "en el contrato portable de persistencia"
             )
-        return quantized
+        return ExactDecimal(quantized)
 
     def bind_processor(self, dialect):
         parent = super().bind_processor(dialect)
