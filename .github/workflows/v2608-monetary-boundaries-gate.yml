@@ -1,0 +1,154 @@
+name: V2.60.8 · Monetary boundary enforcement
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/db/models/revenue.py"
+      - "app/monetary.py"
+      - "app/commercial_operations_web.py"
+      - "app/payment_web.py"
+      - "app/revenue_operations.py"
+      - "tests/test_v2608_monetary_boundaries.py"
+      - "tests/test_v2608_bind_policy.py"
+      - "tests/test_v2607_monetary_precision.py"
+      - "tests/test_v2606_revenue_operations_truth.py"
+      - "tests/test_v2606_activation_invoice_integrity.py"
+      - ".github/workflows/v2608-monetary-boundaries-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v2608-monetary-boundaries-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  monetary-boundaries:
+    name: Money boundaries · SQLite and PostgreSQL contract
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v2608
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v2608"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.8
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v2608-pycache" python -m compileall -q \
+            app/db/models/revenue.py \
+            app/monetary.py \
+            app/commercial_operations_web.py \
+            app/payment_web.py \
+            app/revenue_operations.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py
+
+      - name: Probar fronteras monetarias y regresiones Revenue Operations
+        run: |
+          pytest -q \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            --junitxml=v2608-monetary-boundaries.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2608-sqlite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2608
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2608-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Verificar bind exacto PostgreSQL real
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v2608
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v2608-postgres
+        run: |
+          python - <<'PY'
+          from decimal import Decimal
+          from sqlalchemy import select
+          from app.db.base import SessionLocal
+          from app.db.models import Organization, ServiceContract
+
+          with SessionLocal() as session:
+              organization = Organization(name="V2608 PostgreSQL", tax_id="V2608-PG", sector="Prueba", country="Colombia", status="Activa")
+              session.add(organization)
+              session.flush()
+              contract = ServiceContract(
+                  organization_id=organization.id,
+                  reference="CTR-V2608-PG",
+                  title="Prueba PostgreSQL",
+                  version="1.0",
+                  status="Borrador",
+                  start_date=__import__("datetime").date(2026, 9, 1),
+                  renewal_type="Por acuerdo",
+                  auto_renew=False,
+                  notice_days=30,
+                  contract_value=Decimal("100.005"),
+                  billing_cycle="Anual",
+                  owner="CI",
+                  terms_snapshot="Prueba V2.60.8",
+                  created_by="ci",
+              )
+              session.add(contract)
+              session.commit()
+              session.expire_all()
+              stored = session.scalar(select(ServiceContract).where(ServiceContract.reference == "CTR-V2608-PG"))
+              assert stored is not None
+              assert stored.contract_value == Decimal("100.01"), stored.contract_value
+          PY
+
+      - name: Publicar evidencia V2.60.8
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v2608-monetary-boundaries-evidence
+          path: v2608-monetary-boundaries.xml
+          if-no-files-found: warn
+          retention-days: 14
