@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, date, datetime, timedelta
+from decimal import Decimal
 from pathlib import Path
 
 import pytest
@@ -81,7 +82,7 @@ def test_v2606_revenue_migration_is_explicit_idempotent_non_destructive_and_zero
 
 
 def test_v2606_nonnegative_parser_fails_closed_for_invalid_money() -> None:
-    assert parse_nonnegative_number("123.45", "el valor") == pytest.approx(123.45)
+    assert parse_nonnegative_number("123.45", "el valor") == Decimal("123.45")
     for bad in ("", "-0.01", "nan", "NaN", "inf", "-inf", "texto"):
         with pytest.raises(ValueError):
             parse_nonnegative_number(bad, "el valor")
@@ -328,7 +329,7 @@ def test_v2606_recurring_charge_records_base_without_inventing_tax_total() -> No
         assert breakdown is not None
         assert breakdown.charge_type == "Recurrente"
         assert breakdown.amount_semantics == INVOICE_BASE_BEFORE_TAX
-        assert breakdown.net_amount == pytest.approx(invoice.amount)
+        assert breakdown.net_amount == invoice.amount
         assert breakdown.tax_rate_snapshot is None
         assert breakdown.tax_amount is None
         assert breakdown.total_amount is None
@@ -476,10 +477,10 @@ def test_v2606_activation_payment_has_authoritative_net_tax_total_breakdown() ->
         lead = session.scalar(select(CommercialLead).order_by(CommercialLead.id))
         plan = session.scalar(select(ServicePlan).where(ServicePlan.active.is_(True)).order_by(ServicePlan.id))
         assert lead is not None and plan is not None
-        implementation = 1000000.0
-        recurring = 200000.0
-        discount = 50000.0
-        tax = 19.0
+        implementation = Decimal("1000000.00")
+        recurring = Decimal("200000.00")
+        discount = Decimal("50000.00")
+        tax = Decimal("19.0000")
         proposal = CommercialProposal(
             lead_id=lead.id,
             plan_id=plan.id,
@@ -533,13 +534,13 @@ def test_v2606_activation_payment_has_authoritative_net_tax_total_breakdown() ->
         assert breakdown is not None
         assert breakdown.charge_type == "Activación"
         assert breakdown.amount_semantics == INVOICE_TOTAL_WITH_TAX
-        expected_net = implementation + recurring - discount
-        expected_tax = expected_net * 0.19
-        assert breakdown.net_amount == pytest.approx(expected_net)
-        assert breakdown.tax_rate_snapshot == pytest.approx(19.0)
-        assert breakdown.tax_amount == pytest.approx(expected_tax)
-        assert breakdown.total_amount == pytest.approx(payment.amount)
-        assert invoice.amount == pytest.approx(payment.amount)
+        expected_net = Decimal("1150000.00")
+        expected_tax = Decimal("218500.00")
+        assert breakdown.net_amount == expected_net
+        assert breakdown.tax_rate_snapshot == Decimal("19.0000")
+        assert breakdown.tax_amount == expected_tax
+        assert breakdown.total_amount == payment.amount
+        assert invoice.amount == payment.amount
 
 
 def test_v2606_operations_ui_names_semantics_and_tax_boundary_explicitly() -> None:
