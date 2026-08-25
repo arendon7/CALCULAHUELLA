@@ -193,6 +193,7 @@ def payment_is_terminal(status: str) -> bool:
 def contract_allowed_targets(contract: Any) -> tuple[str, ...]:
     current = getattr(contract, "status", "")
     allowed = set(_allowed_targets(CONTRACT_TRANSITIONS, current, "contrato"))
+    # Renovado is never a manual status option: a linked child version is the authority.
     allowed.discard("Renovado")
     if "Vigente" in allowed and not contract_has_signature_evidence(contract):
         allowed.discard("Vigente")
@@ -227,15 +228,10 @@ def validate_contract_transition(
     if target == current:
         return
     _validate_transition(CONTRACT_TRANSITIONS, current, target, "contrato")
-    if target == "Renovado":
-        if not allow_renewal:
-            raise LifecycleTransitionError(
-                "El estado Renovado solo puede generarse al crear una renovación contractual vinculada."
-            )
-        if not contract_has_signature_evidence(contract):
-            raise LifecycleTransitionError(
-                "No se puede consolidar una renovación desde un contrato sin evidencia de firma persistida."
-            )
+    if target == "Renovado" and not allow_renewal:
+        raise LifecycleTransitionError(
+            "El estado Renovado solo puede generarse al crear una renovación contractual vinculada."
+        )
     if target == "Vigente" and not contract_has_signature_evidence(contract):
         raise LifecycleTransitionError(
             "Un contrato no puede quedar Vigente sin identidad, fecha y hash de firma persistidos."
@@ -245,12 +241,16 @@ def validate_contract_transition(
 
 
 def ensure_contract_can_renew(contract: Any) -> None:
+    """Allow versioned renewal without fabricating missing legacy signature evidence.
+
+    V2.60.12 requires signatures for new Borrador → Vigente transitions, but an
+    already-persisted legacy contract may legitimately be Vigente or Terminado
+    without the newer signature snapshot. Renewal preserves that historical
+    absence and creates a linked child; it does not backfill or claim a signature.
+    """
+
     if getattr(contract, "status", "") not in {"Vigente", "Terminado"}:
         raise LifecycleTransitionError("Solo pueden renovarse contratos vigentes o terminados.")
-    if not contract_has_signature_evidence(contract):
-        raise LifecycleTransitionError(
-            "No se puede crear una renovación desde un contrato sin evidencia de firma persistida."
-        )
 
 
 def order_allowed_targets(order: Any) -> tuple[str, ...]:
