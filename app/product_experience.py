@@ -171,13 +171,6 @@ CORE_SECTIONS: tuple[dict[str, object], ...] = (
                 "✓",
                 any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
             ),
-            _item(
-                "Cierre mensual",
-                "/cierre-mensual",
-                "period_close",
-                "▣",
-                any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
-            ),
         ),
     },
     {
@@ -238,6 +231,13 @@ ADVANCED_SECTIONS: tuple[dict[str, object], ...] = (
         "items": (
             _item("Matriz del piloto", "/piloto-greenatics", "greenatics_pilot", "♻", any_capability=("view_methodology", "provide_data", "manage_sources")),
             _item("Ejecución del piloto", "/piloto-greenatics/ejecucion", "greenatics_pilot_execution", "▶", any_capability=("view_methodology", "provide_data", "manage_sources")),
+            _item(
+                "Cierre mensual del piloto",
+                "/cierre-mensual",
+                "period_close",
+                "▣",
+                any_capability=("provide_data", "manage_sources", "review", "approve", "view_methodology"),
+            ),
         ),
     },
 )
@@ -269,7 +269,7 @@ INTERNAL_SECTIONS: tuple[dict[str, object], ...] = (
             _item("Administración SaaS", "/administracion-saas", "saas_admin", "▣", any_capability=("manage_saas",)),
             _item("Alistamiento comercial", "/alistamiento", "readiness", "◆", any_capability=("manage_readiness",)),
             _item("Mapa del producto", "/modulos", "modules", "◫", any_capability=("manage_org", "view_methodology")),
-            _item("Consolidación V1.0", "/consolidacion", "consolidation", "◆", any_capability=("view_consolidation", "manage_consolidation")),
+            _item("Gobierno de release", "/consolidacion", "consolidation", "◆", any_capability=("view_consolidation", "manage_consolidation")),
         ),
     },
 )

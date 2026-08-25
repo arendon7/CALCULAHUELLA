@@ -1,4 +1,5 @@
 (() => {
+  const reducedMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
   const menuButton = document.querySelector('[data-menu-button]');
   const mobilePanel = document.querySelector('[data-mobile-panel]');
 
@@ -15,7 +16,7 @@
     });
     mobilePanel.querySelectorAll('a').forEach(a => a.addEventListener('click', closeMenu));
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && mobilePanel.classList.contains('open')) {
         closeMenu();
         menuButton.focus();
       }
@@ -24,7 +25,6 @@
 
   const tabs = [...document.querySelectorAll('[data-tab]')];
   const panels = [...document.querySelectorAll('[data-panel]')];
-
   const activateTab = tab => {
     const target = tab.dataset.tab;
     tabs.forEach(t => {
@@ -39,7 +39,6 @@
       p.hidden = !active;
     });
   };
-
   tabs.forEach((tab, index) => {
     tab.addEventListener('click', () => activateTab(tab));
     tab.addEventListener('keydown', event => {
@@ -62,13 +61,9 @@
     const target = document.querySelector(id);
     if (!target) return;
     event.preventDefault();
-    target.scrollIntoView({
-      behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
-      block: 'start'
-    });
+    target.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
     history.replaceState(null, '', id);
   }));
-
 
   const processSteps = [...document.querySelectorAll('[data-process]')];
   const processPanels = [...document.querySelectorAll('[data-process-panel]')];
@@ -102,7 +97,8 @@
       event.preventDefault(); let next=index;
       if(event.key==='ArrowRight') next=(index+1)%processSteps.length;
       if(event.key==='ArrowLeft') next=(index-1+processSteps.length)%processSteps.length;
-      if(event.key==='Home') next=0; if(event.key==='End') next=processSteps.length-1;
+      if(event.key==='Home') next=0;
+      if(event.key==='End') next=processSteps.length-1;
       processSteps[next].focus(); activateProcess(processSteps[next]);
     });
   });
@@ -128,8 +124,12 @@
     document.querySelector('[data-trace-state]').textContent=s;
   }));
 
-
   const diagnosticForm = document.querySelector('[data-diagnostic-form]');
+  const routePrices = {
+    'Huella Esencial': '$1.300.000 COP / año',
+    'Gestión de Carbono': '$3.300.000 COP / año',
+    'Gestión Avanzada': '$8.300.000 COP / año'
+  };
   if (diagnosticForm) {
     diagnosticForm.addEventListener('submit', event => {
       event.preventDefault();
@@ -142,7 +142,7 @@
       if (!sector) return;
       const sectorBase = {servicios:8, industria:18, agro:16, logistica:14, residuos:15}[sector] || 10;
       const sources = Math.min(60, sectorBase + Math.max(0, sedes-1)*3 + (objetivo==='verificacion'?4:0));
-      let complexityScore = sedes + (sector==='industria'||sector==='agro'?3:1) + (datos==='baja'?4:datos==='media'?2:0) + (objetivo==='verificacion'?4:objetivo==='reducir'?2:0);
+      const complexityScore = sedes + (sector==='industria'||sector==='agro'?3:1) + (datos==='baja'?4:datos==='media'?2:0) + (objetivo==='verificacion'?4:objetivo==='reducir'?2:0);
       const complexity = complexityScore >= 12 ? 'Alta' : complexityScore >= 7 ? 'Media' : 'Baja';
       const maturity = primera==='si' ? (datos==='alta'?'Inicial organizada':'Inicial') : (objetivo==='reducir'?'En gestión':'Intermedia');
       const route = objetivo==='verificacion' || complexity==='Alta' ? 'Gestión Avanzada' : (primera==='si' && objetivo==='medir' ? 'Huella Esencial' : 'Gestión de Carbono');
@@ -152,8 +152,18 @@
       document.querySelector('[data-result-sources]').textContent=String(sources);
       document.querySelector('[data-result-areas]').textContent=String(areas);
       document.querySelector('[data-result-route]').textContent=route;
-      document.querySelector('[data-result-note]').textContent=`Ruta orientativa: ${route}. El alcance definitivo requiere revisar fuentes, límites, datos y objetivos con el equipo técnico.`;
-      try { localStorage.setItem('cthDiagnostic', JSON.stringify({sector,sedes,primera,datos,objetivo,maturity,complexity,sources,areas,route})); } catch (_) { /* El diagnóstico sigue funcionando sin persistencia local. */ }
+      const priceNode = document.querySelector('[data-result-price]');
+      if (priceNode) priceNode.textContent=`Referencia estándar: ${routePrices[route]}`;
+      document.querySelector('[data-result-note]').textContent=`Esta ruta es orientativa. El precio final depende de sedes, fuentes, calidad de información, alcance 3 y requerimientos documentales.`;
+      const result = document.querySelector('[data-diagnostic-result]');
+      if (result) {
+        result.classList.add('has-result');
+        if (!reducedMotion) result.animate([
+          { opacity:.72, transform:'translateY(8px)' },
+          { opacity:1, transform:'translateY(0)' }
+        ], { duration:220, easing:'cubic-bezier(0.23, 1, 0.32, 1)' });
+      }
+      try { localStorage.setItem('cthDiagnostic', JSON.stringify({sector,sedes,primera,datos,objetivo,maturity,complexity,sources,areas,route,price:routePrices[route]})); } catch (_) {}
     });
   }
 
@@ -169,9 +179,38 @@
     resourcePanel.querySelector('[data-resource-kicker]').textContent=v[0];
     resourcePanel.querySelector('[data-resource-title]').textContent=v[1];
     resourcePanel.querySelector('[data-resource-text]').textContent=v[2];
-    resourcePanel.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'auto':'smooth',block:'nearest'});
+    if (!reducedMotion) resourcePanel.animate([
+      { opacity:0, transform:'translateY(8px)' },
+      { opacity:1, transform:'translateY(0)' }
+    ], { duration:180, easing:'cubic-bezier(0.23, 1, 0.32, 1)' });
+    resourcePanel.scrollIntoView({behavior:reducedMotion?'auto':'smooth',block:'nearest'});
   }));
   const resourceClose=document.querySelector('.resource-close');
   if(resourceClose) resourceClose.addEventListener('click',()=>{resourcePanel.hidden=true;});
 
+  /* Emil-style authored motion: one hero moment, plus direct press feedback in CSS. */
+  const craftStage = document.querySelector('[data-craft-stage]');
+  if (craftStage && !reducedMotion) {
+    requestAnimationFrame(() => craftStage.classList.add('is-ready'));
+    const finePointer = matchMedia('(hover: hover) and (pointer: fine)').matches;
+    if (finePointer) {
+      let tx = 0, ty = 0, cx = 0, cy = 0, raf = 0;
+      const tick = () => {
+        cx += (tx - cx) * .09;
+        cy += (ty - cy) * .09;
+        craftStage.style.setProperty('--stage-x', `${cx.toFixed(2)}deg`);
+        craftStage.style.setProperty('--stage-y', `${cy.toFixed(2)}deg`);
+        if (Math.abs(tx-cx) > .01 || Math.abs(ty-cy) > .01) raf = requestAnimationFrame(tick); else raf = 0;
+      };
+      craftStage.addEventListener('pointermove', event => {
+        const r = craftStage.getBoundingClientRect();
+        tx = ((event.clientY-r.top)/r.height - .5) * -1.2;
+        ty = ((event.clientX-r.left)/r.width - .5) * 1.4;
+        if (!raf) raf = requestAnimationFrame(tick);
+      });
+      craftStage.addEventListener('pointerleave', () => { tx = 0; ty = 0; if (!raf) raf = requestAnimationFrame(tick); });
+    }
+  } else if (craftStage) {
+    craftStage.classList.add('is-ready');
+  }
 })();

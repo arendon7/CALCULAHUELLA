@@ -18,6 +18,7 @@ from sqlalchemy.orm import Session, selectinload
 from .calculations import recalculate_inventory, recalculate_source
 from .capture_guidance import capture_summary
 from .config import settings
+from .data_request_status import open_data_requests
 from .database import (
     ActivityData, DataRequest, EmissionSource, EvidenceDocument, Inventory,
     add_audit, get_db, refresh_progress,
@@ -51,6 +52,7 @@ def register_information_routes(
     ALLOWED_UNITS = allowed_units
     DATA_ORIGINS = data_origins
     _parse_excel_period = parse_excel_period
+
     @app.get("/informacion", response_class=HTMLResponse)
     def information_page(request: Request, show_all: bool = False, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
@@ -65,6 +67,53 @@ def register_information_routes(
                 .order_by(ActivityData.period_start.desc(), ActivityData.created_at.desc())
             )
         )
+        open_requests = open_data_requests(requests)
+        role = str(user.get("role", "Cliente"))
+        if role == "Cliente" and open_requests:
+            information_focus = {
+                "task": "solicitudes",
+                "eyebrow": "RESPONDE LO PENDIENTE",
+                "title": "Atiende las solicitudes de información abiertas",
+                "detail": f"Tienes {len(open_requests)} requerimiento(s) activo(s). Revisa qué dato o soporte falta y actualiza su estado cuando quede entregado.",
+                "href": "#solicitudes",
+                "action": "Abrir solicitudes",
+            }
+        elif bool(user.get("can_provide_data")):
+            information_focus = {
+                "task": "datos",
+                "eyebrow": "CONTINÚA LA CAPTURA",
+                "title": "Registra el siguiente dato verificable",
+                "detail": "Selecciona una fuente y periodo pendientes. Prioriza valores respaldados por factura, certificado o registro operativo.",
+                "href": "/captura-guiada",
+                "action": "Ir a captura guiada",
+            }
+        elif bool(user.get("can_review")):
+            information_focus = {
+                "task": "evidencias",
+                "eyebrow": "REVISA LA EVIDENCIA",
+                "title": "Comprueba soportes, periodos e integridad",
+                "detail": f"Hay {len(documents)} evidencia(s) en el expediente. Revisa que el soporte corresponda al dato, periodo y fuente antes de aprobarlo.",
+                "href": "#evidencias",
+                "action": "Revisar evidencias",
+            }
+        elif open_requests:
+            information_focus = {
+                "task": "solicitudes",
+                "eyebrow": "GESTIONA EL FLUJO",
+                "title": "Resuelve las solicitudes abiertas",
+                "detail": f"Quedan {len(open_requests)} requerimiento(s) activos antes de completar la recolección del periodo.",
+                "href": "#solicitudes",
+                "action": "Ver solicitudes",
+            }
+        else:
+            information_focus = {
+                "task": "datos",
+                "eyebrow": "REVISA LA COBERTURA",
+                "title": "Confirma que cada fuente tenga datos y soporte",
+                "detail": "No hay solicitudes abiertas. Revisa el historial y completa los periodos o evidencias que aún falten.",
+                "href": "#datos",
+                "action": "Revisar registros",
+            }
         quality_counts = {level: sum(1 for item in records if item.quality_level == level) for level in ("A", "B", "C", "D")}
         visible_records = records if show_all else records[:12]
         first_period_start = inventory.start_date
@@ -82,6 +131,8 @@ def register_information_routes(
                 "information",
                 inventory=inventory,
                 requests=requests,
+                open_requests=open_requests,
+                information_focus=information_focus,
                 documents=documents,
                 records=records,
                 visible_records=visible_records,
@@ -94,6 +145,7 @@ def register_information_routes(
                 default_period_end=first_period_end.isoformat(),
             ),
         )
+
     @app.post("/informacion/solicitudes/nueva")
     def request_create(
         request: Request,
@@ -127,6 +179,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "La solicitud de información fue creada.")
         return RedirectResponse("/informacion", status_code=303)
+
     @app.post("/informacion/solicitudes/{request_id}/estado")
     def request_status_update(
         request_id: int,
@@ -150,6 +203,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "El estado de la solicitud fue actualizado.")
         return RedirectResponse("/informacion", status_code=303)
+
     @app.post("/informacion/datos/nuevo")
     def activity_data_create(
         request: Request,
@@ -218,6 +272,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "El dato de actividad fue registrado.")
         return RedirectResponse("/informacion", status_code=303)
+
     @app.post("/informacion/datos/{record_id}/editar")
     def activity_data_update(
         record_id: int,
@@ -275,6 +330,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "El dato fue actualizado.")
         return RedirectResponse(f"/fuentes/{record.source_id}", status_code=303)
+
     @app.post("/informacion/evidencias/nueva")
     async def evidence_upload(
         request: Request,
@@ -333,6 +389,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "La evidencia fue cargada y protegida con huella SHA-256.")
         return RedirectResponse("/informacion", status_code=303)
+
     @app.get("/evidencias/{document_id}/descargar")
     def evidence_download(document_id: int, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         document = session.scalar(select(EvidenceDocument).join(Inventory).where(EvidenceDocument.id == document_id, Inventory.organization_id == int(user["organization_id"])))
@@ -346,6 +403,7 @@ def register_information_routes(
         if local_path:
             return FileResponse(local_path, filename=document.name)
         return RedirectResponse(storage.presigned_url(document.stored_name), status_code=302)
+
     @app.post("/evidencias/{document_id}/estado")
     def evidence_status_update(
         document_id: int,
@@ -368,6 +426,7 @@ def register_information_routes(
         session.commit()
         set_flash(request, "La evidencia fue revisada.")
         return RedirectResponse("/informacion", status_code=303)
+
     @app.get("/informacion/plantilla.xlsx")
     def activity_template(session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
@@ -453,6 +512,7 @@ def register_information_routes(
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             headers={"Content-Disposition": f'attachment; filename="{filename}"'},
         )
+
     @app.get("/informacion/importar", response_class=HTMLResponse)
     def import_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         inventory = get_inventory(session, user)
@@ -461,6 +521,7 @@ def register_information_routes(
             name="import_data.html",
             context=common_context(request, session, user, "information", inventory=inventory, sources=inventory.sources, errors=[], preview=[]),
         )
+
     @app.post("/informacion/importar", response_class=HTMLResponse)
     async def import_activity_data(
         request: Request,

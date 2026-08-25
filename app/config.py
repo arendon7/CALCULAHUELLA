@@ -36,6 +36,7 @@ class Settings:
     session_https_only: bool = env_bool("SESSION_HTTPS_ONLY", False)
     trusted_hosts: tuple[str, ...] = tuple(env_list("TRUSTED_HOSTS", "localhost,127.0.0.1,testserver"))
     public_base_url: str = os.environ.get("PUBLIC_BASE_URL", "http://127.0.0.1:8765").rstrip("/")
+    public_result_max_age_hours: int = int(os.environ.get("PUBLIC_RESULT_MAX_AGE_HOURS", "720"))
     max_upload_mb: int = int(os.environ.get("MAX_UPLOAD_MB", "10"))
     max_request_mb: int = int(os.environ.get("MAX_REQUEST_MB", "12"))
     slow_request_seconds: float = float(os.environ.get("SLOW_REQUEST_SECONDS", "1.0"))

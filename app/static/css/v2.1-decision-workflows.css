@@ -1,0 +1,175 @@
+/* V2.1.4 · Decision & Closure
+   Cálculo → análisis → reducción → cierre.
+   La jerarquía visual sigue estado → riesgo/hotspot → decisión → trazabilidad. */
+
+/* Cálculo: salud del motor antes del detalle por fuente. */
+body.app-shell .calculation-notice{display:grid;grid-template-columns:auto minmax(0,1fr);gap:13px;align-items:center;padding:16px 18px;border:1px solid rgba(45,111,115,.17);border-radius:17px;background:linear-gradient(135deg,#eef7f3,#fff);box-shadow:none}
+body.app-shell .calculation-notice>span{display:grid;place-items:center;min-width:62px;min-height:38px;padding:7px 10px;border-radius:11px;background:#0b3b2e;color:#fff;font-size:.72rem;font-weight:850;letter-spacing:.07em}
+body.app-shell .calculation-notice p{margin:0;line-height:1.45}
+body.app-shell .calculation-notice small{display:block;margin-top:3px;color:#65766d}
+body.app-shell .calculation-kpis{grid-template-columns:repeat(4,minmax(0,1fr))}
+body.app-shell .calculation-kpis .mini-card{position:relative;overflow:hidden}
+body.app-shell .calculation-kpis .mini-card:first-child{background:linear-gradient(145deg,#0b3b2e,#165342);border-color:transparent}
+body.app-shell .calculation-kpis .mini-card:first-child :is(small,strong,p){color:#fff}
+body.app-shell .calculation-kpis .mini-card:nth-child(3){border-color:rgba(202,154,108,.26);background:#fffbf7}
+body.app-shell .calculation-kpis .mini-card:nth-child(4){border-color:rgba(177,78,65,.22);background:#fff8f7}
+body.app-shell .calculation-kpis .mini-card:nth-child(4)::before{content:"";position:absolute;inset:0 auto 0 0;width:3px;background:#b14e41}
+body.app-shell .calculation-kpis+.card{border-top:4px solid rgba(45,111,115,.68)}
+body.app-shell .calculation-kpis+.card .responsive-table{width:100%;min-width:0;max-width:100%;overflow:auto}
+body.app-shell .calculation-kpis+.card table{min-width:900px}
+body.app-shell .calc-state{display:inline-flex;align-items:center;min-height:28px;padding:5px 9px;border-radius:999px;font-size:.72rem;font-weight:780}
+body.app-shell .calc-state.state-ok{background:#e7f3eb;color:#226a4d}
+body.app-shell .calc-state.state-alert{background:#fff3df;color:#8c5a14}
+body.app-shell .calc-state.state-error{background:#fde9e6;color:#9a4035}
+body.app-shell .engine-rules{background:linear-gradient(180deg,#fff,#f8fbf9);box-shadow:none}
+body.app-shell .engine-rules .rule-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+body.app-shell .engine-rules .rule-grid>article{display:grid;grid-template-columns:34px minmax(0,1fr);gap:10px;align-items:start;padding:14px;border:1px solid var(--v212-app-line);border-radius:14px;background:#fff}
+body.app-shell .engine-rules .rule-grid>article>span{display:grid;place-items:center;width:34px;height:34px;border-radius:10px;background:#eaf3ee;color:#0b3b2e;font-weight:850}
+body.app-shell .engine-rules p{margin:4px 0 0;color:#6a7972;line-height:1.45;font-size:.76rem}
+
+/* Análisis: lectura ejecutiva y Pareto dominan; el detalle histórico queda después. */
+body.app-shell .analysis-grid{display:grid;grid-template-columns:minmax(0,1.45fr) minmax(300px,.7fr);gap:16px;align-items:stretch;margin-bottom:16px}
+body.app-shell .analysis-grid>.card{min-width:0}
+body.app-shell .analysis-grid .insight-panel{background:linear-gradient(145deg,#0b3b2e,#165342);border-color:transparent;color:#fff;box-shadow:0 18px 42px rgba(11,59,46,.12)}
+body.app-shell .analysis-grid .insight-panel :is(small,h3,strong,p){color:#fff}
+body.app-shell .analysis-grid .insight-panel .insight{display:grid;grid-template-columns:32px minmax(0,1fr);gap:10px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.12)}
+body.app-shell .analysis-grid .insight-panel .insight:last-child{border-bottom:0}
+body.app-shell .analysis-grid .insight-panel .insight>span{display:grid;place-items:center;width:32px;height:32px;border-radius:10px;background:rgba(255,255,255,.12);font-weight:850}
+body.app-shell .analysis-grid .insight-panel .insight p{margin:0}
+body.app-shell .analysis-grid .insight-panel .insight small{display:block;margin-top:3px;opacity:.72;line-height:1.4}
+body.app-shell .rank-list{display:grid;gap:8px}
+body.app-shell .rank-list>article{display:grid;grid-template-columns:30px minmax(150px,.9fr) minmax(120px,1fr) auto;gap:11px;align-items:center;padding:10px 11px;border-radius:12px;background:#f8fbf9}
+body.app-shell .rank-list>article>span{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#e8f1ec;color:#0b3b2e;font-weight:850}
+body.app-shell .rank-list .rank-bar{height:7px;border-radius:999px;background:#e4ece7;overflow:hidden}
+body.app-shell .rank-list .rank-bar>i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2d6f73,#a7c1a0)}
+body.app-shell .analysis-detail-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;margin-bottom:16px}
+body.app-shell .analysis-detail-grid>.card{min-width:0}
+body.app-shell .history-card{margin-bottom:16px}
+body.app-shell .history-card .responsive-table{width:100%;min-width:0;max-width:100%;overflow:auto}
+body.app-shell .history-card table{min-width:720px}
+body.app-shell .management-grid{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(280px,.5fr);gap:16px;align-items:start}
+body.app-shell .management-grid>.card{min-width:0}
+body.app-shell .management-grid>.sticky-form{position:sticky;top:92px;background:linear-gradient(180deg,#fff,#f8fbf9)}
+body.app-shell .management-grid .responsive-table{width:100%;min-width:0;max-width:100%;overflow:auto}
+
+/* Reducción: la decisión y la brecha antes del portafolio detallado. */
+body.app-shell .reduction-page-head{align-items:flex-start}
+body.app-shell .reduction-page-head .head-actions{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:8px}
+body.app-shell .reduction-command{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;padding:clamp(20px,3vw,32px);border:0;background:radial-gradient(circle at 86% 15%,rgba(167,193,160,.22),transparent 30%),linear-gradient(145deg,#082f25,#0b3b2e 58%,#175248);color:#fff;box-shadow:0 22px 55px rgba(11,59,46,.18)}
+body.app-shell .reduction-command :is(.eyebrow,h2,p,strong){color:#fff}
+body.app-shell .reduction-command h2{max-width:780px;margin:7px 0 9px;font-size:clamp(1.65rem,3vw,2.55rem);line-height:1.05;letter-spacing:-.045em;text-wrap:balance}
+body.app-shell .reduction-command p{margin:0;opacity:.78;line-height:1.55}
+body.app-shell .reduction-command-score{display:grid;justify-items:center;gap:10px;min-width:150px}
+body.app-shell .readiness-dial{display:grid;place-items:center;align-content:center;width:122px;height:122px;border-radius:50%;background:radial-gradient(circle at center,#103f33 57%,transparent 58%),conic-gradient(#a7c1a0 calc(var(--score)*1%),rgba(255,255,255,.14) 0);box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}
+body.app-shell .readiness-dial strong{font-size:1.55rem;line-height:1}
+body.app-shell .readiness-dial span{margin-top:4px;color:rgba(255,255,255,.7);font-size:.7rem}
+body.app-shell .reduction-kpis{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:11px;margin:14px 0}
+body.app-shell .reduction-kpis .metric-card{min-width:0;min-height:150px;padding:17px;border-radius:16px;box-shadow:0 6px 22px rgba(11,59,46,.04)}
+body.app-shell .reduction-kpis .metric-card h2{margin:6px 0;font-size:clamp(1.25rem,2vw,1.65rem);letter-spacing:-.035em}
+body.app-shell .reduction-kpis .metric-card p{margin:0;color:#6b7a73;font-size:.75rem;line-height:1.4}
+body.app-shell .reduction-kpis .metric-card:nth-child(3){border-color:rgba(45,111,115,.23);background:#f3f8f5}
+body.app-shell .target-command{border-top:4px solid #2d6f73;background:linear-gradient(180deg,#fff,#fafcfb)}
+body.app-shell .target-command-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(280px,.7fr);gap:20px;align-items:center}
+body.app-shell .target-command-values{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+body.app-shell .target-command-values>div{padding:13px;border:1px solid var(--v212-app-line);border-radius:13px;background:#fff}
+body.app-shell .target-command-values span{display:block;color:#74827b;font-size:.7rem;text-transform:uppercase;letter-spacing:.05em}
+body.app-shell .target-command-values strong{display:block;margin-top:4px;color:#183229}
+body.app-shell .coverage-visual{padding:18px;border-radius:16px;background:#f1f7f4}
+body.app-shell .coverage-track{position:relative;height:12px;margin-bottom:12px;border-radius:999px;background:#dfe9e3;overflow:visible}
+body.app-shell .coverage-track>i{display:block;height:100%;border-radius:inherit;background:linear-gradient(90deg,#2d6f73,#63a879)}
+body.app-shell .coverage-target{position:absolute;right:0;top:18px;color:#63736b;font-size:.68rem}
+body.app-shell .trajectory-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px;margin-top:16px}
+body.app-shell .trajectory-grid>article{padding:12px;border-radius:13px;background:#f8fbf9;border:1px solid var(--v212-app-line)}
+body.app-shell .trajectory-grid strong,body.app-shell .trajectory-grid span{display:block;margin-top:3px}
+body.app-shell .reduction-management-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:14px 0}
+body.app-shell .reduction-management-grid>.card{min-width:0;box-shadow:0 6px 22px rgba(11,59,46,.04)}
+body.app-shell .reduction-management-grid .alert-card.has-alert{border-color:rgba(177,78,65,.25);background:#fff9f8}
+body.app-shell .control-counts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+body.app-shell .control-counts>div{padding:10px;border-radius:11px;background:#f8fbf9}
+body.app-shell .control-counts dt{color:#718079;font-size:.68rem;text-transform:uppercase}
+body.app-shell .control-counts dd{margin:3px 0 0;font-size:1.25rem;font-weight:850;color:#183229}
+body.app-shell .action-portfolio-section{min-width:0;border-top:4px solid rgba(45,111,115,.6)}
+body.app-shell .portfolio-table-wrap{width:100%;min-width:0;max-width:100%;overflow:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+body.app-shell .portfolio-table{min-width:1180px}
+body.app-shell .portfolio-table td{vertical-align:top}
+body.app-shell .reduction-create-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start;margin-top:16px}
+body.app-shell .reduction-create-grid>.card{min-width:0;background:linear-gradient(180deg,#fff,#fafcfb)}
+
+/* Cierre mensual: readiness y bloqueos antes de la acción irreversible. */
+body.app-shell .period-close-head{display:flex;justify-content:space-between;gap:24px;align-items:flex-end;margin-bottom:16px}
+body.app-shell .period-close-head h1{margin:5px 0 8px;letter-spacing:-.045em}
+body.app-shell .period-selector{display:grid;gap:5px;min-width:190px;padding:12px 14px;border:1px solid var(--v212-app-line);border-radius:14px;background:#fff}
+body.app-shell .period-selector label{font-size:.68rem;color:#718079;text-transform:uppercase;letter-spacing:.06em}
+body.app-shell .period-status-bar{display:grid;grid-template-columns:1fr 1fr repeat(3,minmax(0,1fr));gap:0;margin-bottom:12px;border:1px solid var(--v212-app-line);border-radius:18px;background:#fff;overflow:hidden;box-shadow:0 8px 26px rgba(11,59,46,.04)}
+body.app-shell .period-status-bar>div{display:flex;flex-direction:column;justify-content:center;min-height:88px;padding:15px 17px}
+body.app-shell .period-status-bar>div+div{border-left:1px solid var(--v212-app-line)}
+body.app-shell .period-status-bar>div:first-child{background:linear-gradient(145deg,#0b3b2e,#165342)}
+body.app-shell .period-status-bar>div:first-child :is(small,strong){color:#fff}
+body.app-shell .period-status-bar small{color:#74827b;font-size:.68rem;letter-spacing:.06em}
+body.app-shell .period-status-bar strong{margin-top:5px;color:#183229;font-size:1.05rem}
+body.app-shell .period-kpis{margin-bottom:14px}
+body.app-shell .period-layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(290px,.55fr);gap:16px;align-items:start;min-width:0}
+body.app-shell .period-layout>*{min-width:0}
+body.app-shell .period-table-card{min-width:0}
+body.app-shell .period-table-card .table-wrap{width:100%;min-width:0;max-width:100%;overflow:auto;overscroll-behavior-inline:contain;-webkit-overflow-scrolling:touch}
+body.app-shell .period-table{min-width:1040px}
+body.app-shell .period-side{position:sticky;top:92px;display:grid;gap:12px}
+body.app-shell .blockers-card{border-top:4px solid #ca9a6c;box-shadow:none}
+body.app-shell .blockers-card .success-panel{padding:14px;border-radius:13px;background:#eaf5ee}
+body.app-shell .blocker-list{display:grid;gap:7px}
+body.app-shell .blocker-list p{display:grid;grid-template-columns:24px minmax(0,1fr);gap:8px;align-items:start;margin:0;padding:9px;border-radius:10px;background:#fff8f7;color:#713e37;font-size:.76rem;line-height:1.4}
+body.app-shell .action-card{box-shadow:none;background:linear-gradient(180deg,#fff,#f8fbf9)}
+body.app-shell .action-card .btn{min-height:48px}
+body.app-shell .danger-zone{border-color:rgba(177,78,65,.2);background:#fff9f8}
+body.app-shell .integrity-card{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:20px;align-items:center;border-color:rgba(45,111,115,.2);background:#f3f8f5}
+body.app-shell .integrity-card h2{overflow-wrap:anywhere;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:.82rem;line-height:1.5}
+
+@media(max-width:1100px){
+  body.app-shell .calculation-kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .engine-rules .rule-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .analysis-grid{grid-template-columns:1fr}
+  body.app-shell .analysis-grid .insight-panel{order:-1}
+  body.app-shell .reduction-kpis{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.app-shell .reduction-kpis .metric-card:first-child{grid-column:span 2}
+  body.app-shell .reduction-management-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  body.app-shell .reduction-management-grid>.alert-card{grid-column:1/-1}
+  body.app-shell .period-status-bar{grid-template-columns:repeat(3,minmax(0,1fr))}
+  body.app-shell .period-status-bar>div:nth-child(4){border-left:0;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .period-status-bar>div:nth-child(4),body.app-shell .period-status-bar>div:nth-child(5){border-top:1px solid var(--v212-app-line)}
+}
+
+@media(max-width:900px){
+  body.app-shell .analysis-detail-grid,body.app-shell .management-grid,body.app-shell .target-command-grid,body.app-shell .period-layout{grid-template-columns:1fr}
+  body.app-shell .management-grid>.sticky-form,body.app-shell .period-side{position:static}
+  body.app-shell .reduction-command{grid-template-columns:1fr}
+  body.app-shell .reduction-command-score{grid-template-columns:auto minmax(0,1fr);justify-items:start;align-items:center}
+  body.app-shell .readiness-dial{width:98px;height:98px}
+  body.app-shell .reduction-create-grid{grid-template-columns:1fr}
+  body.app-shell .period-close-head{align-items:flex-start}
+}
+
+@media(max-width:620px){
+  body.app-shell .calculation-notice{grid-template-columns:1fr}
+  body.app-shell .calculation-notice>span{justify-self:start;min-width:0;min-height:32px}
+  body.app-shell .calculation-kpis,body.app-shell .reduction-kpis,body.app-shell .reduction-management-grid,body.app-shell .period-status-bar{grid-template-columns:1fr}
+  body.app-shell .reduction-kpis .metric-card:first-child,body.app-shell .reduction-management-grid>.alert-card{grid-column:auto}
+  body.app-shell .engine-rules .rule-grid{grid-template-columns:1fr}
+  body.app-shell .rank-list>article{grid-template-columns:30px minmax(0,1fr) auto}
+  body.app-shell .rank-list .rank-bar{grid-column:2/-1}
+  body.app-shell .reduction-page-head .head-actions{width:100%;flex-wrap:nowrap;justify-content:flex-start;overflow:auto;scrollbar-width:none;padding-bottom:3px}
+  body.app-shell .reduction-page-head .head-actions::-webkit-scrollbar{display:none}
+  body.app-shell .reduction-page-head .head-actions>*{flex:0 0 auto}
+  body.app-shell .reduction-command{padding:20px}
+  body.app-shell .reduction-command-score{grid-template-columns:1fr;justify-items:start}
+  body.app-shell .target-command-values{grid-template-columns:1fr}
+  body.app-shell .period-close-head{display:grid;grid-template-columns:1fr}
+  body.app-shell .period-selector{width:100%;min-width:0}
+  body.app-shell .period-status-bar>div+div{border-left:0;border-top:1px solid var(--v212-app-line)}
+  body.app-shell .period-status-bar>div{min-height:70px;padding:12px 14px}
+  body.app-shell .integrity-card{grid-template-columns:1fr}
+  body.app-shell .period-side .action-card{position:relative}
+}
+
+@media(prefers-reduced-motion:reduce){
+  body.app-shell .reduction-page-head .head-actions{scroll-behavior:auto}
+}

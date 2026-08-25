@@ -46,7 +46,7 @@ def test_v035_routes_are_owned_by_explicit_domain_modules():
     expected = {
         "users": 8,
         "inventories": 17,
-        "reports": 6,
+        "reports": 7,
         "operations": 15,
         "service_operations": 2,
     }

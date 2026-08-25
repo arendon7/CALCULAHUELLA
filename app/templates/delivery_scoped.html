@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Cierre histórico · Calcula tu Huella{% endblock %}
+{% block page_label %}Cierre histórico{% endblock %}
+{% block content %}
+<div class="page-head delivery-heading">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Cierre e informes</p>
+    <h1>Estado de cierre del periodo</h1>
+    <p>Consulta cómo quedó el expediente, qué controles estaban listos o pendientes y qué nivel de uso o publicación correspondía a este periodo.</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reportes">Ver informes</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reduccion">Ver reducción</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
+  </div>
+</div>
+
+<div class="method-boundary-note scoped-workspace-notice"><strong>Consulta explícita del periodo:</strong> esta vista reconstruye el estado de cierre de {{ inventory.name }} sin cambiar el periodo por defecto. Es exclusivamente informativa: no aprueba, no cierra, no publica y no ejecuta las acciones sugeridas por las puertas de control.</div>
+
+<section class="work-command delivery-command publication-{{ delivery.publication.tone }}" aria-label="Estado histórico de uso y publicación">
+  <div class="work-command-main">
+    <span class="eyebrow">ESTADO DE USO Y PUBLICACIÓN</span>
+    <h2>{{ 'El periodo quedó habilitado para entrega controlada' if delivery.publication.can_share_external else 'El periodo conserva restricciones de uso o publicación' }}</h2>
+    <p>{{ delivery.publication.message }}</p>
+    <div class="work-command-meta">
+      <span><b>Alistamiento:</b> {{ delivery.score }}%</span>
+      <span><b>Puertas listas:</b> {{ delivery.metrics.ready_gates }}/8</span>
+      <span><b>Evidencia:</b> {{ delivery.metrics.evidence_coverage }}%</span>
+    </div>
+  </div>
+  <div class="work-command-action">
+    <small>NIVEL REGISTRADO</small>
+    <strong>{{ delivery.publication.level }}</strong>
+    <span>{{ delivery.publication.audience }}</span>
+    {% if delivery.next_action %}<span class="permission-note">Siguiente control registrado: {{ delivery.next_action.name }} · {{ delivery.next_action.owner }}</span>{% endif %}
+  </div>
+</section>
+
+{% set calculation_gate = delivery.gates|selectattr('code','equalto','calculation')|first %}
+{% set review_gate = delivery.gates|selectattr('code','equalto','review')|first %}
+<section class="card" aria-labelledby="historical-maturity-title" data-result-maturity>
+  <div class="card-head"><div><small>MADUREZ DEL RESULTADO</small><h3 id="historical-maturity-title">Cuantificado, revisado y publicable son estados distintos</h3><p>La lectura histórica conserva las mismas autoridades del expediente y no infiere estados adicionales.</p></div><span class="status-chip {{ 'complete' if delivery.publication.can_share_external else 'progressing' }}">{{ delivery.publication.level }}</span></div>
+  <div class="delivery-gates">
+    <article class="delivery-gate gate-{{ 'ready' if calculation_gate.status=='Listo' else 'blocked' if calculation_gate.status=='Bloqueado' else 'progress' }}">
+      <div class="gate-index">1</div><div class="gate-copy"><div class="gate-title"><h4>Cuantificado</h4><span>{{ calculation_gate.status }}</span></div><p>{{ calculation_gate.detail }}</p><small class="gate-owner">Autoridad: {{ calculation_gate.name }}</small></div>
+    </article>
+    <article class="delivery-gate gate-{{ 'ready' if review_gate.status=='Listo' and delivery.approved else 'blocked' if review_gate.status=='Bloqueado' else 'progress' }}">
+      <div class="gate-index">2</div><div class="gate-copy"><div class="gate-title"><h4>Revisado y aprobado</h4><span>{{ 'Listo' if review_gate.status=='Listo' and delivery.approved else 'Pendiente' }}</span></div><p>Revisión profesional: {{ review_gate.status }}. Aprobación o cierre formal: {{ 'registrado' if delivery.approved else 'pendiente' }}.</p><small class="gate-owner">La aprobación interna no equivale a verificación independiente.</small></div>
+    </article>
+    <article class="delivery-gate gate-{{ 'ready' if delivery.publication.can_share_external else 'blocked' if delivery.publication.tone=='blocked' else 'progress' }}">
+      <div class="gate-index">3</div><div class="gate-copy"><div class="gate-title"><h4>Publicable</h4><span>{{ 'Listo' if delivery.publication.can_share_external else 'No habilitado' }}</span></div><p>{{ delivery.publication.message }}</p><small class="gate-owner">Nivel: {{ delivery.publication.level }} · Audiencia: {{ delivery.publication.audience }}</small></div>
+    </article>
+  </div>
+  <div class="method-boundary-note"><strong>Importante:</strong> revisión o aprobación interna, cierre documental y verificación independiente son controles diferentes. Esta vista no los fusiona ni los sustituye.</div>
+</section>
+
+<section class="delivery-hero card delivery-readiness">
+  <div class="delivery-score"><div class="delivery-score-ring" style="--score:{{ delivery.score }}"><strong>{{ delivery.score }}%</strong><span>alistamiento</span></div><div><small>ESTADO DEL EXPEDIENTE</small><h2>{{ delivery.status }}</h2><p>{{ delivery.narrative.conclusion }}</p></div></div>
+  <div class="delivery-kpis">
+    <article><small>PUERTAS LISTAS</small><strong>{{ delivery.metrics.ready_gates }}/8</strong><span>{{ delivery.metrics.blocked_gates }} bloqueadas</span></article>
+    <article><small>CONFIANZA</small><strong>{{ delivery.decision.confidence_label }}</strong><span>{{ delivery.decision.confidence_score }}%</span></article>
+    <article><small>EVIDENCIA</small><strong>{{ delivery.metrics.evidence_coverage }}%</strong><span>soporte documental</span></article>
+    <article><small>COBERTURA</small><strong>{{ delivery.metrics.coverage_ratio }}%</strong><span>{{ delivery.metrics.covered_sources }}/{{ delivery.metrics.included_sources }} fuentes</span></article>
+  </div>
+</section>
+
+<section class="card">
+  <div class="card-head"><div><small>OCHO PUERTAS DE CONTROL</small><h3>Estado histórico, responsable y criterio de cierre</h3></div><span class="counter">{{ delivery.metrics.ready_gates }}/8</span></div>
+  <div class="delivery-gates">
+    {% for gate in delivery.gates %}
+    <article class="delivery-gate gate-{{ 'ready' if gate.status=='Listo' else 'blocked' if gate.status=='Bloqueado' else 'progress' }}">
+      <div class="gate-index">{{ loop.index }}</div>
+      <div class="gate-copy"><div class="gate-title"><h4>{{ gate.name }}</h4><span>{{ gate.status }}</span></div><p>{{ gate.detail }}</p><small class="gate-owner">Responsable: {{ gate.owner }}</small><details><summary>Ver criterio de cierre</summary><p>{{ gate.acceptance }}</p></details></div>
+    </article>
+    {% endfor %}
+  </div>
+</section>
+
+{% if delivery.blockers or delivery.action_plan %}
+<section class="card closure-plan">
+  <div class="card-head"><div><small>PENDIENTES REGISTRADOS</small><h3>Bloqueadores y plan de cierre del periodo</h3></div><span class="counter">{{ delivery.action_plan|length }}</span></div>
+  {% if delivery.blockers %}<div class="delivery-alert delivery-alert-blocked"><div><strong>{{ delivery.blockers|length }} bloqueador(es) crítico(s)</strong><p>Se muestran como evidencia histórica; esta pantalla no ejecuta sus acciones.</p></div></div>{% endif %}
+  <div class="closure-plan-list">
+    {% for item in delivery.action_plan %}
+    <div class="closure-plan-item"><span class="closure-order">{{ item.number }}</span><span class="status-badge {{ 'danger' if item.priority=='Crítica' else 'warning' if item.priority=='Alta' else 'neutral' }}">{{ item.priority }}</span><div><small>{{ item.stage|upper }}</small><strong>{{ item.title }}</strong><p>{{ item.detail }}</p><em>Cierre: {{ item.acceptance }}</em></div><div class="closure-owner"><small>RESPONSABLE</small><strong>{{ item.owner }}</strong></div></div>
+    {% endfor %}
+  </div>
+</section>
+{% endif %}
+
+<section class="card report-history">
+  <div class="card-head"><div><small>ARTEFACTOS DEL PERIODO</small><h3>Documentos persistidos</h3></div><span class="counter">{{ artifacts|length }}</span></div>
+  {% if artifacts %}<div class="responsive-table"><table><thead><tr><th>Tipo</th><th>Versión</th><th>Estado</th><th>Generado por</th><th>Fecha</th><th>Integridad</th><th></th></tr></thead><tbody>{% for item in artifacts %}<tr><td><strong>{{ item.report_type }}</strong></td><td>{{ item.version }}</td><td>{{ item.status }}</td><td>{{ item.generated_by }}</td><td>{{ item.generated_at.strftime('%d/%m/%Y %H:%M') }}</td><td><code>{{ item.sha256[:12] }}…</code></td><td><a class="btn btn-outline" href="/reportes/{{ item.id }}/descargar">Descargar</a></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Sin artefactos persistidos.</strong><p>Este periodo no tiene documentos generados para consulta.</p></div>{% endif %}
+</section>
+{% endblock %}

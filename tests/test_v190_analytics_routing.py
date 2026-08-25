@@ -10,6 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 ANALYTICS_ROUTES = {
     ("GET", "/analisis"),
+    ("GET", "/inventarios/{inventory_id}/analisis"),
     ("POST", "/analisis/indicadores/nuevo"),
     ("POST", "/analisis/indicadores/{indicator_id}/editar"),
 }
@@ -30,7 +31,8 @@ def test_v190_analytics_has_dedicated_http_authority():
     assert '@app.get("/analisis"' not in main_source
     assert '@app.post("/analisis/indicadores/' not in main_source
     assert "register_analytics_routes(" in main_source
-    assert module_source.count("@app.") == 3
+    assert module_source.count("@app.") == 4
+    assert '@app.get("/inventarios/{inventory_id}/analisis"' in module_source
     assert "full_analysis" in module_source
     assert "ActivityIndicator" in module_source
     assert "_parse_excel_period" not in module_source

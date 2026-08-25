@@ -1,0 +1,21 @@
+{% macro data_readiness_band(score) -%}
+  {%- set value = score|int -%}
+  {%- if value >= 80 -%}Alta
+  {%- elif value >= 60 -%}Media
+  {%- elif value >= 40 -%}En desarrollo
+  {%- else -%}Inicial
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro review_readiness_band(score) -%}
+  {%- set value = score|int -%}
+  {%- if value >= 70 -%}Preparación alta
+  {%- elif value >= 50 -%}En desarrollo
+  {%- else -%}Inicial
+  {%- endif -%}
+{%- endmacro %}
+
+{% macro duration_reference(months) -%}
+  {%- set value = months|int -%}
+  {{- value }}–{{ value + 1 }} meses
+{%- endmacro %}

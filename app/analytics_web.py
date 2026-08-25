@@ -14,9 +14,14 @@ def register_analytics_routes(
     app, templates, common_context, require_user, ensure_capability, set_flash, parse_date,
     get_inventory, ensure_inventory_editable
 ) -> None:
-    @app.get("/analisis", response_class=HTMLResponse)
-    def analysis_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-        inventory = get_inventory(session, user)
+    def _render_analysis(
+        request: Request,
+        session: Session,
+        user: dict,
+        inventory,
+        *,
+        scoped_workspace: bool,
+    ):
         analysis = full_analysis(session, inventory)
         return templates.TemplateResponse(
             request=request,
@@ -24,8 +29,36 @@ def register_analytics_routes(
             context=common_context(
                 request, session, user, "analysis", inventory=inventory,
                 indicator_types=[("Producción", "t"), ("Empleados", "personas"), ("Ingresos", "COP"), ("Servicios", "servicios"), ("Área", "m²")],
+                scoped_workspace=scoped_workspace,
                 **analysis,
             ),
+        )
+
+    @app.get("/analisis", response_class=HTMLResponse)
+    def analysis_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        return _render_analysis(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=False,
+        )
+
+    @app.get("/inventarios/{inventory_id}/analisis", response_class=HTMLResponse)
+    def inventory_analysis_page(
+        inventory_id: int,
+        request: Request,
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        inventory = get_inventory(session, user, inventory_id)
+        return _render_analysis(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=True,
         )
 
     @app.post("/analisis/indicadores/nuevo")

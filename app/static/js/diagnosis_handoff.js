@@ -2,6 +2,11 @@
   const STORAGE_KEY = 'cth_landing_context_v1';
   const SCHEMA = 'cth.landing_context.v1';
   const MAX_AGE_MS = 30 * 60 * 1000;
+  const PLAN_LABELS = Object.freeze({
+    ESENCIAL: 'Huella Esencial',
+    EMPRESARIAL: 'Huella Empresarial',
+    CORPORATIVO: 'Gestión Corporativa'
+  });
 
   function readContext(now = Date.now()) {
     let raw = '';
@@ -27,6 +32,13 @@
     return context;
   }
 
+  function readPlanContext() {
+    const params = new URLSearchParams(window.location.search);
+    const code = (params.get('plan') || '').trim().toUpperCase();
+    if (!Object.prototype.hasOwnProperty.call(PLAN_LABELS, code)) return null;
+    return { code, label: PLAN_LABELS[code] };
+  }
+
   function setSelectValue(select, value) {
     if (!select || typeof value !== 'string' || !value) return false;
     const option = Array.from(select.options).find(
@@ -37,8 +49,8 @@
     return true;
   }
 
-  function showPrefillNotice(form, applied) {
-    if (!form || applied < 1 || form.querySelector('[data-diagnosis-prefill]')) return;
+  function showPrefillNotice(form, applied, plan = null) {
+    if (!form || (!plan && applied < 1) || form.querySelector('[data-diagnosis-prefill]')) return;
     const note = document.createElement('div');
     note.className = 'diagnosis-prefill-note';
     note.dataset.diagnosisPrefill = '';
@@ -46,11 +58,18 @@
     note.setAttribute('aria-live', 'polite');
 
     const title = document.createElement('strong');
-    title.textContent = 'Continuamos desde la landing.';
     const description = document.createElement('span');
-    description.textContent = applied === 2
-      ? 'Aplicamos sector y objetivo desde la landing. Puedes cambiarlos antes de enviar.'
-      : 'Aplicamos una respuesta desde la landing. Puedes cambiarla antes de enviar.';
+    if (plan) {
+      title.textContent = `Vienes evaluando: ${plan.label}.`;
+      description.textContent = applied > 0
+        ? 'Conservamos esta referencia comercial y aplicamos el contexto reutilizable de la landing. Puedes cambiar tus respuestas; el diagnóstico puede recomendar otro nivel.'
+        : 'Esta es una referencia comercial, no una decisión del motor. El diagnóstico puede recomendar otro nivel según tus respuestas.';
+    } else {
+      title.textContent = 'Continuamos desde la landing.';
+      description.textContent = applied === 2
+        ? 'Aplicamos sector y objetivo desde la landing. Puedes cambiarlos antes de enviar.'
+        : 'Aplicamos una respuesta desde la landing. Puedes cambiarla antes de enviar.';
+    }
     note.append(title, description);
 
     const progress = form.querySelector('.diagnosis-wizard-progress');
@@ -58,12 +77,17 @@
   }
 
   function applyLandingContext() {
-    const form = document.querySelector('[data-diagnosis-wizard]');
+    const form = document.querySelector('[data-v260-diagnosis-wizard], [data-diagnosis-wizard]');
     if (!form) return 0;
-    const context = readContext();
-    if (!context) return 0;
 
-    const reusable = context.reusable || {};
+    // A server-side validation response is authoritative. Reapplying cached landing
+    // context here would overwrite answers the user already reviewed and submitted.
+    const restoringRejectedForm = Boolean(form.querySelector('[role="alert"]'));
+    if (restoringRejectedForm) return 0;
+
+    const plan = readPlanContext();
+    const context = readContext();
+    const reusable = context && context.reusable ? context.reusable : {};
     const allowed = {
       sector: form.querySelector('select[name="sector"]'),
       objective: form.querySelector('select[name="objective"]')
@@ -73,7 +97,7 @@
     Object.entries(allowed).forEach(([field, select]) => {
       if (setSelectValue(select, reusable[field])) applied += 1;
     });
-    showPrefillNotice(form, applied);
+    showPrefillNotice(form, applied, plan);
     return applied;
   }
 

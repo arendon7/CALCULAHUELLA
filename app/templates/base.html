@@ -8,6 +8,7 @@
   <title>{% block title %}Calcula tu Huella{% endblock %}</title>
   <link rel="icon" href="{{ url_for('static', path='img/brand-symbol.svg') }}">
   <link rel="stylesheet" href="{{ url_for('static', path='css/app.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', path='css/inventory-dossier.css') }}">
   <script defer src="{{ url_for('static', path='js/app.js') }}"></script>
 </head>
 <body class="app-shell" data-active-module="{{ active }}" data-role="{{ user.role }}">
@@ -16,6 +17,23 @@
     <a class="skip-link" href="#navegacion-principal">Saltar a navegación</a>
   </div>
   <div class="sr-only" id="live-region" aria-live="polite" aria-atomic="true"></div>
+
+  {% if inventory is defined and inventory %}
+    {% set nav_dossier_root = '/inventarios/' ~ inventory.id %}
+    {% set nav_dossier_paths = [nav_dossier_root, nav_dossier_root ~ '/informacion', nav_dossier_root ~ '/calculos', nav_dossier_root ~ '/analisis', nav_dossier_root ~ '/reduccion', nav_dossier_root ~ '/reportes', nav_dossier_root ~ '/entrega-profesional'] %}
+    {% set nav_dossier_href_by_active = {
+      'information': nav_dossier_root ~ '/informacion',
+      'calculations': nav_dossier_root ~ '/calculos',
+      'analysis': nav_dossier_root ~ '/analisis',
+      'reduction': nav_dossier_root ~ '/reduccion',
+      'reports': nav_dossier_root ~ '/reportes',
+      'delivery': nav_dossier_root ~ '/entrega-profesional'
+    } %}
+    {% set in_dossier_workspace = request.url.path in nav_dossier_paths %}
+  {% else %}
+    {% set nav_dossier_href_by_active = {} %}
+    {% set in_dossier_workspace = false %}
+  {% endif %}
 
   <aside class="sidebar" id="sidebar" aria-label="Navegación de la aplicación" tabindex="-1">
     <a class="brand" href="/dashboard" aria-label="Ir al centro de trabajo de Calcula tu Huella"><img src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
@@ -37,7 +55,11 @@
     {% for section in navigation.core %}
     <nav class="nav-group{% if not loop.first %} compact-nav{% endif %}" aria-label="{{ section['label'] }}">
       <p class="nav-label">{{ section["label"] }}</p>
-      {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
+      {% for item in section["items"] %}
+        {% set period_preserving = in_dossier_workspace and item['active'] in nav_dossier_href_by_active %}
+        {% set resolved_href = nav_dossier_href_by_active[item['active']] if period_preserving else item['href'] %}
+        <a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ resolved_href }}" {% if period_preserving %}data-period-preserving="true" aria-label="{{ item['label'] }} · mantener periodo mostrado"{% endif %} {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>
+      {% endfor %}
     </nav>
     {% endfor %}
 
@@ -46,7 +68,7 @@
       <summary>Herramientas avanzadas <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.advanced %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
+        <p class="nav-label">{{ section['label'] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
@@ -58,7 +80,7 @@
       <summary>Administración interna <span aria-hidden="true">⌄</span></summary>
       {% for section in navigation.internal %}
       <nav class="nav-group compact-nav" aria-label="{{ section['label'] }}">
-        <p class="nav-label">{{ section["label"] }}</p>
+        <p class="nav-label">{{ section['label'] }}</p>
         {% for item in section["items"] %}<a class="nav-item {% if active == item['active'] %}active{% endif %}" href="{{ item['href'] }}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span>{{ item["label"] }}</a>{% endfor %}
       </nav>
       {% endfor %}
@@ -92,7 +114,11 @@
       <button class="icon-button mobile-only" id="menuButton" aria-expanded="false" aria-controls="sidebar" aria-label="Abrir menú">☰</button>
       <div class="topbar-title" aria-live="polite">{% block page_label %}Calcula tu Huella{% endblock %}</div>
       <div class="topbar-actions">
-        <a class="version-pill" href="/entrega-profesional" aria-label="Estado del inventario: {{ inventory.status if inventory is defined else 'ver estado' }}"><span>Inventario</span><b>{{ inventory.status if inventory is defined else 'Ver estado' }}</b></a>
+        {% if inventory is defined and inventory %}
+        <a class="version-pill" href="/inventarios/{{ inventory.id }}" aria-label="Periodo mostrado: {{ inventory.start_date.strftime('%d/%m/%Y') }} a {{ inventory.end_date.strftime('%d/%m/%Y') }}. Estado: {{ inventory.status }}"><span>Periodo mostrado</span><b>{{ inventory.base_year }} · {{ inventory.status }}</b></a>
+        {% else %}
+        <a class="version-pill" href="/inventario" aria-label="Abrir periodo por defecto"><span>Periodo</span><b>Ver por defecto</b></a>
+        {% endif %}
         <button class="icon-button" type="button" data-open-tour title="Recorrido guiado" aria-label="Iniciar recorrido guiado">✦</button>
         <button class="icon-button" type="button" data-open-context-help title="Ayuda de esta página" aria-label="Abrir ayuda de esta página">?</button>
         <button class="icon-button plain-language-button" type="button" data-open-glossary title="Términos en lenguaje claro" aria-label="Abrir diccionario de términos en lenguaje claro">Aa</button>
@@ -117,10 +143,29 @@
     </header>
     <div class="page-content" id="contenido-aplicacion" tabindex="-1">
       {% if flash %}<div class="flash flash-{{ flash.level }}" role="{{ 'alert' if flash.level in ['error','warning'] else 'status' }}" aria-live="{{ 'assertive' if flash.level == 'error' else 'polite' }}" tabindex="-1">{{ flash.message }}</div>{% endif %}
-      {% if inventory is defined and inventory.locked %}
+      {% if inventory is defined and inventory and inventory.locked %}
       <div class="locked-banner" role="status"><span aria-hidden="true">🔒</span><div><strong>Inventario cerrado e inmutable</strong><small>Los datos, evidencias, factores y cálculos de la versión {{ inventory.version }} están bloqueados. Para corregirlos debe crearse una nueva versión desde Control.</small></div></div>
       {% endif %}
       <div class="form-error-summary" id="form-error-summary" role="alert" aria-live="assertive" tabindex="-1" hidden></div>
+      {% if inventory is defined and inventory %}
+        {% set dossier_root = nav_dossier_root %}
+        {% set dossier_nav = [
+          {'href': dossier_root, 'label': 'Ficha', 'detail': 'Contexto y límites', 'icon': '1'},
+          {'href': dossier_root ~ '/informacion', 'label': 'Datos', 'detail': 'Actividad y evidencia', 'icon': '2'},
+          {'href': dossier_root ~ '/calculos', 'label': 'Resultados', 'detail': 'Huella y trazabilidad', 'icon': '3'},
+          {'href': dossier_root ~ '/analisis', 'label': 'Análisis', 'detail': 'Lectura e intensidad', 'icon': '4'},
+          {'href': dossier_root ~ '/reduccion', 'label': 'Reducción', 'detail': 'Metas y medidas', 'icon': '5'},
+          {'href': dossier_root ~ '/reportes', 'label': 'Informes', 'detail': 'Versiones documentales', 'icon': '6'},
+          {'href': dossier_root ~ '/entrega-profesional', 'label': 'Cierre', 'detail': 'Uso y publicación', 'icon': '7'}
+        ] %}
+        {% if in_dossier_workspace %}
+        <nav class="task-jumpbar inventory-dossier-nav" aria-label="Vistas del expediente del periodo" data-inventory-dossier-nav>
+          {% for item in dossier_nav %}
+          <a href="{{ item.href }}" class="{% if request.url.path == item.href %}active{% endif %}" {% if request.url.path == item.href %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item.icon }}</span><strong>{{ item.label }}</strong><small>{{ item.detail }}</small></a>
+          {% endfor %}
+        </nav>
+        {% endif %}
+      {% endif %}
       {% block content %}{% endblock %}
     </div>
   </main>
@@ -131,7 +176,9 @@
     {% for section in navigation.core %}
       {% for item in section["items"] %}
         {% if mobile_nav.count < 4 %}
-        <a href="{{ item['href'] }}" class="{% if active == item['active'] %}active{% endif %}" {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span><small>{{ item["label"]|replace('Centro de trabajo','Inicio')|replace('Continuar mi recorrido','Recorrido')|replace('Continuar recorrido','Recorrido')|replace('Prioridades de revisión','Recorrido')|replace('Plan de verificación','Recorrido')|replace('Portafolio de empresas','Empresas') }}</small></a>
+        {% set period_preserving = in_dossier_workspace and item['active'] in nav_dossier_href_by_active %}
+        {% set resolved_href = nav_dossier_href_by_active[item['active']] if period_preserving else item['href'] %}
+        <a href="{{ resolved_href }}" class="{% if active == item['active'] %}active{% endif %}" {% if period_preserving %}data-period-preserving="true" aria-label="{{ item['label'] }} · mantener periodo mostrado"{% endif %} {% if active == item['active'] %}aria-current="page"{% endif %}><span aria-hidden="true">{{ item["icon"] }}</span><small>{{ item["label"]|replace('Centro de trabajo','Inicio')|replace('Continuar mi recorrido','Recorrido')|replace('Continuar recorrido','Recorrido')|replace('Prioridades de revisión','Recorrido')|replace('Plan de verificación','Recorrido')|replace('Portafolio de empresas','Empresas') }}</small></a>
         {% set mobile_nav.count = mobile_nav.count + 1 %}
         {% endif %}
       {% endfor %}
@@ -148,7 +195,7 @@
     <div class="dialog-body" id="context-help-description">
       {% if active == 'dashboard' %}
       <p>Empieza por <strong>Tu siguiente acción</strong>. El resumen de emisiones y el recorrido muestran avance; los análisis detallados están plegados para no distraer.</p>
-      <ol><li>Confirma la empresa y el periodo activos.</li><li>Abre la acción prioritaria asignada a tu rol.</li><li>Consulta controles metodológicos solo cuando necesites profundizar.</li></ol>
+      <ol><li>Confirma la empresa y el periodo mostrado.</li><li>Abre la acción prioritaria asignada a tu rol.</li><li>Consulta controles metodológicos solo cuando necesites profundizar.</li></ol>
       {% elif active in ['information', 'guided_capture'] %}
       <p>Esta zona reúne datos de actividad y sus soportes. Registra primero el periodo, el valor y la unidad; después confirma origen, evidencia e incertidumbre.</p>
       <ol><li>Usa Captura guiada para registros individuales.</li><li>Evita duplicar periodos ya existentes.</li><li>Asocia una evidencia verificable siempre que esté disponible.</li></ol>
@@ -207,7 +254,7 @@
     <div class="tour-progress" aria-hidden="true"><i data-tour-progress></i></div>
     <div class="dialog-body tour-body">
       <section data-tour-step tabindex="-1">
-        <span class="tour-icon" aria-hidden="true">1</span><small>CONTEXTO ACTIVO</small><h3>Trabajas sobre {{ org.trade_name or org.name }}</h3><p>La empresa y el periodo activos determinan todos los datos, cálculos y documentos que ves. Confírmalos antes de registrar información.</p>
+        <span class="tour-icon" aria-hidden="true">1</span><small>CONTEXTO DE TRABAJO</small><h3>Trabajas sobre {{ org.trade_name or org.name }}</h3><p>La empresa y, cuando corresponde, el periodo mostrado determinan los datos, cálculos y documentos que ves. En las rutas generales, el contexto por defecto es el periodo más reciente.</p>
       </section>
       <section data-tour-step tabindex="-1" hidden>
         <span class="tour-icon" aria-hidden="true">2</span><small>NAVEGACIÓN POR ROL</small><h3>Tu menú está pensado para {{ user.role }}</h3><p>{{ role_profile.mission }} La vista esencial muestra únicamente las decisiones habituales; la vista completa conserva las herramientas especializadas.</p>

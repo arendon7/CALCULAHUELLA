@@ -123,6 +123,7 @@ def test_v045_public_diagnostic_persists_lead_and_explainable_assessment():
                 "relies_on_suppliers": "on",
                 "core_processes": "Producción, reacción química, almacenamiento",
                 "current_data_systems": "ERP, Excel",
+                "accept_privacy": "yes",
             },
             follow_redirects=False,
         )

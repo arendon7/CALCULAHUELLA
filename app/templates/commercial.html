@@ -1,19 +1,203 @@
 {% extends "base.html" %}
+{% from "public/plan_copy.html" import public_plan_name %}
 {% block title %}Gestión comercial · Calcula tu Huella{% endblock %}
 {% block page_label %}Gestión comercial{% endblock %}
 {% block content %}
-<section class="page-heading"><div><span class="eyebrow">DIAGNÓSTICO, PROPUESTAS Y PAGOS</span><h1>Embudo comercial</h1><p>Convierte diagnósticos públicos en propuestas trazables, aceptación contractual y activación del servicio.</p></div><a class="button primary" href="/diagnostico" target="_blank">Abrir diagnóstico público</a></section>
-<div class="metrics-grid"><article class="metric-card"><small>Prospectos</small><strong>{{ summary.leads }}</strong><span>{{ summary.qualified }} calificados</span></article><article class="metric-card"><small>Propuestas</small><strong>{{ summary.proposals }}</strong><span>{{ summary.accepted }} aceptadas</span></article><article class="metric-card"><small>Pipeline primer año</small><strong>$ {{ summary.pipeline|number_es(0) }}</strong><span>COP</span></article><article class="metric-card"><small>Pagos confirmados</small><strong>$ {{ summary.paid|number_es(0) }}</strong><span>COP</span></article></div>
-<div class="two-column-grid commercial-layout">
-<section class="panel"><div class="panel-heading"><div><span class="eyebrow">PROSPECTOS</span><h2>Diagnósticos recibidos</h2></div></div><div class="commercial-list">{% for lead in leads %}<article class="lead-card"><div><span class="status-badge {{ 'success' if lead.status=='Ganado' else 'warning' if lead.status in ['Calificado','Propuesta'] else '' }}">{{ lead.status }}</span><h3>{{ lead.company_name }}</h3><p>{{ lead.contact_name }} · {{ lead.email }}</p><small>{{ lead.sector }} · {{ lead.facilities_count }} sede(s) · {{ lead.desired_scopes }}</small></div><div class="lead-score"><b>{{ lead.complexity_score }}</b><small>{{ lead.recommended_plan_code }}</small></div><form action="/comercial/leads/{{ lead.id }}/estado" method="post"><select name="status">{% for status in ['Nuevo','Contactado','Calificado','Propuesta','Ganado','Descartado'] %}<option {% if status==lead.status %}selected{% endif %}>{{ status }}</option>{% endfor %}</select><input name="assigned_to" value="{{ lead.assigned_to }}"><button class="button secondary">Actualizar</button></form></article>{% else %}<div class="empty-state">No hay diagnósticos.</div>{% endfor %}</div></section>
-<aside class="panel"><div class="panel-heading"><div><span class="eyebrow">NUEVA PROPUESTA</span><h2>Preparar oferta</h2></div></div><form class="stacked-form" action="/comercial/propuestas/nueva" method="post"><label>Prospecto<select name="lead_id" required>{% for lead in leads %}<option value="{{ lead.id }}">{{ lead.company_name }}</option>{% endfor %}</select></label><label>Plan<select name="plan_id" required>{% for plan in plans %}<option value="{{ plan.id }}">{{ plan.name }}</option>{% endfor %}</select></label><label>Título<input name="title" value="Implementación de inventario corporativo de GEI" required></label><div class="form-grid"><label>Implementación<input type="number" name="implementation_fee" value="8500000"></label><label>Suscripción<input type="number" name="recurring_fee" value="9900000"></label><label>Descuento<input type="number" name="discount_amount" value="0"></label><label>IVA %<input type="number" name="tax_rate" value="19"></label><label>Ciclo<select name="billing_cycle"><option>Anual</option><option>Mensual</option></select></label><label>Válida hasta<input type="date" name="valid_until"></label></div><label>Alcance, una línea por elemento<textarea name="scope" rows="4">Caracterización y límites
-Alcances 1 y 2
-Alcance 3 priorizado
-Dashboard e informe técnico</textarea></label><label>Entregables<textarea name="deliverables" rows="4">Inventario corporativo
-Informe ejecutivo y técnico
-Memoria de cálculo
-Plan inicial de reducción</textarea></label><label>Condiciones<textarea name="terms" rows="3">Implementación estimada de 8 a 10 semanas. La verificación independiente no está incluida.</textarea></label><button class="button primary full">Crear propuesta</button></form></aside>
+{% set pf = proposal_form_values or {} %}
+<section class="page-heading">
+  <div>
+    <span class="eyebrow">DIAGNÓSTICO, PROPUESTAS Y PAGOS</span>
+    <h1>Embudo comercial</h1>
+    <p>Convierte diagnósticos públicos en propuestas trazables, aceptación contractual y activación del servicio.</p>
+  </div>
+  <a class="button primary" href="/diagnostico" target="_blank">Abrir diagnóstico público</a>
+</section>
+
+<div class="metrics-grid">
+  <article class="metric-card"><small>Prospectos</small><strong>{{ summary.leads }}</strong><span>{{ summary.qualified }} calificados</span></article>
+  <article class="metric-card"><small>Propuestas</small><strong>{{ summary.proposals }}</strong><span>{{ summary.accepted }} aceptadas</span></article>
+  <article class="metric-card"><small>Pipeline primer año</small><strong>$ {{ summary.pipeline|number_es(0) }}</strong><span>COP</span></article>
+  <article class="metric-card"><small>Pagos confirmados</small><strong>$ {{ summary.paid|number_es(0) }}</strong><span>COP</span></article>
 </div>
-<section class="panel"><div class="panel-heading"><div><span class="eyebrow">PROPUESTAS</span><h2>Seguimiento y aceptación</h2></div></div><div class="table-wrap"><table><thead><tr><th>Referencia</th><th>Empresa</th><th>Plan</th><th>Valor</th><th>Estado</th><th>Enlace</th><th></th></tr></thead><tbody>{% for proposal in proposals %}<tr><td><b>{{ proposal.reference }}</b><small>{{ proposal.created_at.strftime('%d/%m/%Y') }}</small></td><td>{{ proposal.company_name }}</td><td>{{ proposal.plan.name if proposal.plan else 'Personalizado' }}</td><td>$ {{ proposal.first_year_total|number_es(0) }}</td><td><span class="status-badge {{ 'success' if proposal.status=='Aceptada' else 'warning' if proposal.status in ['Enviada','Vista'] else '' }}">{{ proposal.status }}</span></td><td><a class="text-link" href="/propuesta/{{ proposal.public_token }}" target="_blank">Ver pública ↗</a></td><td>{% if proposal.status=='Borrador' %}<form action="/comercial/propuestas/{{ proposal.id }}/enviar" method="post"><button class="button secondary">Enviar</button></form>{% endif %}</td></tr>{% else %}<tr><td colspan="7">No hay propuestas.</td></tr>{% endfor %}</tbody></table></div></section>
-<section class="panel"><div class="panel-heading"><div><span class="eyebrow">TRANSACCIONES</span><h2>Pagos e integración</h2></div></div><div class="table-wrap"><table><thead><tr><th>Referencia</th><th>Empresa</th><th>Valor</th><th>Pasarela</th><th>Estado</th><th>Fecha</th></tr></thead><tbody>{% for payment in payments %}<tr><td>{{ payment.external_reference }}</td><td>{{ payment.proposal.company_name if payment.proposal else '—' }}</td><td>$ {{ payment.amount|number_es(0) }}</td><td>{{ payment.gateway }}</td><td><span class="status-badge {{ 'success' if payment.status=='Pagada' else 'warning' }}">{{ payment.status }}</span></td><td>{{ (payment.paid_at or payment.created_at).strftime('%d/%m/%Y %H:%M') }}</td></tr>{% else %}<tr><td colspan="6">No hay transacciones.</td></tr>{% endfor %}</tbody></table></div><div class="callout">El flujo demostrativo no procesa dinero. Para producción utiliza <code>POST /api/pagos/webhook</code> con <code>X-Payment-Secret</code>.</div></section>
+
+<div class="two-column-grid commercial-layout">
+  <section class="panel">
+    <div class="panel-heading">
+      <div><span class="eyebrow">PROSPECTOS</span><h2>Diagnósticos recibidos</h2></div>
+    </div>
+    <div class="commercial-list">
+      {% for lead in leads %}
+        {% set diagnostic = assessment_by_lead.get(lead.id) %}
+        {% set reference_code = diagnostic.recommended_package_code if diagnostic else lead.recommended_plan_code %}
+        <article class="lead-card">
+          <div>
+            <span class="status-badge {{ 'success' if lead.status=='Ganado' else 'warning' if lead.status in ['Calificado','Propuesta'] else '' }}">{{ lead.status }}</span>
+            <h3>{{ lead.company_name }}</h3>
+            <p>{{ lead.contact_name }} · {{ lead.email }}</p>
+            <small>{{ lead.sector }} · {{ lead.facilities_count }} sede(s) · {{ lead.desired_scopes }}</small>
+          </div>
+          <div class="lead-score">
+            <b>{{ diagnostic.complexity_level if diagnostic else 'Por validar' }}</b>
+            <small>Complejidad orientativa</small>
+            <span>{{ public_plan_name(reference_code) }} · referencia diagnóstica</span>
+          </div>
+          <form action="/comercial/leads/{{ lead.id }}/estado" method="post">
+            <select name="status">
+              {% for status in ['Nuevo','Contactado','Calificado','Propuesta','Ganado','Descartado'] %}
+              <option {% if status==lead.status %}selected{% endif %}>{{ status }}</option>
+              {% endfor %}
+            </select>
+            <input name="assigned_to" value="{{ lead.assigned_to }}">
+            <button class="button secondary">Actualizar</button>
+          </form>
+        </article>
+      {% else %}
+        <div class="empty-state">No hay diagnósticos.</div>
+      {% endfor %}
+    </div>
+  </section>
+
+  <aside class="panel">
+    <div class="panel-heading">
+      <div><span class="eyebrow">NUEVA PROPUESTA</span><h2>Preparar oferta</h2></div>
+    </div>
+
+    <div class="callout">
+      <strong>Autoridad de la oferta</strong>
+      <p>El diagnóstico orienta complejidad y plan de referencia, pero no fija precio, impuestos, descuento, vigencia, tiempo de implementación ni alcance contractual. Los valores de campañas públicas tampoco se copian automáticamente a esta propuesta.</p>
+      <p><small>El valor recurrente siempre significa <strong>valor por ciclo</strong>: una mensualidad si eliges Mensual o una anualidad si eliges Anual. El sistema calcula aparte la inversión del primer año y el pago de activación.</small></p>
+    </div>
+
+    {% if proposal_error %}
+    <div class="callout" role="alert" tabindex="-1">
+      <strong>No se creó la propuesta.</strong>
+      <p>{{ proposal_error }}</p>
+    </div>
+    {% endif %}
+
+    {% if leads and plans %}
+    <form class="stacked-form" action="/comercial/propuestas/nueva" method="post">
+      <label>Prospecto
+        <select name="lead_id" required>
+          <option value="" disabled {% if not pf.get('lead_id') %}selected{% endif %}>Selecciona un diagnóstico</option>
+          {% for lead in leads %}
+            {% set diagnostic = assessment_by_lead.get(lead.id) %}
+            {% set reference_code = diagnostic.recommended_package_code if diagnostic else lead.recommended_plan_code %}
+            <option value="{{ lead.id }}" {% if pf.get('lead_id') == lead.id %}selected{% endif %}>{{ lead.company_name }} · {{ diagnostic.complexity_level if diagnostic else 'Por validar' }} · ref. {{ public_plan_name(reference_code) }}</option>
+          {% endfor %}
+        </select>
+        <small>La referencia diagnóstica ayuda a contextualizar; no selecciona el plan contractual por ti.</small>
+      </label>
+
+      <label>Plan contractual
+        <select name="plan_id" required>
+          <option value="" disabled {% if not pf.get('plan_id') %}selected{% endif %}>Selecciona el plan de la oferta</option>
+          {% for plan in plans %}
+          <option value="{{ plan.id }}" {% if pf.get('plan_id') == plan.id %}selected{% endif %}>{{ public_plan_name(plan.code) }}</option>
+          {% endfor %}
+        </select>
+        <small>Confirma el plan después de revisar alcance, sedes, datos, entregables y condiciones.</small>
+      </label>
+
+      <label>Título
+        <input name="title" value="{{ pf.get('title', '') }}" placeholder="Ej. Inventario corporativo de GEI 2026" required>
+      </label>
+
+      <div class="form-grid">
+        <label>Implementación · COP
+          <input type="number" name="implementation_fee" value="{{ pf.get('implementation_fee', '') }}" min="0" step="0.01" inputmode="decimal" placeholder="Define el valor" required>
+        </label>
+        <label>Valor recurrente por ciclo · COP
+          <input type="number" name="recurring_fee" value="{{ pf.get('recurring_fee', '') }}" min="0" step="0.01" inputmode="decimal" placeholder="Define el valor" required>
+          <small>Mensual: valor de cada mes. Anual: valor de cada año.</small>
+        </label>
+        <label>Descuento inicial · COP
+          <input type="number" name="discount_amount" value="{{ pf.get('discount_amount', '0') }}" min="0" step="0.01" inputmode="decimal" required>
+          <small>Se aplica una sola vez al pago de activación y al valor contractual del primer año.</small>
+        </label>
+        <label>Impuesto %
+          <input type="number" name="tax_rate" value="{{ pf.get('tax_rate', '') }}" min="0" max="100" step="0.01" inputmode="decimal" placeholder="Define la tasa" required>
+        </label>
+        <label>Ciclo de facturación
+          <select name="billing_cycle" required>
+            <option value="" disabled {% if not pf.get('billing_cycle') %}selected{% endif %}>Selecciona</option>
+            <option value="Anual" {% if pf.get('billing_cycle') == 'Anual' %}selected{% endif %}>Anual</option>
+            <option value="Mensual" {% if pf.get('billing_cycle') == 'Mensual' %}selected{% endif %}>Mensual</option>
+          </select>
+          <small>El primer año contiene 1 ciclo anual o 12 ciclos mensuales.</small>
+        </label>
+        <label>Válida hasta
+          <input type="date" name="valid_until" value="{{ pf.get('valid_until', '') }}" min="{{ proposal_min_valid_until }}" required>
+        </label>
+      </div>
+
+      <label>Alcance · una línea por elemento
+        <textarea name="scope" rows="4" placeholder="Ej. Alcances 1 y 2 para las sedes acordadas" required>{{ pf.get('scope', '') }}</textarea>
+        <small>Describe únicamente lo que la oferta realmente cubrirá; no copies automáticamente el alcance sugerido por el diagnóstico.</small>
+      </label>
+
+      <label>Entregables · una línea por elemento
+        <textarea name="deliverables" rows="4" placeholder="Ej. Inventario corporativo y memoria de cálculo" required>{{ pf.get('deliverables', '') }}</textarea>
+      </label>
+
+      <label>Condiciones
+        <textarea name="terms" rows="4" placeholder="Define condiciones, supuestos, dependencias y tiempos acordados." required>{{ pf.get('terms', '') }}</textarea>
+        <small>Indica expresamente si una eventual revisión o verificación independiente está incluida, excluida o se contratará por separado. No uses el diagnóstico como prueba de verificación.</small>
+      </label>
+
+      <button class="button primary full">Crear borrador de propuesta</button>
+    </form>
+    {% else %}
+      <div class="empty-state">Se necesita al menos un diagnóstico y un plan activo para preparar una propuesta.</div>
+    {% endif %}
+  </aside>
+</div>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">PROPUESTAS</span><h2>Seguimiento y aceptación</h2></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Referencia</th><th>Empresa</th><th>Plan</th><th>Valor primer año</th><th>Estado</th><th>Enlace</th><th></th></tr></thead>
+      <tbody>
+      {% for proposal in proposals %}
+        <tr>
+          <td><b>{{ proposal.reference }}</b><small>{{ proposal.created_at.strftime('%d/%m/%Y') }}</small></td>
+          <td>{{ proposal.company_name }}</td>
+          <td>{{ public_plan_name(proposal.plan.code) if proposal.plan else 'Personalizado' }}</td>
+          <td>$ {{ proposal.first_year_total|number_es(0) }}</td>
+          <td><span class="status-badge {{ 'success' if proposal.status=='Aceptada' else 'warning' if proposal.status in ['Enviada','Vista'] else '' }}">{{ proposal.status }}</span></td>
+          <td><a class="text-link" href="/propuesta/{{ proposal.public_token }}" target="_blank">Ver pública ↗</a></td>
+          <td>{% if proposal.status=='Borrador' %}<form action="/comercial/propuestas/{{ proposal.id }}/enviar" method="post"><button class="button secondary">Enviar</button></form>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="7">No hay propuestas.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="panel-heading"><div><span class="eyebrow">TRANSACCIONES</span><h2>Pagos e integración</h2></div></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Referencia</th><th>Empresa</th><th>Valor</th><th>Pasarela</th><th>Estado</th><th>Fecha</th></tr></thead>
+      <tbody>
+      {% for payment in payments %}
+        <tr>
+          <td>{{ payment.external_reference }}</td>
+          <td>{{ payment.proposal.company_name if payment.proposal else '—' }}</td>
+          <td>$ {{ payment.amount|number_es(0) }}</td>
+          <td>{{ payment.gateway }}</td>
+          <td><span class="status-badge {{ 'success' if payment.status=='Pagada' else 'warning' }}">{{ payment.status }}</span></td>
+          <td>{{ (payment.paid_at or payment.created_at).strftime('%d/%m/%Y %H:%M') }}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="6">No hay transacciones.</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="callout">El flujo demostrativo no procesa dinero. Para producción utiliza <code>POST /api/pagos/webhook</code> con <code>X-Payment-Secret</code>.</div>
+</section>
 {% endblock %}

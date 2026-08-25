@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi import Depends, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from .data_quality import (
@@ -13,7 +14,7 @@ from .data_quality import (
     resolve_finding,
 )
 from .config import settings
-from .database import get_db
+from .database import Inventory, get_db
 from .security import validate_upload_bytes
 
 
@@ -36,17 +37,28 @@ def register_data_quality_routes(app, templates, common_context, require_user, s
         if not _can_view(user):
             raise HTTPException(403, "Tu rol no puede consultar la calidad de datos")
         summary = data_quality_summary(session, int(user["organization_id"]), batch_id)
+        selected_inventory = None
+        selected = summary.get("selected")
+        if selected is not None and selected.inventory_id is not None:
+            selected_inventory = session.scalar(
+                select(Inventory).where(
+                    Inventory.id == selected.inventory_id,
+                    Inventory.organization_id == int(user["organization_id"]),
+                )
+            )
+        context = common_context(
+            request,
+            session,
+            user,
+            "data_quality",
+            summary=summary,
+            can_manage=_can_manage(user),
+            selected_inventory=selected_inventory,
+        )
         return templates.TemplateResponse(
             request=request,
             name="data_quality.html",
-            context=common_context(
-                request,
-                session,
-                user,
-                "data_quality",
-                summary=summary,
-                can_manage=_can_manage(user),
-            ),
+            context=context,
         )
 
     @app.get("/calidad-datos/plantilla.xlsx")

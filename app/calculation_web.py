@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from .calculations import recalculate_inventory, source_calculation_summary
 from .database import add_audit, get_db
+from .inventory_context import inventory_metrics
+from .scoped_information_web import register_scoped_information_routes
+from .scoped_source_web import register_scoped_source_routes
 
 
 def register_calculation_routes(
@@ -18,19 +21,48 @@ def register_calculation_routes(
     get_inventory,
     ensure_inventory_editable,
 ) -> None:
-    @app.get("/calculos", response_class=HTMLResponse)
-    def calculations_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-        inventory = get_inventory(session, user)
+    # ADR-002 composes the explicit historical workspace here without touching
+    # the large operational Information router or introducing hidden session state.
+    register_scoped_information_routes(
+        app,
+        templates,
+        common_context,
+        require_user,
+        get_inventory,
+    )
+    register_scoped_source_routes(
+        app,
+        templates,
+        common_context,
+        require_user,
+        get_inventory,
+    )
+
+    def _render_calculations(
+        request: Request,
+        session: Session,
+        user: dict,
+        inventory,
+        *,
+        scoped_workspace: bool,
+    ):
         source_rows = []
         total_calculations = 0
         total_alerts = 0
         total_errors = 0
         for source in inventory.sources:
             summary = source_calculation_summary(session, source.id)
-            source_rows.append({"source": source, "summary": summary, "assignments": len([item for item in source.factor_assignments if item.active])})
+            source_rows.append(
+                {
+                    "source": source,
+                    "summary": summary,
+                    "assignments": len([item for item in source.factor_assignments if item.active]),
+                }
+            )
             total_calculations += len(summary["calculations"])
             total_alerts += int(summary["alerts"])
             total_errors += int(summary["errors"])
+        metrics = inventory_metrics(inventory)
         return templates.TemplateResponse(
             request=request,
             name="calculations.html",
@@ -44,7 +76,36 @@ def register_calculation_routes(
                 total_calculations=total_calculations,
                 total_alerts=total_alerts,
                 total_errors=total_errors,
+                scoped_workspace=scoped_workspace,
+                **metrics,
             ),
+        )
+
+    @app.get("/calculos", response_class=HTMLResponse)
+    def calculations_page(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        return _render_calculations(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=False,
+        )
+
+    @app.get("/inventarios/{inventory_id}/calculos", response_class=HTMLResponse)
+    def inventory_calculations_page(
+        inventory_id: int,
+        request: Request,
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        inventory = get_inventory(session, user, inventory_id)
+        return _render_calculations(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=True,
         )
 
     @app.post("/inventarios/{inventory_id}/recalcular")

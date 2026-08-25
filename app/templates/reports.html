@@ -2,43 +2,64 @@
 {% block title %}Informes · Calcula tu Huella{% endblock %}
 {% block page_label %}Informes y entregables{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">{{ inventory.name }} / Entregables</p><h1>Documentos controlados para decisión y verificación</h1><p>Genera la ficha ejecutiva, los informes y la memoria de cálculo desde un mismo expediente trazable.</p></div><span class="phase-label">V0.55 · informe explicable</span></div>
+{% set can_prepare_documents = (not scoped_workspace) and (user.can_manage_inventory or user.can_review) %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Entregables</p>
+    <h1>Documentos controlados para decisión y verificación</h1>
+    <p>{% if scoped_workspace %}Consulta los artefactos, versiones y estado documental que pertenecen exclusivamente a este periodo.{% elif can_prepare_documents %}Genera la ficha ejecutiva, los informes y la memoria de cálculo desde un mismo expediente trazable.{% else %}Consulta el estado de publicación, las versiones disponibles y su trazabilidad desde un mismo expediente controlado.{% endif %}</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    {% if scoped_workspace %}
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/reduccion">Ver reducción</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
+    {% else %}<span class="phase-label">Informe controlado · expediente trazable</span>{% endif %}
+  </div>
+</div>
+
+{% if scoped_workspace %}
+<div class="method-boundary-note scoped-workspace-notice"><strong>Consulta explícita del periodo:</strong> esta vista reúne únicamente artefactos y estado documental de {{ inventory.name }}. No cambia el periodo por defecto y no permite generar, aprobar ni publicar documentos desde el workspace histórico.</div>
+{% endif %}
 
 <div class="report-summary-strip">
-  <div><small>EMISIONES</small><strong>{{ total|number_es }} tCO₂e</strong></div>
+  <div><small>HUELLA BRUTA</small><strong>{{ total|number_es }} tCO₂e</strong></div>
   <div><small>ALISTAMIENTO</small><strong>{{ delivery.score }}%</strong></div>
   <div><small>CALIDAD</small><strong>{{ quality.score }}%</strong></div>
   <div><small>PUBLICACIÓN</small><strong>{{ delivery.publication.level }}</strong></div>
 </div>
 
-{% if delivery.blockers %}
-<div class="delivery-alert delivery-alert-blocked"><div><strong>Versión final bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) deben cerrarse. Puedes generar documentos de trabajo, pero conservarán estado de borrador.</p></div><a href="/entrega-profesional">Ver controles pendientes →</a></div>
+{% if scoped_workspace %}
+<div class="delivery-alert {% if delivery.blockers %}delivery-alert-blocked{% elif not delivery.approved %}delivery-alert-warning{% else %}delivery-alert-ready{% endif %}"><div><strong>Estado documental del periodo</strong><p>{{ delivery.publication.notice }} Esta lectura no modifica aprobación, cierre ni autorización de publicación.</p></div></div>
+{% elif delivery.blockers %}
+<div class="delivery-alert delivery-alert-blocked"><div><strong>Versión final bloqueada</strong><p>{{ delivery.blockers|length }} control(es) crítico(s) deben cerrarse. {% if can_prepare_documents %}Puedes generar versiones de trabajo, pero no quedan habilitadas para emisión final mientras esos controles sigan pendientes.{% else %}El equipo responsable puede preparar versiones de trabajo, pero ninguna queda habilitada para emisión final mientras esos controles sigan pendientes.{% endif %}</p></div><a href="/entrega-profesional">Ver controles pendientes →</a></div>
 {% elif not delivery.approved %}
-<div class="delivery-alert delivery-alert-warning"><div><strong>Emisión condicionada</strong><p>El inventario aún no está aprobado o cerrado. Los documentos se generarán como borrador técnico.</p></div><a href="/control">Ir a revisión →</a></div>
+<div class="delivery-alert delivery-alert-warning"><div><strong>Emisión condicionada</strong><p>El inventario aún no está aprobado o cerrado. {% if can_prepare_documents %}Puedes generar versiones de trabajo para revisión interna, sin presentarlas como entrega final.{% else %}Puedes consultar las versiones existentes; la preparación y revisión del documento corresponde al equipo responsable.{% endif %}</p></div>{% if can_prepare_documents %}<a href="/control">Ir a revisión →</a>{% else %}<a href="/entrega-profesional">Ver estado de cierre →</a>{% endif %}</div>
 {% else %}
 <div class="delivery-alert delivery-alert-ready"><div><strong>Habilitado para entrega controlada</strong><p>La aprobación está registrada. Revisa la versión generada antes de compartirla.</p></div><a href="/entrega-profesional">Ver resumen de entrega →</a></div>
 {% endif %}
 
 <div class="report-layout-v6">
   <section class="card">
-    <div class="card-head"><div><small>GENERADOR VERSIONADO</small><h3>Crear entregable</h3></div><div class="table-actions"><a href="/reportes/consultoria">Taller de informe →</a><a href="/entrega-profesional">Centro de entrega →</a></div></div>
+    <div class="card-head"><div><small>{{ 'HISTORIAL VERSIONADO' if scoped_workspace else ('GENERADOR VERSIONADO' if can_prepare_documents else 'PAQUETE VERSIONADO') }}</small><h3>{{ 'Artefactos del periodo' if scoped_workspace else ('Crear entregable' if can_prepare_documents else 'Entregables para consulta') }}</h3></div>{% if not scoped_workspace %}<div class="table-actions"><a href="/reportes/consultoria">Taller de informe →</a><a href="/entrega-profesional">Centro de entrega →</a></div>{% endif %}</div>
     <div class="deliverable-grid">
       {% for item in delivery.deliverables %}
       <article class="deliverable-card delivery-document-card">
         <div class="delivery-document-head"><span class="doc-icon">▤</span><span class="status-chip {{ 'complete' if item.status=='Listo' else 'progressing' }}">{{ item.status }}</span></div>
         <div><small>{{ item.format }}</small><h3>{{ item.title }}</h3><p>{{ item.description }}</p><em>{{ item.condition }}</em></div>
-        {% if user.can_manage_inventory or user.can_review %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary">Generar {{ item.format }}</button></form>{% endif %}
+        {% if can_prepare_documents %}<form action="/reportes/generar" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><input type="hidden" name="report_type" value="{{ item.code }}"><button class="btn btn-primary" data-document-mode="{{ 'final' if item.status=='Listo' and delivery.publication.can_share_external else 'working' }}">Generar {{ item.format }}{% if not (item.status=='Listo' and delivery.publication.can_share_external) %} de trabajo{% endif %}</button></form>{% endif %}
       </article>
       {% endfor %}
     </div>
-    <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación.</p></div>
+    <div class="report-notice"><strong>Control documental</strong><p>{{ delivery.publication.notice }} Cada archivo conserva tipo, versión, autor, fecha, tamaño, huella SHA-256 y estado de aprobación. La aprobación del archivo controla su versión documental; no sustituye la aprobación o cierre del inventario ni habilita por sí sola la publicación externa. La revisión o aprobación interna tampoco equivale a verificación independiente.</p></div>
   </section>
 
-  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen actual</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div><a href="/entrega-profesional">Revisar las ocho puertas →</a></aside>
+  <aside class="card report-summary"><small>{{ inventory.name|upper }}</small><h3>Resumen del periodo</h3><div class="summary-number">{{ total|number_es }}<span>tCO₂e</span></div><ul><li><span>Alcance 1</span><b>{{ scopes[1]|number_es }}</b></li><li><span>Alcance 2</span><b>{{ scopes[2]|number_es }}</b></li><li><span>Alcance 3</span><b>{{ scopes[3]|number_es }}</b></li></ul><div class="quality-score"><span>Preparación para entrega</span><b>{{ delivery.score }}%</b><div class="progress"><i style="width:{{ delivery.score }}%"></i></div></div>{% if scoped_workspace %}<a href="/inventarios/{{ inventory.id }}">Volver al expediente →</a>{% else %}<a href="/entrega-profesional">Revisar las ocho puertas →</a>{% endif %}</aside>
 </div>
 
 <section class="card report-history">
   <div class="card-head"><div><small>HISTORIAL</small><h3>Documentos generados</h3></div><span class="counter">{{ artifacts|length }}</span></div>
-  {% if artifacts %}<div class="responsive-table"><table><thead><tr><th>Tipo</th><th>Versión</th><th>Estado</th><th>Generado por</th><th>Fecha</th><th>Tamaño</th><th>Integridad</th><th>Acciones</th></tr></thead><tbody>{% for item in artifacts %}<tr><td><strong>{{ item.report_type }}</strong></td><td>{{ item.version }}</td><td><span class="status-chip {{ 'complete' if item.status=='Aprobado' else 'progressing' }}">{{ item.status }}</span></td><td>{{ item.generated_by }}</td><td>{{ item.generated_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ item.file_size|bytes }}</td><td><code>{{ item.sha256[:12] }}…</code></td><td><div class="table-actions"><a class="btn btn-outline" href="/reportes/{{ item.id }}/descargar">Descargar</a>{% if user.can_approve and item.status!='Aprobado' %}<form action="/reportes/{{ item.id }}/aprobar" method="post"><button class="btn btn-primary">Aprobar</button></form>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Aún no hay documentos generados.</strong><p>Selecciona uno de los entregables anteriores.</p></div>{% endif %}
+  {% if artifacts %}<div class="responsive-table"><table><thead><tr><th>Tipo</th><th>Versión</th><th>Estado</th><th>Generado por</th><th>Fecha</th><th>Tamaño</th><th>Integridad</th><th>Acciones</th></tr></thead><tbody>{% for item in artifacts %}<tr><td><strong>{{ item.report_type }}</strong></td><td>{{ item.version }}</td><td><span class="status-chip {{ 'complete' if item.status=='Aprobado' else 'progressing' }}">{{ item.status }}</span></td><td>{{ item.generated_by }}</td><td>{{ item.generated_at.strftime('%d/%m/%Y %H:%M') }}</td><td>{{ item.file_size|bytes }}</td><td><code>{{ item.sha256[:12] }}…</code></td><td><div class="table-actions"><a class="btn btn-outline" href="/reportes/{{ item.id }}/descargar">Descargar</a>{% if not scoped_workspace and user.can_approve and item.status!='Aprobado' %}<form action="/reportes/{{ item.id }}/aprobar" method="post"><button class="btn btn-primary">Aprobar documento</button></form>{% endif %}</div></td></tr>{% endfor %}</tbody></table></div>{% else %}<div class="empty-state"><strong>Aún no hay documentos generados.</strong><p>{% if scoped_workspace %}Este periodo no tiene artefactos persistidos para consulta.{% elif can_prepare_documents %}Selecciona uno de los entregables anteriores para crear la primera versión controlada.{% else %}Cuando el equipo responsable genere una versión, aparecerá aquí con su estado e integridad para consulta.{% endif %}</p></div>{% endif %}
 </section>
 {% endblock %}

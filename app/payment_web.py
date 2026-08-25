@@ -5,6 +5,7 @@ import hmac
 import json
 import secrets
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from fastapi import Depends, Form, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -12,6 +13,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.orm import Session, selectinload
 
+from .commercial_pricing import proposal_initial_payment, subscription_custom_monthly_fee
 from .config import settings
 from .database import get_db
 from .db.models import (
@@ -23,13 +25,125 @@ from .db.models import (
     OrganizationSubscription,
     PaymentTransaction,
 )
+from .money import money_equal, parse_money, quantize_rate
+from .revenue_operations import INVOICE_TOTAL_WITH_TAX, activation_breakdown
 
 
 class PaymentWebhookPayload(BaseModel):
     external_reference: str = Field(min_length=3, max_length=120)
     status: str = Field(min_length=3, max_length=30)
-    amount: float = Field(ge=0)
+    amount: Decimal = Field(ge=0)
     payer_email: str = ""
+
+
+def _next_billing_date(start: date, billing_cycle: str) -> date:
+    safe_day = min(start.day, 28)
+    if billing_cycle == "Mensual":
+        if start.month == 12:
+            return date(start.year + 1, 1, safe_day)
+        return date(start.year, start.month + 1, safe_day)
+    return date(start.year + 1, start.month, safe_day)
+
+
+def _ensure_supported_billing_contract(proposal: CommercialProposal) -> None:
+    if proposal.billing_cycle == "Mensual" and proposal.contract_version != "1.1":
+        raise HTTPException(
+            409,
+            "La propuesta mensual usa una versión contractual anterior. Debe regenerarse antes de aceptar o confirmar pagos.",
+        )
+
+
+def _canonical_acceptance_timestamp(value: datetime) -> str:
+    """Normalize ORM round-trips so an acceptance snapshot can be recomputed byte-for-byte."""
+    normalized = value.replace(tzinfo=UTC) if value.tzinfo is None else value.astimezone(UTC)
+    return normalized.isoformat()
+
+
+def _proposal_acceptance_source(
+    proposal: CommercialProposal,
+    accepted_by: str,
+    accepted_email: str,
+    accepted_at: datetime,
+) -> str:
+    """Canonical V1.1 acceptance snapshot binding identity, scope and complete economics."""
+    payload = {
+        "reference": proposal.reference,
+        "contract_version": proposal.contract_version,
+        "billing_cycle": proposal.billing_cycle,
+        "implementation_fee": f"{proposal.implementation_fee:.2f}",
+        "recurring_fee": f"{proposal.recurring_fee:.2f}",
+        "discount_amount": f"{proposal.discount_amount:.2f}",
+        "tax_rate": f"{proposal.tax_rate:.4f}",
+        "first_year_total": f"{proposal.first_year_total:.2f}",
+        "scope_json": proposal.scope_json,
+        "deliverables_json": proposal.deliverables_json,
+        "terms": proposal.terms,
+        "accepted_by": accepted_by.strip(),
+        "accepted_email": accepted_email.strip().lower(),
+        "accepted_at": _canonical_acceptance_timestamp(accepted_at),
+    }
+    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+
+
+def _classify_activation_invoice(
+    invoice: BillingInvoice,
+    proposal: CommercialProposal,
+    payment: PaymentTransaction,
+) -> None:
+    parts = activation_breakdown(
+        proposal.implementation_fee,
+        proposal.recurring_fee,
+        proposal.discount_amount,
+        proposal.tax_rate,
+    )
+    if not money_equal(parts["total_amount"], payment.amount):
+        raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
+    if not money_equal(invoice.amount, payment.amount):
+        raise HTTPException(409, "El cobro existente no coincide con el pago de activación aceptado")
+
+    if invoice.amount_semantics is not None:
+        expected = {
+            "charge_type": "Activación",
+            "amount_semantics": INVOICE_TOTAL_WITH_TAX,
+            "net_amount": parts["net_amount"],
+            "tax_rate_snapshot": parts["tax_rate_snapshot"],
+            "tax_amount": parts["tax_amount"],
+            "total_amount": parts["total_amount"],
+            "source_reference": proposal.reference,
+        }
+        actual = {
+            "charge_type": invoice.charge_type,
+            "amount_semantics": invoice.amount_semantics,
+            "net_amount": invoice.net_amount,
+            "tax_rate_snapshot": invoice.tax_rate_snapshot,
+            "tax_amount": invoice.tax_amount,
+            "total_amount": invoice.total_amount,
+            "source_reference": invoice.source_reference,
+        }
+        money_keys = {"net_amount", "tax_amount", "total_amount"}
+        for key, expected_value in expected.items():
+            actual_value = actual[key]
+            if key in money_keys:
+                if actual_value is None or not money_equal(actual_value, expected_value):
+                    raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+            elif key == "tax_rate_snapshot":
+                if actual_value is None or quantize_rate(actual_value) != quantize_rate(expected_value):
+                    raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+            elif actual_value != expected_value:
+                raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+        return
+
+    invoice.charge_type = "Activación"
+    invoice.amount_semantics = INVOICE_TOTAL_WITH_TAX
+    invoice.net_amount = parts["net_amount"]
+    invoice.tax_rate_snapshot = parts["tax_rate_snapshot"]
+    invoice.tax_amount = parts["tax_amount"]
+    invoice.total_amount = parts["total_amount"]
+    invoice.source_reference = proposal.reference
+    invoice.classification_note = (
+        "Total de activación derivado de la propuesta aceptada: implementación + primer ciclo - descuento inicial + impuesto."
+    )
+    invoice.semantics_created_at = payment.paid_at or datetime.now(UTC)
 
 
 def register_payment_routes(app, templates) -> None:
@@ -47,9 +161,10 @@ def register_payment_routes(app, templates) -> None:
             proposal.status = "Vencida"
             session.commit()
             raise HTTPException(409, "La propuesta está vencida")
+        _ensure_supported_billing_contract(proposal)
         timestamp = datetime.now(UTC)
         client_ip = request.client.host if request.client else "unknown"
-        acceptance_source = f"{proposal.reference}|{accepted_by.strip()}|{accepted_email.strip().lower()}|{timestamp.isoformat()}|{proposal.first_year_total}|{proposal.contract_version}"
+        acceptance_source = _proposal_acceptance_source(proposal, accepted_by, accepted_email, timestamp)
         proposal.status = "Aceptada"
         proposal.accepted_by = accepted_by.strip()
         proposal.accepted_email = accepted_email.strip().lower()
@@ -60,9 +175,16 @@ def register_payment_routes(app, templates) -> None:
         if not payment:
             payment = PaymentTransaction(
                 proposal_id=proposal.id, public_token=secrets.token_urlsafe(24), gateway="Demo",
-                status="Pendiente", amount=proposal.first_year_total, currency="COP",
+                status="Pendiente",
+                amount=proposal_initial_payment(
+                    proposal.implementation_fee,
+                    proposal.recurring_fee,
+                    proposal.discount_amount,
+                    proposal.tax_rate,
+                ),
+                currency="COP",
                 external_reference=f"PAY-{proposal.reference}", payer_name=proposal.accepted_by,
-                payer_email=proposal.accepted_email, provider_payload='{"mode": "demo"}',
+                payer_email=proposal.accepted_email, provider_payload='{"mode": "demo", "charge": "activation"}',
             )
             session.add(payment)
         session.commit()
@@ -96,12 +218,13 @@ def register_payment_routes(app, templates) -> None:
         proposal = payment.proposal
         if proposal.status != "Aceptada":
             raise HTTPException(409, "La propuesta debe aceptarse antes del pago")
+        _ensure_supported_billing_contract(proposal)
         payment.status = "Pagada"
         payment.gateway = "Demo"
         payment.payer_name = payer_name.strip()
         payment.payer_email = payer_email.strip().lower()
         payment.paid_at = datetime.now(UTC)
-        payment.provider_payload = json.dumps({"mode": "demo", "method": method, "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
+        payment.provider_payload = json.dumps({"mode": "demo", "method": method, "charge": "activation", "confirmed_at": payment.paid_at.isoformat()}, ensure_ascii=False)
         if not proposal.organization_id:
             base_name = proposal.company_name.strip()
             organization = session.scalar(select(Organization).where(Organization.name == base_name))
@@ -121,7 +244,15 @@ def register_payment_routes(app, templates) -> None:
                 subscription = OrganizationSubscription(
                     organization_id=organization.id, plan_id=proposal.plan_id, billing_cycle=proposal.billing_cycle,
                     status="Activa", start_date=date.today(), renewal_date=renewal,
-                    notes=f"Activada desde propuesta {proposal.reference} y pago demostrativo.",
+                    custom_monthly_fee=subscription_custom_monthly_fee(
+                        proposal.recurring_fee,
+                        proposal.billing_cycle,
+                    ),
+                    notes=(
+                        f"Activada desde propuesta {proposal.reference}; conserva el valor base recurrente negociado "
+                        f"por ciclo. Impuesto contractual de {format(proposal.tax_rate.normalize(), 'f')}% se conserva en la propuesta y se "
+                        "liquida en el documento tributario/pago final, no dentro de custom_monthly_fee."
+                    ),
                 )
                 session.add(subscription)
                 session.flush()
@@ -130,12 +261,14 @@ def register_payment_routes(app, templates) -> None:
                 invoice = BillingInvoice(
                     organization_id=organization.id, subscription_id=subscription.id if subscription else None,
                     reference=f"COBRO-{proposal.reference}", period_start=date.today(),
-                    period_end=date(date.today().year + 1, date.today().month, min(date.today().day, 28)),
+                    period_end=_next_billing_date(date.today(), proposal.billing_cycle),
                     amount=payment.amount, status="Pagada", issued_at=date.today(), due_date=date.today(),
-                    paid_at=payment.paid_at, notes="Registro administrativo generado desde el pago demostrativo. No constituye factura electrónica.",
+                    paid_at=payment.paid_at,
+                    notes="Cobro de activación generado desde el pago demostrativo. Incluye implementación, primer ciclo recurrente, descuento inicial e impuestos según la propuesta. No constituye factura electrónica.",
                 )
                 session.add(invoice)
                 session.flush()
+            _classify_activation_invoice(invoice, proposal, payment)
             payment.subscription_id = subscription.id if subscription else None
             payment.invoice_id = invoice.id
             onboarding_specs = [
@@ -164,16 +297,22 @@ def register_payment_routes(app, templates) -> None:
     def payment_webhook(payload: PaymentWebhookPayload, x_payment_secret: str | None = Header(None), session: Session = Depends(get_db)):
         if not settings.payment_webhook_secret or not hmac.compare_digest(x_payment_secret or "", settings.payment_webhook_secret):
             raise HTTPException(401, "Firma de pago inválida")
-        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.external_reference == payload.external_reference))
+        payment = session.scalar(select(PaymentTransaction).where(PaymentTransaction.external_reference == payload.external_reference).options(selectinload(PaymentTransaction.proposal)))
         if not payment:
             raise HTTPException(404, "Transacción no encontrada")
-        if abs(payment.amount - payload.amount) > 0.01:
+        if payment.proposal:
+            _ensure_supported_billing_contract(payment.proposal)
+        try:
+            reported_amount = parse_money(payload.amount, "el valor informado")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if not money_equal(payment.amount, reported_amount):
             raise HTTPException(409, "El valor informado no coincide")
         normalized_status = payload.status.strip().lower()
         mapping = {"paid": "Pagada", "approved": "Pagada", "pending": "Pendiente", "failed": "Fallida", "declined": "Fallida", "refunded": "Reembolsada"}
         payment.status = mapping.get(normalized_status, payload.status[:30])
         payment.payer_email = payload.payer_email.strip().lower() or payment.payer_email
         payment.paid_at = datetime.now(UTC) if payment.status == "Pagada" else payment.paid_at
-        payment.provider_payload = json.dumps(payload.model_dump(), ensure_ascii=False)
+        payment.provider_payload = json.dumps(payload.model_dump(mode="json"), ensure_ascii=False)
         session.commit()
         return {"ok": True, "transaction_id": payment.id, "status": payment.status}

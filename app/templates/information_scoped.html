@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Datos históricos · Calcula tu Huella{% endblock %}
+{% block page_label %}Datos y evidencias históricas{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Datos y evidencias</p>
+    <h1>Datos y evidencias del periodo</h1>
+    <p>Consulta los registros de actividad, solicitudes y soportes que pertenecen exclusivamente a este expediente.</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Ver resultados</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/analisis">Ver análisis</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
+  </div>
+</div>
+
+<div class="method-boundary-note scoped-workspace-notice"><strong>Consulta explícita del periodo:</strong> esta vista lee únicamente datos, solicitudes y evidencias de {{ inventory.name }}. No cambia el periodo por defecto y no permite registrar, importar, editar, revisar ni cambiar estados desde el workspace histórico.</div>
+
+<section class="source-summary-grid data-summary-grid" aria-label="Resumen histórico de información">
+  <article class="mini-card"><small>REGISTROS</small><strong>{{ records|length }}</strong><p>Datos de actividad</p></article>
+  <article class="mini-card"><small>EVIDENCIAS</small><strong>{{ documents|length }}</strong><p>Soportes persistidos</p></article>
+  <article class="mini-card"><small>CALIDAD A–B</small><strong>{{ quality_counts.A + quality_counts.B }}</strong><p>Registros de mayor calidad</p></article>
+  <article class="mini-card"><small>SOLICITUDES ABIERTAS</small><strong>{{ open_requests|length }}</strong><p>Estado histórico registrado</p></article>
+</section>
+
+<nav class="task-jumpbar" aria-label="Contenido histórico del expediente">
+  <a href="#datos"><span>1</span><strong>Datos</strong><small>Valor, periodo y fuente</small></a>
+  <a href="#solicitudes"><span>2</span><strong>Solicitudes</strong><small>Responsables y estado</small></a>
+  <a href="#evidencias"><span>3</span><strong>Evidencias</strong><small>Soportes e integridad</small></a>
+</nav>
+
+<section class="section-anchor task-panel" id="datos">
+  <div class="section-title-row"><div><span class="section-number">1</span><div><small>DATOS DE ACTIVIDAD</small><h2>Registros del periodo</h2></div></div><span class="phase-label">Solo lectura</span></div>
+  <section class="card">
+    <div class="card-head"><div><small>TRAZABILIDAD OPERATIVA</small><h3>Historial completo</h3></div><span class="counter">{{ records|length }}</span></div>
+    {% if records %}
+    <div class="responsive-table"><table><thead><tr><th>Fuente y sede</th><th>Periodo</th><th>Dato</th><th>Origen</th><th>Calidad</th><th>Incertidumbre</th><th>Estado</th><th>Soporte</th></tr></thead><tbody>
+      {% for item in records %}<tr data-record-id="{{ item.id }}">
+        <td><strong>{{ item.source.name }}</strong><small class="table-sub">{{ item.source.facility.name if item.source.facility else 'Corporativo' }}</small></td>
+        <td>{{ item.period_start.strftime('%d/%m/%Y') }}<small class="table-sub">{{ item.period_end.strftime('%d/%m/%Y') }}</small></td>
+        <td><strong>{{ item.value|number_es(2) }}</strong> {{ item.unit }}{% if item.is_estimated %}<span class="estimated-mark">Estimado</span>{% endif %}</td>
+        <td>{{ item.data_origin }}</td>
+        <td><span class="quality-badge quality-{{ item.quality_level|lower }}">{{ item.quality_level }}</span></td>
+        <td><strong>{{ item.uncertainty_percentage|number_es(1) }}%</strong><small class="table-sub">{{ item.uncertainty_basis or 'Sin base documentada' }}</small></td>
+        <td><span class="status-chip {{ 'complete' if item.status == 'Aprobado' else 'progressing' if item.status in ['Cargado','En revisión'] else 'pending' }}">{{ item.status }}</span></td>
+        <td>{% if item.evidence %}<a class="btn btn-outline btn-small" href="/evidencias/{{ item.evidence.id }}/descargar">Descargar soporte</a>{% else %}<span class="muted">Sin soporte</span>{% endif %}</td>
+      </tr>{% endfor %}
+    </tbody></table></div>
+    {% else %}<div class="empty-state"><strong>Sin datos persistidos.</strong><p>Este expediente no contiene registros de actividad.</p></div>{% endif %}
+  </section>
+</section>
+
+<section class="section-anchor task-panel" id="solicitudes">
+  <div class="section-title-row"><div><span class="section-number">2</span><div><small>FLUJO DE INFORMACIÓN</small><h2>Solicitudes registradas</h2></div></div><span class="phase-label">Solo lectura</span></div>
+  <section class="card">
+    <div class="request-list">{% for item in requests %}
+      <article data-request-id="{{ item.id }}"><div class="request-status {{ item.status|lower|replace(' ','-') }}"></div><div><h3>{{ item.title }}</h3><p>{{ item.instructions or 'Sin instrucciones adicionales.' }}</p><small>Fuente: {{ item.source_name or 'General' }} · Responsable: {{ item.requested_to }} · Vence {{ item.due_date.strftime('%d/%m/%Y') if item.due_date else 'sin fecha' }}</small><span class="status-chip {{ 'complete' if item.status == 'Completado' else 'progressing' if item.status in ['Cargado','En revisión'] else 'pending' }}">{{ item.status }}</span></div></article>
+    {% else %}<div class="empty-state compact"><strong>Sin solicitudes.</strong><span>Este expediente no tiene requerimientos de información registrados.</span></div>{% endfor %}</div>
+  </section>
+</section>
+
+<section class="section-anchor task-panel" id="evidencias">
+  <div class="section-title-row"><div><span class="section-number">3</span><div><small>REPOSITORIO DOCUMENTAL</small><h2>Evidencias del periodo</h2></div></div><span class="phase-label">Descarga controlada</span></div>
+  <section class="card">
+    {% if documents %}<div class="responsive-table"><table><thead><tr><th>Documento</th><th>Fuente</th><th>Periodo</th><th>Tamaño</th><th>Integridad</th><th>Estado</th><th></th></tr></thead><tbody>
+      {% for doc in documents %}<tr data-evidence-id="{{ doc.id }}"><td><strong class="document-name">▤ {{ doc.name }}</strong><small class="table-sub">{{ doc.document_type }} · {{ doc.uploaded_by }}</small></td><td>{{ doc.source_name }}</td><td>{{ doc.period_label or 'No indicado' }}</td><td>{{ doc.file_size|bytes }}</td><td><code class="hash-code">{{ doc.sha256[:12] }}…</code></td><td><span class="status-chip {{ 'complete' if doc.status == 'Aprobado' else 'progressing' if doc.status == 'En revisión' else 'pending' }}">{{ doc.status }}</span></td><td><a class="btn btn-outline btn-small" href="/evidencias/{{ doc.id }}/descargar">Descargar</a></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<div class="empty-state"><strong>Sin evidencias persistidas.</strong><p>Este expediente no contiene soportes documentales.</p></div>{% endif %}
+  </section>
+</section>
+
+<section class="card architecture-note">
+  <div><span>→</span><p><strong>Continúa sin perder el periodo.</strong><small>El workspace histórico conserva el mismo expediente al pasar de datos a resultados, análisis, reducción, informes y cierre.</small></p></div>
+  <div class="table-actions"><a href="/inventarios/{{ inventory.id }}/calculos">Resultados</a><a href="/inventarios/{{ inventory.id }}/analisis">Análisis</a><a href="/inventarios/{{ inventory.id }}/reduccion">Reducción</a><a href="/inventarios/{{ inventory.id }}/reportes">Informes</a><a href="/inventarios/{{ inventory.id }}/entrega-profesional">Cierre</a></div>
+</section>
+{% endblock %}

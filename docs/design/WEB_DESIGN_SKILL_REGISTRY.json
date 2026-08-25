@@ -1,0 +1,257 @@
+{
+  "schema": "cth-web-design-skill-registry-1.0",
+  "project": "Calcula tu Huella",
+  "decision_date": "2026-08-11",
+  "upstream_policy": {
+    "mode": "reviewed-snapshot",
+    "automatic_updates": false,
+    "rule": "Cada cambio upstream requiere revisión de fuente y revalidación de gates antes de adoptarse."
+  },
+  "sources": [
+    {
+      "id": "emil-design-engineering",
+      "repo": "emilkowalski/skills",
+      "reviewed_commit": "78761e1b57f97dce65b983d640c70a68f39e8163",
+      "primary_skills": [
+        "emil-design-eng",
+        "review-animations",
+        "find-animation-opportunities",
+        "prototype"
+      ],
+      "role": "motion_and_interaction_craft",
+      "primary_for": [
+        "motion",
+        "microinteractions"
+      ],
+      "advisory_for": [
+        "product_ui",
+        "public_marketing"
+      ]
+    },
+    {
+      "id": "impeccable",
+      "repo": "pbakaus/impeccable",
+      "reviewed_commit": "c0b9b6f95ab29c1615cf9969227a0d965925a2ae",
+      "primary_skills": [
+        "impeccable"
+      ],
+      "role": "systematic_ui_critique_and_polish",
+      "primary_for": [
+        "product_ui",
+        "final_qa",
+        "responsive",
+        "content_clarity"
+      ],
+      "advisory_for": [
+        "public_marketing",
+        "motion"
+      ]
+    },
+    {
+      "id": "taste-skill",
+      "repo": "Leonxlnx/taste-skill",
+      "reviewed_commit": "e988add20dab0fa97d7a76781c48961c8184288e",
+      "primary_skills": [
+        "design-taste-frontend",
+        "redesign-existing-projects",
+        "imagegen-frontend-web"
+      ],
+      "role": "visual_direction_and_anti_generic_marketing",
+      "primary_for": [
+        "public_marketing"
+      ],
+      "advisory_for": [
+        "visual_exploration"
+      ],
+      "restricted_for": [
+        "product_ui",
+        "dashboards",
+        "data_tables",
+        "multi_step_workflows"
+      ]
+    },
+    {
+      "id": "openai-frontend-skill",
+      "repo": "openai/skills",
+      "reviewed_commit": "49f948faa9258a0c61caceaf225e179651397431",
+      "primary_skills": [
+        "frontend-skill"
+      ],
+      "role": "art_direction_reference",
+      "primary_for": [],
+      "advisory_for": [
+        "public_marketing",
+        "prototypes"
+      ]
+    },
+    {
+      "id": "vercel-web-design-guidelines",
+      "repo": "vercel-labs/agent-skills",
+      "reviewed_commit": "7c180d9044c9ae2b442b567aad4e42a28dd5ed62",
+      "primary_skills": [
+        "web-design-guidelines",
+        "writing-guidelines"
+      ],
+      "role": "objective_interface_and_writing_review",
+      "primary_for": [
+        "accessibility",
+        "interaction_quality",
+        "content_quality",
+        "final_qa"
+      ],
+      "advisory_for": [
+        "product_ui",
+        "public_marketing"
+      ]
+    }
+  ],
+  "binario_ia": {
+    "reference": "SB Web App Factory v4.0 / App Factory IA",
+    "reuse": [
+      "product-intake",
+      "functional-architecture",
+      "ux-system",
+      "content-factory",
+      "asset-factory",
+      "mock-data",
+      "product-lab",
+      "quality-gates",
+      "component-intelligence",
+      "project-memory",
+      "model-evaluation",
+      "governance",
+      "web-intelligence"
+    ],
+    "agents": [
+      "Discovery Analyst",
+      "Product Architect",
+      "UX Reviewer",
+      "Content Strategist",
+      "Asset Director",
+      "QA Auditor",
+      "Engineering Guardian"
+    ],
+    "principles": [
+      "product_approved_is_not_production_approved",
+      "fail_closed_gates",
+      "human_release_authority",
+      "never_lose_a_good_version"
+    ]
+  },
+  "routing": {
+    "public_marketing": {
+      "primary": [
+        "design-taste-frontend",
+        "impeccable",
+        "binario-content-factory",
+        "binario-asset-factory"
+      ],
+      "advisory": [
+        "frontend-skill",
+        "emil-design-eng",
+        "web-design-guidelines"
+      ],
+      "evidence": [
+        "desktop_screenshot",
+        "mobile_screenshot",
+        "content_review",
+        "a11y_review"
+      ]
+    },
+    "product_ui": {
+      "primary": [
+        "impeccable",
+        "web-design-guidelines",
+        "binario-ux-system",
+        "binario-component-intelligence"
+      ],
+      "advisory": [
+        "emil-design-eng",
+        "writing-guidelines"
+      ],
+      "restricted": [
+        "design-taste-frontend"
+      ],
+      "evidence": [
+        "desktop_screenshot",
+        "mobile_screenshot",
+        "keyboard_path",
+        "error_state",
+        "empty_state",
+        "high_load_state"
+      ]
+    },
+    "motion": {
+      "primary": [
+        "emil-design-eng",
+        "review-animations"
+      ],
+      "advisory": [
+        "impeccable"
+      ],
+      "constraints": [
+        "prefers-reduced-motion",
+        "no_motion_for_decoration_only",
+        "no_blocking_transitions"
+      ]
+    },
+    "content": {
+      "primary": [
+        "binario-content-factory",
+        "writing-guidelines",
+        "impeccable"
+      ],
+      "advisory": [
+        "frontend-skill"
+      ],
+      "evidence": [
+        "screen_context",
+        "cta_clarity",
+        "error_copy",
+        "empty_state_copy",
+        "help_copy"
+      ]
+    },
+    "final_qa": {
+      "primary": [
+        "web-design-guidelines",
+        "impeccable",
+        "binario-quality-gates"
+      ],
+      "advisory": [
+        "review-animations"
+      ],
+      "evidence": [
+        "browser_e2e",
+        "responsive",
+        "keyboard",
+        "reduced_motion",
+        "visual_diff",
+        "performance_observation"
+      ]
+    }
+  },
+  "locks": {
+    "domain_truth_lock": "Ningún cambio de diseño o UX puede alterar factores, GWP, fórmulas, metodología, semántica contable de carbono ni resultados autoritativos.",
+    "brand_truth_lock": {
+      "decision_version": "1.4.2",
+      "logo_primary_sha256": "04a9b2557c1aff819eef52364dbe88677044299a6c868a7318703fdccffa638e",
+      "symbol_sha256": "c43e33c89860aac5d7f582009b7d53e7902aa7704c9484fefcb1e2a2f99ce3e8",
+      "redraw_allowed": false
+    },
+    "functional_truth_lock": "Diseño no cambia rutas, contratos de formularios, permisos ni semántica de negocio salvo defecto funcional reproducible tratado por separado."
+  },
+  "required_gates": [
+    "domain_truth_lock",
+    "brand_truth_lock",
+    "information_architecture",
+    "content_quality",
+    "accessibility",
+    "responsive",
+    "motion",
+    "browser_e2e",
+    "visual_evidence",
+    "performance",
+    "human_approval"
+  ]
+}

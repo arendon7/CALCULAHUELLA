@@ -9,10 +9,15 @@
     <p>Seis etapas ordenadas. Abre únicamente la que necesitas y conserva el contexto de lo que ocurre después.</p>
   </div>
   <div class="head-actions">
-    <span class="period-chip">{{ inventory.name }} · {{ journey.score }}%</span>
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
     {% if journey.actions %}<a class="btn btn-primary" href="{{ journey.actions[0].href }}">Continuar tarea prioritaria</a>{% endif %}
   </div>
 </div>
+
+<section class="card architecture-note journey-context-note" data-default-period-journey>
+  <div><span>↳</span><p><strong>Recorrido del periodo por defecto.</strong><small>Las rutas generales trabajan sobre {{ inventory.name }}, el periodo más reciente de la organización. Consultar un periodo histórico no sustituye este contexto.</small></p></div>
+  <a href="/inventarios">Ver periodos →</a>
+</section>
 
 <section class="journey-role-strip card">
   <div><span class="eyebrow">VISTA DE {{ user.role|upper }}</span><strong>{{ journey.profile.name }}</strong><p>{{ journey.profile.focus }}</p></div>

@@ -26,20 +26,23 @@ def register_period_close_routes(app, templates, common_context, require_user, s
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         capabilities = set(user["capabilities"])
+        context = common_context(
+            request,
+            session,
+            user,
+            "period_close",
+            summary=summary,
+            can_submit=bool({"provide_data", "manage_inventory"} & capabilities),
+            can_close=bool({"review", "approve"} & capabilities),
+            can_reopen="approve" in capabilities,
+        )
+        inventory = summary.get("inventory")
+        if inventory is not None:
+            context["inventory"] = inventory
         return templates.TemplateResponse(
             request=request,
             name="period_close.html",
-            context=common_context(
-                request,
-                session,
-                user,
-                "period_close",
-                summary=summary,
-                inventory=summary.get("inventory"),
-                can_submit=bool({"provide_data", "manage_inventory"} & capabilities),
-                can_close=bool({"review", "approve"} & capabilities),
-                can_reopen="approve" in capabilities,
-            ),
+            context=context,
         )
 
     @app.post("/cierre-mensual/enviar")

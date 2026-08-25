@@ -1,4 +1,4 @@
-/* Calcula tu Huella V1.4 — estilos públicos modulares */
+/* Calcula tu Huella — superficie pública modular */
 @import url("./styles/part-1.css");
 @import url("./styles/part-2.css");
 @import url("./styles/part-3.css");
@@ -6,3 +6,31 @@
 @import url("./styles/part-5.css");
 @import url("./styles/part-6.css");
 @import url("./styles/part-7.css");
+@import url("./styles/v2.1-public.css");
+@import url("./styles/v2.1-preview.css");
+@import url("./styles/v2.1-craft.css");
+@import url("./styles/v2.1-craft-polish.css");
+@import url("./styles/v2.1-conversion.css");
+@import url("./styles/v2.1-journey.css");
+@import url("./styles/v2.1-handoff.css");
+
+/* Reset explícito de reglas heredadas que pertenecían al antiguo bloque visual. */
+.craft-experience .experience-years{
+  position:static;
+  left:auto;
+  bottom:auto;
+  background:transparent;
+  border-radius:0;
+  padding:0;
+  box-shadow:none;
+}
+.craft-experience .experience-signature .portrait-mark{
+  width:74px;
+  height:74px;
+  border-radius:50%;
+  background:var(--forest);
+  border:0;
+  color:#fff;
+  font-size:1.08rem;
+  letter-spacing:.04em;
+}

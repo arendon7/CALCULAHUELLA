@@ -112,6 +112,11 @@ from .commercial import (
     RenewalOpportunity,
 )
 
+from .revenue import (
+    BillingChargeBreakdown,
+    ContractSignatureSnapshot,
+)
+
 from .climate import (
     BenchmarkReference,
     ImpactSnapshot,
@@ -244,6 +249,8 @@ __all__ = [
     "ServiceOrder",
     "CollectionAction",
     "BillingDocumentRecord",
+    "BillingChargeBreakdown",
+    "ContractSignatureSnapshot",
     "CustomerSuccessProfile",
     "AccountHealthSnapshot",
     "ValueMilestone",

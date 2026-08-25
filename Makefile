@@ -1,6 +1,6 @@
 SHELL := /bin/bash
 
-.PHONY: setup dev test demo reset-demo docker-up docker-down inventory
+.PHONY: setup dev test demo reset-demo docker-up docker-down inventory brand-check brand-require-canonical brand-require-master design-governance design-skills-bootstrap
 
 setup:
 	./scripts/dev/setup.sh
@@ -25,3 +25,19 @@ docker-down:
 
 inventory:
 	.venv/bin/python scripts/migration/build_source_inventory.py . --output instance/source_inventory.csv
+
+brand-check:
+	python3 scripts/brand/verify_master_assets.py
+
+brand-require-canonical:
+	python3 scripts/brand/verify_master_assets.py --require-canonical
+
+# Alias transitorio para automatizaciones locales anteriores a V2.1.
+brand-require-master: brand-require-canonical
+
+design-governance:
+	python3 scripts/design/check_web_design_governance.py
+
+# Helper local opcional; nunca forma parte de CI/release.
+design-skills-bootstrap:
+	./scripts/design/bootstrap_external_design_skills.sh

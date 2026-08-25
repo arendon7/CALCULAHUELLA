@@ -11,7 +11,7 @@
 <body class="login-page">
   <a class="skip-link" href="#acceso">Saltar al acceso</a>
   <section class="login-visual">
-    <a href="/" aria-label="Volver al sitio público"><img class="login-logo" src="{{ url_for('static', path='img/brand-reversed.svg') }}" alt="Calcula tu Huella"></a>
+    <a class="login-brand-plate" href="/" aria-label="Volver al sitio público"><img class="login-logo" src="{{ url_for('static', path='img/brand-primary.svg') }}" alt="Calcula tu Huella"></a>
     <div class="login-copy">
       <p class="eyebrow">PLATAFORMA PROFESIONAL DE HUELLA DE CARBONO</p>
       <h1>Mide.<br><span>Comprende.</span><br>Reduce.</h1>
@@ -31,7 +31,7 @@
       <form method="post" action="/login" class="login-form">
         <label>Correo electrónico<input name="email" type="email" autocomplete="username" value="{{ 'consultor@calculatuhuella.local' if app_settings.seed_demo else '' }}" required></label>
         <label>Contraseña<input name="password" type="password" autocomplete="current-password" value="{{ 'Demo2026!' if app_settings.seed_demo else '' }}" required></label>
-        <button class="btn btn-primary btn-block">Iniciar sesión</button>
+        <button type="submit" class="btn btn-primary btn-block">Iniciar sesión</button>
       </form>
       {% if app_settings.seed_demo %}<div class="demo-users"><strong>Entorno demostrativo</strong><span>Perfiles disponibles: admin, consultor, cliente, revisor y verificador.</span><small>Dominio: @calculatuhuella.local · Contraseña: Demo2026!</small></div>{% endif %}
       <small class="login-security-note">El acceso y las acciones relevantes quedan asociados al usuario y a su organización.</small>

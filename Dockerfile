@@ -6,7 +6,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     APP_ENV=production \
     OPEN_BROWSER=0 \
     HOST=0.0.0.0 \
-    PORT=8765
+    PORT=8765 \
+    CTH_PYTHON_BIN=/usr/local/bin/python
 
 WORKDIR /app
 RUN apt-get update && apt-get install -y --no-install-recommends postgresql-client curl && rm -rf /var/lib/apt/lists/*

@@ -1,0 +1,63 @@
+/* V2.39 · Navegación persistente del expediente por periodo.
+   Solo complementa task-jumpbar; no introduce estado ni cambia el contexto del inventario. */
+body.app-shell .inventory-dossier-nav{
+  grid-auto-flow:unset;
+  grid-auto-columns:unset;
+  grid-template-columns:repeat(7,minmax(0,1fr));
+  margin-bottom:18px;
+}
+body.app-shell .inventory-dossier-nav>a{
+  min-width:0;
+}
+body.app-shell .inventory-dossier-nav>a[aria-current="page"]{
+  border-color:rgba(45,111,115,.28);
+  background:#fff;
+  box-shadow:0 5px 16px rgba(11,59,46,.06);
+}
+body.app-shell .inventory-dossier-nav>a[aria-current="page"]>span{
+  background:#0b3b2e;
+  color:#fff;
+}
+body.app-shell .inventory-dossier-nav>a[aria-current="page"]>strong{
+  color:#0b3b2e;
+}
+
+@media(max-width:1180px){
+  body.app-shell .inventory-dossier-nav{
+    grid-template-columns:repeat(4,minmax(0,1fr));
+  }
+}
+
+/* V2.43 · En móvil todas las vistas del expediente permanecen visibles.
+   Evita un carrusel horizontal cuyo paso activo podría iniciar fuera del viewport. */
+@media(max-width:720px){
+  body.app-shell .inventory-dossier-nav{
+    grid-auto-flow:unset;
+    grid-template-columns:repeat(3,minmax(0,1fr));
+    grid-auto-columns:unset;
+    overflow-x:visible;
+    overscroll-behavior-inline:auto;
+    scroll-snap-type:none;
+    gap:7px;
+    padding:7px;
+  }
+  body.app-shell .inventory-dossier-nav>a{
+    grid-template-columns:1fr;
+    justify-items:center;
+    align-content:center;
+    gap:5px;
+    min-height:58px;
+    padding:7px 5px;
+    text-align:center;
+  }
+  body.app-shell .inventory-dossier-nav>a>span{
+    grid-row:auto;
+  }
+  body.app-shell .inventory-dossier-nav>a>strong{
+    line-height:1.15;
+    overflow-wrap:anywhere;
+  }
+  body.app-shell .inventory-dossier-nav>a>small{
+    display:none;
+  }
+}

@@ -2,20 +2,24 @@
 {% block title %}Inventarios · Calcula tu Huella{% endblock %}
 {% block page_label %}Inventarios corporativos{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">Inventario / Periodos</p><h1>Inventarios</h1><p>Cada periodo conserva su metodología, límites, sedes, fuentes y versión.</p></div>{% if user.can_manage_inventory %}<a class="btn btn-primary" href="/inventarios/nuevo">＋ Crear inventario</a>{% endif %}</div>
+<div class="page-head"><div><p class="breadcrumb">Inventario / Periodos</p><h1>Inventarios</h1><p>Cada periodo conserva su metodología, límites, sedes, fuentes y versión. El periodo más reciente aparece primero y es el contexto por defecto cuando una ruta no especifica inventario.</p></div>{% if user.can_manage_inventory %}<a class="btn btn-primary" href="/inventarios/nuevo">＋ Crear inventario</a>{% endif %}</div>
 
-<section class="card architecture-note"><div><span>01</span><p><strong>La unidad principal es el proyecto de inventario.</strong><small>Una empresa puede tener varios años, distintas versiones y configuraciones metodológicas independientes.</small></p></div><a href="/modulos">Consultar arquitectura →</a></section>
+<section class="card architecture-note"><div><span>01</span><p><strong>Consulta histórica sin cambiar el contexto por defecto.</strong><small>Abrir un periodo anterior permite revisar su expediente, pero las rutas generales —como Inicio, recorrido, datos, resultados o informes— continúan usando el periodo más reciente.</small></p></div><a href="/inventario">Ir al periodo por defecto →</a></section>
 
 <div class="inventory-card-grid">
 {% for inventory in inventories %}
-  <article class="inventory-card card">
+  <article class="inventory-card card {% if loop.first %}current-context{% else %}historical-context{% endif %}">
     <div class="inventory-card-top"><span class="year-badge">{{ inventory.base_year }}</span><span class="status-chip {{ 'active' if inventory.status in ['Activo','Aprobado'] else 'pending' }}">{{ inventory.status }}</span></div>
+    {% if loop.first %}<p class="eyebrow">PERIODO MÁS RECIENTE · CONTEXTO POR DEFECTO</p>{% else %}<p class="eyebrow">PERIODO HISTÓRICO · CONSULTA EXPLÍCITA</p>{% endif %}
     <h2>{{ inventory.name }}</h2>
     <p>{{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</p>
-    <dl><div><dt>Metodología</dt><dd>{{ inventory.methodology }}</dd></div><div><dt>Consolidación</dt><dd>{{ inventory.consolidation_approach }}</dd></div><div><dt>Etapa actual</dt><dd>{{ inventory.current_stage }}</dd></div><div><dt>Sedes</dt><dd>{{ inventory.facility_links|selectattr('included')|list|length }}</dd></div></dl>
+    <dl><div><dt>Metodología</dt><dd>{{ inventory.methodology }}</dd></div><div><dt>Consolidación</dt><dd>{{ inventory.consolidation_approach }}</dd></div><div><dt>Etapa del periodo</dt><dd>{{ inventory.current_stage }}</dd></div><div><dt>Sedes</dt><dd>{{ inventory.facility_links|selectattr('included')|list|length }}</dd></div></dl>
     <div class="progress"><i style="width:{{ inventory.progress }}%"></i></div><small>{{ inventory.progress }}% de avance estructural</small>
-    <div class="card-actions"><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">Abrir</a>{% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">Configurar</a>{% elif inventory.locked %}<a class="btn btn-outline" href="/control">Ver versión cerrada</a>{% endif %}</div>
+    {% if not loop.first %}<p class="context-note"><small>Consultar esta ficha no cambia el periodo por defecto de las rutas generales.</small></p>{% endif %}
+    <div class="card-actions"><a class="btn btn-primary" href="/inventarios/{{ inventory.id }}">{{ 'Abrir periodo por defecto' if loop.first else 'Consultar periodo histórico' }}</a>{% if user.can_manage_inventory and not inventory.locked %}<a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/editar">Configurar</a>{% elif inventory.locked and loop.first %}<a class="btn btn-outline" href="/control">Ver control del periodo por defecto</a>{% endif %}</div>
   </article>
+{% else %}
+  <section class="card empty-state"><h2>Aún no hay inventarios</h2><p>{% if user.can_manage_inventory %}Crea el primer periodo para definir límites, metodología y fuentes.{% else %}Tu organización todavía no tiene un periodo disponible para consulta.{% endif %}</p>{% if user.can_manage_inventory %}<a class="btn btn-primary" href="/inventarios/nuevo">Crear primer inventario</a>{% endif %}</section>
 {% endfor %}
 </div>
 {% endblock %}

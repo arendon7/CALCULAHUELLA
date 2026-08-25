@@ -23,18 +23,59 @@ def register_report_routes(
     set_flash,
     get_inventory,
 ) -> None:
-    @app.get("/reportes", response_class=HTMLResponse)
-    def reports(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
-        inventory = get_inventory(session, user)
+    def _render_reports(
+        request: Request,
+        session: Session,
+        user: dict,
+        inventory,
+        *,
+        scoped_workspace: bool,
+    ):
         analysis = full_analysis(session, inventory)
         artifacts = list_report_artifacts(session, inventory.id)
         delivery = professional_delivery_summary(session, inventory, analysis=analysis)
         return templates.TemplateResponse(
             request=request,
             name="reports.html",
-            context=common_context(request, session, user, "reports", inventory=inventory, artifacts=artifacts, delivery=delivery, **analysis),
+            context=common_context(
+                request,
+                session,
+                user,
+                "reports",
+                inventory=inventory,
+                artifacts=artifacts,
+                delivery=delivery,
+                scoped_workspace=scoped_workspace,
+                **analysis,
+            ),
         )
 
+    @app.get("/reportes", response_class=HTMLResponse)
+    def reports(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
+        inventory = get_inventory(session, user)
+        return _render_reports(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=False,
+        )
+
+    @app.get("/inventarios/{inventory_id}/reportes", response_class=HTMLResponse)
+    def inventory_reports(
+        inventory_id: int,
+        request: Request,
+        session: Session = Depends(get_db),
+        user: dict = Depends(require_user),
+    ):
+        inventory = get_inventory(session, user, inventory_id)
+        return _render_reports(
+            request,
+            session,
+            user,
+            inventory,
+            scoped_workspace=True,
+        )
 
     @app.get("/reportes/consultoria", response_class=HTMLResponse)
     def consulting_workshop(request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user)):
@@ -89,7 +130,6 @@ def register_report_routes(
         set_flash(request, f"{artifact.report_type} generado correctamente.")
         return RedirectResponse("/reportes", status_code=303)
 
-
     @app.get("/reportes/{artifact_id}/descargar")
     def download_report(artifact_id: int, session: Session = Depends(get_db), user: dict = Depends(require_user)):
         artifact = get_report_artifact(session, int(user["organization_id"]), artifact_id)
@@ -108,7 +148,6 @@ def register_report_routes(
             return FileResponse(local_path, filename=artifact.file_name, media_type=media_types.get(local_path.suffix.lower(), "application/octet-stream"))
         return RedirectResponse(storage.presigned_url(artifact.stored_name), status_code=302)
 
-
     @app.post("/reportes/{artifact_id}/aprobar")
     def approve_report(
         artifact_id: int, request: Request, session: Session = Depends(get_db), user: dict = Depends(require_user),
@@ -126,4 +165,3 @@ def register_report_routes(
         session.commit()
         set_flash(request, "Informe aprobado y versionado.")
         return RedirectResponse("/reportes", status_code=303)
-
