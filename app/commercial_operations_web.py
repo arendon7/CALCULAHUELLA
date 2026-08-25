@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from fastapi import Depends, Form, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -20,6 +21,7 @@ from .db.models import (
     ServiceContract,
     ServiceOrder,
 )
+from .money import parse_money, parse_nonnegative_decimal, quantize_money
 from .revenue_operations import (
     CONTRACT_SIGNATURE_VERSION,
     INVOICE_BASE_BEFORE_TAX,
@@ -126,29 +128,35 @@ def register_commercial_operations_routes(
             if item.status == "Vigente" and item.end_date and 0 <= (item.end_date - today).days <= 120
         ]
 
-        def known_total(items: list[BillingInvoice]) -> float:
+        def known_total(items: list[BillingInvoice]) -> Decimal:
             return sum(
-                breakdown_by_invoice[item.id].total_amount or 0
-                for item in items
-                if item.id in breakdown_by_invoice
-                and breakdown_by_invoice[item.id].amount_semantics == INVOICE_TOTAL_WITH_TAX
-                and breakdown_by_invoice[item.id].total_amount is not None
+                (
+                    breakdown_by_invoice[item.id].total_amount or Decimal("0")
+                    for item in items
+                    if item.id in breakdown_by_invoice
+                    and breakdown_by_invoice[item.id].amount_semantics == INVOICE_TOTAL_WITH_TAX
+                    and breakdown_by_invoice[item.id].total_amount is not None
+                ),
+                Decimal("0"),
             )
 
         pending_tax_base = sum(
-            breakdown_by_invoice[item.id].net_amount or 0
-            for item in outstanding
-            if item.id in breakdown_by_invoice
-            and breakdown_by_invoice[item.id].amount_semantics == INVOICE_BASE_BEFORE_TAX
-            and breakdown_by_invoice[item.id].net_amount is not None
+            (
+                breakdown_by_invoice[item.id].net_amount or Decimal("0")
+                for item in outstanding
+                if item.id in breakdown_by_invoice
+                and breakdown_by_invoice[item.id].amount_semantics == INVOICE_BASE_BEFORE_TAX
+                and breakdown_by_invoice[item.id].net_amount is not None
+            ),
+            Decimal("0"),
         )
         legacy_outstanding = sum(1 for item in outstanding if item.id not in breakdown_by_invoice)
         summary = {
             "active_contracts": sum(1 for item in contracts if item.status == "Vigente"),
             "open_orders": sum(1 for item in orders if item.status not in {"Aceptada", "Cancelada"}),
-            "outstanding_amount": round(known_total(outstanding), 2),
-            "overdue_amount": round(known_total(overdue), 2),
-            "pending_tax_base": round(pending_tax_base, 2),
+            "outstanding_amount": quantize_money(known_total(outstanding)),
+            "overdue_amount": quantize_money(known_total(overdue)),
+            "pending_tax_base": quantize_money(pending_tax_base),
             "legacy_outstanding": legacy_outstanding,
             "renewals": len(renewals),
         }
@@ -195,7 +203,7 @@ def register_commercial_operations_routes(
         if renewal_type not in VALID_RENEWAL_TYPES:
             raise HTTPException(400, "Tipo de renovación inválido")
         try:
-            contract_value_number = parse_nonnegative_number(contract_value, "el valor contractual")
+            contract_value_number = parse_money(contract_value, "el valor contractual")
             notice_days_number = parse_nonnegative_number(notice_days, "los días de preaviso")
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
@@ -291,7 +299,7 @@ def register_commercial_operations_routes(
         if contract.status not in {"Vigente", "Terminado"}:
             raise HTTPException(409, "Solo pueden renovarse contratos vigentes o terminados")
         try:
-            renewal_value = parse_nonnegative_number(contract_value, "el valor de renovación")
+            renewal_value = parse_money(contract_value, "el valor de renovación")
         except ValueError as exc:
             raise HTTPException(400, str(exc)) from exc
         start = _route_date(parse_date, start_date, "La fecha inicial")
@@ -413,12 +421,13 @@ def register_commercial_operations_routes(
         )
         if subscription.billing_cycle == "Anual":
             raw_amount = (
-                subscription.custom_monthly_fee * 12
+                subscription.custom_monthly_fee * Decimal("12")
                 if subscription.custom_monthly_fee is not None
                 else subscription.plan.annual_fee
             )
         try:
-            base_amount = parse_nonnegative_number(raw_amount, "la base recurrente")
+            base_value = parse_nonnegative_decimal(raw_amount, "la base recurrente")
+            base_amount = quantize_money(base_value)
         except ValueError as exc:
             raise HTTPException(409, str(exc)) from exc
 
