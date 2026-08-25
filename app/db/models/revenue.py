@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from decimal import Decimal
+
 from sqlalchemy import DateTime, Numeric, String, Text, select
 from sqlalchemy.orm import mapped_column
 
@@ -22,16 +24,78 @@ RATE_PRECISION = 9
 RATE_SCALE = 4
 
 
+class ExactDecimal(Decimal):
+    """Decimal compatible with historical arithmetic that used float literals.
+
+    V2.60.7 never converts a float through its binary representation. If old
+    application/bootstrap code combines a persisted monetary value with a
+    literal such as ``1.19``, the literal is first converted through ``str`` and
+    every arithmetic result remains an ``ExactDecimal`` until an explicit
+    monetary quantization boundary is reached.
+    """
+
+    @staticmethod
+    def _coerce(other: object) -> object:
+        return Decimal(str(other)) if isinstance(other, float) else other
+
+    @classmethod
+    def _wrap(cls, value: object) -> object:
+        if value is NotImplemented:
+            return value
+        if isinstance(value, Decimal) and not isinstance(value, cls):
+            return cls(value)
+        return value
+
+    def __add__(self, other: object):
+        return self._wrap(super().__add__(self._coerce(other)))
+
+    def __radd__(self, other: object):
+        return self._wrap(super().__radd__(self._coerce(other)))
+
+    def __sub__(self, other: object):
+        return self._wrap(super().__sub__(self._coerce(other)))
+
+    def __rsub__(self, other: object):
+        return self._wrap(super().__rsub__(self._coerce(other)))
+
+    def __mul__(self, other: object):
+        return self._wrap(super().__mul__(self._coerce(other)))
+
+    def __rmul__(self, other: object):
+        return self._wrap(super().__rmul__(self._coerce(other)))
+
+    def __truediv__(self, other: object):
+        return self._wrap(super().__truediv__(self._coerce(other)))
+
+    def __rtruediv__(self, other: object):
+        return self._wrap(super().__rtruediv__(self._coerce(other)))
+
+
+class ExactNumeric(Numeric):
+    """NUMERIC returning ``ExactDecimal`` while preserving SQL NUMERIC identity."""
+
+    def result_processor(self, dialect, coltype):
+        parent = super().result_processor(dialect, coltype)
+
+        def process(value):
+            converted = parent(value) if parent is not None else value
+            if converted is None or isinstance(converted, ExactDecimal):
+                return converted
+            return ExactDecimal(str(converted))
+
+        return process
+
+
 def _money_type() -> Numeric:
-    return Numeric(MONEY_PRECISION, MONEY_SCALE, asdecimal=True)
+    return ExactNumeric(MONEY_PRECISION, MONEY_SCALE, asdecimal=True)
 
 
 def _normalized_money_type() -> Numeric:
-    return Numeric(MONEY_PRECISION, NORMALIZED_MONEY_SCALE, asdecimal=True)
+    return ExactNumeric(MONEY_PRECISION, NORMALIZED_MONEY_SCALE, asdecimal=True)
 
 
 def _rate_type() -> Numeric:
-    return Numeric(RATE_PRECISION, RATE_SCALE, asdecimal=True)
+    return ExactNumeric(RATE_PRECISION, RATE_SCALE, asdecimal=True)
 
 
 def _set_exact_type(model, column_name: str, column_type: Numeric) -> None:
