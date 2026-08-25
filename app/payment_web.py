@@ -5,6 +5,7 @@ import hmac
 import json
 import secrets
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from fastapi import Depends, Form, Header, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -24,13 +25,14 @@ from .db.models import (
     OrganizationSubscription,
     PaymentTransaction,
 )
+from .money import money_equal, parse_money, quantize_rate
 from .revenue_operations import INVOICE_TOTAL_WITH_TAX, activation_breakdown
 
 
 class PaymentWebhookPayload(BaseModel):
     external_reference: str = Field(min_length=3, max_length=120)
     status: str = Field(min_length=3, max_length=30)
-    amount: float = Field(ge=0)
+    amount: Decimal = Field(ge=0)
     payer_email: str = ""
 
 
@@ -63,7 +65,7 @@ def _proposal_acceptance_source(
     accepted_email: str,
     accepted_at: datetime,
 ) -> str:
-    """Canonical acceptance snapshot binding identity, scope and complete economics."""
+    """Canonical V1.1 acceptance snapshot binding identity, scope and complete economics."""
     payload = {
         "reference": proposal.reference,
         "contract_version": proposal.contract_version,
@@ -94,9 +96,9 @@ def _classify_activation_invoice(
         proposal.discount_amount,
         proposal.tax_rate,
     )
-    if abs(parts["total_amount"] - payment.amount) > 0.01:
+    if not money_equal(parts["total_amount"], payment.amount):
         raise HTTPException(409, "El pago de activación no coincide con el snapshot económico aceptado")
-    if abs(float(invoice.amount) - payment.amount) > 0.01:
+    if not money_equal(invoice.amount, payment.amount):
         raise HTTPException(409, "El cobro existente no coincide con el pago de activación aceptado")
 
     if invoice.amount_semantics is not None:
@@ -118,10 +120,14 @@ def _classify_activation_invoice(
             "total_amount": invoice.total_amount,
             "source_reference": invoice.source_reference,
         }
+        money_keys = {"net_amount", "tax_amount", "total_amount"}
         for key, expected_value in expected.items():
             actual_value = actual[key]
-            if isinstance(expected_value, float):
-                if actual_value is None or abs(float(actual_value) - expected_value) > 0.01:
+            if key in money_keys:
+                if actual_value is None or not money_equal(actual_value, expected_value):
+                    raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
+            elif key == "tax_rate_snapshot":
+                if actual_value is None or quantize_rate(actual_value) != quantize_rate(expected_value):
                     raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
             elif actual_value != expected_value:
                 raise HTTPException(409, "La clasificación económica existente no coincide con la propuesta aceptada")
@@ -296,13 +302,17 @@ def register_payment_routes(app, templates) -> None:
             raise HTTPException(404, "Transacción no encontrada")
         if payment.proposal:
             _ensure_supported_billing_contract(payment.proposal)
-        if abs(payment.amount - payload.amount) > 0.01:
+        try:
+            reported_amount = parse_money(payload.amount, "el valor informado")
+        except ValueError as exc:
+            raise HTTPException(400, str(exc)) from exc
+        if not money_equal(payment.amount, reported_amount):
             raise HTTPException(409, "El valor informado no coincide")
         normalized_status = payload.status.strip().lower()
         mapping = {"paid": "Pagada", "approved": "Pagada", "pending": "Pendiente", "failed": "Fallida", "declined": "Fallida", "refunded": "Reembolsada"}
         payment.status = mapping.get(normalized_status, payload.status[:30])
         payment.payer_email = payload.payer_email.strip().lower() or payment.payer_email
         payment.paid_at = datetime.now(UTC) if payment.status == "Pagada" else payment.paid_at
-        payment.provider_payload = json.dumps(payload.model_dump(), ensure_ascii=False)
+        payment.provider_payload = json.dumps(payload.model_dump(mode="json"), ensure_ascii=False)
         session.commit()
         return {"ok": True, "transaction_id": payment.id, "status": payment.status}
