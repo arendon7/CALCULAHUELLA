@@ -1203,18 +1203,51 @@ def test_v016_service_order_lifecycle():
         with SessionLocal() as session:
             order = session.scalar(select(ServiceOrder).where(ServiceOrder.reference == "OS-TEST-2026-001"))
             order_id = order.id
-        response = client.post(
+
+        # V2.60.12: acceptance cannot fabricate delivery evidence in
+        # the same write. The rejected shortcut must leave the order
+        # untouched before the valid lifecycle is exercised.
+        shortcut = client.post(
+            f"/operacion-comercial/ordenes/{order_id}/estado",
+            data={"status": "Aceptada", "notes": "Intento sin entrega persistida"},
+            follow_redirects=False,
+        )
+        assert shortcut.status_code == 409
+        with SessionLocal() as session:
+            persisted = session.get(ServiceOrder, order_id)
+            assert persisted.status == "Planeada"
+            assert persisted.delivered_at is None
+            assert persisted.accepted_at is None
+
+        executing = client.post(
+            f"/operacion-comercial/ordenes/{order_id}/estado",
+            data={"status": "En ejecución", "notes": "Trabajo iniciado"},
+            follow_redirects=False,
+        )
+        assert executing.status_code == 303
+        delivered = client.post(
+            f"/operacion-comercial/ordenes/{order_id}/estado",
+            data={"status": "Entregada", "notes": "Entrega técnica persistida"},
+            follow_redirects=False,
+        )
+        assert delivered.status_code == 303
+        with SessionLocal() as session:
+            persisted = session.get(ServiceOrder, order_id)
+            assert persisted.status == "Entregada"
+            assert persisted.delivered_at is not None
+            assert persisted.accepted_at is None
+
+        accepted = client.post(
             f"/operacion-comercial/ordenes/{order_id}/estado",
             data={"status": "Aceptada", "notes": "Aceptada por el cliente"},
             follow_redirects=False,
         )
-        assert response.status_code == 303
+        assert accepted.status_code == 303
     with SessionLocal() as session:
         order = session.get(ServiceOrder, order_id)
         assert order.status == "Aceptada"
         assert order.delivered_at is not None
         assert order.accepted_at is not None
-
 
 def test_v016_recurring_charge_creates_billing_document():
     with SessionLocal() as session:
@@ -1244,7 +1277,29 @@ def test_v016_recurring_charge_creates_billing_document():
 
 def test_v016_collection_action_can_close_and_mark_invoice_paid():
     with SessionLocal() as session:
-        invoice = session.scalar(select(BillingInvoice).where(BillingInvoice.organization_id == 1).order_by(BillingInvoice.id))
+        # Own a deterministic invoice whose complete economic total is
+        # authoritative. V2.60.12 must not infer a paid total from an
+        # arbitrary legacy/base-before-tax seeded record.
+        invoice = BillingInvoice(
+            organization_id=1,
+            reference="INV-V016-TOTAL-KNOWN",
+            period_start=date(2026, 8, 1),
+            period_end=date(2026, 8, 31),
+            amount=119000,
+            status="Pendiente",
+            issued_at=date(2026, 8, 1),
+            due_date=date(2026, 8, 15),
+            charge_type="Prueba de cartera",
+            amount_semantics="total_with_tax",
+            net_amount=100000,
+            tax_rate_snapshot=19,
+            tax_amount=19000,
+            total_amount=119000,
+            source_reference="V016-COLLECTION",
+            classification_note="Total de prueba autoritativo para validar cierre de cartera.",
+        )
+        session.add(invoice)
+        session.commit()
         invoice_id = invoice.id
     with TestClient(app) as client:
         login(client, "consultor@calculatuhuella.local")
@@ -1273,7 +1328,6 @@ def test_v016_collection_action_can_close_and_mark_invoice_paid():
         assert action.completed_at is not None
         assert invoice.status == "Pagada"
         assert invoice.paid_at is not None
-
 
 def test_v017_seeded_customer_success_data_exists():
     with SessionLocal() as session:

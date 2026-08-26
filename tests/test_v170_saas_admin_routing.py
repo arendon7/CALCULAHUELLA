@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from pathlib import Path
 
 from fastapi.testclient import TestClient
@@ -65,8 +66,33 @@ def test_v170_saas_subscription_and_invoice_updates_remain_persistent():
         if plan is None:
             plan = session.get(ServicePlan, subscription.plan_id)
         assert plan is not None
-        invoice = session.scalar(select(BillingInvoice).order_by(BillingInvoice.id))
-        assert invoice is not None
+
+        # V2.60.12 intentionally forbids declaring an invoice paid when the
+        # persisted record only contains a pre-tax base or legacy-unknown
+        # semantics. This V1.7 routing test therefore owns an invoice whose
+        # full economic total is authoritative instead of depending on the
+        # arbitrary first seeded invoice.
+        invoice = BillingInvoice(
+            organization_id=subscription.organization_id,
+            subscription_id=subscription.id,
+            reference="INV-V170-TOTAL-KNOWN",
+            period_start=date(2027, 1, 1),
+            period_end=date(2027, 1, 31),
+            amount=119000,
+            status="Pendiente",
+            issued_at=date(2027, 1, 1),
+            due_date=date(2027, 1, 15),
+            charge_type="Prueba de routing",
+            amount_semantics="total_with_tax",
+            net_amount=100000,
+            tax_rate_snapshot=19,
+            tax_amount=19000,
+            total_amount=119000,
+            source_reference="V170-ROUTING",
+            classification_note="Total de prueba autoritativo para validar persistencia del routing SaaS.",
+        )
+        session.add(invoice)
+        session.commit()
         subscription_id, plan_id, invoice_id = subscription.id, plan.id, invoice.id
 
     with TestClient(app) as client:
