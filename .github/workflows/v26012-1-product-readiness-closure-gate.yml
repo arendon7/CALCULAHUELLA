@@ -86,15 +86,46 @@ jobs:
             tests/test_v26012_commercial_lifecycle_integrity.py \
             tests/test_v26012_hash_boundaries.py
 
-      - name: Run failed Product Readiness blocks and lifecycle regressions
+      - name: Run failed Product Readiness blocks with canonical isolation
+        shell: bash
         run: |
-          pytest -q \
-            tests/test_app.py \
-            tests/test_v170_saas_admin_routing.py \
-            tests/test_v26012_commercial_lifecycle_policy.py \
-            tests/test_v26012_commercial_lifecycle_integrity.py \
-            tests/test_v26012_hash_boundaries.py \
-            --junitxml=v26012-1-product-readiness-closure.xml
+          set -euo pipefail
+
+          run_isolated() {
+            local label="$1"
+            shift
+            local temp_root
+            temp_root="$(mktemp -d "${RUNNER_TEMP}/cth-v26012-1-${label}.XXXXXX")"
+            echo "isolated_block=${label}"
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+              TMPDIR="${temp_root}" TEMP="${temp_root}" TMP="${temp_root}" \
+              python scripts/pytest_isolated.py "$@"
+            rm -rf "${temp_root}"
+          }
+
+          # Product Readiness deliberately deselects this superseded historical
+          # public-copy assertion from test_app.py. Keep exact parity here so
+          # this hotfix gate does not resurrect an obsolete /diagnostico contract.
+          run_isolated test-app \
+            -q tests/test_app.py \
+            --deselect=tests/test_app.py::test_public_site_and_diagnostic_flow \
+            --junitxml=v26012-1-test-app.xml
+
+          run_isolated v170-saas \
+            -q tests/test_v170_saas_admin_routing.py \
+            --junitxml=v26012-1-v170-saas.xml
+
+          run_isolated v26012-policy \
+            -q tests/test_v26012_commercial_lifecycle_policy.py \
+            --junitxml=v26012-1-v26012-policy.xml
+
+          run_isolated v26012-integrity \
+            -q tests/test_v26012_commercial_lifecycle_integrity.py \
+            --junitxml=v26012-1-v26012-integrity.xml
+
+          run_isolated v26012-hash \
+            -q tests/test_v26012_hash_boundaries.py \
+            --junitxml=v26012-1-v26012-hash.xml
 
       - name: Fresh migration SQLite
         env:
@@ -115,6 +146,8 @@ jobs:
             echo "head_sha=${HEAD_SHA}"
             echo "production_code_change=none"
             echo "schema_change=none"
+            echo "test_process_isolation=product-readiness-parity"
+            echo "superseded_diagnostic_assertion=deselected-as-canonical-runner"
             echo "stale_service_order_shortcut=409-preserved"
             echo "valid_service_order_flow=planned-executing-delivered-accepted"
             echo "paid_invoice_requires=total_with_tax-plus-total_amount"
@@ -126,6 +159,6 @@ jobs:
         with:
           name: v26012-1-product-readiness-closure-evidence
           path: |
-            v26012-1-product-readiness-closure.xml
+            v26012-1-*.xml
             v26012-1-evidence.txt
           retention-days: 14
