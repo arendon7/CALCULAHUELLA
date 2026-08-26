@@ -5,6 +5,7 @@ from pathlib import Path
 from types import SimpleNamespace
 
 from app.capture_guidance import capture_summary
+from scripts.product_readiness_contracts import TARGETED_CONTRACTS
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,8 +43,10 @@ def test_v200_product_readiness_gate_includes_operational_security_contracts() -
         "tests/test_v100_rc1_release_candidate.py",
         "tests/test_v200_product_readiness_gate.py",
     )
+    authority = set(TARGETED_CONTRACTS)
+    assert "python scripts/product_readiness_contracts.py" in source
     for test_path in required_tests:
-        assert test_path in source
+        assert test_path in authority
 
 
 def test_v200_product_readiness_gate_keeps_real_browser_and_role_journeys() -> None:
