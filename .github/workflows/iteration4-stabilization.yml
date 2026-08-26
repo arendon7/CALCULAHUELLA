@@ -55,35 +55,10 @@ jobs:
 
       - name: Ejecutar contratos de product readiness
         run: |
-          pytest -q \
-            tests/test_iteration15_canonical_workflow.py \
-            tests/test_iteration16_area_assignment.py \
-            tests/test_iteration16_work_items.py \
-            tests/test_iteration17_integrated_workflow.py \
-            tests/test_iteration18_stabilization.py \
-            tests/test_iteration19_role_journeys.py \
-            tests/test_v024_security_hardening.py \
-            tests/test_v030_mac_lifecycle.py \
-            tests/test_v034_operational_hardening.py \
-            tests/test_v057_production_readiness.py \
-            tests/test_v100_rc1_release_candidate.py \
-            tests/test_v200_product_readiness_gate.py \
-            tests/test_v200_postgres_continuity_gate.py \
-            tests/test_v200_postgres_schema_compatibility.py \
-            tests/test_v200_postgres_methodology_schema.py \
-            tests/test_v210_brand_provenance.py \
-            tests/test_v210_brand_package.py \
-            tests/test_v259_render_release_identity_gate.py \
-            tests/test_v2602_public_diagnosis_trust_consent.py \
-            tests/test_v2603_public_result_interpretation.py \
-            tests/test_v260_public_diagnosis_value_hierarchy.py \
-            tests/test_v260_public_experience_evidence_safe.py \
-            tests/test_v260_public_handoff_taxonomy.py \
-            tests/test_v260_public_result_visual_contract.py \
-            tests/test_v260_solution_plan_alignment.py \
-            tests/test_v2604_product_readiness_feedback.py \
-            tests/test_v2605_commercial_authority.py \
-            --junitxml=iteration4-targeted.xml
+          python scripts/product_readiness_contracts.py \
+            --timeout 420 \
+            --durations 5 \
+            --junitxml iteration4-targeted.xml
 
       - name: Migración desde base vacía
         run: |
