@@ -14,6 +14,10 @@ from scripts.product_readiness_contracts import (
 )
 
 
+ROOT = Path(__file__).resolve().parents[1]
+V26013_WORKFLOW = ROOT / ".github" / "workflows" / "v26013-product-readiness-contract-authority-gate.yml"
+
+
 def _write(root: Path, relative_path: str) -> None:
     path = root / relative_path
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -126,3 +130,13 @@ def test_product_readiness_execution_plan_keeps_transversal_contracts_isolated()
         "tests/test_v2607_known.py",
         "tests/test_migration_legacy_compat.py",
     )
+
+
+def test_v26013_evidence_distinguishes_certified_head_from_synthetic_checkout() -> None:
+    source = V26013_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "CERTIFIED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}" in source
+    assert 'echo "certified_head_sha=${CERTIFIED_HEAD_SHA}"' in source
+    assert 'echo "checked_out_sha=$(git rev-parse HEAD)"' in source
+    assert 'echo "github_sha=${GITHUB_SHA}"' in source
+    assert "v26013-certified-identity.txt" in source
