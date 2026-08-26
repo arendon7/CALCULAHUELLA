@@ -84,9 +84,17 @@ jobs:
           python -m alembic upgrade head
           python -m alembic current | tee v26013-migration-current.log
 
-      - name: Registrar SHA certificado
+      - name: Registrar identidad certificada
         if: always()
-        run: git rev-parse HEAD > v26013-certified-sha.txt
+        env:
+          CERTIFIED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "certified_head_sha=${CERTIFIED_HEAD_SHA}"
+            echo "checked_out_sha=$(git rev-parse HEAD)"
+            echo "github_sha=${GITHUB_SHA}"
+          } > v26013-certified-identity.txt
 
       - name: Publicar evidencia V2.60.13
         if: always()
@@ -98,6 +106,6 @@ jobs:
             v26013-authority-validation.log
             v26013-product-readiness-contracts.xml
             v26013-migration-current.log
-            v26013-certified-sha.txt
+            v26013-certified-identity.txt
           if-no-files-found: warn
           retention-days: 14
