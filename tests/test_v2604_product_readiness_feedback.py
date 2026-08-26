@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts.product_readiness_contracts import TARGETED_CONTRACTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "iteration4-stabilization.yml"
@@ -35,12 +37,15 @@ def _workflow_sections() -> tuple[str, str]:
 
 def test_v2604_active_release_contracts_run_in_exact_early_gate() -> None:
     targeted, full = _workflow_sections()
+    authority = set(TARGETED_CONTRACTS)
 
     for contract in ACTIVE_RELEASE_CONTRACTS:
-        assert contract in targeted, f"Contrato activo fuera del gate dirigido temprano: {contract}"
+        assert contract in authority, f"Contrato activo fuera de la autoridad dirigida temprana: {contract}"
 
-    assert "pytest -q" in targeted
-    assert "--junitxml=iteration4-targeted.xml" in targeted
+    assert "python scripts/product_readiness_contracts.py" in targeted
+    assert "--timeout 420" in targeted
+    assert "--durations 5" in targeted
+    assert "--junitxml iteration4-targeted.xml" in targeted
     assert "python scripts/run_test_tier.py full --durations 5 --timeout 420" in full
 
 
