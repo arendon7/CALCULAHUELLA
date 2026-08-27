@@ -9,6 +9,12 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .database import CommercialLead, ServicePlan, get_db
+from .public_contact_contract import (
+    PUBLIC_CONTACT_LEAD_SOURCE,
+    PUBLIC_CONTACT_LEAD_STATUS,
+    PUBLIC_CONTACT_SUCCESS_LOCATION,
+    PUBLIC_CONTACT_SUCCESS_STATE,
+)
 
 _CONTACT_PLAN_LABELS = {
     "ESENCIAL": "Huella Esencial",
@@ -147,7 +153,7 @@ def register_public_routes(app, templates, current_user) -> None:
                     "user": current_user(request),
                     "app_settings": settings,
                     "route_context": route_context,
-                    "contact_sent": request.query_params.get("estado") == "recibido",
+                    "contact_sent": request.query_params.get("estado") == PUBLIC_CONTACT_SUCCESS_STATE,
                 },
             )
 
@@ -207,9 +213,9 @@ def register_public_routes(app, templates, current_user) -> None:
             ),
             complexity_score=0,
             recommended_plan_code=plan_code,
-            status="Nuevo",
-            source="Contacto público same-origin",
+            status=PUBLIC_CONTACT_LEAD_STATUS,
+            source=PUBLIC_CONTACT_LEAD_SOURCE,
         )
         session.add(lead)
         session.commit()
-        return RedirectResponse("/contacto?estado=recibido", status_code=303)
+        return RedirectResponse(PUBLIC_CONTACT_SUCCESS_LOCATION, status_code=303)

@@ -6,11 +6,19 @@ import pytest
 from alembic.config import Config
 from alembic.script import ScriptDirectory
 
+from app.public_contact_contract import (
+    PUBLIC_CONTACT_LEAD_SOURCE,
+    PUBLIC_CONTACT_LEAD_STATUS,
+    PUBLIC_CONTACT_SUCCESS_LOCATION,
+    PUBLIC_CONTACT_SUCCESS_STATE,
+)
 from scripts import alembic_revision_authority as authority
 
 ROOT = Path(__file__).resolve().parents[1]
 POSTGRES_GATE = ROOT / "scripts" / "postgres_legacy_migration_gate.py"
 LEGACY_COMPAT = ROOT / "tests" / "test_migration_legacy_compat.py"
+PUBLIC_WEB = ROOT / "app" / "public_web.py"
+RUNTIME_GATE = ROOT / "scripts" / "vercel_staging_contract.py"
 SERVERLESS_WORKFLOW = ROOT / ".github" / "workflows" / "vercel-staging-contract.yml"
 
 
@@ -73,6 +81,36 @@ def test_v2621_legacy_compat_test_no_longer_duplicates_current_head_authority() 
     assert "repository_head_revision(ROOT)" in source
 
 
+def test_v26211_public_contact_contract_declares_same_origin_semantics() -> None:
+    assert PUBLIC_CONTACT_SUCCESS_STATE == "recibido"
+    assert PUBLIC_CONTACT_SUCCESS_LOCATION == "/contacto?estado=recibido"
+    assert PUBLIC_CONTACT_LEAD_STATUS == "Nuevo"
+    assert PUBLIC_CONTACT_LEAD_SOURCE == "Contacto público same-origin"
+
+
+def test_v26211_public_endpoint_consumes_shared_contact_authority() -> None:
+    source = PUBLIC_WEB.read_text(encoding="utf-8")
+
+    assert "from .public_contact_contract import (" in source
+    assert 'request.query_params.get("estado") == PUBLIC_CONTACT_SUCCESS_STATE' in source
+    assert "status=PUBLIC_CONTACT_LEAD_STATUS" in source
+    assert "source=PUBLIC_CONTACT_LEAD_SOURCE" in source
+    assert "RedirectResponse(PUBLIC_CONTACT_SUCCESS_LOCATION, status_code=303)" in source
+
+
+def test_v26211_serverless_gate_consumes_same_authority_without_legacy_literals() -> None:
+    source = RUNTIME_GATE.read_text(encoding="utf-8")
+
+    assert "from app.public_contact_contract import (" in source
+    assert "accepted_location != PUBLIC_CONTACT_SUCCESS_LOCATION" in source
+    assert "latest[3:] != [PUBLIC_CONTACT_LEAD_STATUS, PUBLIC_CONTACT_LEAD_SOURCE]" in source
+    assert '"location": accepted_location' in source
+    assert '"lead_status": latest[3]' in source
+    assert '"lead_source": latest[4]' in source
+    assert '"Landing pública V1.0"' not in source
+    assert '"contacto=recibido"' not in source
+
+
 def test_v2621_serverless_workflow_executes_and_tracks_authority_contract() -> None:
     source = SERVERLESS_WORKFLOW.read_text(encoding="utf-8")
 
@@ -80,3 +118,4 @@ def test_v2621_serverless_workflow_executes_and_tracks_authority_contract() -> N
     assert f'- "{contract}"' in source
     assert f"pytest -q {contract}" in source
     assert 'run: python -m scripts.postgres_legacy_migration_gate' in source
+    assert 'run: python scripts/vercel_staging_contract.py' in source

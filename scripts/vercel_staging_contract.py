@@ -13,6 +13,15 @@ from pathlib import Path
 import httpx
 
 ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from app.public_contact_contract import (
+    PUBLIC_CONTACT_LEAD_SOURCE,
+    PUBLIC_CONTACT_LEAD_STATUS,
+    PUBLIC_CONTACT_SUCCESS_LOCATION,
+)
+
 ARTIFACT_DIR = Path(os.environ.get("SERVERLESS_STAGING_ARTIFACT_DIR", "serverless-staging-artifacts")).resolve()
 ARTIFACT_DIR.mkdir(parents=True, exist_ok=True)
 BASE_URL = "http://127.0.0.1:8791"
@@ -182,17 +191,24 @@ def main() -> None:
                     )
                     if accepted.status_code != 303:
                         raise AssertionError(f"/contacto válido debía responder 303, obtuvo {accepted.status_code}")
-                    if "contacto=recibido" not in accepted.headers.get("location", ""):
-                        raise AssertionError(f"Redirect comercial inesperado: {accepted.headers.get('location')!r}")
+                    accepted_location = accepted.headers.get("location", "")
+                    if accepted_location != PUBLIC_CONTACT_SUCCESS_LOCATION:
+                        raise AssertionError(f"Redirect comercial inesperado: {accepted_location!r}")
                     lead_after = _lead_snapshot(db_path)
                     if lead_after["count"] != int(lead_before["count"]) + 1:
                         raise AssertionError(f"El lead válido no se persistió exactamente una vez: {lead_after!r}")
                     latest = lead_after["latest"] or []
                     if latest[:3] != ["Empresa Gate Staging", "Persona Gate", "gate@example.test"]:
                         raise AssertionError(f"Lead persistido inesperado: {latest!r}")
-                    if latest[3:] != ["Nuevo", "Landing pública V1.0"]:
+                    if latest[3:] != [PUBLIC_CONTACT_LEAD_STATUS, PUBLIC_CONTACT_LEAD_SOURCE]:
                         raise AssertionError(f"Estado/origen comercial inesperados: {latest!r}")
-                    evidence["contact_valid"] = {"status": 303, "lead_delta": 1}
+                    evidence["contact_valid"] = {
+                        "status": 303,
+                        "lead_delta": 1,
+                        "location": accepted_location,
+                        "lead_status": latest[3],
+                        "lead_source": latest[4],
+                    }
 
                     invalid_login = client.post(
                         "/login",
