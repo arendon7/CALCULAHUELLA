@@ -20,7 +20,8 @@ def test_v261_html_mocks_label_demonstrative_data_visibly() -> None:
     reports = _read(V14 / "reports_decision.html")
     reduction = _read(V14 / "reduction_solutions.html")
 
-    assert "Centro de trabajo · Inventario corporativo 2026 · DATOS DEMOSTRATIVOS" in hero
+    assert "Centro de trabajo · Inventario corporativo 2026" in hero
+    assert "Tu inventario · DATOS DEMOSTRATIVOS" in hero
     assert "Greenatics S.A.S. · DATOS DEMOSTRATIVOS" in platform
     assert "Calcula tu Huella · DATOS DEMOSTRATIVOS" in process
     assert "Datos demostrativos:" in process
@@ -63,5 +64,10 @@ def test_v261_browser_gate_requires_visible_demo_transparency() -> None:
     source = _read(BROWSER_GATE)
 
     assert "def _assert_demo_transparency(page: Page)" in source
-    assert 'page.get_by_text("DATOS DEMOSTRATIVOS", exact=False)' in source
+    assert 'page.locator(".app-head .app-kicker")' in source
+    assert 'page.locator(".workspace-bar")' in source
+    assert 'page.locator(".process-window-top")' in source
+    assert 'page.locator(".report-page-front")' in source
+    assert 'page.locator(".decision-top")' in source
+    assert 'page.locator(".reduction-head")' in source
     assert 'landing-demo-transparency.png' in source
