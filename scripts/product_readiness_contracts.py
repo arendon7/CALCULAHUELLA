@@ -13,8 +13,8 @@ ROOT = Path(__file__).resolve().parents[1]
 
 # Single source of truth for the focused Product Readiness certification layer.
 # Keep historical contracts already enforced by iteration4-stabilization.yml and
-# classify every V2.60 contract explicitly. The drift guard below makes a new
-# tests/test_v260*.py fail closed until it is deliberately classified here.
+# classify every versioned adoption contract explicitly. The drift guard below
+# makes new V2.60/V2.61 contracts fail closed until deliberately classified here.
 TARGETED_CONTRACTS: tuple[str, ...] = (
     "tests/test_iteration15_canonical_workflow.py",
     "tests/test_iteration16_area_assignment.py",
@@ -57,20 +57,28 @@ TARGETED_CONTRACTS: tuple[str, ...] = (
     "tests/test_v26012_commercial_lifecycle_policy.py",
     "tests/test_v26012_commercial_lifecycle_integrity.py",
     "tests/test_v26012_hash_boundaries.py",
+    "tests/test_v261_visible_demo_data_labels.py",
 )
 
 # Cross-version compatibility contracts belong to Product Readiness but are not
-# named test_v260*.py, so they are tracked separately from the V2.60 drift set.
+# part of the current versioned naming families, so they are tracked separately.
 TRANSVERSAL_CONTRACTS: tuple[str, ...] = (
     "tests/test_v210_product_readiness_inheritance.py",
     "tests/test_migration_legacy_compat.py",
 )
 
-# A V2.60 module may be excluded only by naming it here with a non-empty reason.
-# Empty by design: current V2.60 contracts are expected to be adoption-relevant.
+# A versioned module may be excluded only by naming it here with a non-empty reason.
+# Empty by design: current V2.60/V2.61 contracts are adoption-relevant.
 EXCLUDED_VERSIONED_CONTRACTS: dict[str, str] = {}
 
-VERSIONED_GLOB = "test_v260*.py"
+VERSIONED_GLOBS: tuple[str, ...] = (
+    "test_v260*.py",
+    "test_v261*.py",
+)
+VERSIONED_PREFIXES: tuple[str, ...] = (
+    "test_v260",
+    "test_v261",
+)
 
 
 class ContractAuthorityError(RuntimeError):
@@ -79,9 +87,17 @@ class ContractAuthorityError(RuntimeError):
 
 def discover_versioned_contracts(root: Path = ROOT) -> tuple[str, ...]:
     tests_root = root / "tests"
-    return tuple(
-        sorted(path.relative_to(root).as_posix() for path in tests_root.glob(VERSIONED_GLOB))
-    )
+    discovered = {
+        path.relative_to(root).as_posix()
+        for pattern in VERSIONED_GLOBS
+        for path in tests_root.glob(pattern)
+    }
+    return tuple(sorted(discovered))
+
+
+def _is_versioned_contract(relative_path: str) -> bool:
+    name = Path(relative_path).name
+    return any(name.startswith(prefix) for prefix in VERSIONED_PREFIXES)
 
 
 def _duplicates(values: Sequence[str]) -> set[str]:
@@ -135,18 +151,18 @@ def validate_authority(
 
     discovered = set(discover_versioned_contracts(root))
     classified_versioned = {
-        path for path in targeted_tuple if Path(path).name.startswith("test_v260")
+        path for path in targeted_tuple if _is_versioned_contract(path)
     } | set(excluded_paths)
 
     unclassified = sorted(discovered - classified_versioned)
     stale = sorted(classified_versioned - discovered)
     if unclassified:
         errors.append(
-            "Drift V2.60: contratos sin clasificar: " + ", ".join(unclassified)
+            "Drift versionado: contratos sin clasificar: " + ", ".join(unclassified)
         )
     if stale:
         errors.append(
-            "Autoridad V2.60 obsoleta: rutas clasificadas que ya no existen en la familia: "
+            "Autoridad versionada obsoleta: rutas clasificadas que ya no existen en las familias controladas: "
             + ", ".join(stale)
         )
 
@@ -335,7 +351,7 @@ def main() -> int:
         f"{len(TARGETED_CONTRACTS)} targeted · "
         f"{len(TRANSVERSAL_CONTRACTS)} transversal · "
         f"{len(EXCLUDED_VERSIONED_CONTRACTS)} excluded · "
-        f"{len(discovered)} V2.60 discovered",
+        f"{len(discovered)} versioned discovered",
         flush=True,
     )
     if args.validate_only:
