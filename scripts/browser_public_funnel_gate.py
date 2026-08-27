@@ -44,6 +44,60 @@ def _assert_no_horizontal_overflow(page: Page, label: str) -> dict[str, int]:
     return metrics
 
 
+def _assert_demo_transparency(page: Page) -> dict[str, object]:
+    labels = page.get_by_text("DATOS DEMOSTRATIVOS", exact=False)
+    label_count = labels.count()
+    if label_count < 6:
+        raise AssertionError(
+            "La landing no hace suficientemente explícitos los datos demostrativos: "
+            f"solo {label_count} etiquetas visibles en el DOM."
+        )
+
+    required_surfaces = (
+        (".app-top .demo-data-label", "DATOS DEMOSTRATIVOS"),
+        (".workspace-bar", "Greenatics S.A.S. · DATOS DEMOSTRATIVOS"),
+        (".process-window-top", "Calcula tu Huella · DATOS DEMOSTRATIVOS"),
+        (".report-page-front", "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026"),
+        (".decision-top", "Sala de decisión · DATOS DEMOSTRATIVOS"),
+        (".reduction-head", "DATOS DEMOSTRATIVOS · PLAN DE REDUCCIÓN 2026–2027"),
+    )
+    for selector, fragment in required_surfaces:
+        surface = page.locator(selector)
+        if surface.count() != 1:
+            raise AssertionError(f"Superficie demostrativa ausente o ambigua: {selector!r}")
+        surface.wait_for(state="visible")
+        source_text = surface.text_content() or ""
+        if fragment not in source_text:
+            raise AssertionError(
+                f"La superficie {selector!r} no expone la aclaración requerida: {fragment!r}"
+            )
+
+    hero_label = page.locator(".app-top .demo-data-label")
+    hero_box = hero_label.bounding_box()
+    viewport = page.viewport_size
+    if hero_box is None or viewport is None:
+        raise AssertionError("No fue posible medir la visibilidad de la etiqueta demostrativa del hero.")
+    if hero_box["x"] < 0 or hero_box["x"] + hero_box["width"] > viewport["width"]:
+        raise AssertionError(
+            "Etiqueta demostrativa del hero quedó recortada horizontalmente: "
+            f"box={hero_box!r}, viewport={viewport!r}"
+        )
+
+    trace_disclaimer = page.locator(".trace-copy .trace-reserve").filter(has_text="Datos demostrativos:")
+    if trace_disclaimer.count() != 1:
+        raise AssertionError("La trazabilidad no contiene una única aclaración visible de datos demostrativos.")
+    trace_disclaimer.wait_for(state="visible")
+
+    return {
+        "uppercase_label_count": label_count,
+        "hero_label_fully_visible": True,
+        "required_surfaces": [
+            {"selector": selector, "text": fragment}
+            for selector, fragment in required_surfaces
+        ],
+    }
+
+
 def _canonical_footer_logo_state(page: Page) -> dict[str, object]:
     footer_logo = page.locator("footer .canonical-footer-logo")
     footer_logo.wait_for(state="visible")
@@ -105,7 +159,7 @@ def main() -> int:
     evidence: dict[str, object] = {
         "engine": "chromium",
         "base_url": BASE_URL,
-        "journey": "landing -> prefill -> diagnosis -> consent -> result -> mobile result",
+        "journey": "landing -> demo transparency -> prefill -> diagnosis -> consent -> result -> mobile result",
         "email": EMAIL,
     }
     console_errors: list[str] = []
@@ -119,6 +173,20 @@ def main() -> int:
         page.on("pageerror", lambda error: page_errors.append(str(error)))
 
         page.goto(BASE_URL, wait_until="networkidle")
+        demo_transparency = _assert_demo_transparency(page)
+        landing_desktop_layout = _assert_no_horizontal_overflow(page, "Landing desktop")
+        landing_desktop = ARTIFACT_DIR / "landing-demo-transparency.png"
+        page.screenshot(path=str(landing_desktop), full_page=True)
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload(wait_until="networkidle")
+        _assert_demo_transparency(page)
+        landing_mobile_layout = _assert_no_horizontal_overflow(page, "Landing móvil")
+        landing_mobile = ARTIFACT_DIR / "landing-demo-transparency-mobile.png"
+        page.screenshot(path=str(landing_mobile), full_page=True)
+
+        page.set_viewport_size({"width": 1440, "height": 1000})
+        page.reload(wait_until="networkidle")
         landing_form = page.locator("[data-landing-context-form]")
         landing_form.wait_for(state="visible")
         landing_form.locator('select[name="landing_sector"]').select_option("Manufactura")
@@ -219,6 +287,17 @@ def main() -> int:
         mobile_screenshot = ARTIFACT_DIR / "public-funnel-result-mobile.png"
         page.screenshot(path=str(mobile_screenshot), full_page=True)
 
+        evidence["landing_demo_transparency"] = {
+            **demo_transparency,
+            "screenshots": {
+                "desktop": landing_desktop.name,
+                "mobile": landing_mobile.name,
+            },
+            "layout": {
+                "desktop": landing_desktop_layout,
+                "mobile": landing_mobile_layout,
+            },
+        }
         evidence["screenshots"] = {
             "desktop": screenshot.name,
             "mobile": mobile_screenshot.name,

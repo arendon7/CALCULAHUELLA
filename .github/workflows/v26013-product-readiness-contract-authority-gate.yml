@@ -10,6 +10,7 @@ on:
       - "scripts/pytest_isolated.py"
       - "tests/test_product_readiness_contract_authority.py"
       - "tests/test_v260*.py"
+      - "tests/test_v261*.py"
       - "tests/test_migration_legacy_compat.py"
       - ".github/workflows/iteration4-stabilization.yml"
       - ".github/workflows/v26013-product-readiness-contract-authority-gate.yml"
@@ -62,7 +63,7 @@ jobs:
             tests/test_product_readiness_contract_authority.py \
             --junitxml=v26013-authority-self.xml
 
-      - name: Validar inventario y drift V2.60
+      - name: Validar inventario y drift versionado
         run: |
           set -o pipefail
           python scripts/product_readiness_contracts.py --validate-only 2>&1 | tee v26013-authority-validation.log
