@@ -1,7 +1,11 @@
+.work-page-heading{margin-bottom:14px}
+.work-page-heading>div{max-width:840px}
 .work-summary{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin:18px 0 24px}
 .work-metric{background:var(--surface,#fff);border:1px solid var(--line,#dce3de);border-radius:16px;padding:16px;min-width:0}
 .work-metric small{display:block;color:var(--muted,#68746f);font-weight:700;letter-spacing:.04em}
 .work-metric strong{display:block;font-size:1.75rem;margin-top:6px}
+.work-secondary-actions{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:-6px 0 18px;min-width:0}
+.work-secondary-actions form{margin:0;min-width:0}
 .work-layout{display:grid;grid-template-columns:minmax(0,1.8fr) minmax(290px,.8fr);gap:20px;align-items:start}
 .work-layout>*{min-width:0}
 .work-layout>div,.work-layout>aside{min-width:0;max-width:100%}
@@ -33,4 +37,4 @@
 .overdue{color:#9d2c2c;font-weight:800}
 .work-help{font-size:.92rem;color:var(--muted,#68746f);overflow-wrap:anywhere}
 @media(max-width:1050px){.work-summary{grid-template-columns:repeat(3,1fr)}.work-layout{grid-template-columns:1fr}.work-meta{grid-template-columns:repeat(2,1fr)}}
-@media(max-width:640px){.work-summary{grid-template-columns:repeat(2,1fr)}.work-card-top{display:block}.work-meta{grid-template-columns:1fr}.work-create-form .two{grid-template-columns:1fr}.work-action-form{display:grid}.work-action-form input{min-width:0;width:100%}}
+@media(max-width:640px){.work-page-heading{margin-bottom:10px}.work-page-heading p{font-size:.9rem;line-height:1.48}.work-summary{grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:10px 0 14px}.work-metric{border-radius:14px;padding:11px 12px}.work-metric small{font-size:.68rem}.work-metric strong{font-size:1.35rem;margin-top:3px}.work-secondary-actions{display:grid;grid-template-columns:1fr;gap:8px;margin:0 0 14px}.work-secondary-actions form,.work-secondary-actions .btn,.work-secondary-actions form .btn{width:100%;max-width:100%}.work-card-top{display:block}.work-meta{grid-template-columns:1fr}.work-create-form .two{grid-template-columns:1fr}.work-action-form{display:grid}.work-action-form input{min-width:0;width:100%}}
