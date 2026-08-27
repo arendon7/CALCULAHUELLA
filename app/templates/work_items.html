@@ -2,24 +2,11 @@
 {% block title %}Mi trabajo · Calcula tu Huella{% endblock %}
 {% block page_label %}Mi trabajo{% endblock %}
 {% block content %}
-<section class="page-heading">
+<section class="page-heading work-page-heading">
   <div>
     <span class="eyebrow">TRABAJO CON RESPONSABLE Y CIERRE</span>
     <h1>Mi trabajo</h1>
     <p>Reúne solicitudes, correcciones, validaciones, revisiones y cierres en una sola bandeja. Cada tarea muestra quién actúa, qué debe entregar, qué ocurre después y, cuando aplica, a qué periodo pertenece.</p>
-  </div>
-  <div class="page-actions">
-    <a class="btn btn-secondary" href="/dashboard">Ver resumen del periodo por defecto</a>
-    <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
-    {% if can_create %}
-    <form method="post" action="/mi-trabajo/sincronizar">
-      <input type="hidden" name="return_status" value="{{ selected_status }}">
-      <input type="hidden" name="return_stage" value="{{ selected_stage }}">
-      <input type="hidden" name="return_scope" value="{{ selected_scope }}">
-      <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
-      <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
-    </form>
-    {% endif %}
   </div>
 </section>
 
@@ -30,6 +17,20 @@
   <article class="work-metric"><small>BLOQUEADAS</small><strong>{{ summary.blocked }}</strong></article>
   <article class="work-metric"><small>EN CONTROL</small><strong>{{ summary.under_review }}</strong></article>
 </section>
+
+<div class="work-secondary-actions" aria-label="Acciones de apoyo">
+  <a class="btn btn-secondary" href="/dashboard">Ver resumen del periodo por defecto</a>
+  <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
+  {% if can_create %}
+  <form method="post" action="/mi-trabajo/sincronizar">
+    <input type="hidden" name="return_status" value="{{ selected_status }}">
+    <input type="hidden" name="return_stage" value="{{ selected_stage }}">
+    <input type="hidden" name="return_scope" value="{{ selected_scope }}">
+    <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
+    <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
+  </form>
+  {% endif %}
+</div>
 
 <section class="work-layout">
   <div>
