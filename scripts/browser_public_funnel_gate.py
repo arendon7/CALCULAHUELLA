@@ -53,24 +53,35 @@ def _assert_demo_transparency(page: Page) -> dict[str, object]:
             f"solo {label_count} etiquetas visibles en el DOM."
         )
 
-    required_fragments = (
-        "Centro de trabajo · Inventario corporativo 2026 · DATOS DEMOSTRATIVOS",
-        "Greenatics S.A.S. · DATOS DEMOSTRATIVOS",
-        "Calcula tu Huella · DATOS DEMOSTRATIVOS",
-        "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026",
-        "Sala de decisión · DATOS DEMOSTRATIVOS",
-        "DATOS DEMOSTRATIVOS · PLAN DE REDUCCIÓN 2026–2027",
+    required_surfaces = (
+        (".app-head .app-kicker", "Tu inventario · DATOS DEMOSTRATIVOS"),
+        (".workspace-bar", "Greenatics S.A.S. · DATOS DEMOSTRATIVOS"),
+        (".process-window-top", "Calcula tu Huella · DATOS DEMOSTRATIVOS"),
+        (".report-page-front", "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026"),
+        (".decision-top", "Sala de decisión · DATOS DEMOSTRATIVOS"),
+        (".reduction-head", "DATOS DEMOSTRATIVOS · PLAN DE REDUCCIÓN 2026–2027"),
     )
-    for fragment in required_fragments:
-        locator = page.get_by_text(fragment, exact=True)
-        if locator.count() != 1:
-            raise AssertionError(f"Etiqueta demostrativa ausente o ambigua: {fragment!r}")
-        locator.wait_for(state="visible")
+    for selector, fragment in required_surfaces:
+        surface = page.locator(selector)
+        if surface.count() != 1:
+            raise AssertionError(f"Superficie demostrativa ausente o ambigua: {selector!r}")
+        surface.wait_for(state="visible")
+        if fragment not in surface.inner_text():
+            raise AssertionError(
+                f"La superficie {selector!r} no expone la aclaración requerida: {fragment!r}"
+            )
 
-    page.get_by_text("Datos demostrativos:", exact=False).wait_for(state="visible")
+    trace_disclaimer = page.locator(".trace-copy .trace-reserve").filter(has_text="Datos demostrativos:")
+    if trace_disclaimer.count() != 1:
+        raise AssertionError("La trazabilidad no contiene una única aclaración visible de datos demostrativos.")
+    trace_disclaimer.wait_for(state="visible")
+
     return {
         "uppercase_label_count": label_count,
-        "required_fragments": list(required_fragments),
+        "required_surfaces": [
+            {"selector": selector, "text": fragment}
+            for selector, fragment in required_surfaces
+        ],
     }
 
 
