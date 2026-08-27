@@ -20,8 +20,8 @@ def test_v261_html_mocks_label_demonstrative_data_visibly() -> None:
     reports = _read(V14 / "reports_decision.html")
     reduction = _read(V14 / "reduction_solutions.html")
 
-    assert "Centro de trabajo · Inventario corporativo 2026" in hero
-    assert "Tu inventario · DATOS DEMOSTRATIVOS" in hero
+    assert '<span class="app-title">Centro de trabajo</span>' in hero
+    assert '<span class="app-kicker demo-data-label">DATOS DEMOSTRATIVOS</span>' in hero
     assert "Greenatics S.A.S. · DATOS DEMOSTRATIVOS" in platform
     assert "Calcula tu Huella · DATOS DEMOSTRATIVOS" in process
     assert "Datos demostrativos:" in process
@@ -37,6 +37,8 @@ def test_v261_demo_labels_preserve_mock_status_semantics() -> None:
     reduction = _read(V14 / "reduction_solutions.html")
 
     assert '<span class="status-chip">En recopilación</span>' in hero
+    assert '<div class="app-kicker">Tu inventario</div>' in hero
+    assert "Greenatics S.A.S. · Periodo 2026 · Uso interno" in hero
     assert '<span class="status-chip">En preparación</span>' in platform
     assert "Aprobado internamente" in reports
     assert "En evaluación" in reduction
@@ -64,10 +66,11 @@ def test_v261_browser_gate_requires_visible_demo_transparency() -> None:
     source = _read(BROWSER_GATE)
 
     assert "def _assert_demo_transparency(page: Page)" in source
-    assert 'page.locator(".app-head .app-kicker")' in source
+    assert 'page.locator(".app-top .demo-data-label")' in source
     assert 'page.locator(".workspace-bar")' in source
     assert 'page.locator(".process-window-top")' in source
     assert 'page.locator(".report-page-front")' in source
     assert 'page.locator(".decision-top")' in source
     assert 'page.locator(".reduction-head")' in source
+    assert "Etiqueta demostrativa del hero quedó recortada" in source
     assert 'landing-demo-transparency.png' in source
