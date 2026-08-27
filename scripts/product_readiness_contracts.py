@@ -62,6 +62,7 @@ TARGETED_CONTRACTS: tuple[str, ...] = (
 # Cross-version compatibility contracts belong to Product Readiness but are not
 # named test_v260*.py, so they are tracked separately from the V2.60 drift set.
 TRANSVERSAL_CONTRACTS: tuple[str, ...] = (
+    "tests/test_v210_product_readiness_inheritance.py",
     "tests/test_migration_legacy_compat.py",
 )
 
