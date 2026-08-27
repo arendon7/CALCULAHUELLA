@@ -20,7 +20,7 @@ def test_v261_html_mocks_label_demonstrative_data_visibly() -> None:
     reports = _read(V14 / "reports_decision.html")
     reduction = _read(V14 / "reduction_solutions.html")
 
-    assert '<span class="app-title">Centro de trabajo</span>' in hero
+    assert '<span class="app-title">Centro</span>' in hero
     assert '<span class="app-kicker demo-data-label">DATOS DEMOSTRATIVOS</span>' in hero
     assert "Greenatics S.A.S. · DATOS DEMOSTRATIVOS" in platform
     assert "Calcula tu Huella · DATOS DEMOSTRATIVOS" in process
