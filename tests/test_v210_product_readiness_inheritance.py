@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from scripts.product_readiness_contracts import TARGETED_CONTRACTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = ROOT / ".github" / "workflows" / "iteration4-stabilization.yml"
@@ -18,8 +20,11 @@ def test_v210_full_gate_accepts_v19_and_certified_v20_bases() -> None:
 
 def test_v210_brand_contracts_are_inside_targeted_release_gate() -> None:
     source = workflow_source()
-    assert "tests/test_v210_brand_provenance.py" in source
-    assert "tests/test_v210_brand_package.py" in source
+    authority = set(TARGETED_CONTRACTS)
+
+    assert "python scripts/product_readiness_contracts.py" in source
+    assert "tests/test_v210_brand_provenance.py" in authority
+    assert "tests/test_v210_brand_package.py" in authority
 
 
 def test_v210_inheritance_keeps_all_v20_release_barriers() -> None:
