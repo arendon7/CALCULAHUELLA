@@ -54,7 +54,7 @@ def _assert_demo_transparency(page: Page) -> dict[str, object]:
         )
 
     required_surfaces = (
-        (".app-head .app-kicker", "Tu inventario · DATOS DEMOSTRATIVOS"),
+        (".app-top .demo-data-label", "DATOS DEMOSTRATIVOS"),
         (".workspace-bar", "Greenatics S.A.S. · DATOS DEMOSTRATIVOS"),
         (".process-window-top", "Calcula tu Huella · DATOS DEMOSTRATIVOS"),
         (".report-page-front", "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026"),
@@ -72,6 +72,17 @@ def _assert_demo_transparency(page: Page) -> dict[str, object]:
                 f"La superficie {selector!r} no expone la aclaración requerida: {fragment!r}"
             )
 
+    hero_label = page.locator(".app-top .demo-data-label")
+    hero_box = hero_label.bounding_box()
+    viewport = page.viewport_size
+    if hero_box is None or viewport is None:
+        raise AssertionError("No fue posible medir la visibilidad de la etiqueta demostrativa del hero.")
+    if hero_box["x"] < 0 or hero_box["x"] + hero_box["width"] > viewport["width"]:
+        raise AssertionError(
+            "Etiqueta demostrativa del hero quedó recortada horizontalmente: "
+            f"box={hero_box!r}, viewport={viewport!r}"
+        )
+
     trace_disclaimer = page.locator(".trace-copy .trace-reserve").filter(has_text="Datos demostrativos:")
     if trace_disclaimer.count() != 1:
         raise AssertionError("La trazabilidad no contiene una única aclaración visible de datos demostrativos.")
@@ -79,6 +90,7 @@ def _assert_demo_transparency(page: Page) -> dict[str, object]:
 
     return {
         "uppercase_label_count": label_count,
+        "hero_label_fully_visible": True,
         "required_surfaces": [
             {"selector": selector, "text": fragment}
             for selector, fragment in required_surfaces
