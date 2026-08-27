@@ -66,7 +66,8 @@ def _assert_demo_transparency(page: Page) -> dict[str, object]:
         if surface.count() != 1:
             raise AssertionError(f"Superficie demostrativa ausente o ambigua: {selector!r}")
         surface.wait_for(state="visible")
-        if fragment not in surface.inner_text():
+        source_text = surface.text_content() or ""
+        if fragment not in source_text:
             raise AssertionError(
                 f"La superficie {selector!r} no expone la aclaración requerida: {fragment!r}"
             )
