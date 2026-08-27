@@ -44,6 +44,36 @@ def _assert_no_horizontal_overflow(page: Page, label: str) -> dict[str, int]:
     return metrics
 
 
+def _assert_demo_transparency(page: Page) -> dict[str, object]:
+    labels = page.get_by_text("DATOS DEMOSTRATIVOS", exact=False)
+    label_count = labels.count()
+    if label_count < 6:
+        raise AssertionError(
+            "La landing no hace suficientemente explícitos los datos demostrativos: "
+            f"solo {label_count} etiquetas visibles en el DOM."
+        )
+
+    required_fragments = (
+        "Centro de trabajo · Inventario corporativo 2026 · DATOS DEMOSTRATIVOS",
+        "Greenatics S.A.S. · DATOS DEMOSTRATIVOS",
+        "Calcula tu Huella · DATOS DEMOSTRATIVOS",
+        "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026",
+        "Sala de decisión · DATOS DEMOSTRATIVOS",
+        "DATOS DEMOSTRATIVOS · PLAN DE REDUCCIÓN 2026–2027",
+    )
+    for fragment in required_fragments:
+        locator = page.get_by_text(fragment, exact=True)
+        if locator.count() != 1:
+            raise AssertionError(f"Etiqueta demostrativa ausente o ambigua: {fragment!r}")
+        locator.wait_for(state="visible")
+
+    page.get_by_text("Datos demostrativos:", exact=False).wait_for(state="visible")
+    return {
+        "uppercase_label_count": label_count,
+        "required_fragments": list(required_fragments),
+    }
+
+
 def _canonical_footer_logo_state(page: Page) -> dict[str, object]:
     footer_logo = page.locator("footer .canonical-footer-logo")
     footer_logo.wait_for(state="visible")
@@ -105,7 +135,7 @@ def main() -> int:
     evidence: dict[str, object] = {
         "engine": "chromium",
         "base_url": BASE_URL,
-        "journey": "landing -> prefill -> diagnosis -> consent -> result -> mobile result",
+        "journey": "landing -> demo transparency -> prefill -> diagnosis -> consent -> result -> mobile result",
         "email": EMAIL,
     }
     console_errors: list[str] = []
@@ -119,6 +149,20 @@ def main() -> int:
         page.on("pageerror", lambda error: page_errors.append(str(error)))
 
         page.goto(BASE_URL, wait_until="networkidle")
+        demo_transparency = _assert_demo_transparency(page)
+        landing_desktop_layout = _assert_no_horizontal_overflow(page, "Landing desktop")
+        landing_desktop = ARTIFACT_DIR / "landing-demo-transparency.png"
+        page.screenshot(path=str(landing_desktop), full_page=True)
+
+        page.set_viewport_size({"width": 390, "height": 844})
+        page.reload(wait_until="networkidle")
+        _assert_demo_transparency(page)
+        landing_mobile_layout = _assert_no_horizontal_overflow(page, "Landing móvil")
+        landing_mobile = ARTIFACT_DIR / "landing-demo-transparency-mobile.png"
+        page.screenshot(path=str(landing_mobile), full_page=True)
+
+        page.set_viewport_size({"width": 1440, "height": 1000})
+        page.reload(wait_until="networkidle")
         landing_form = page.locator("[data-landing-context-form]")
         landing_form.wait_for(state="visible")
         landing_form.locator('select[name="landing_sector"]').select_option("Manufactura")
@@ -219,6 +263,17 @@ def main() -> int:
         mobile_screenshot = ARTIFACT_DIR / "public-funnel-result-mobile.png"
         page.screenshot(path=str(mobile_screenshot), full_page=True)
 
+        evidence["landing_demo_transparency"] = {
+            **demo_transparency,
+            "screenshots": {
+                "desktop": landing_desktop.name,
+                "mobile": landing_mobile.name,
+            },
+            "layout": {
+                "desktop": landing_desktop_layout,
+                "mobile": landing_mobile_layout,
+            },
+        }
         evidence["screenshots"] = {
             "desktop": screenshot.name,
             "mobile": mobile_screenshot.name,
