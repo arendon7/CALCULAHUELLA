@@ -66,11 +66,22 @@ def test_v261_browser_gate_requires_visible_demo_transparency() -> None:
     source = _read(BROWSER_GATE)
 
     assert "def _assert_demo_transparency(page: Page)" in source
-    assert 'page.locator(".app-top .demo-data-label")' in source
-    assert 'page.locator(".workspace-bar")' in source
-    assert 'page.locator(".process-window-top")' in source
-    assert 'page.locator(".report-page-front")' in source
-    assert 'page.locator(".decision-top")' in source
-    assert 'page.locator(".reduction-head")' in source
+    assert "required_surfaces = (" in source
+    required_contracts = (
+        '(".app-top .demo-data-label", "DATOS DEMOSTRATIVOS")',
+        '(".workspace-bar", "Greenatics S.A.S. · DATOS DEMOSTRATIVOS")',
+        '(".process-window-top", "Calcula tu Huella · DATOS DEMOSTRATIVOS")',
+        '(".report-page-front", "DATOS DEMOSTRATIVOS · INFORME EJECUTIVO · 2026")',
+        '(".decision-top", "Sala de decisión · DATOS DEMOSTRATIVOS")',
+        '(".reduction-head", "DATOS DEMOSTRATIVOS · PLAN DE REDUCCIÓN 2026–2027")',
+    )
+    for contract in required_contracts:
+        assert contract in source
+
+    assert "surface = page.locator(selector)" in source
+    assert 'surface.wait_for(state="visible")' in source
+    assert "source_text = surface.text_content() or \"\"" in source
+    assert 'hero_label = page.locator(".app-top .demo-data-label")' in source
+    assert "hero_box = hero_label.bounding_box()" in source
     assert "Etiqueta demostrativa del hero quedó recortada" in source
     assert 'landing-demo-transparency.png' in source
