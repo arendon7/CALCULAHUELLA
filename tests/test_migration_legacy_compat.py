@@ -9,9 +9,10 @@ from pathlib import Path
 from sqlalchemy import create_engine, inspect
 from sqlalchemy.sql.sqltypes import Numeric
 
+from scripts.alembic_revision_authority import repository_head_revision
+
 ROOT = Path(__file__).resolve().parents[1]
 LEGACY_REVISION = "20260806_0038"
-HEAD_REVISION = "20260825_0042"
 WORK_TABLES = {
     "work_items",
     "work_item_events",
@@ -64,7 +65,7 @@ def test_migration_graph_contains_live_checkpoint_and_single_head(tmp_path: Path
     assert "20260812_0040" in history
     assert "20260824_0041" in history
     assert heads.count("(head)") == 1
-    assert HEAD_REVISION in heads
+    assert repository_head_revision(ROOT) in heads
 
 
 def test_live_like_0038_database_upgrades_without_shrinking_or_schema_bootstrap(tmp_path: Path) -> None:
@@ -149,4 +150,4 @@ def test_live_like_0038_database_upgrades_without_shrinking_or_schema_bootstrap(
     _assert_numeric(after, "service_contracts", "contract_value", 20, 2)
 
     with sqlite3.connect(db_path) as conn:
-        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == HEAD_REVISION
+        assert conn.execute("SELECT version_num FROM alembic_version").fetchone()[0] == repository_head_revision(ROOT)
