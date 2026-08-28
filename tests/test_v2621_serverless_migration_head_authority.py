@@ -118,4 +118,7 @@ def test_v2621_serverless_workflow_executes_and_tracks_authority_contract() -> N
     assert f'- "{contract}"' in source
     assert f"pytest -q {contract}" in source
     assert 'run: python -m scripts.postgres_legacy_migration_gate' in source
-    assert 'run: python scripts/vercel_staging_contract.py' in source
+    assert 'run: python -m scripts.vercel_staging_contract' in source
+    assert 'run: python scripts/vercel_staging_contract.py' not in source
+    assert "pull_request:" in source
+    assert "      - feature/v2-1-0-brand-provenance" in source
