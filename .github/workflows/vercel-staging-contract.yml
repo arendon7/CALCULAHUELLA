@@ -19,6 +19,24 @@ on:
       - "tests/test_v2621_serverless_migration_head_authority.py"
       - "vercel.json"
       - ".github/workflows/vercel-staging-contract.yml"
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    paths:
+      - "api/**"
+      - "app/**"
+      - "migrations/**"
+      - "requirements*.txt"
+      - "scripts/vercel_staging_contract.py"
+      - "scripts/postgres_legacy_migration_gate.py"
+      - "scripts/alembic_revision_authority.py"
+      - "tests/test_vercel_staging_adapter.py"
+      - "tests/test_migration_legacy_compat.py"
+      - "tests/test_v200_postgres_schema_compatibility.py"
+      - "tests/test_v200_postgres_methodology_schema.py"
+      - "tests/test_v2621_serverless_migration_head_authority.py"
+      - "vercel.json"
+      - ".github/workflows/vercel-staging-contract.yml"
   workflow_dispatch:
 
 permissions:
