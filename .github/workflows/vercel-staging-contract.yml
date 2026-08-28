@@ -74,7 +74,7 @@ jobs:
         run: python -m scripts.postgres_legacy_migration_gate
 
       - name: Ejecutar FastAPI desde api.index:app
-        run: python scripts/vercel_staging_contract.py
+        run: python -m scripts.vercel_staging_contract
 
       - name: Publicar evidencia serverless
         if: always()
