@@ -14,7 +14,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # Single source of truth for the focused Product Readiness certification layer.
 # Keep historical contracts already enforced by iteration4-stabilization.yml and
 # classify every versioned adoption contract explicitly. The drift guard below
-# makes new V2.60/V2.61/V2.62/V2.62.1 contracts fail closed until deliberately classified here.
+# makes new V2.60/V2.61/V2.62/V2.63 contracts fail closed until deliberately classified here.
 TARGETED_CONTRACTS: tuple[str, ...] = (
     "tests/test_iteration15_canonical_workflow.py",
     "tests/test_iteration16_area_assignment.py",
@@ -60,6 +60,7 @@ TARGETED_CONTRACTS: tuple[str, ...] = (
     "tests/test_v261_visible_demo_data_labels.py",
     "tests/test_v262_mobile_operational_priority.py",
     "tests/test_v2621_serverless_migration_head_authority.py",
+    "tests/test_v263_mac_rc_provenance_continuity.py",
 )
 
 # Cross-version compatibility contracts belong to Product Readiness but are not
@@ -70,18 +71,20 @@ TRANSVERSAL_CONTRACTS: tuple[str, ...] = (
 )
 
 # A versioned module may be excluded only by naming it here with a non-empty reason.
-# Empty by design: current V2.60/V2.61/V2.62/V2.62.1 contracts are adoption-relevant.
+# Empty by design: current V2.60/V2.61/V2.62/V2.63 contracts are adoption-relevant.
 EXCLUDED_VERSIONED_CONTRACTS: dict[str, str] = {}
 
 VERSIONED_GLOBS: tuple[str, ...] = (
     "test_v260*.py",
     "test_v261*.py",
     "test_v262*.py",
+    "test_v263*.py",
 )
 VERSIONED_PREFIXES: tuple[str, ...] = (
     "test_v260",
     "test_v261",
     "test_v262",
+    "test_v263",
 )
 
 

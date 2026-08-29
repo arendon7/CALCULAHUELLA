@@ -12,6 +12,7 @@ on:
       - "tests/test_v260*.py"
       - "tests/test_v261*.py"
       - "tests/test_v262*.py"
+      - "tests/test_v263*.py"
       - "tests/test_migration_legacy_compat.py"
       - ".github/workflows/iteration4-stabilization.yml"
       - ".github/workflows/v26013-product-readiness-contract-authority-gate.yml"
