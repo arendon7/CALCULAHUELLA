@@ -1,0 +1,104 @@
+{% from "public/plan_copy.html" import public_plan_description, public_plan_fit %}
+<section class="section v15-pricing-section" id="precios" aria-labelledby="v15-pricing-title">
+  <div class="container">
+    <div class="v15-fair-banner" role="note" aria-label="Beneficio Feria de Negocios Verdes Corantioquia">
+      <div class="v15-fair-brand">
+        <div class="v15-fair-wordmark"><span>FERIA DE</span><strong>NEGOCIOS VERDES</strong><small>Corantioquia</small></div>
+        <img src="{{ url_for('static', path='img/campaign/corantioquia.png') }}" alt="Corantioquia">
+      </div>
+      <div class="v15-fair-offer">
+        <strong>{{ fair_discount_percent }}% DE DESCUENTO EN LOS PLANES ANUALES</strong>
+        <p>Beneficio especial de feria sobre la licencia anual. La vigencia y aplicación del beneficio se confirman al formalizar la propuesta.</p>
+      </div>
+    </div>
+
+    <header class="section-head v15-pricing-head">
+      <div class="eyebrow">Planes anuales · precio especial de feria</div>
+      <h2 id="v15-pricing-title">Tres niveles de gestión. Elige por la complejidad de tu operación.</h2>
+      <p>Los valores mostrados corresponden a la licencia anual de plataforma. El diagnóstico confirma qué plan encaja y si necesitas acompañamiento, levantamientos o integraciones adicionales; esos servicios profesionales adicionales se cotizan por separado cuando apliquen.</p>
+    </header>
+    <div class="v15-plan-grid">
+      {% for offer in fair_offers %}
+      {% set plan = offer.plan %}
+      <article class="v15-plan-card{% if plan.code == 'EMPRESARIAL' %} featured{% endif %}" data-plan-code="{{ plan.code }}">
+        <div class="v15-plan-top">
+          <span class="v15-plan-label">{{ plan.code }}</span>
+          <h3>{{ plan.name }}</h3>
+          <div class="v15-plan-fit"><small>IDEAL PARA</small><strong>{{ public_plan_fit(plan.code) }}</strong></div>
+          <p>{{ public_plan_description(plan.code) }}</p>
+        </div>
+        <div class="v15-price">
+          {% if offer.regular_annual_fee and offer.regular_annual_fee > 0 %}
+          <div class="v15-regular-price">Precio anual habitual <del>${{ offer.regular_annual_fee|number_es(0) }}</del> COP</div>
+          <div class="v15-promo-price"><strong>${{ offer.promo_annual_fee|number_es(0) }}</strong><span>COP / año</span></div>
+          <div class="v15-license-caption">Licencia anual de plataforma</div>
+          <div class="v15-saving">{{ offer.discount_percent }}% de descuento · ahorras ${{ (offer.regular_annual_fee - offer.promo_annual_fee)|number_es(0) }} COP</div>
+          {% else %}
+          <div class="v15-promo-price"><strong>A medida</strong><span>según diagnóstico</span></div>
+          {% endif %}
+        </div>
+        <ul>
+          <li><b>{{ plan.max_users }}</b> usuarios incluidos</li>
+          <li><b>{{ plan.max_facilities }}</b> sedes incluidas</li>
+          <li><b>{{ plan.max_inventories }}</b> inventarios incluidos</li>
+          <li>{% if plan.includes_scope3 %}<b>Alcance 3</b> incluido según configuración del plan{% else %}Alcance 3 se prioriza y cotiza cuando aplique{% endif %}</li>
+          <li>{% if plan.includes_verification_portal %}Portal para preparar revisión externa{% else %}Revisión profesional según alcance contratado{% endif %}</li>
+        </ul>
+        {% if plan.code == 'ESENCIAL' %}<a class="btn btn-secondary" href="/diagnostico?plan=ESENCIAL">Validar plan Esencial →</a>
+        {% elif plan.code == 'EMPRESARIAL' %}<a class="btn btn-primary" href="/diagnostico?plan=EMPRESARIAL">Evaluar plan Empresarial →</a>
+        {% elif plan.code == 'CORPORATIVO' %}<a class="btn btn-secondary" href="/diagnostico?plan=CORPORATIVO">Revisar alcance Corporativo →</a>
+        {% else %}<a class="btn btn-secondary" href="/diagnostico">Confirmar alcance →</a>{% endif %}
+      </article>
+      {% else %}
+      <article class="v15-plan-card">
+        <div class="v15-plan-top"><span class="v15-plan-label">ESENCIAL</span><h3>Huella Esencial</h3><div class="v15-plan-fit"><small>IDEAL PARA</small><strong>Primera huella</strong></div><p>Primera medición y organización del proceso.</p></div>
+        <div class="v15-price"><div class="v15-promo-price"><strong>A medida</strong><span>según diagnóstico</span></div></div>
+        <a class="btn btn-primary" href="/diagnostico">Solicitar diagnóstico →</a>
+      </article>
+      {% endfor %}
+    </div>
+    <div class="v15-pricing-boundary">
+      <div><strong>Incluido según el plan</strong><p>Acceso a plataforma, organización del inventario, flujo de responsables, trazabilidad, vistas de resultados y capacidades contratadas.</p></div>
+      <div><strong>Se define en el diagnóstico</strong><p>Levantamientos especiales, visitas, integraciones, alcance 3 de alta complejidad, desarrollos específicos y profundidad del acompañamiento profesional.</p></div>
+      <div><strong>Independiente cuando corresponda</strong><p>Una revisión interna o el uso del portal no equivalen a verificación independiente. Los servicios de un tercero verificador se acuerdan y contratan por separado.</p></div>
+    </div>
+    <p class="v15-price-note">Precios de licencia anual en COP. El descuento del 30% corresponde a la campaña comercial de la Feria de Negocios Verdes de Corantioquia; su vigencia y aplicación se confirman en la propuesta. Servicios profesionales adicionales y verificación independiente se cotizan por separado cuando correspondan.</p>
+  </div>
+</section>
+
+<section class="section v15-about-section" id="quienes-somos" aria-labelledby="v15-about-title">
+  <div class="container v15-about-grid">
+    <div class="v15-about-copy">
+      <div class="eyebrow">Potenciado por Greenatics</div>
+      <h2 id="v15-about-title">Software climático con criterio ambiental detrás.</h2>
+      <p>Calcula tu Huella nace de una necesidad práctica: convertir datos, facturas, soportes, criterios técnicos y conversaciones dispersas en un proceso de carbono que una organización pueda entender, operar y explicar.</p>
+      <p>Greenatics aporta conocimiento aplicado en sostenibilidad, economía circular y gestión ambiental. La plataforma traduce ese criterio en una ruta de trabajo más ordenada, sin presentar el software como sustituto del juicio profesional ni usar credenciales individuales no documentadas como argumento comercial.</p>
+      <div class="v15-about-actions"><a class="btn btn-primary" href="/diagnostico">Evaluar mi organización</a><a class="btn btn-secondary" href="/contacto">Hablar con el equipo</a></div>
+    </div>
+    <div class="v15-about-panel">
+      <article class="v15-about-lead"><small>CAPACIDADES DE ACOMPAÑAMIENTO</small><h3>Criterio técnico integrado al proceso</h3><p>El acompañamiento se concentra en estructurar información, documentar metodología, resolver observaciones, interpretar resultados y convertirlos en decisiones trazables.</p></article>
+      <div class="v15-about-mini-grid">
+        <article><strong>8 etapas</strong><span>para conectar diagnóstico, planificación, datos, metodología, cálculo, revisión, informes y reducción.</span></article>
+        <article><strong>1 expediente</strong><span>para relacionar datos, evidencias, decisiones metodológicas, resultados y observaciones.</span></article>
+      </div>
+      <p class="v15-about-qualification">No publicamos credenciales individuales, títulos, años de experiencia o referencias de proyectos hasta contar con soporte documental aprobado para publicación.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section v15-faq-section" id="preguntas" aria-labelledby="v15-faq-title">
+  <div class="container v15-faq-grid">
+    <header>
+      <div class="eyebrow">Preguntas antes de comenzar</div>
+      <h2 id="v15-faq-title">Lo importante es saber qué estás contratando y para qué.</h2>
+      <p>El diagnóstico evita sobredimensionar el proyecto y aclara desde el inicio qué cubre la plataforma, qué requiere acompañamiento y qué puede necesitar una revisión independiente.</p>
+    </header>
+    <div class="v15-faq-list">
+      <details open><summary>¿Puedo empezar solo con alcances 1 y 2?</summary><p>Sí. Para muchas organizaciones es una primera etapa razonable. El diagnóstico identifica si existen fuentes de alcance 3 que convenga priorizar desde el inicio por materialidad, clientes, licitaciones u otros objetivos.</p></details>
+      <details><summary>¿El precio de la licencia incluye todo el trabajo de consultoría?</summary><p>No. Los precios visibles corresponden a la licencia anual de plataforma. El acompañamiento profesional, levantamientos, integraciones o actividades especiales dependen de la complejidad y se cotizan por separado cuando apliquen.</p></details>
+      <details><summary>¿Qué pasa si mis datos están incompletos?</summary><p>La plataforma permite identificar vacíos, responsables, evidencias pendientes y supuestos. La calidad del resultado depende de la calidad de la información y de las decisiones metodológicas que correspondan.</p></details>
+      <details><summary>¿Calcula tu Huella certifica o verifica automáticamente el inventario?</summary><p>No. La plataforma soporta cálculo, revisión, trazabilidad y preparación documental, pero una verificación independiente exige un tercero competente e independiente cuando el objetivo así lo requiera.</p></details>
+      <details><summary>¿Puedo empezar con una sola sede y crecer después?</summary><p>Sí, cuando metodológicamente sea coherente con el objetivo del inventario. La ruta puede comenzar de forma acotada y ampliarse a nuevas sedes, periodos, fuentes o categorías a medida que madura la gestión.</p></details>
+    </div>
+  </div>
+</section>

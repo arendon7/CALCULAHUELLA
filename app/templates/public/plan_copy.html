@@ -1,0 +1,23 @@
+{% macro public_plan_name(code) -%}
+{%- if code == 'ESENCIAL' -%}Huella Esencial
+{%- elif code == 'EMPRESARIAL' -%}Huella Empresarial
+{%- elif code == 'CORPORATIVO' -%}Gestión Corporativa
+{%- else -%}Plan recomendado
+{%- endif -%}
+{%- endmacro %}
+
+{% macro public_plan_fit(code) -%}
+{%- if code == 'ESENCIAL' -%}Primera huella
+{%- elif code == 'EMPRESARIAL' -%}Gestión continua
+{%- elif code == 'CORPORATIVO' -%}Mayor exigencia
+{%- else -%}Alcance configurado
+{%- endif -%}
+{%- endmacro %}
+
+{% macro public_plan_description(code) -%}
+{%- if code == 'ESENCIAL' -%}Primera huella para una operación acotada, con alcances 1 y 2 y una ruta ordenada de datos, evidencias e informe.
+{%- elif code == 'EMPRESARIAL' -%}Gestión anual para varias sedes, alcance 3 priorizado, informes técnicos y mayor coordinación entre responsables.
+{%- elif code == 'CORPORATIVO' -%}Operación multiempresa, alcance 3 avanzado, integraciones, gobierno ampliado y soporte prioritario.
+{%- else -%}Capacidades de plataforma configuradas según el alcance definido para tu organización.
+{%- endif -%}
+{%- endmacro %}

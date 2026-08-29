@@ -4,6 +4,7 @@ on:
   pull_request:
     branches:
       - refactor/v1-9-0-core-surfaces
+      - stabilization/v2-0-0-product-readiness
     types: [opened, synchronize, reopened, ready_for_review]
   workflow_dispatch:
 
@@ -54,23 +55,10 @@ jobs:
 
       - name: Ejecutar contratos de product readiness
         run: |
-          pytest -q \
-            tests/test_iteration15_canonical_workflow.py \
-            tests/test_iteration16_area_assignment.py \
-            tests/test_iteration16_work_items.py \
-            tests/test_iteration17_integrated_workflow.py \
-            tests/test_iteration18_stabilization.py \
-            tests/test_iteration19_role_journeys.py \
-            tests/test_v024_security_hardening.py \
-            tests/test_v030_mac_lifecycle.py \
-            tests/test_v034_operational_hardening.py \
-            tests/test_v057_production_readiness.py \
-            tests/test_v100_rc1_release_candidate.py \
-            tests/test_v200_product_readiness_gate.py \
-            tests/test_v200_postgres_continuity_gate.py \
-            tests/test_v200_postgres_schema_compatibility.py \
-            tests/test_v200_postgres_methodology_schema.py \
-            --junitxml=iteration4-targeted.xml
+          python scripts/product_readiness_contracts.py \
+            --timeout 420 \
+            --durations 5 \
+            --junitxml iteration4-targeted.xml
 
       - name: Migración desde base vacía
         run: |

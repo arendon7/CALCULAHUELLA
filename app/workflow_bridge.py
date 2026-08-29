@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from . import workflow_service as _workflow_service
-from .database import DataRequest, Inventory, WorkItem
+from .database import DataRequest, Inventory, WorkItem, WorkItemLink
 from .notifications import create_notification, notify_roles
 from .workflow_domain import STATUS_BY_CODE
 from .workflow_integrations import mirror_source_from_work_item, sync_specialized_work_items
@@ -52,6 +52,26 @@ def _snapshot(item: WorkItem | None) -> tuple[object, ...] | None:
         item.closed_at,
         item.version,
     )
+
+
+def _origin_link_snapshot(
+    session: Session,
+    work_item_id: int | None,
+    request_id: int,
+) -> tuple[str, str] | None:
+    if work_item_id is None:
+        return None
+    row = session.execute(
+        select(WorkItemLink.route, WorkItemLink.label).where(
+            WorkItemLink.work_item_id == work_item_id,
+            WorkItemLink.entity_type == "DataRequest",
+            WorkItemLink.entity_id == request_id,
+            WorkItemLink.relationship_type == "origin",
+        )
+    ).first()
+    if row is None:
+        return None
+    return (str(row[0] or ""), str(row[1] or ""))
 
 
 def _status_label(item: WorkItem) -> str:
@@ -246,7 +266,17 @@ def sync_data_request(
         )
     )
     before = _snapshot(existing)
-    item, _ = _base_sync_data_request(
+    origin_before = _origin_link_snapshot(
+        session,
+        existing.id if existing is not None else None,
+        request_record.id,
+    )
+    expected_origin = (
+        f"/inventarios/{request_record.inventory_id}",
+        request_record.title.strip(),
+    )
+    origin_needs_repair = existing is not None and origin_before != expected_origin
+    item, base_changed = _base_sync_data_request(
         session,
         request_record,
         organization_id=organization_id,
@@ -260,7 +290,7 @@ def sync_data_request(
         item.assignee_role = "Cliente"
     if item.status_code == "closed" and item.closed_at is None:
         item.closed_at = request_record.completed_at or datetime.now(UTC)
-    return item, before is None or before != _snapshot(item)
+    return item, base_changed or origin_needs_repair or before is None or before != _snapshot(item)
 
 
 def _sync_data_requests_only(session: Session, organization_id: int, actor_email: str) -> dict[str, int]:

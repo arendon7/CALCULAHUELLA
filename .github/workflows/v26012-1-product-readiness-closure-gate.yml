@@ -1,0 +1,164 @@
+name: V2.60.12.1 · Product Readiness closure gate
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    paths:
+      - tests/test_app.py
+      - tests/test_v170_saas_admin_routing.py
+      - tests/test_v26012_commercial_lifecycle_policy.py
+      - tests/test_v26012_commercial_lifecycle_integrity.py
+      - tests/test_v26012_hash_boundaries.py
+      - .github/workflows/v26012-1-product-readiness-closure-gate.yml
+
+permissions:
+  contents: read
+
+env:
+  APP_ENV: local
+  SEED_DEMO: true
+  SCHEDULER_ENABLED: "0"
+  STRUCTURED_LOGGING: "0"
+  PBKDF2_ITERATIONS: "10000"
+  CSRF_ENABLED: "1"
+  STORAGE_BACKEND: local
+  BACKUP_OFFSITE_ENABLED: "0"
+
+jobs:
+  close-product-readiness-regressions:
+    name: Historical contracts · lifecycle truth · SQLite
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout exact PR head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Enforce narrow hotfix surface
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          git fetch origin "${BASE_SHA}" --depth=1
+          python - <<'PY'
+          import os
+          import subprocess
+
+          base = os.environ["BASE_SHA"]
+          changed = set(
+              subprocess.check_output(
+                  ["git", "diff", "--name-only", f"{base}...HEAD"],
+                  text=True,
+              ).splitlines()
+          )
+          allowed = {
+              "tests/test_app.py",
+              "tests/test_v170_saas_admin_routing.py",
+              ".github/workflows/v26012-1-product-readiness-closure-gate.yml",
+          }
+          unexpected = changed - allowed
+          missing = {"tests/test_app.py", "tests/test_v170_saas_admin_routing.py"} - changed
+          assert not unexpected, f"Unexpected hotfix surface: {sorted(unexpected)}"
+          assert not missing, f"Expected regression closures missing: {sorted(missing)}"
+          print("narrow_hotfix_surface=PASS")
+          print("changed_files=" + ",".join(sorted(changed)))
+          PY
+
+      - name: Compile closure surface
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v26012-1-pycache" python -m compileall -q \
+            tests/test_app.py \
+            tests/test_v170_saas_admin_routing.py \
+            tests/test_v26012_commercial_lifecycle_policy.py \
+            tests/test_v26012_commercial_lifecycle_integrity.py \
+            tests/test_v26012_hash_boundaries.py
+
+      - name: Run failed Product Readiness blocks with canonical isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          run_isolated() {
+            local label="$1"
+            shift
+            local temp_root
+            temp_root="$(mktemp -d "${RUNNER_TEMP}/cth-v26012-1-${label}.XXXXXX")"
+            echo "isolated_block=${label}"
+            PYTEST_DISABLE_PLUGIN_AUTOLOAD=1 \
+              TMPDIR="${temp_root}" TEMP="${temp_root}" TMP="${temp_root}" \
+              python scripts/pytest_isolated.py "$@"
+            rm -rf "${temp_root}"
+          }
+
+          # Product Readiness deliberately deselects this superseded historical
+          # public-copy assertion from test_app.py. Keep exact parity here so
+          # this hotfix gate does not resurrect an obsolete /diagnostico contract.
+          run_isolated test-app \
+            -q tests/test_app.py \
+            --deselect=tests/test_app.py::test_public_site_and_diagnostic_flow \
+            --junitxml=v26012-1-test-app.xml
+
+          run_isolated v170-saas \
+            -q tests/test_v170_saas_admin_routing.py \
+            --junitxml=v26012-1-v170-saas.xml
+
+          run_isolated v26012-policy \
+            -q tests/test_v26012_commercial_lifecycle_policy.py \
+            --junitxml=v26012-1-v26012-policy.xml
+
+          run_isolated v26012-integrity \
+            -q tests/test_v26012_commercial_lifecycle_integrity.py \
+            --junitxml=v26012-1-v26012-integrity.xml
+
+          run_isolated v26012-hash \
+            -q tests/test_v26012_hash_boundaries.py \
+            --junitxml=v26012-1-v26012-hash.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26012-1-sqlite
+        run: |
+          unset DATABASE_URL
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Build closure evidence
+        env:
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          {
+            echo "checkpoint=V2.60.12.1"
+            echo "head_sha=${HEAD_SHA}"
+            echo "production_code_change=none"
+            echo "schema_change=none"
+            echo "test_process_isolation=product-readiness-parity"
+            echo "superseded_diagnostic_assertion=deselected-as-canonical-runner"
+            echo "stale_service_order_shortcut=409-preserved"
+            echo "valid_service_order_flow=planned-executing-delivered-accepted"
+            echo "paid_invoice_requires=total_with_tax-plus-total_amount"
+            echo "historical_seed_order_dependency=removed"
+          } > v26012-1-evidence.txt
+
+      - name: Upload closure evidence
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26012-1-product-readiness-closure-evidence
+          path: |
+            v26012-1-*.xml
+            v26012-1-evidence.txt
+          retention-days: 14

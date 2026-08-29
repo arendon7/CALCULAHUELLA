@@ -5,40 +5,105 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="color-scheme" content="light">
   <meta name="theme-color" content="#0B3B2E">
-  <title>Calcula tu Huella V1.0 · Copia funcional UI/UX V1.4.0 integración controlada</title>
-  <meta name="description" content="Centraliza datos, evidencias, solicitudes, cálculos e informes para gestionar la huella de carbono con acompañamiento profesional y trazabilidad.">
-  <link rel="icon" href="assets/logo.svg">
+  <meta name="robots" content="index,follow,max-image-preview:large">
+  <title>Calcula tu Huella | Huella de carbono trazable y gestión climática</title>
+  <meta name="description" content="Calcula, documenta y gestiona la huella de carbono de tu empresa con datos y evidencias trazables, acompañamiento profesional, informes y planes de reducción.">
+  <link rel="canonical" href="https://arendon7.github.io/CALCULAHUELLA/">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="es_CO">
+  <meta property="og:site_name" content="Calcula tu Huella">
+  <meta property="og:title" content="Calcula tu Huella | De datos dispersos a decisiones climáticas trazables">
+  <meta property="og:description" content="Plataforma y acompañamiento profesional para construir inventarios de GEI explicables, actualizables y útiles para tomar decisiones.">
+  <meta property="og:url" content="https://arendon7.github.io/CALCULAHUELLA/">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="Calcula tu Huella | Gestión de carbono trazable">
+  <meta name="twitter:description" content="Datos, evidencias, cálculo, revisión, informes y reducción dentro de un mismo proceso.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="icon" href="assets/symbol.svg">
   <link rel="stylesheet" href="styles.css">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "WebApplication",
+    "name": "Calcula tu Huella",
+    "url": "https://arendon7.github.io/CALCULAHUELLA/",
+    "description": "Plataforma y acompañamiento profesional para construir, documentar, revisar y gestionar inventarios corporativos de gases de efecto invernadero.",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Web",
+    "inLanguage": "es-CO",
+    "featureList": [
+      "Recopilación guiada de datos y evidencias",
+      "Trazabilidad de datos, factores, fórmulas y resultados",
+      "Control de calidad y observaciones",
+      "Análisis de hotspots",
+      "Planes de reducción y seguimiento",
+      "Informes ejecutivos, técnicos y memoria de cálculo"
+    ],
+    "offers": [
+      {"@type":"Offer","name":"Huella Esencial","price":"1300000","priceCurrency":"COP"},
+      {"@type":"Offer","name":"Gestión de Carbono","price":"3300000","priceCurrency":"COP"},
+      {"@type":"Offer","name":"Gestión Avanzada","price":"8300000","priceCurrency":"COP"}
+    ]
+  }
+  </script>
+  <script type="application/ld+json">
+  {
+    "@context":"https://schema.org",
+    "@type":"FAQPage",
+    "inLanguage":"es-CO",
+    "mainEntity":[
+      {"@type":"Question","name":"¿Cuánto tarda?","acceptedAnswer":{"@type":"Answer","text":"Depende principalmente de la disponibilidad y calidad de los datos, el número de sedes y fuentes y la rapidez de respuesta de las áreas. El diagnóstico identifica los bloqueos antes de comprometer una ruta."}},
+      {"@type":"Question","name":"¿Sirve si nunca hemos medido?","acceptedAnswer":{"@type":"Answer","text":"Sí. Huella Esencial está pensada para una primera medición y comienza organizando estructura, responsables, datos y evidencias antes del cálculo."}},
+      {"@type":"Question","name":"¿Qué información debemos tener?","acceptedAnswer":{"@type":"Answer","text":"Consumos, combustibles, compras, residuos, transporte y otros datos relevantes según la operación. No necesitas tenerlos perfectos: la plataforma identifica faltantes y ayuda a ordenarlos."}},
+      {"@type":"Question","name":"¿La plataforma reemplaza al profesional ambiental?","acceptedAnswer":{"@type":"Answer","text":"No. Automatiza y estructura el trabajo repetible; el criterio profesional sigue siendo necesario para alcance, materialidad, supuestos, calidad y decisiones metodológicas."}},
+      {"@type":"Question","name":"¿El resultado queda certificado?","acceptedAnswer":{"@type":"Answer","text":"No automáticamente. Un inventario documentado y aprobado internamente no equivale a verificación independiente. Gestión Avanzada puede preparar el expediente para ese proceso."}},
+      {"@type":"Question","name":"¿Por qué el precio puede variar?","acceptedAnswer":{"@type":"Answer","text":"Porque dos empresas con ventas similares pueden tener una complejidad climática muy distinta. Sedes, fuentes, alcance 3, calidad de datos, integraciones y requerimientos externos cambian el esfuerzo real."}},
+      {"@type":"Question","name":"¿Podemos empezar pequeño y ampliar después?","acceptedAnswer":{"@type":"Answer","text":"Sí. La arquitectura permite comenzar con alcances 1 y 2 y aumentar profundidad cuando exista una necesidad material, comercial o de gestión justificada."}},
+      {"@type":"Question","name":"¿La demo de Pages guarda información empresarial real?","acceptedAnswer":{"@type":"Answer","text":"No. Es una preview de UX con datos demostrativos y almacenamiento local del navegador. La aplicación transaccional utiliza backend, autenticación, permisos y base de datos."}}
+    ]
+  }
+  </script>
   <script defer src="config.js"></script>
   <script defer src="app.js"></script>
 </head>
-<body>
+<body class="public-v14-body">
 <a class="skip-link" href="#contenido">Saltar al contenido</a>
 <header class="site-header">
-<div class="container nav">
-<a aria-label="Calcula tu Huella, inicio" class="brand" href="#inicio">
-<img alt="Calcula tu Huella" src="assets/logo.svg"/>
-</a>
-<nav aria-label="Navegación principal" class="nav-links">
-<a href="#plataforma">Plataforma</a>
-<a href="#como-funciona">Cómo funciona</a>
-<a href="#soluciones">Soluciones</a>
-<a href="#informes">Informes</a>
-<a href="#experiencia">Experiencia</a>
-<a href="#recursos">Recursos</a>
-</nav>
-<div class="nav-actions">
-<a class="btn btn-secondary nav-demo" data-app-link="login" href="#plataforma">Ver demo funcional</a><a class="btn btn-primary" href="#diagnostico">Realizar diagnóstico</a>
-<button aria-controls="mobilePanel" aria-expanded="false" aria-label="Abrir menú" class="menu-button" data-menu-button=""><span></span></button>
-</div>
-</div>
-<nav aria-label="Navegación móvil" class="mobile-panel" data-mobile-panel="" id="mobilePanel">
-<a href="#plataforma">Plataforma</a><a href="#como-funciona">Cómo funciona</a><a href="#soluciones">Soluciones</a><a href="#informes">Informes</a><a href="#reduccion">Reducción</a><a href="#experiencia">Experiencia</a><a href="#recursos">Recursos</a><a data-app-link="login" href="#plataforma">Abrir aplicación demo</a><a class="btn btn-primary" href="#diagnostico">Realizar diagnóstico</a>
-</nav>
+  <div class="container nav">
+    <a aria-label="Calcula tu Huella, inicio" class="brand" href="#inicio"><img alt="Calcula tu Huella" src="assets/logo.svg"></a>
+    <nav aria-label="Navegación principal" class="nav-links">
+      <a href="#valor">Por qué</a>
+      <a href="#como-funciona">Cómo funciona</a>
+      <a href="#demo-app">Plataforma</a>
+      <a href="#precios">Precios</a>
+      <a href="#preguntas">Preguntas</a>
+    </nav>
+    <div class="nav-actions">
+      <a class="login-link nav-demo" data-app-link="login" href="#demo-app">Abrir demo</a>
+      <a class="btn btn-primary" href="#diagnostico">Encontrar mi ruta</a>
+      <button aria-controls="mobilePanel" aria-expanded="false" aria-label="Abrir menú" class="menu-button" data-menu-button type="button"><span></span></button>
+    </div>
+  </div>
+  <nav aria-label="Navegación móvil" class="mobile-panel" data-mobile-panel id="mobilePanel">
+    <a href="#valor">Por qué</a>
+    <a href="#como-funciona">Cómo funciona</a>
+    <a href="#demo-app">Explorar plataforma</a>
+    <a href="#precios">Precios</a>
+    <a href="#preguntas">Preguntas frecuentes</a>
+    <a data-app-link="login" href="#demo-app">Abrir demo</a>
+    <a class="btn btn-primary" href="#diagnostico">Encontrar mi ruta</a>
+  </nav>
 </header>
 <main id="contenido" data-section-host aria-busy="true"><div class="container" style="padding:72px 0"><p>Cargando experiencia pública…</p></div></main>
-<footer class="footer-mini">
-<div class="container"><img alt="Calcula tu Huella" src="assets/logo.svg"/><span>V1.0 canónica · Copia funcional UI/UX V1.4.0 integración controlada · Agosto de 2026</span></div>
+<footer class="site-footer-craft">
+  <div class="container footer-craft-grid">
+    <div class="footer-craft-brand"><img alt="Calcula tu Huella" src="assets/logo.svg"><p>Plataforma y acompañamiento profesional para convertir datos operativos en inventarios de GEI trazables, actualizables y útiles para decidir.</p><span>Vista pública de producto · Agosto de 2026</span></div>
+    <nav aria-label="Producto" class="footer-craft-nav"><strong>Producto</strong><a href="#demo-app">Explorar plataforma</a><a href="#como-funciona">Cómo funciona</a><a href="#primer-ano">Primer año</a><a href="#escenarios">Escenarios demo</a><a href="#precios">Planes y precios</a></nav>
+    <nav aria-label="Confianza" class="footer-craft-nav"><strong>Confianza</strong><a href="#trazabilidad">Trazabilidad</a><a href="#por-que">Principios metodológicos</a><a href="#marcos-metodologicos">Marcos revisados</a><a href="#experiencia">Dirección técnica</a><a href="#preguntas">Preguntas frecuentes</a></nav>
+    <div class="footer-craft-action"><strong>¿Por dónde empezar?</strong><p>El diagnóstico orientativo toma cinco respuestas y no solicita correo ni teléfono.</p><a class="btn btn-light" href="#diagnostico">Encontrar mi ruta</a></div>
+  </div>
+  <div class="container footer-craft-legal"><span>La preview de GitHub Pages usa datos demostrativos y almacenamiento local del navegador.</span><span>Un inventario aprobado internamente no equivale por sí mismo a verificación independiente.</span></div>
 </footer>
 </body>
 </html>

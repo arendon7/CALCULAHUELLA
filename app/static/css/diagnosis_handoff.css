@@ -22,3 +22,56 @@
   font-size: .78rem;
   line-height: 1.4;
 }
+
+/* V2.60.2 · consentimiento explícito del diagnóstico público. */
+.diagnosis-consent {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #f5f8f7;
+  color: #52666f;
+  cursor: pointer;
+}
+
+.diagnosis-consent input {
+  width: 18px !important;
+  height: 18px;
+  min-height: 0 !important;
+  margin: 2px 0 0;
+  accent-color: var(--green);
+}
+
+.diagnosis-consent > span {
+  display: block;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  background: transparent;
+  color: #52666f;
+  font-size: .72rem;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.diagnosis-consent a {
+  color: var(--green);
+  font-weight: 800;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.diagnosis-consent input:focus-visible {
+  outline: 3px solid rgba(45, 111, 115, .24);
+  outline-offset: 3px;
+}
+
+/* CSP/WebKit: el progreso depende de un estado discreto, no de style inline. */
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="1"] .diagnosis-progress-track i { width: 25%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="2"] .diagnosis-progress-track i { width: 50%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="3"] .diagnosis-progress-track i { width: 75%; }
+[data-v260-diagnosis-wizard][data-diagnosis-progress-step="4"] .diagnosis-progress-track i { width: 100%; }

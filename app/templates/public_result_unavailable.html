@@ -1,0 +1,18 @@
+{% extends "public_base.html" %}
+{% block title %}Resultado no disponible · Calcula tu Huella{% endblock %}
+{% block robots %}<meta name="robots" content="noindex,nofollow,noarchive">{% endblock %}
+{% block content %}
+<section class="result-shell intelligent-result">
+  <span>ACCESO AL RESULTADO</span>
+  <h1>Este resultado no está disponible</h1>
+  <p>El enlace puede haber vencido o no ser válido. Por privacidad no distinguimos entre ambos casos.</p>
+  <div class="method-note">
+    <strong>Puedes continuar sin recuperar este enlace.</strong>
+    <p>Realiza un nuevo diagnóstico para generar una recomendación actualizada o vuelve al inicio para revisar cómo funciona la plataforma.</p>
+  </div>
+  <div class="result-actions">
+    <a class="button primary large" href="/diagnostico">Realizar un nuevo diagnóstico</a>
+    <a class="button secondary large" href="/">Volver al inicio</a>
+  </div>
+</section>
+{% endblock %}

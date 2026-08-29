@@ -35,11 +35,16 @@ def _login(client: TestClient) -> None:
 def test_v170_commercial_operations_have_dedicated_http_authority():
     main_source = (ROOT / "app/main.py").read_text(encoding="utf-8")
     module_source = (ROOT / "app/commercial_operations_web.py").read_text(encoding="utf-8")
+    revenue_source = (ROOT / "app/revenue_operations.py").read_text(encoding="utf-8")
     assert '@app.get("/operacion-comercial"' not in main_source
     assert '@app.post("/operacion-comercial/' not in main_source
     assert "register_commercial_operations_routes(" in main_source
     assert module_source.count("@app.") == 11
-    assert "def _contract_signature_hash" in module_source
+    assert "contract_signature_hash" in module_source
+    assert "contract_signature_source" in module_source
+    assert "def _contract_signature_hash" not in module_source
+    assert "def contract_signature_hash" in revenue_source
+    assert "def contract_signature_source" in revenue_source
     assert "def _contract_reference" in module_source
     assert "def _order_reference" in module_source
     assert "def _require_customer_success_view" not in module_source

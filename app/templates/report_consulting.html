@@ -8,7 +8,7 @@
     <h1>Convierte resultados en una historia útil para decidir</h1>
     <p>Revisa comparabilidad, intensidades, hallazgos, limitaciones y recomendaciones antes de generar un documento editable o una versión controlada.</p>
   </div>
-  <span class="phase-label">V0.55 · informes de consultoría</span>
+  <span class="phase-label">Preparación editorial · revisión humana</span>
 </div>
 
 <section class="consulting-hero card">
@@ -23,7 +23,7 @@
     <form action="/reportes/generar" method="post">
       <input type="hidden" name="inventory_id" value="{{ inventory.id }}">
       <input type="hidden" name="report_type" value="editable">
-      <button class="btn btn-primary">Generar Word editable</button>
+      <button class="btn btn-primary" data-document-mode="{{ 'final' if delivery.publication.can_share_external else 'working' }}">Generar Word editable{% if not delivery.publication.can_share_external %} de trabajo{% endif %}</button>
     </form>
     {% endif %}
   </div>

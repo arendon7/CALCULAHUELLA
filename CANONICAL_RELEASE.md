@@ -1,5 +1,7 @@
 # Declaración de versión canónica
 
+> **Alcance de esta evidencia:** este documento conserva el snapshot histórico de canonicalización aprobado el 5 de agosto de 2026 para la versión técnica de aplicación `1.0.0`. No pretende describir el head web más reciente ni sustituye la evidencia posterior de CI/Render. La línea de certificación web V2.1.5 post-RC evoluciona de forma independiente y no implica por sí sola un cambio de versión semántica de la aplicación.
+
 ## Identidad
 
 - Producto: Calcula tu Huella

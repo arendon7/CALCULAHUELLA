@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from datetime import UTC, date, datetime
+from decimal import Decimal
 
 from sqlalchemy import Boolean, Date, DateTime, Float, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from ..base import Base
+from ..monetary_types import money_type, normalized_money_type, rate_type
 
 class CommercialReadinessItem(Base):
     __tablename__ = "commercial_readiness_items"
@@ -32,8 +34,8 @@ class ServicePlan(Base):
     code: Mapped[str] = mapped_column(String(40), unique=True, index=True)
     name: Mapped[str] = mapped_column(String(100))
     description: Mapped[str] = mapped_column(Text, default="")
-    monthly_fee: Mapped[float] = mapped_column(Float, default=0)
-    annual_fee: Mapped[float] = mapped_column(Float, default=0)
+    monthly_fee: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
+    annual_fee: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     max_users: Mapped[int] = mapped_column(Integer, default=5)
     max_facilities: Mapped[int] = mapped_column(Integer, default=3)
     max_inventories: Mapped[int] = mapped_column(Integer, default=3)
@@ -55,7 +57,7 @@ class OrganizationSubscription(Base):
     start_date: Mapped[date] = mapped_column(Date, default=date.today)
     trial_end: Mapped[date | None] = mapped_column(Date, nullable=True)
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True)
-    custom_monthly_fee: Mapped[float | None] = mapped_column(Float, nullable=True)
+    custom_monthly_fee: Mapped[Decimal | None] = mapped_column(normalized_money_type(), nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
 
@@ -167,12 +169,21 @@ class BillingInvoice(Base):
     reference: Mapped[str] = mapped_column(String(80), unique=True)
     period_start: Mapped[date] = mapped_column(Date)
     period_end: Mapped[date] = mapped_column(Date)
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     status: Mapped[str] = mapped_column(String(30), default="Pendiente")
     issued_at: Mapped[date] = mapped_column(Date, default=date.today)
     due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
     paid_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     notes: Mapped[str] = mapped_column(Text, default="")
+    charge_type: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    amount_semantics: Mapped[str | None] = mapped_column(String(40), nullable=True)
+    net_amount: Mapped[Decimal | None] = mapped_column(money_type(), nullable=True)
+    tax_rate_snapshot: Mapped[Decimal | None] = mapped_column(rate_type(), nullable=True)
+    tax_amount: Mapped[Decimal | None] = mapped_column(money_type(), nullable=True)
+    total_amount: Mapped[Decimal | None] = mapped_column(money_type(), nullable=True)
+    source_reference: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    classification_note: Mapped[str | None] = mapped_column(Text, nullable=True)
+    semantics_created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     subscription: Mapped[OrganizationSubscription | None] = relationship()
 
@@ -218,11 +229,11 @@ class CommercialProposal(Base):
     status: Mapped[str] = mapped_column(String(30), default="Borrador")
     valid_until: Mapped[date | None] = mapped_column(Date, nullable=True)
     billing_cycle: Mapped[str] = mapped_column(String(20), default="Anual")
-    implementation_fee: Mapped[float] = mapped_column(Float, default=0)
-    recurring_fee: Mapped[float] = mapped_column(Float, default=0)
-    discount_amount: Mapped[float] = mapped_column(Float, default=0)
-    tax_rate: Mapped[float] = mapped_column(Float, default=0)
-    first_year_total: Mapped[float] = mapped_column(Float, default=0)
+    implementation_fee: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
+    recurring_fee: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
+    discount_amount: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
+    tax_rate: Mapped[Decimal] = mapped_column(rate_type(), default=Decimal("0.0000"))
+    first_year_total: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     scope_json: Mapped[str] = mapped_column(Text, default="[]")
     deliverables_json: Mapped[str] = mapped_column(Text, default="[]")
     terms: Mapped[str] = mapped_column(Text, default="")
@@ -253,7 +264,7 @@ class PaymentTransaction(Base):
     public_token: Mapped[str] = mapped_column(String(80), unique=True, index=True)
     gateway: Mapped[str] = mapped_column(String(40), default="Demo")
     status: Mapped[str] = mapped_column(String(30), default="Pendiente")
-    amount: Mapped[float] = mapped_column(Float, default=0)
+    amount: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     currency: Mapped[str] = mapped_column(String(10), default="COP")
     external_reference: Mapped[str] = mapped_column(String(120), default="")
     payer_name: Mapped[str] = mapped_column(String(180), default="")
@@ -282,7 +293,7 @@ class ServiceContract(Base):
     renewal_type: Mapped[str] = mapped_column(String(40), default="Anual")
     auto_renew: Mapped[bool] = mapped_column(Boolean, default=False)
     notice_days: Mapped[int] = mapped_column(Integer, default=30)
-    contract_value: Mapped[float] = mapped_column(Float, default=0)
+    contract_value: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     billing_cycle: Mapped[str] = mapped_column(String(20), default="Anual")
     owner: Mapped[str] = mapped_column(String(180), default="Equipo comercial")
     terms_snapshot: Mapped[str] = mapped_column(Text, default="")
@@ -290,6 +301,9 @@ class ServiceContract(Base):
     signed_email: Mapped[str] = mapped_column(String(180), default="")
     signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     signature_hash: Mapped[str] = mapped_column(String(64), default="")
+    signature_version: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    signature_payload: Mapped[str | None] = mapped_column(Text, nullable=True)
+    signature_snapshot_created_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_by: Mapped[str] = mapped_column(String(180), default="sistema")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC))
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=lambda: datetime.now(UTC), onupdate=lambda: datetime.now(UTC))
@@ -459,7 +473,7 @@ class RenewalOpportunity(Base):
     renewal_date: Mapped[date | None] = mapped_column(Date, nullable=True, index=True)
     status: Mapped[str] = mapped_column(String(40), default="Por preparar")
     probability: Mapped[int] = mapped_column(Integer, default=50)
-    forecast_amount: Mapped[float] = mapped_column(Float, default=0)
+    forecast_amount: Mapped[Decimal] = mapped_column(money_type(), default=Decimal("0.00"))
     strategy: Mapped[str] = mapped_column(Text, default="")
     blockers: Mapped[str] = mapped_column(Text, default="")
     next_action: Mapped[str] = mapped_column(Text, default="")

@@ -2,8 +2,55 @@
 {% block title %}Portal del verificador · Calcula tu Huella{% endblock %}
 {% block page_label %}Verificación independiente{% endblock %}
 {% block content %}
-<div class="page-head"><div><p class="breadcrumb">Expediente / {{ inventory.name }}</p><h1>Portal del verificador</h1><p>Consulta de solo lectura, hallazgos independientes y paquete reproducible de aseguramiento.</p></div><span class="phase-label">Funcional · V0.8</span></div>
+<div class="page-head"><div><p class="breadcrumb">Expediente / {{ inventory.name }}</p><h1>Portal del verificador</h1><p>Consulta de solo lectura, hallazgos independientes y paquete reproducible de aseguramiento.</p></div><span class="phase-label">Expediente trazable</span></div>
 <div class="verification-banner"><span>◇</span><div><strong>Espacio independiente de revisión</strong><small>Los hallazgos de este portal no alteran datos, factores ni cálculos. Toda interacción queda en auditoría.</small></div></div>
+
+{% set verification_packages = reports|selectattr('report_type','equalto','Paquete de verificación')|list %}
+<section class="card" aria-labelledby="verification-priority-title">
+  <div class="card-head">
+    <div>
+      <small>PRIORIDAD DE VERIFICACIÓN</small>
+      {% if blockers %}
+        <h3 id="verification-priority-title">Resolver bloqueos de calidad antes de concluir</h3>
+      {% elif finding_counts.major > 0 %}
+        <h3 id="verification-priority-title">Resolver hallazgos materiales abiertos</h3>
+      {% elif finding_counts.open > 0 %}
+        <h3 id="verification-priority-title">Decidir los hallazgos que siguen abiertos</h3>
+      {% elif verification_packages %}
+        <h3 id="verification-priority-title">Revisar el expediente reproducible y documentar la conclusión</h3>
+      {% else %}
+        <h3 id="verification-priority-title">Generar el paquete reproducible para iniciar la revisión</h3>
+      {% endif %}
+    </div>
+    {% if blockers %}
+      <span class="status-chip warning">{{ blockers|length }} bloqueos</span>
+    {% elif finding_counts.major > 0 %}
+      <span class="status-chip warning">{{ finding_counts.major }} materiales</span>
+    {% elif finding_counts.open > 0 %}
+      <span class="status-chip progressing">{{ finding_counts.open }} abiertos</span>
+    {% elif verification_packages %}
+      <span class="status-chip active">Expediente preparado</span>
+    {% else %}
+      <span class="status-chip progressing">Preparar paquete</span>
+    {% endif %}
+  </div>
+  {% if blockers %}
+    <p>Las puertas internas todavía reportan condiciones pendientes. Revísalas primero; una conclusión de verificación no debe ocultar bloqueos de calidad existentes.</p>
+    <a class="btn btn-primary" href="#puertas">Revisar puertas de calidad</a>
+  {% elif finding_counts.major > 0 %}
+    <p>Existen hallazgos mayores o críticos sin cerrar. Prioriza su evidencia, respuesta y conclusión antes de preparar el expediente final.</p>
+    <a class="btn btn-primary" href="#hallazgos">Revisar hallazgos materiales</a>
+  {% elif finding_counts.open > 0 %}
+    <p>No hay hallazgos materiales abiertos, pero quedan decisiones pendientes en el expediente externo. Ciérralas o documenta por qué deben permanecer abiertas.</p>
+    <a class="btn btn-primary" href="#hallazgos">Decidir hallazgos abiertos</a>
+  {% elif verification_packages %}
+    <p>Las puertas y hallazgos no muestran pendientes prioritarios. Usa el paquete reproducible y los informes emitidos como base de la revisión independiente.</p>
+    <a class="btn btn-primary" href="#paquete">Revisar paquete e informes</a>
+  {% else %}
+    <p>Las puertas y hallazgos no muestran pendientes prioritarios. Genera el paquete reproducible para consolidar datos, cálculos, factores, evidencias e informes disponibles.</p>
+    <a class="btn btn-primary" href="#paquete">Preparar paquete de aseguramiento</a>
+  {% endif %}
+</section>
 
 <section class="card verifier-hero">
   <div><small>EMISIONES</small><h2>{{ inventory.sources|selectattr('included')|sum(attribute='emissions')|number_es }} tCO₂e</h2><p>{{ inventory.methodology_version }}</p></div>
@@ -14,13 +61,13 @@
 
 <div class="verification-layout">
   <div class="verification-main">
-    <section class="card">
+    <section class="card" id="puertas">
       <div class="card-head"><div><small>PUERTAS DE CALIDAD</small><h3>Estado previo al aseguramiento</h3></div><span class="status-chip {% if can_approve %}active{% else %}warning{% endif %}">{{ 'Listo' if can_approve else 'Con bloqueos' }}</span></div>
       <div class="gate-grid">{% for gate in gates %}<article class="gate-card"><span class="status-dot {% if gate.status == 'Aprobado' %}ok{% else %}pending{% endif %}"></span><div><strong>{{ gate.name }}</strong><small>{{ gate.detail }}</small></div></article>{% endfor %}</div>
       {% if blockers %}<div class="method-note"><strong>Bloqueos:</strong> {{ blockers|join(' · ') }}</div>{% endif %}
     </section>
 
-    <section class="card">
+    <section class="card" id="hallazgos">
       <div class="card-head"><div><small>HALLAZGOS EXTERNOS</small><h3>Expediente de verificación</h3></div><span class="counter">{{ findings|length }}</span></div>
       {% if findings %}<div class="finding-list">{% for finding in findings %}<article class="finding-card severity-{{ finding.severity|lower }}"><div class="finding-head"><div><small>{{ finding.finding_type|upper }} · {{ finding.source.name if finding.source else 'INVENTARIO' }}</small><h3>{{ finding.title }}</h3></div><span class="status-chip {% if finding.status == 'Cerrado' %}active{% else %}progressing{% endif %}">{{ finding.status }}</span></div><p>{{ finding.description }}</p><dl><div><dt>Severidad</dt><dd>{{ finding.severity }}</dd></div><div><dt>Verificador</dt><dd>{{ finding.verifier_email }}</dd></div><div><dt>Fecha</dt><dd>{{ finding.created_at.strftime('%Y-%m-%d') }}</dd></div></dl>
       {% if finding.management_response %}<div class="response-box"><strong>Respuesta de gestión</strong><p>{{ finding.management_response }}</p><small>{{ finding.response_by }}</small></div>{% endif %}
@@ -39,7 +86,7 @@
 
   <aside class="verification-side">
     {% if user.can_external_audit %}<section class="card"><div class="card-head"><div><small>NUEVO HALLAZGO</small><h3>Registrar evidencia</h3></div></div><form action="/verificacion/hallazgos/nuevo" method="post" class="stack-form"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><label>Título<input name="title" required></label><label>Tipo<select name="finding_type"><option>Observación</option><option>Solicitud de información</option><option>No conformidad</option><option>Oportunidad de mejora</option></select></label><label>Severidad<select name="severity"><option>Informativa</option><option selected>Menor</option><option>Mayor</option><option>Crítica</option></select></label><label>Fuente<select name="source_id"><option value="">Inventario general</option>{% for source in inventory.sources %}<option value="{{ source.id }}">{{ source.name }}</option>{% endfor %}</select></label><label>Descripción<textarea name="description" required></textarea></label><button class="btn btn-primary btn-block">Crear hallazgo</button></form></section>{% endif %}
-    <section class="card"><div class="card-head"><div><small>PAQUETE DE ASEGURAMIENTO</small><h3>Exportación reproducible</h3></div></div><p>Genera un ZIP con manifiesto, datos, cálculos, factores, índices, hallazgos e informes disponibles.</p><form action="/verificacion/paquete" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><button class="btn btn-primary btn-block">Generar paquete</button></form>{% set packages = reports|selectattr('report_type','equalto','Paquete de verificación')|list %}{% if packages %}<hr class="section-divider"><strong>Paquetes anteriores</strong>{% for item in packages[:3] %}<a class="download-row" href="/reportes/{{ item.id }}/descargar"><span>ZIP</span><div><strong>{{ item.file_name }}</strong><small>{{ item.generated_at.strftime('%Y-%m-%d %H:%M') }} · {{ item.file_size|bytes }}</small></div></a>{% endfor %}{% endif %}</section>
+    <section class="card" id="paquete"><div class="card-head"><div><small>PAQUETE DE ASEGURAMIENTO</small><h3>Exportación reproducible</h3></div></div><p>Genera un ZIP con manifiesto, datos, cálculos, factores, índices, hallazgos e informes disponibles.</p><form action="/verificacion/paquete" method="post"><input type="hidden" name="inventory_id" value="{{ inventory.id }}"><button class="btn btn-primary btn-block">Generar paquete</button></form>{% if verification_packages %}<hr class="section-divider"><strong>Paquetes anteriores</strong>{% for item in verification_packages[:3] %}<a class="download-row" href="/reportes/{{ item.id }}/descargar"><span>ZIP</span><div><strong>{{ item.file_name }}</strong><small>{{ item.generated_at.strftime('%Y-%m-%d %H:%M') }} · {{ item.file_size|bytes }}</small></div></a>{% endfor %}{% endif %}</section>
     <section class="card"><div class="card-head"><div><small>DOCUMENTOS</small><h3>Informes emitidos</h3></div></div>{% for report in reports if report.report_type != 'Paquete de verificación' %}<a class="download-row" href="/reportes/{{ report.id }}/descargar"><span>{{ 'PDF' if report.file_name.endswith('.pdf') else 'XLS' }}</span><div><strong>{{ report.report_type }}</strong><small>{{ report.status }} · v{{ report.version }}</small></div></a>{% else %}<p>No existen informes generados.</p>{% endfor %}</section>
   </aside>
 </div>

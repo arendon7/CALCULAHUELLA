@@ -1,0 +1,83 @@
+name: V2.60 · Public funnel gate
+
+on:
+  pull_request:
+    branches:
+      - stabilization/v2-0-0-product-readiness
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: public-funnel-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  public-funnel:
+    name: Funnel público · Chromium
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      INSTANCE_DIR: /tmp/cth-public-funnel
+      PUBLIC_FUNNEL_GATE_BASE_URL: http://127.0.0.1:8769
+      PUBLIC_FUNNEL_GATE_ARTIFACT_DIR: public-funnel-gate-artifacts
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar aplicación y Chromium
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt "playwright>=1.50,<2"
+          python -m playwright install --with-deps chromium
+
+      - name: Preparar base aislada
+        run: |
+          rm -rf "${INSTANCE_DIR}" public-funnel-gate-artifacts
+          mkdir -p "${INSTANCE_DIR}" public-funnel-gate-artifacts
+          python -m alembic upgrade head
+          python - <<'PY'
+          from app.database import init_db
+          init_db()
+          PY
+
+      - name: Ejecutar contratos V2.60.3
+        run: pytest -q tests/test_v2603_public_result_interpretation.py
+
+      - name: Iniciar aplicación para funnel público
+        run: |
+          python -m uvicorn app.main:app --host 127.0.0.1 --port 8769 > public-funnel-gate-artifacts/server.log 2>&1 &
+          echo $! > public-funnel-gate-artifacts/server.pid
+          for attempt in $(seq 1 60); do
+            if curl -fsS http://127.0.0.1:8769/api/health > public-funnel-gate-artifacts/health.json; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat public-funnel-gate-artifacts/server.log
+          exit 1
+
+      - name: Recorrer landing, diagnóstico, consentimiento y resultado
+        run: python scripts/browser_public_funnel_gate.py
+
+      - name: Publicar evidencia del funnel público
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: public-funnel-gate-evidence
+          path: public-funnel-gate-artifacts/
+          if-no-files-found: error
+          retention-days: 14

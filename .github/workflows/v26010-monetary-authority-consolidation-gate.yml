@@ -1,0 +1,170 @@
+name: V2.60.10 · Monetary authority consolidation
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "app/db/monetary_types.py"
+      - "app/db/models/commercial.py"
+      - "app/db/models/revenue.py"
+      - "tests/test_v26010_monetary_authority_consolidation.py"
+      - "tests/test_v2609_numeric_range_integrity.py"
+      - "tests/test_v2609_orm_flush_guard.py"
+      - "tests/test_v2608_monetary_boundaries.py"
+      - "tests/test_v2608_bind_policy.py"
+      - "tests/test_v2607_monetary_precision.py"
+      - "tests/test_v2606_revenue_operations_truth.py"
+      - "tests/test_v2606_activation_invoice_integrity.py"
+      - "tests/test_migration_legacy_compat.py"
+      - ".github/workflows/v26010-monetary-authority-consolidation-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26010-monetary-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  monetary-authority:
+    name: Declarative monetary authority · SQLite and PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: cth_v26010
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d cth_v26010"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+      STORAGE_BACKEND: local
+      BACKUP_OFFSITE_ENABLED: "0"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-prod.txt -r requirements-dev.txt
+
+      - name: Compilar superficie V2.60.10
+        run: |
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v26010-pycache" python -m compileall -q \
+            app/db/monetary_types.py \
+            app/db/models/commercial.py \
+            app/db/models/revenue.py \
+            tests/test_v26010_monetary_authority_consolidation.py
+
+      - name: Probar autoridad declarativa y regresiones monetarias
+        run: |
+          pytest -q \
+            tests/test_v26010_monetary_authority_consolidation.py \
+            tests/test_v2609_numeric_range_integrity.py \
+            tests/test_v2609_orm_flush_guard.py \
+            tests/test_v2608_monetary_boundaries.py \
+            tests/test_v2608_bind_policy.py \
+            tests/test_v2607_monetary_precision.py \
+            tests/test_v2606_revenue_operations_truth.py \
+            tests/test_v2606_activation_invoice_integrity.py \
+            tests/test_migration_legacy_compat.py \
+            --junitxml=v26010-monetary-authority.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26010-sqlite
+        run: |
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Fresh migration PostgreSQL
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26010
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26010-postgres
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+
+      - name: Comparar metadata declarativa con PostgreSQL real
+        env:
+          DATABASE_URL: postgresql+psycopg://postgres:postgres@127.0.0.1:5432/cth_v26010
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26010-postgres
+        run: |
+          python - <<'PY'
+          from sqlalchemy import inspect
+          from app.db.base import ENGINE
+          from app.db.models import (
+              BillingInvoice,
+              CommercialProposal,
+              OrganizationSubscription,
+              PaymentTransaction,
+              RenewalOpportunity,
+              ServiceContract,
+              ServicePlan,
+          )
+          from app.db.monetary_types import ExactNumeric
+
+          expected = {
+              "service_plans": {"monthly_fee": (20, 2), "annual_fee": (20, 2)},
+              "organization_subscriptions": {"custom_monthly_fee": (20, 6)},
+              "billing_invoices": {
+                  "amount": (20, 2), "net_amount": (20, 2), "tax_rate_snapshot": (9, 4),
+                  "tax_amount": (20, 2), "total_amount": (20, 2),
+              },
+              "commercial_proposals": {
+                  "implementation_fee": (20, 2), "recurring_fee": (20, 2),
+                  "discount_amount": (20, 2), "tax_rate": (9, 4), "first_year_total": (20, 2),
+              },
+              "payment_transactions": {"amount": (20, 2)},
+              "service_contracts": {"contract_value": (20, 2)},
+              "renewal_opportunities": {"forecast_amount": (20, 2)},
+          }
+          models = (
+              ServicePlan, OrganizationSubscription, BillingInvoice, CommercialProposal,
+              PaymentTransaction, ServiceContract, RenewalOpportunity,
+          )
+          for model in models:
+              for name, pair in expected[model.__tablename__].items():
+                  declared = model.__table__.c[name].type
+                  assert isinstance(declared, ExactNumeric), (model.__name__, name, declared)
+                  assert (declared.precision, declared.scale) == pair
+
+          db = inspect(ENGINE)
+          for table, columns in expected.items():
+              physical = {item["name"]: item["type"] for item in db.get_columns(table)}
+              for name, pair in columns.items():
+                  column_type = physical[name]
+                  assert (column_type.precision, column_type.scale) == pair, (table, name, column_type)
+          PY
+
+      - name: Publicar evidencia V2.60.10
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26010-monetary-authority-evidence
+          path: v26010-monetary-authority.xml
+          if-no-files-found: warn
+          retention-days: 14

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from scripts.product_readiness_contracts import TARGETED_CONTRACTS
+
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "scripts" / "postgres_restore_gate.py"
@@ -39,5 +41,7 @@ def test_v200_product_readiness_workflow_has_real_postgres_restore_job() -> None
 
 def test_v200_postgres_continuity_is_part_of_targeted_release_contract() -> None:
     source = WORKFLOW.read_text(encoding="utf-8")
-    assert "tests/test_v200_postgres_continuity_gate.py" in source
-    assert "tests/test_v200_postgres_methodology_schema.py" in source
+    authority = set(TARGETED_CONTRACTS)
+    assert "python scripts/product_readiness_contracts.py" in source
+    assert "tests/test_v200_postgres_continuity_gate.py" in authority
+    assert "tests/test_v200_postgres_methodology_schema.py" in authority

@@ -7,6 +7,8 @@ from typing import Any
 from .config import settings
 
 MIN_REGRESSION_TESTS = 386
+WEB_CERTIFICATION_LINE = "V2.1.5 post-RC web"
+WEB_CERTIFICATION_SOURCE = "PR #24 · CI completo · Render checksPass"
 
 
 def _load_test_evidence(project_dir: Path) -> dict[str, Any]:
@@ -24,6 +26,34 @@ def _load_test_evidence(project_dir: Path) -> dict[str, Any]:
         return {"status": "invalid", "test_count": 0, "path": str(path)}
     payload["path"] = str(path)
     return payload
+
+
+def _load_canonical_snapshot(project_dir: Path) -> dict[str, Any]:
+    """Read the immutable canonicalization snapshot without treating it as current CI evidence."""
+    path = project_dir / "RELEASE_CANONICA.json"
+    fallback = {
+        "status": "missing",
+        "path": str(path),
+        "release_id": "",
+        "canonical_date": "",
+        "application_version": "",
+        "migration_head": "",
+    }
+    if not path.is_file():
+        return fallback
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {**fallback, "status": "invalid"}
+    return {
+        "status": "available",
+        "path": str(path),
+        "release_id": str(payload.get("release_id", "")),
+        "canonical_date": str(payload.get("canonical_date", "")),
+        "application_version": str(payload.get("application_version", "")),
+        "migration_head": str(payload.get("migration_head", "")),
+        "source_release": str(payload.get("source_release", "")),
+    }
 
 
 def _evidence_file_exists(project_dir: Path, canonical: str, legacy: str) -> bool:
@@ -46,6 +76,7 @@ def release_candidate_summary(
 ) -> dict[str, object]:
     """Summarize V1.0 readiness without conflating controlled release and public production."""
     evidence = _load_test_evidence(project_dir)
+    canonical_snapshot = _load_canonical_snapshot(project_dir)
     test_count = int(evidence.get("test_count", 0) or 0)
     tests_ok = evidence.get("status") == "passed" and test_count >= MIN_REGRESSION_TESTS
 
@@ -131,6 +162,13 @@ def release_candidate_summary(
     return {
         "version": settings.version,
         "status": status,
+        "identity": {
+            "application_version": settings.version,
+            "web_certification_line": WEB_CERTIFICATION_LINE,
+            "web_certification_source": WEB_CERTIFICATION_SOURCE,
+            "canonical_snapshot": canonical_snapshot,
+            "snapshot_matches_application_version": canonical_snapshot.get("application_version") == settings.version,
+        },
         "package_ready": package_ready,
         "governance_ready": governance_ready,
         "internal_ready": internal_ready,

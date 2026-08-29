@@ -2,20 +2,11 @@
 {% block title %}Mi trabajo · Calcula tu Huella{% endblock %}
 {% block page_label %}Mi trabajo{% endblock %}
 {% block content %}
-<section class="page-heading">
+<section class="page-heading work-page-heading">
   <div>
     <span class="eyebrow">TRABAJO CON RESPONSABLE Y CIERRE</span>
     <h1>Mi trabajo</h1>
-    <p>Reúne solicitudes, correcciones, validaciones, revisiones y cierres en una sola bandeja. Cada tarea muestra quién actúa, qué debe entregar y qué ocurre después.</p>
-  </div>
-  <div class="page-actions">
-    <a class="btn btn-secondary" href="/dashboard">Ver resumen del inventario</a>
-    <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
-    {% if can_create %}
-    <form method="post" action="/mi-trabajo/sincronizar">
-      <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
-    </form>
-    {% endif %}
+    <p>Reúne solicitudes, correcciones, validaciones, revisiones y cierres en una sola bandeja. Cada tarea muestra quién actúa, qué debe entregar, qué ocurre después y, cuando aplica, a qué periodo pertenece.</p>
   </div>
 </section>
 
@@ -26,6 +17,20 @@
   <article class="work-metric"><small>BLOQUEADAS</small><strong>{{ summary.blocked }}</strong></article>
   <article class="work-metric"><small>EN CONTROL</small><strong>{{ summary.under_review }}</strong></article>
 </section>
+
+<div class="work-secondary-actions" aria-label="Acciones de apoyo">
+  <a class="btn btn-secondary" href="/dashboard">Ver resumen del periodo por defecto</a>
+  <a class="btn btn-secondary" href="/guia">Consultar el proceso</a>
+  {% if can_create %}
+  <form method="post" action="/mi-trabajo/sincronizar">
+    <input type="hidden" name="return_status" value="{{ selected_status }}">
+    <input type="hidden" name="return_stage" value="{{ selected_stage }}">
+    <input type="hidden" name="return_scope" value="{{ selected_scope }}">
+    <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
+    <button class="btn btn-primary" type="submit">Sincronizar solicitudes</button>
+  </form>
+  {% endif %}
+</div>
 
 <section class="work-layout">
   <div>
@@ -43,6 +48,13 @@
             {% for option in stages %}<option value="{{ option.code }}" {% if selected_stage == option.code %}selected{% endif %}>{{ loop.index }}. {{ option.label }}</option>{% endfor %}
           </select>
         </label>
+        <label>Periodo
+          <select name="inventory_id" data-work-period-filter>
+            <option value="" {% if not selected_inventory_filter %}selected{% endif %}>Todos los periodos</option>
+            <option value="transversal" {% if selected_inventory_filter == 'transversal' %}selected{% endif %}>Trabajo transversal</option>
+            {% for inventory in inventories %}<option value="{{ inventory.id }}" {% if selected_inventory_filter == inventory.id|string %}selected{% endif %}>{{ inventory.name }} · {{ inventory.start_date.strftime('%d/%m/%Y') }}–{{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ 'por defecto' if loop.first else 'histórico' }}</option>{% endfor %}
+          </select>
+        </label>
         {% if can_view_all %}
         <label>Alcance
           <select name="scope">
@@ -58,13 +70,16 @@
 
     <div class="work-list">
       {% for item in items %}
-      <article class="work-card" id="tarea-{{ item.id }}">
+      {% set task_inventory = inventory_by_id.get(item.inventory_id) if item.inventory_id else none %}
+      {% set task_inventory_route = '/inventarios/' ~ task_inventory.id if task_inventory else '' %}
+      <article class="work-card" id="tarea-{{ item.id }}" data-work-inventory-id="{{ item.inventory_id or '' }}">
         <div class="work-card-top">
           <div>
             <div class="work-kicker">
               <span class="status-badge {% if item.status_code in ['returned','blocked'] %}warning{% elif item.status_code in ['closed'] %}active{% else %}neutral{% endif %}">{{ status_label(item.status_code) }}</span>
               <small>{{ work_types[item.work_type] if item.work_type in work_types else item.work_type }}</small>
               <small>Etapa {{ item.stage_code }}</small>
+              {% if task_inventory %}<small class="work-period-context">{{ task_inventory.name }} · {{ task_inventory.start_date.strftime('%d/%m/%Y') }}–{{ task_inventory.end_date.strftime('%d/%m/%Y') }}</small>{% else %}<small class="work-period-context">Trabajo transversal · sin periodo específico</small>{% endif %}
             </div>
             <h3>{{ item.title }}</h3>
             {% if item.description %}<p>{{ item.description }}</p>{% endif %}
@@ -76,7 +91,7 @@
           <div><small>Responsable</small><strong>{{ item.assignee_email or item.assignee_role or item.assignee_area or 'Sin asignar' }}</strong></div>
           <div><small>Fecha límite</small><strong class="{% if item.due_date and item.due_date < today %}overdue{% endif %}">{{ item.due_date.strftime('%d/%m/%Y') if item.due_date else 'Sin fecha' }}</strong></div>
           <div><small>Solicitante</small><strong>{{ item.requester_email or item.created_by }}</strong></div>
-          <div><small>Versión</small><strong>{{ item.version }}</strong></div>
+          <div><small>Versión de tarea</small><strong>{{ item.version }}</strong></div>
         </div>
 
         <div class="work-next"><small>PRÓXIMA ACCIÓN</small><p>{{ item.next_action or 'Revisar el estado y definir la acción siguiente.' }}</p></div>
@@ -84,7 +99,8 @@
           <summary>Ver criterio de aceptación y trazabilidad</summary>
           <p><strong>Criterio de aceptación:</strong> {{ item.acceptance_criteria }}</p>
           {% if item.blocking_reason %}<p><strong>Bloqueo:</strong> {{ item.blocking_reason }}</p>{% endif %}
-          {% if item.source_route %}<a class="work-source-link" href="{{ item.source_route }}">Abrir el registro de origen →</a>{% endif %}
+          {% if task_inventory %}<p><strong>Expediente:</strong> <a href="/inventarios/{{ task_inventory.id }}">{{ task_inventory.name }} · {{ task_inventory.start_date.strftime('%d/%m/%Y') }} – {{ task_inventory.end_date.strftime('%d/%m/%Y') }}</a></p>{% endif %}
+          {% if item.source_route %}<a class="work-source-link" href="{{ item.source_route }}">{{ 'Abrir expediente del periodo →' if task_inventory and item.source_route == task_inventory_route else 'Abrir el registro de origen →' }}</a>{% endif %}
           {% if item.events %}
           <ol>
             {% for event in item.events[-5:] %}<li>{{ event.created_at.strftime('%d/%m/%Y %H:%M') }} · {{ event.event_code }} · {{ event.actor_email }}{% if event.comment %}: {{ event.comment }}{% endif %}</li>{% endfor %}
@@ -98,6 +114,10 @@
           <form class="work-action-form" method="post" action="/mi-trabajo/{{ item.id }}/accion">
             <input type="hidden" name="action" value="{{ action }}">
             <input type="hidden" name="expected_version" value="{{ item.version }}">
+            <input type="hidden" name="return_status" value="{{ selected_status }}">
+            <input type="hidden" name="return_stage" value="{{ selected_stage }}">
+            <input type="hidden" name="return_scope" value="{{ selected_scope }}">
+            <input type="hidden" name="return_inventory_id" value="{{ selected_inventory_filter }}">
             {% if action in reason_actions %}<input name="comment" required placeholder="Describe el motivo de esta decisión">{% else %}<input name="comment" placeholder="Comentario opcional para la trazabilidad">{% endif %}
             <button class="btn {% if action in ['submit','accept_delivery','close'] %}btn-primary{% else %}btn-secondary{% endif %}" type="submit">{{ action_labels[action] }}</button>
           </form>
@@ -123,8 +143,8 @@
           <select name="work_type" required>{% for code, label in work_types.items() %}<option value="{{ code }}">{{ label }}</option>{% endfor %}</select>
         </label>
         <label>Descripción<textarea name="description" rows="3" placeholder="Explica el contexto y lo que debe realizarse"></textarea></label>
-        <label>Inventario
-          <select name="inventory_id"><option value="">Sin inventario específico</option>{% for inventory in inventories %}<option value="{{ inventory.id }}">{{ inventory.name }} · {{ inventory.version }}</option>{% endfor %}</select>
+        <label>Periodo / inventario
+          <select name="inventory_id"><option value="">Trabajo transversal · sin periodo específico</option>{% for inventory in inventories %}<option value="{{ inventory.id }}">{{ inventory.name }} · {{ inventory.start_date.strftime('%d/%m/%Y') }}–{{ inventory.end_date.strftime('%d/%m/%Y') }} · {{ 'por defecto' if loop.first else 'histórico' }}</option>{% endfor %}</select>
         </label>
         <div class="two">
           <label>Prioridad<select name="priority"><option value="normal">Normal</option><option value="high">Alta</option><option value="critical">Crítica</option><option value="low">Baja</option></select></label>

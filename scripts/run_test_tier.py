@@ -26,17 +26,28 @@ NODE_ISOLATION_FILES = {
 }
 
 # Historical assertions are kept in their original modules for lineage, but
-# individual checks superseded by the canonical V1.0/V1.4 contract are replaced
-# by explicit regressions in test_iteration18_public_contract.py and
-# test_iteration18_canonical_regressions.py. Only the obsolete assertions are
-# deselected; the rest of each historical module continues to run.
+# individual checks superseded by the canonical public/brand contracts are
+# deselected from the full release gate. Current contracts remain protected by
+# test_iteration18_public_contract.py, V1.6 public regressions and V2.1 brand/UX
+# tests. Only the obsolete assertions are skipped; every other test in each
+# historical module continues to run.
 FULL_DESELECT_BY_FILE = {
     "test_app.py": (
         "tests/test_app.py::test_public_site_and_diagnostic_flow",
     ),
+    "test_iteration18_canonical_regressions.py": (
+        "tests/test_iteration18_canonical_regressions.py::test_iteration18_public_contract_supersedes_legacy_v049_v051_copy",
+    ),
+    "test_v0451_user_experience.py": (
+        "tests/test_v0451_user_experience.py::test_primary_surfaces_use_user_facing_language",
+    ),
+    "test_v0452_brand_navigation.py": (
+        "tests/test_v0452_brand_navigation.py::test_canonical_brand_assets_are_present_and_used",
+    ),
     "test_v049_landing_windows_factor_dialogue.py": (
         "tests/test_v049_landing_windows_factor_dialogue.py::test_v049_public_landing_explains_value_greenatics_prices_and_flow",
         "tests/test_v049_landing_windows_factor_dialogue.py::test_v049_version_and_migration_are_aligned",
+        "tests/test_v049_landing_windows_factor_dialogue.py::test_v049_public_landing_contract_is_preserved_through_the_v16_public_authority",
     ),
     "test_v050_support_and_factor_governance.py": (
         "tests/test_v050_support_and_factor_governance.py::test_v050_support_page_api_and_release_metadata_are_aligned",

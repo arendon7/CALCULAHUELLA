@@ -1,68 +1,69 @@
-<section class="section section-soft" id="problema">
-<div class="container">
-<header class="section-head">
-<div class="eyebrow">Un proceso que suele estar fragmentado</div>
-<h2>La dificultad no es solamente calcular. Es coordinar toda la información.</h2>
-<p>Cuando facturas, registros, mensajes, responsables y decisiones se gestionan por separado, aparecen retrasos, solicitudes repetidas, documentos perdidos y cifras difíciles de justificar.</p>
-</header>
-<div aria-label="Representación de información dispersa" class="problem-stage">
-<div aria-hidden="true" class="problem-line"></div>
-<article class="fragment frag-mail"><b>Correo</b><span>“Te envío el archivo corregido…”</span></article>
-<article class="fragment frag-sheet"><b>Hoja de cálculo</b><span>Inventario_final_v7_ahora_si.xlsx</span></article>
-<article class="fragment frag-folder"><b>Carpeta compartida</b><span>Facturas / pendientes / nuevas</span></article>
-<article class="fragment frag-message"><b>Mensaje</b><span>“¿Cuál fue el dato aprobado?”</span></article>
-<article class="fragment frag-invoice"><b>Factura</b><span>Periodo y unidad por confirmar</span></article>
-<div class="problem-center"><div><strong>¿Cuál es la versión correcta?</strong><span>El proceso pierde tiempo buscando, conciliando y solicitando nuevamente.</span></div></div>
-</div>
-<div class="problem-cards">
-<article class="problem-card"><span class="problem-number">01</span><h3>Información dispersa</h3><p>Los datos y documentos se encuentran en áreas, carpetas y sistemas diferentes.</p></article>
-<article class="problem-card"><span class="problem-number">02</span><h3>Responsabilidades poco claras</h3><p>Las personas no siempre saben qué deben entregar, para cuándo o con qué soporte.</p></article>
-<article class="problem-card"><span class="problem-number">03</span><h3>Reprocesos</h3><p>La misma información se solicita, corrige y consolida varias veces.</p></article>
-<article class="problem-card"><span class="problem-number">04</span><h3>Resultados difíciles de justificar</h3><p>Las cifras pierden la conexión con sus datos, factores, evidencias y decisiones.</p></article>
-</div>
-</div>
+<section class="section section-soft craft-problem" id="problema">
+  <div class="container problem-intro-grid">
+    <div><h2>El cálculo rara vez es la parte que más tiempo consume.</h2></div>
+    <div><p>La fricción aparece antes: datos en áreas distintas, archivos con nombres parecidos, soportes sin relación con la cifra, responsables que no saben qué falta y decisiones técnicas que quedan fuera del expediente.</p></div>
+  </div>
+
+  <div class="container problem-composition">
+    <div aria-label="Representación de información dispersa" class="problem-stage">
+      <div aria-hidden="true" class="problem-line"></div>
+      <article class="fragment frag-mail"><b>Correo</b><span>“Te envío el archivo corregido…”</span></article>
+      <article class="fragment frag-sheet"><b>Hoja de cálculo</b><span>Inventario_final_v7_ahora_si.xlsx</span></article>
+      <article class="fragment frag-folder"><b>Carpeta compartida</b><span>Facturas / pendientes / nuevas</span></article>
+      <article class="fragment frag-message"><b>Mensaje</b><span>“¿Cuál fue el dato aprobado?”</span></article>
+      <article class="fragment frag-invoice"><b>Factura</b><span>Periodo y unidad por confirmar</span></article>
+      <div class="problem-center"><div><strong>¿Cuál es la versión correcta?</strong><span>El trabajo se desplaza de analizar a buscar, conciliar y volver a pedir.</span></div></div>
+    </div>
+    <div class="problem-consequences" aria-label="Consecuencias de un proceso fragmentado">
+      <article><span>Información</span><strong>Existe, pero no está conectada.</strong><p>Dato, soporte, fuente y periodo viven en lugares distintos.</p></article>
+      <article><span>Responsabilidad</span><strong>Se sabe quién “tiene el archivo”, no quién debe cerrar el dato.</strong><p>Las solicitudes pierden fecha, criterio de aceptación y estado.</p></article>
+      <article><span>Revisión</span><strong>Corregir una cifra no siempre corrige su historia.</strong><p>Versiones paralelas hacen difícil saber qué se aprobó y por qué.</p></article>
+      <article><span>Decisión</span><strong>El resultado llega, pero cuesta defenderlo.</strong><p>La conexión con factores, evidencia y decisiones metodológicas queda incompleta.</p></article>
+    </div>
+  </div>
 </section>
-<section class="section" id="plataforma">
-<div class="container collab-grid">
-<div aria-label="Prototipo interactivo de Solicitudes y mensajes" class="workspace">
-<div class="workspace-bar"><i class="window-dot"></i><i class="window-dot"></i><i class="window-dot"></i><strong>Solicitudes y mensajes</strong><span style="margin-left:auto">Greenatics S.A.S.</span></div>
-<div class="workspace-body">
-<aside aria-hidden="true" class="workspace-side"><h4>Trabajo</h4><div class="ws-item">Mis pendientes</div><div class="ws-item active">Solicitudes</div><div class="ws-item">Mensajes</div><div class="ws-item">Decisiones</div><div class="ws-item">Soporte</div></aside>
-<div class="workspace-main">
-<div class="ws-head"><div><h3>Consumo mensual de electricidad</h3><p>Sede Yarumal · Enero a marzo de 2026</p></div><span class="status-chip">En preparación</span></div>
-<div aria-label="Detalle colaborativo" class="ws-tabs" role="tablist">
-<button aria-selected="true" class="ws-tab active" data-tab="solicitud" role="tab">Solicitud</button>
-<button aria-selected="false" class="ws-tab" data-tab="evidencias" role="tab">Evidencias</button>
-<button aria-selected="false" class="ws-tab" data-tab="historial" role="tab">Historial</button>
-</div>
-<section class="ws-panel active" data-panel="solicitud" role="tabpanel">
-<div class="request-card"><div class="request-top"><div><small>INFORMACIÓN REQUERIDA</small><h4>Consumos mensuales y facturas</h4></div><span class="state">Alta prioridad</span></div><div class="request-meta"><div class="meta-box"><span>Responsable</span><strong>Laura Gómez</strong></div><div class="meta-box"><span>Fecha requerida</span><strong>12 ago 2026</strong></div><div class="meta-box"><span>Evidencia</span><strong>3 facturas</strong></div></div><div class="request-instruction">Registra el consumo mensual en kWh y adjunta una factura por cada mes. Si una factura cubre más de un periodo, explícalo en el comentario.</div><div class="conversation"><div class="message"><b>Equipo técnico</b>La información permitirá completar el cálculo de alcance 2.</div><div class="message mine"><b>Laura · Administración</b>Ya tengo enero y febrero. Estoy solicitando marzo al proveedor.</div></div><div class="ws-actions"><button class="ws-btn secondary">Enviar mensaje</button><button class="ws-btn primary">Responder solicitud</button></div></div>
-</section>
-<section class="ws-panel" data-panel="evidencias" hidden="" role="tabpanel">
-<div class="evidence-row"><div><strong>Factura energía enero.pdf</strong><span>Enero 2026 · relacionada con 1 dato</span></div><span class="state">Aceptada</span></div>
-<div class="evidence-row"><div><strong>Factura energía febrero.pdf</strong><span>Febrero 2026 · relacionada con 1 dato</span></div><span class="state">Aceptada</span></div>
-<div class="evidence-row"><div><strong>Factura marzo</strong><span>Documento todavía no cargado</span></div><span class="state" style="background:#FFF4E8;color:#9A5C18">Pendiente</span></div>
-<div class="ws-actions"><button class="ws-btn primary">Cargar evidencia</button></div>
-</section>
-<section class="ws-panel" data-panel="historial" hidden="" role="tabpanel">
-<div class="history-item"><div class="history-dot">✓</div><div><strong>Solicitud creada</strong><span>Equipo técnico · 6 de agosto, 09:12</span></div></div>
-<div class="history-item"><div class="history-dot">✉</div><div><strong>Laura abrió la solicitud</strong><span>6 de agosto, 10:04</span></div></div>
-<div class="history-item"><div class="history-dot">▤</div><div><strong>Dos facturas cargadas</strong><span>Laura Gómez · 6 de agosto, 11:18</span></div></div>
-<div class="history-item"><div class="history-dot">…</div><div><strong>Respuesta en preparación</strong><span>Falta la factura de marzo</span></div></div>
-</section>
-</div>
-</div>
-</div>
-<div class="collab-copy">
-<div class="eyebrow">Toda la información en un mismo entorno</div>
-<h2>Un solo lugar para recopilar, conversar, revisar y demostrar</h2>
-<p>La plataforma conecta a las áreas de la empresa con el equipo técnico y conserva cada solicitud, respuesta, documento y decisión dentro del inventario.</p>
-<div class="benefit-list">
-<article class="benefit"><span class="benefit-icon">▦</span><div><h3>Datos y evidencias</h3><p>Registra consumos y actividades por sede, fuente y periodo, junto con sus documentos de soporte.</p></div></article>
-<article class="benefit"><span class="benefit-icon">◎</span><div><h3>Solicitudes y responsables</h3><p>Cada área sabe qué debe entregar, para cuándo y con qué criterio se considerará completo.</p></div></article>
-<article class="benefit"><span class="benefit-icon">✉</span><div><h3>Mensajes y observaciones</h3><p>Las aclaraciones y correcciones permanecen vinculadas con el elemento que ayudan a resolver.</p></div></article>
-<article class="benefit"><span class="benefit-icon">✓</span><div><h3>Estados e historial</h3><p>Consulta qué está completo, qué requiere atención y quién tomó cada decisión.</p></div></article>
-</div>
-</div>
-</div>
+
+<section class="section craft-platform" id="plataforma">
+  <div class="container collab-grid">
+    <div aria-label="Prototipo interactivo de Solicitudes y mensajes" class="workspace">
+      <div class="workspace-bar"><i class="window-dot"></i><i class="window-dot"></i><i class="window-dot"></i><strong>Solicitudes y mensajes</strong><span style="margin-left:auto">Greenatics S.A.S.</span></div>
+      <div class="workspace-body">
+        <aside aria-hidden="true" class="workspace-side"><h4>Trabajo</h4><div class="ws-item">Mis pendientes</div><div class="ws-item active">Solicitudes</div><div class="ws-item">Mensajes</div><div class="ws-item">Decisiones</div><div class="ws-item">Soporte</div></aside>
+        <div class="workspace-main">
+          <div class="ws-head"><div><h3>Consumo mensual de electricidad</h3><p>Sede Yarumal · Enero a marzo de 2026</p></div><span class="status-chip">En preparación</span></div>
+          <div aria-label="Detalle colaborativo" class="ws-tabs" role="tablist">
+            <button aria-selected="true" class="ws-tab active" data-tab="solicitud" role="tab">Solicitud</button>
+            <button aria-selected="false" class="ws-tab" data-tab="evidencias" role="tab">Evidencias</button>
+            <button aria-selected="false" class="ws-tab" data-tab="historial" role="tab">Historial</button>
+          </div>
+          <section class="ws-panel active" data-panel="solicitud" role="tabpanel">
+            <div class="request-card"><div class="request-top"><div><small>INFORMACIÓN REQUERIDA</small><h4>Consumos mensuales y facturas</h4></div><span class="state">Alta prioridad</span></div><div class="request-meta"><div class="meta-box"><span>Responsable</span><strong>Laura Gómez</strong></div><div class="meta-box"><span>Fecha requerida</span><strong>12 ago 2026</strong></div><div class="meta-box"><span>Evidencia</span><strong>3 facturas</strong></div></div><div class="request-instruction">Registra el consumo mensual en kWh y adjunta una factura por cada mes. Si una factura cubre más de un periodo, explícalo en el comentario.</div><div class="conversation"><div class="message"><b>Equipo técnico</b>La información permitirá completar el cálculo de alcance 2.</div><div class="message mine"><b>Laura · Administración</b>Ya tengo enero y febrero. Estoy solicitando marzo al proveedor.</div></div><div class="ws-actions"><button class="ws-btn secondary">Enviar mensaje</button><button class="ws-btn primary">Responder solicitud</button></div></div>
+          </section>
+          <section class="ws-panel" data-panel="evidencias" hidden role="tabpanel">
+            <div class="evidence-row"><div><strong>Factura energía enero.pdf</strong><span>Enero 2026 · relacionada con 1 dato</span></div><span class="state">Aceptada</span></div>
+            <div class="evidence-row"><div><strong>Factura energía febrero.pdf</strong><span>Febrero 2026 · relacionada con 1 dato</span></div><span class="state">Aceptada</span></div>
+            <div class="evidence-row"><div><strong>Factura marzo</strong><span>Documento todavía no cargado</span></div><span class="state pending-state">Pendiente</span></div>
+            <div class="ws-actions"><button class="ws-btn primary">Cargar evidencia</button></div>
+          </section>
+          <section class="ws-panel" data-panel="historial" hidden role="tabpanel">
+            <div class="history-item"><div class="history-dot history-done"></div><div><strong>Solicitud creada</strong><span>Equipo técnico · 6 de agosto, 09:12</span></div></div>
+            <div class="history-item"><div class="history-dot history-open"></div><div><strong>Laura abrió la solicitud</strong><span>6 de agosto, 10:04</span></div></div>
+            <div class="history-item"><div class="history-dot history-file"></div><div><strong>Dos facturas cargadas</strong><span>Laura Gómez · 6 de agosto, 11:18</span></div></div>
+            <div class="history-item"><div class="history-dot history-wait"></div><div><strong>Respuesta en preparación</strong><span>Falta la factura de marzo</span></div></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <div class="collab-copy craft-collab-copy">
+      <h2>Un solo lugar para recopilar, conversar, revisar y demostrar.</h2>
+      <p>La plataforma conecta a las áreas de la empresa con el equipo técnico y conserva cada solicitud, respuesta, documento y decisión dentro del inventario.</p>
+      <div class="benefit-list craft-benefit-list">
+        <article class="benefit"><span class="benefit-mark"></span><div><h3>Datos con contexto</h3><p>Sede, fuente, periodo, unidad y soporte permanecen juntos.</p></div></article>
+        <article class="benefit"><span class="benefit-mark"></span><div><h3>Solicitudes que se pueden cerrar</h3><p>Cada responsable conoce fecha, evidencia esperada y condición de completitud.</p></div></article>
+        <article class="benefit"><span class="benefit-mark"></span><div><h3>Conversaciones que no se pierden</h3><p>Aclaraciones y correcciones quedan vinculadas con el elemento que resuelven.</p></div></article>
+        <article class="benefit"><span class="benefit-mark"></span><div><h3>Historial que explica el presente</h3><p>Se conserva qué cambió, quién decidió y qué versión quedó vigente.</p></div></article>
+      </div>
+    </div>
+  </div>
 </section>

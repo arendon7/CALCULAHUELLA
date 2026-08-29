@@ -1,12 +1,13 @@
 {% extends "public_base.html" %}
 {% block title %}Diagnóstico inicial · Calcula tu Huella{% endblock %}
 {% block content %}
+{% set fv = form_values or {} %}
 <section class="diagnosis-shell diagnosis-wide diagnosis-wizard-shell">
   <div class="diagnosis-intro">
     <span>DIAGNÓSTICO INICIAL</span>
     <h1>Define la ruta correcta antes de empezar a calcular</h1>
     <p>En cuatro pasos identificamos la complejidad operativa, el estado de los datos y la profundidad que puede requerir tu inventario.</p>
-    <div class="diagnosis-time"><strong>4–6 minutos</strong><span>Resultado inmediato y explicable</span></div>
+    <div class="diagnosis-time"><strong>En unos minutos</strong><span>Resultado orientativo al finalizar</span></div>
     <div class="diagnosis-benefits">
       <b>Al finalizar obtendrás:</b>
       <span>✓ Perfil de complejidad y madurez</span>
@@ -14,10 +15,10 @@
       <span>✓ Alcances y módulos recomendados</span>
       <span>✓ Ruta y duración de referencia</span>
     </div>
-    <div class="method-note"><strong>Una recomendación, no una verificación</strong><p>El resultado orienta la conversación inicial. No valida un inventario ni reemplaza la revisión del equipo técnico.</p></div>
+    <div class="method-note"><strong>Una orientación inicial, no una verificación</strong><p>El resultado organiza la información que compartes y ayuda a definir qué conviene validar antes de configurar el inventario. No calcula tu huella, no certifica resultados y no reemplaza la revisión del equipo técnico.</p></div>
   </div>
 
-  <form class="diagnosis-form diagnosis-wizard" action="/diagnostico" method="post" data-diagnosis-wizard>
+  <form class="diagnosis-form diagnosis-wizard" action="/diagnostico" method="post" data-v260-diagnosis-wizard data-diagnosis-initial-step="{{ initial_step or 1 }}">
     {% if error %}<div class="public-error" role="alert">{{ error }}</div>{% endif %}
     <div class="diagnosis-wizard-progress" aria-label="Progreso del diagnóstico">
       <div class="diagnosis-progress-track"><i data-diagnosis-progress></i></div>
@@ -28,36 +29,37 @@
     </div>
 
     <section class="diagnosis-step" data-diagnosis-step="1">
-      <div class="form-section"><span>1</span><div><h2>Empresa y contacto</h2><p>Información básica para contextualizar la recomendación.</p></div></div>
+      <div class="form-section"><span>1</span><div><h2>Empresa y contacto</h2><p>Empezamos con el contexto mínimo de la organización. El correo y el teléfono se solicitan al final, cuando ya hayas completado la evaluación.</p></div></div>
       <div class="public-form-grid">
-        <label>Empresa<input name="company_name" autocomplete="organization" required></label>
-        <label>Nombre de contacto<input name="contact_name" autocomplete="name" required></label>
-        <label>Correo corporativo<input type="email" name="email" autocomplete="email" required></label>
-        <label>Teléfono<input name="phone" autocomplete="tel"></label>
-        <label>Sector<select name="sector" required><option value="">Selecciona un sector</option><option>Manufactura</option><option>Transporte y logística</option><option>Servicios y oficinas</option><option>Agroindustria</option><option>Gestión de residuos</option><option>Construcción</option><option>Salud</option><option>Energía</option><option>Otro</option></select></label>
-        <label>Ciudad<input name="city" autocomplete="address-level2"></label>
+        <label>Empresa<input name="company_name" autocomplete="organization" value="{{ fv.get('company_name', '') }}" required></label>
+        <label>Nombre de contacto<input name="contact_name" autocomplete="name" value="{{ fv.get('contact_name', '') }}" required></label>
+        <label>Sector<select name="sector" required>
+          <option value="">Selecciona un sector</option>
+          {% for item in ['Manufactura','Transporte y logística','Servicios y oficinas','Agroindustria','Gestión de residuos','Construcción','Salud','Energía','Otro'] %}<option{% if fv.get('sector') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}
+        </select></label>
+        <label>Ciudad<input name="city" autocomplete="address-level2" value="{{ fv.get('city', '') }}"></label>
       </div>
     </section>
 
     <section class="diagnosis-step" data-diagnosis-step="2" hidden>
       <div class="form-section"><span>2</span><div><h2>Escala y operación</h2><p>Identifica las actividades que pueden originar emisiones dentro y fuera de la empresa.</p></div></div>
       <div class="public-form-grid">
-        <label>Empleados<select name="employees_band" required><option>1 a 20</option><option>21 a 50</option><option>51 a 200</option><option>Más de 200</option></select></label>
-        <label>Número de sedes<input type="number" min="1" max="100" name="facilities_count" value="1" required></label>
-        <label>Países donde opera<input type="number" min="1" max="50" name="countries_count" value="1" required></label>
-        <label class="full">Procesos principales<textarea name="core_processes" rows="3" placeholder="Ej.: producción, transporte, refrigeración, compostaje o tratamiento de aguas"></textarea></label>
+        <label>Empleados<select name="employees_band" required>{% for item in ['1 a 20','21 a 50','51 a 200','Más de 200'] %}<option{% if fv.get('employees_band') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Número de sedes<input type="number" min="1" max="100" name="facilities_count" value="{{ fv.get('facilities_count', 1) }}" required></label>
+        <label>Países donde opera<input type="number" min="1" max="50" name="countries_count" value="{{ fv.get('countries_count', 1) }}" required></label>
+        <label class="full">Procesos principales<textarea name="core_processes" rows="3" placeholder="Ej.: producción, transporte, refrigeración, compostaje o tratamiento de aguas">{{ fv.get('core_processes', '') }}</textarea></label>
       </div>
       <fieldset class="diagnosis-fieldset"><legend>Selecciona lo que aplica a la operación</legend>
         <div class="diagnosis-option-grid">
-          <label><input type="checkbox" name="uses_fuels"><span>Combustibles en equipos o instalaciones</span></label>
-          <label><input type="checkbox" name="has_fleet"><span>Flota o vehículos propios</span></label>
-          <label><input type="checkbox" name="uses_refrigerants"><span>Refrigeración o aire acondicionado</span></label>
-          <label><input type="checkbox" name="has_process_emissions"><span>Emisiones propias del proceso</span></label>
-          <label><input type="checkbox" name="manages_waste"><span>Generación, tratamiento o aprovechamiento de residuos</span></label>
-          <label><input type="checkbox" name="has_wastewater"><span>Generación o tratamiento de aguas residuales</span></label>
-          <label><input type="checkbox" name="has_agriculture"><span>Agricultura, fertilización o uso de suelo</span></label>
-          <label><input type="checkbox" name="relies_on_suppliers"><span>Proveedores o logística relevantes</span></label>
-          <label><input type="checkbox" name="owns_generation"><span>Generación propia de energía</span></label>
+          <label><input type="checkbox" name="uses_fuels"{% if fv.get('uses_fuels') %} checked{% endif %}><span>Combustibles en equipos o instalaciones</span></label>
+          <label><input type="checkbox" name="has_fleet"{% if fv.get('has_fleet') %} checked{% endif %}><span>Flota o vehículos propios</span></label>
+          <label><input type="checkbox" name="uses_refrigerants"{% if fv.get('uses_refrigerants') %} checked{% endif %}><span>Refrigeración o aire acondicionado</span></label>
+          <label><input type="checkbox" name="has_process_emissions"{% if fv.get('has_process_emissions') %} checked{% endif %}><span>Emisiones propias del proceso</span></label>
+          <label><input type="checkbox" name="manages_waste"{% if fv.get('manages_waste') %} checked{% endif %}><span>Generación, tratamiento o aprovechamiento de residuos</span></label>
+          <label><input type="checkbox" name="has_wastewater"{% if fv.get('has_wastewater') %} checked{% endif %}><span>Generación o tratamiento de aguas residuales</span></label>
+          <label><input type="checkbox" name="has_agriculture"{% if fv.get('has_agriculture') %} checked{% endif %}><span>Agricultura, fertilización o uso de suelo</span></label>
+          <label><input type="checkbox" name="relies_on_suppliers"{% if fv.get('relies_on_suppliers') %} checked{% endif %}><span>Proveedores o logística relevantes</span></label>
+          <label><input type="checkbox" name="owns_generation"{% if fv.get('owns_generation') %} checked{% endif %}><span>Generación propia de energía</span></label>
         </div>
       </fieldset>
     </section>
@@ -66,25 +68,30 @@
       <div class="form-section"><span>3</span><div><h2>Datos y madurez</h2><p>Evalúa qué tan disponible, soportada y gobernada está la información.</p></div></div>
       <div class="diagnosis-readiness-note"><strong>No necesitas tener todo listo.</strong><span>Una disponibilidad baja no impide comenzar; modifica la ruta de levantamiento y acompañamiento.</span></div>
       <div class="public-form-grid">
-        <label class="public-check"><input type="checkbox" name="has_previous_inventory"><span>La empresa ya tiene un inventario anterior</span></label>
-        <label>Disponibilidad de datos<select name="data_availability"><option>Baja</option><option>Parcial</option><option>Media</option><option>Alta</option><option>Completa</option></select></label>
-        <label>Disponibilidad de soportes<select name="evidence_readiness"><option>Baja</option><option>Parcial</option><option>Media</option><option>Alta</option><option>Completa</option></select></label>
-        <label>Frecuencia deseada<select name="reporting_frequency"><option>Anual</option><option>Trimestral</option><option>Mensual</option></select></label>
-        <label class="full">Sistemas actuales<textarea name="current_data_systems" rows="3" placeholder="Ej.: Excel, ERP, facturación, bitácoras, formularios o SharePoint"></textarea></label>
+        <label class="public-check"><input type="checkbox" name="has_previous_inventory"{% if fv.get('has_previous_inventory') %} checked{% endif %}><span>La empresa ya tiene un inventario anterior</span></label>
+        <label>Disponibilidad de datos<select name="data_availability">{% for item in ['Baja','Parcial','Media','Alta','Completa'] %}<option{% if fv.get('data_availability') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Disponibilidad de soportes<select name="evidence_readiness">{% for item in ['Baja','Parcial','Media','Alta','Completa'] %}<option{% if fv.get('evidence_readiness') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Frecuencia deseada<select name="reporting_frequency">{% for item in ['Anual','Trimestral','Mensual'] %}<option{% if fv.get('reporting_frequency') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label class="full">Sistemas actuales<textarea name="current_data_systems" rows="3" placeholder="Ej.: Excel, ERP, facturación, bitácoras, formularios o SharePoint">{{ fv.get('current_data_systems', '') }}</textarea></label>
       </div>
     </section>
 
     <section class="diagnosis-step" data-diagnosis-step="4" hidden>
-      <div class="form-section"><span>4</span><div><h2>Objetivo y profundidad</h2><p>La finalidad define el alcance, la evidencia y el nivel de revisión recomendado.</p></div></div>
+      <div class="form-section"><span>4</span><div><h2>Objetivo y profundidad</h2><p>La finalidad define el alcance, la evidencia y el nivel de revisión recomendado. Al final dejamos los datos de contacto necesarios para dar continuidad a la solicitud.</p></div></div>
       <div class="public-form-grid">
-        <label>Alcance deseado<select name="desired_scopes"><option>Alcances 1 y 2</option><option>Alcances 1, 2 y 3 priorizado</option><option>Alcances 1, 2 y 3 avanzado</option></select></label>
-        <label>Objetivo principal<select name="objective"><option>Conocer la huella corporativa</option><option>Requisito de clientes y estrategia de reducción</option><option>Licitación o cadena de suministro</option><option>Preparación para verificación</option><option>Reporte regulatorio o sostenibilidad</option><option>Información para dirección o financiadores</option></select></label>
-        <label>Nivel de aseguramiento<select name="assurance_ambition"><option>Sin verificación externa</option><option>Revisión interna independiente</option><option>Preparación para verificación limitada</option><option>Preparación para verificación razonable</option></select></label>
-        <label>Plazo objetivo<select name="deadline_months"><option value="12">12 meses</option><option value="6">6 meses</option><option value="4">4 meses</option><option value="2">2 meses</option></select></label>
-        <label>Prioridad<select name="urgency"><option>Normal</option><option>Alta</option></select></label>
-        <label class="full">Contexto adicional<textarea name="notes" rows="4" placeholder="Incluye obligaciones, clientes, plazos o procesos especiales que debamos considerar"></textarea></label>
+        <label>Alcance deseado<select name="desired_scopes">{% for item in ['Alcances 1 y 2','Alcances 1, 2 y 3 priorizado','Alcances 1, 2 y 3 avanzado'] %}<option{% if fv.get('desired_scopes') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Objetivo principal<select name="objective">{% for item in ['Conocer la huella corporativa','Requisito de clientes y estrategia de reducción','Licitación o cadena de suministro','Preparación para verificación','Reporte regulatorio o sostenibilidad','Información para dirección o financiadores'] %}<option{% if fv.get('objective') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Nivel de aseguramiento<select name="assurance_ambition">{% for item in ['Sin verificación externa','Revisión interna independiente','Preparación para verificación limitada','Preparación para verificación razonable'] %}<option{% if fv.get('assurance_ambition') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label>Plazo objetivo<select name="deadline_months">{% for value, label in [(12,'12 meses'),(6,'6 meses'),(4,'4 meses'),(2,'2 meses')] %}<option value="{{ value }}"{% if fv.get('deadline_months', 12)|int == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+        <label>Prioridad<select name="urgency">{% for item in ['Normal','Alta'] %}<option{% if fv.get('urgency') == item %} selected{% endif %}>{{ item }}</option>{% endfor %}</select></label>
+        <label class="full">Contexto adicional<textarea name="notes" rows="4" placeholder="Incluye obligaciones, clientes, plazos o procesos especiales que debamos considerar">{{ fv.get('notes', '') }}</textarea></label>
+        <label>Correo corporativo<input type="email" name="email" autocomplete="email" value="{{ fv.get('email', '') }}" required></label>
+        <label>Teléfono<input name="phone" autocomplete="tel" value="{{ fv.get('phone', '') }}"></label>
       </div>
-      <div class="diagnosis-consent"><span>✓</span><p>Al generar el resultado aceptas que usemos esta información únicamente para elaborar el diagnóstico y dar continuidad a la solicitud.</p></div>
+      <label class="diagnosis-consent">
+        <input type="checkbox" name="accept_privacy" value="yes" required{% if fv.get('accept_privacy') %} checked{% endif %}>
+        <span>Autorizo el tratamiento de estos datos para elaborar el diagnóstico y dar continuidad a mi solicitud. <a href="/legal/privacidad" target="_blank" rel="noopener noreferrer">Ver política de privacidad</a>.</span>
+      </label>
     </section>
 
     <div class="diagnosis-wizard-actions">
@@ -92,7 +99,8 @@
       <button class="button primary" type="button" data-diagnosis-next>Continuar →</button>
       <button class="button primary" type="submit" data-diagnosis-submit hidden>Generar diagnóstico y ruta</button>
     </div>
-    <small class="privacy-note">No necesitas adjuntar documentos ni cifras de emisiones en esta etapa.</small>
+    <small class="privacy-note">No necesitas adjuntar documentos ni cifras de emisiones en esta etapa. El correo se solicita únicamente al completar el diagnóstico.</small>
   </form>
 </section>
+<script defer src="{{ url_for('static', path='js/public-diagnosis-v260.js') }}"></script>
 {% endblock %}

@@ -18,6 +18,7 @@ REDUCTION_ROUTES = {
     ("GET", "/api/reduccion/resumen"),
     ("GET", "/reduccion/exportar.xlsx"),
 }
+SCOPED_REDUCTION_ROUTE = ("GET", "/inventarios/{inventory_id}/reduccion")
 
 
 def _login(client: TestClient) -> None:
@@ -35,7 +36,8 @@ def test_v160_reduction_routes_have_dedicated_http_authority():
     assert '@app.get("/reduccion"' not in main_source
     assert '@app.post("/reduccion/' not in main_source
     assert 'register_reduction_routes(' in main_source
-    assert module_source.count("@app.") == 8
+    assert module_source.count("@app.") == 9
+    assert '@app.get("/inventarios/{inventory_id}/reduccion"' in module_source
     assert "portfolio_summary" in module_source
     assert "from .reporting" not in module_source
 
@@ -49,6 +51,14 @@ def test_v160_reduction_route_contract_is_unique_and_complete():
             actual.extend((method, path) for method in methods if method in {"GET", "POST"})
     assert set(actual) == REDUCTION_ROUTES
     assert len(actual) == len(REDUCTION_ROUTES)
+
+    scoped = [
+        (method, getattr(route, "path", None))
+        for route in app.routes
+        for method in (getattr(route, "methods", set()) or set())
+        if method == "GET" and getattr(route, "path", None) == SCOPED_REDUCTION_ROUTE[1]
+    ]
+    assert scoped == [SCOPED_REDUCTION_ROUTE]
 
 
 def test_v160_reporting_and_reduction_surfaces_coexist_after_extraction():

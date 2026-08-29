@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% block title %}{{ source.name }} · Trazabilidad del periodo{% endblock %}
+{% block page_label %}Resultados / Trazabilidad de fuente{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <p class="breadcrumb">{{ inventory.name }} / Resultados / {{ source.name }}</p>
+    <h1>{{ source.name }} <span class="status-chip {{ 'complete' if source.status == 'Completado' else 'progressing' if source.status == 'En progreso' else 'pending' }}">{{ source.status }}</span></h1>
+    <p>{{ source.facility.name if source.facility else 'Nivel corporativo' }} · Alcance {{ source.scope }} · {{ source.category }}</p>
+  </div>
+  <div class="head-actions">
+    <span class="period-chip">Periodo {{ inventory.start_date.strftime('%d/%m/%Y') }} – {{ inventory.end_date.strftime('%d/%m/%Y') }}</span>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}/calculos">Volver a resultados</a>
+    <a class="btn btn-outline" href="/inventarios/{{ inventory.id }}">Volver al expediente</a>
+  </div>
+</div>
+
+<div class="method-boundary-note scoped-workspace-notice" data-scoped-source-readonly>
+  <strong>Consulta histórica de solo lectura:</strong> esta trazabilidad pertenece exclusivamente al expediente {{ inventory.name }}. Aquí puedes reproducir la cadena dato → factor → GWP → resultado, pero no editar datos, seleccionar factores ni recalcular. Para trabajo operativo usa las rutas generales sobre el periodo por defecto.
+</div>
+
+<div class="source-summary-grid" aria-label="Resumen de la fuente">
+  <article class="mini-card"><small>ACTIVIDAD ACUMULADA</small><strong>{{ total_activity|number_es(2) }}</strong><p>{{ source.preferred_unit or (records[0].unit if records else 'Sin unidad') }}</p></article>
+  <article class="mini-card"><small>EMISIONES CALCULADAS</small><strong>{{ source.emissions|number_es(3) }}</strong><p>tCO₂e · huella bruta</p></article>
+  <article class="mini-card"><small>DATOS</small><strong>{{ records|length }}</strong><p>registros del periodo</p></article>
+  <article class="mini-card"><small>ESTADO DEL MOTOR</small><strong>{% if summary.errors %}{{ summary.errors }} errores{% elif summary.alerts %}{{ summary.alerts }} alertas{% else %}Sin errores{% endif %}</strong><p>{{ summary.calculations|length }} componentes</p></article>
+</div>
+
+<section class="card" aria-labelledby="scoped-source-context-title">
+  <div class="card-head"><div><small>1. CONTEXTO DE LA FUENTE</small><h3 id="scoped-source-context-title">Qué se cuantificó</h3></div></div>
+  <div class="detail-grid">
+    <div><small>Fuente</small><strong>{{ source.name }}</strong></div>
+    <div><small>Alcance</small><strong>Alcance {{ source.scope }}</strong></div>
+    <div><small>Categoría</small><strong>{{ source.category }}</strong></div>
+    <div><small>Sede</small><strong>{{ source.facility.name if source.facility else 'Nivel corporativo' }}</strong></div>
+    <div><small>Responsable</small><strong>{{ source.responsible or 'Sin asignar' }}</strong></div>
+    <div><small>Materialidad</small><strong>{{ source.materiality or 'Sin clasificar' }}</strong></div>
+    <div><small>Frecuencia</small><strong>{{ source.data_frequency or 'Sin definir' }}</strong></div>
+    <div><small>Incluida</small><strong>{{ 'Sí' if source.included else 'No' }}</strong></div>
+  </div>
+  {% if not source.included and source.exclusion_reason %}<p class="method-boundary-note"><strong>Razón de exclusión:</strong> {{ source.exclusion_reason }}</p>{% endif %}
+</section>
+
+<section class="card" id="datos-actividad" aria-labelledby="scoped-source-data-title">
+  <div class="card-head"><div><small>2. DATO Y EVIDENCIA</small><h3 id="scoped-source-data-title">Registros que alimentan el cálculo</h3><p>Los valores se muestran tal como quedaron persistidos en este expediente.</p></div><span class="counter">{{ records|length }}</span></div>
+  <div class="responsive-table"><table>
+    <thead><tr><th>Periodo</th><th>Dato</th><th>Origen</th><th>Calidad</th><th>Incertidumbre</th><th>Evidencia</th><th>CO₂e</th></tr></thead>
+    <tbody>
+    {% for item in records %}
+      <tr>
+        <td>{{ item.period_start.strftime('%d/%m/%Y') }} – {{ item.period_end.strftime('%d/%m/%Y') }}</td>
+        <td><strong>{{ item.value|number_es(3) }} {{ item.unit }}</strong>{% if item.is_estimated %}<small class="table-sub">Estimado</small>{% endif %}</td>
+        <td>{{ item.data_origin or 'Sin clasificar' }}</td>
+        <td><span class="quality-badge quality-{{ item.quality_level|lower }}">{{ item.quality_level }}</span></td>
+        <td>{{ item.uncertainty_percentage|number_es(1) }}%<small class="table-sub">{{ item.uncertainty_basis or 'Sin base documentada' }}</small></td>
+        <td>{% if item.evidence %}<a class="tiny-link" href="/evidencias/{{ item.evidence.id }}/descargar">{{ item.evidence.name }}</a>{% else %}<span class="muted">Sin soporte</span>{% endif %}</td>
+        <td><strong>{{ (item.calculations|sum(attribute='co2e_kg') / 1000)|number_es(5) }} tCO₂e</strong></td>
+      </tr>
+    {% else %}
+      <tr><td colspan="7" class="muted">Esta fuente no tiene datos de actividad persistidos en el periodo.</td></tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="factores-aplicados" aria-labelledby="scoped-source-factors-title">
+  <div class="card-head"><div><small>3. FACTORES Y DECISIONES</small><h3 id="scoped-source-factors-title">Qué factor sustentó cada conversión</h3><p>Se separan los factores predeterminados de la fuente y las decisiones específicas por dato.</p></div></div>
+  <h4>Factores predeterminados activos</h4>
+  <div class="responsive-table"><table>
+    <thead><tr><th>Factor</th><th>Versión</th><th>Gas</th><th>Entrada</th><th>Salida</th><th>Valor</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for assignment in assignments %}
+      <tr>
+        <td><strong>{{ assignment.factor_version.factor.name }}</strong></td>
+        <td>{{ assignment.factor_version.version }}</td>
+        <td>{{ assignment.factor_version.gas.code }}</td>
+        <td>{{ assignment.factor_version.input_unit }}</td>
+        <td>{{ assignment.factor_version.output_unit }}</td>
+        <td>{{ assignment.factor_version.value|number_es(6) }}</td>
+        <td>{{ assignment.factor_version.status }}</td>
+      </tr>
+    {% else %}<tr><td colspan="7" class="muted">No hay factores predeterminados activos.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+
+  <h4>Decisiones específicas por dato</h4>
+  <div class="responsive-table"><table>
+    <thead><tr><th>Dato</th><th>Factor</th><th>Estado</th><th>Compatibilidad</th><th>Justificación</th><th>Revisión</th></tr></thead>
+    <tbody>
+    {% for selection in selections %}
+      <tr>
+        <td>#{{ selection.activity_data_id }}</td>
+        <td><strong>{{ selection.factor_version.factor.name }}</strong><small class="table-sub">{{ selection.factor_version.version }} · {{ selection.factor_version.gas.code }}</small></td>
+        <td>{{ selection.selection_status }}</td>
+        <td>{{ selection.compatibility_score }}%</td>
+        <td>{{ selection.rationale or 'Sin justificación registrada' }}</td>
+        <td>{{ selection.review_notes or 'Sin nota de revisión' }}</td>
+      </tr>
+    {% else %}<tr><td colspan="6" class="muted">No hay decisiones específicas activas; aplican los factores predeterminados cuando corresponde.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+</section>
+
+<section class="card" id="memoria-calculo" aria-labelledby="scoped-source-memory-title">
+  <div class="card-head"><div><small>4. MEMORIA DE CÁLCULO</small><h3 id="scoped-source-memory-title">Fórmulas congeladas y resultado reproducible</h3><p>Cada componente conserva dato normalizado, factor, GWP y fórmula utilizados por el motor.</p></div><span class="counter">{{ summary.calculations|length }}</span></div>
+  <div class="responsive-table"><table>
+    <thead><tr><th>Factor</th><th>Gas</th><th>Dato normalizado</th><th>Factor</th><th>GWP</th><th>Resultado</th><th>Estado</th></tr></thead>
+    <tbody>
+    {% for item in summary.calculations %}
+      <tr>
+        <td><strong>{{ item.factor_version.factor.name }}</strong><small class="table-sub">{{ item.factor_version.version }}</small></td>
+        <td>{{ item.gas_code }}</td>
+        <td>{{ item.normalized_value|number_es(6) }} {{ item.normalized_unit }}</td>
+        <td>{{ item.factor_value|number_es(8) }}</td>
+        <td>{{ item.gwp_value|number_es(3) }}</td>
+        <td><strong>{{ (item.co2e_kg / 1000)|number_es(6) }} tCO₂e</strong></td>
+        <td>{% if item.status == 'Error' %}<span class="calc-state state-error">Error</span>{% elif item.status == 'Con alerta' %}<span class="calc-state state-alert">Con alerta</span>{% else %}<span class="calc-state state-ok">Calculado</span>{% endif %}</td>
+      </tr>
+      <tr><td colspan="7"><small><strong>Fórmula:</strong> {{ item.formula_snapshot or 'Sin memoria persistida' }}{% if item.warning %}<br><strong>Alerta:</strong> {{ item.warning }}{% endif %}</small></td></tr>
+    {% else %}<tr><td colspan="7" class="muted">No existen componentes calculados persistidos para esta fuente.</td></tr>{% endfor %}
+    </tbody>
+  </table></div>
+  {% if summary.warnings %}<div class="method-boundary-note"><strong>Alertas conservadas:</strong> {{ summary.warnings|join(' · ') }}</div>{% endif %}
+</section>
+
+<div class="method-boundary-note"><strong>Lectura contable:</strong> las emisiones mostradas son parte de la huella bruta del periodo. Esta vista no netea remociones, emisiones evitadas, compensaciones ni declaraciones de neutralidad.</div>
+{% endblock %}

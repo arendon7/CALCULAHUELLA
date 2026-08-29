@@ -1,0 +1,114 @@
+name: V2.60.13 · Product Readiness contract authority gate
+
+on:
+  pull_request:
+    branches:
+      - feature/v2-1-0-brand-provenance
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - "scripts/product_readiness_contracts.py"
+      - "scripts/pytest_isolated.py"
+      - "tests/test_product_readiness_contract_authority.py"
+      - "tests/test_v260*.py"
+      - "tests/test_v261*.py"
+      - "tests/test_v262*.py"
+      - "tests/test_v263*.py"
+      - "tests/test_migration_legacy_compat.py"
+      - ".github/workflows/iteration4-stabilization.yml"
+      - ".github/workflows/v26013-product-readiness-contract-authority-gate.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: v26013-product-readiness-authority-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  contract-authority:
+    name: Manifest · drift · isolated contracts · SQLite
+    runs-on: ubuntu-latest
+    timeout-minutes: 55
+    env:
+      APP_ENV: local
+      SEED_DEMO: "false"
+      SCHEDULER_ENABLED: "0"
+      STRUCTURED_LOGGING: "0"
+      PBKDF2_ITERATIONS: "10000"
+      CSRF_ENABLED: "1"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements-dev.txt
+
+      - name: Compilar autoridad V2.60.13
+        run: |
+          rm -rf "${RUNNER_TEMP}/cth-v26013-pycache"
+          PYTHONPYCACHEPREFIX="${RUNNER_TEMP}/cth-v26013-pycache" python -m compileall -q \
+            scripts/product_readiness_contracts.py \
+            scripts/pytest_isolated.py \
+            tests/test_product_readiness_contract_authority.py
+
+      - name: Probar la autoridad y su política fail-closed
+        run: |
+          python scripts/pytest_isolated.py -q \
+            tests/test_product_readiness_contract_authority.py \
+            --junitxml=v26013-authority-self.xml
+
+      - name: Validar inventario y drift versionado
+        run: |
+          set -o pipefail
+          python scripts/product_readiness_contracts.py --validate-only 2>&1 | tee v26013-authority-validation.log
+
+      - name: Ejecutar contratos Product Readiness en procesos aislados
+        run: |
+          python scripts/product_readiness_contracts.py \
+            --timeout 420 \
+            --durations 5 \
+            --junitxml v26013-product-readiness-contracts.xml
+
+      - name: Fresh migration SQLite
+        env:
+          INSTANCE_DIR: ${{ runner.temp }}/cth-v26013-sqlite
+        run: |
+          unset DATABASE_URL
+          rm -rf "${INSTANCE_DIR}"
+          mkdir -p "${INSTANCE_DIR}"
+          python -m alembic upgrade head
+          python -m alembic current | tee v26013-migration-current.log
+
+      - name: Registrar identidad certificada
+        if: always()
+        env:
+          CERTIFIED_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+        run: |
+          {
+            echo "event=${GITHUB_EVENT_NAME}"
+            echo "certified_head_sha=${CERTIFIED_HEAD_SHA}"
+            echo "checked_out_sha=$(git rev-parse HEAD)"
+            echo "github_sha=${GITHUB_SHA}"
+          } > v26013-certified-identity.txt
+
+      - name: Publicar evidencia V2.60.13
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v26013-product-readiness-contract-authority-evidence
+          path: |
+            v26013-authority-self.xml
+            v26013-authority-validation.log
+            v26013-product-readiness-contracts.xml
+            v26013-migration-current.log
+            v26013-certified-identity.txt
+          if-no-files-found: warn
+          retention-days: 14
